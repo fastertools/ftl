@@ -1,0 +1,2 @@
+# ftl-cli
+FTL CLI
