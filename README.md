@@ -76,8 +76,10 @@ flags = [
 ]
 
 [runtime]
-memory_limit = "10MB"
-allowed_hosts = []    # For network access
+# List of external hosts this tool is allowed to make HTTP requests to.
+# Use exact hostnames or patterns with wildcards (e.g., "*.googleapis.com").
+# Leave empty to deny all external requests.
+allowed_hosts = []
 ```
 
 ## Toolkit Composition

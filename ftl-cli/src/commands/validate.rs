@@ -40,10 +40,6 @@ pub async fn execute(name: String) -> Result<()> {
                     errors.push(format!("Invalid version format: {}", manifest.tool.version));
                 }
                 
-                // Check memory limit
-                if !is_valid_memory_limit(&manifest.runtime.memory_limit) {
-                    errors.push(format!("Invalid memory limit format: {}", manifest.runtime.memory_limit));
-                }
             }
             Err(e) => {
                 errors.push(format!("Invalid ftl.toml: {}", e));
@@ -176,22 +172,6 @@ fn is_valid_version(version: &str) -> bool {
     parts.iter().all(|part| part.parse::<u32>().is_ok())
 }
 
-fn is_valid_memory_limit(limit: &str) -> bool {
-    // Accept formats like "10MB", "512KB", "1GB"
-    if limit.len() < 3 {
-        return false;
-    }
-    
-    let (num_part, unit_part) = limit.split_at(limit.len() - 2);
-    
-    // Check if numeric part is valid
-    if num_part.parse::<u32>().is_err() {
-        return false;
-    }
-    
-    // Check if unit is valid
-    matches!(unit_part, "KB" | "MB" | "GB")
-}
 
 #[cfg(test)]
 mod tests {
@@ -209,17 +189,4 @@ mod tests {
         assert!(!is_valid_version(""));
     }
 
-    #[test]
-    fn test_memory_limit_validation() {
-        assert!(is_valid_memory_limit("10MB"));
-        assert!(is_valid_memory_limit("512KB"));
-        assert!(is_valid_memory_limit("1GB"));
-        assert!(is_valid_memory_limit("100MB"));
-        
-        assert!(!is_valid_memory_limit("10"));
-        assert!(!is_valid_memory_limit("10M"));
-        assert!(!is_valid_memory_limit("10mb"));
-        assert!(!is_valid_memory_limit("10 MB"));
-        assert!(!is_valid_memory_limit(""));
-    }
 }

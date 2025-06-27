@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 mod commands;
@@ -68,6 +69,18 @@ enum Command {
     Deploy {
         /// Name of the tool to deploy (defaults to current directory)
         name: Option<String>,
+    },
+    
+    /// Export a tool as a standalone WASM component
+    Export {
+        /// Name of the tool to export (defaults to current directory)
+        name: Option<String>,
+        /// Output path for the component WASM file
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Build profile to use
+        #[arg(short, long)]
+        profile: Option<String>,
     },
     
     /// Watch a tool for changes and rebuild
@@ -210,6 +223,9 @@ async fn main() -> Result<()> {
         }
         Command::Deploy { name } => {
             commands::deploy::execute(name.unwrap_or_else(|| ".".to_string())).await
+        }
+        Command::Export { name, output, profile } => {
+            commands::export::execute(name, output, profile).await
         }
         Command::Watch { name } => {
             commands::watch::execute(name.unwrap_or_else(|| ".".to_string())).await

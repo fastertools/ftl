@@ -36,8 +36,6 @@ pub struct OptimizationConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeConfig {
-    #[serde(default = "default_memory_limit")]
-    pub memory_limit: String,
     #[serde(default)]
     pub allowed_hosts: Vec<String>,
 }
@@ -45,7 +43,6 @@ pub struct RuntimeConfig {
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
-            memory_limit: default_memory_limit(),
             allowed_hosts: Vec::new(),
         }
     }
@@ -72,10 +69,6 @@ pub struct ToolkitTool {
 
 fn default_profile() -> String {
     "release".to_string()
-}
-
-fn default_memory_limit() -> String {
-    "10MB".to_string()
 }
 
 impl ToolManifest {
@@ -148,7 +141,6 @@ features = ["simd"]
 flags = ["-O4", "--enable-simd"]
 
 [runtime]
-memory_limit = "10MB"
 allowed_hosts = []
 "#;
         
