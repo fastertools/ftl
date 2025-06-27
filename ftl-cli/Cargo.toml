@@ -1,0 +1,45 @@
+[package]
+name = "ftl"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for building and deploying WebAssembly-based MCP tools"
+readme = "../README.md"
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[[bin]]
+name = "ftl"
+path = "src/main.rs"
+
+# This binary should not be built for wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Empty to prevent wasm builds
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tempfile.workspace = true
+which.workspace = true
+handlebars.workspace = true
+walkdir.workspace = true
+notify.workspace = true
+include_dir.workspace = true
+cargo_metadata = "0.18"
+dirs = "5.0"
+reqwest = { version = "0.12", features = ["json"] }
+indicatif = "0.17"
+dialoguer = "0.11"
+console = "0.15"
+semver = "1.0"
