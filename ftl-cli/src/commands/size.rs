@@ -209,11 +209,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                                             entry["date"].as_str().unwrap_or("Unknown").to_string()
                                         };
 
-                                    println!(
-                                        "   {}: {}",
-                                        date_display,
-                                        format_size(size)
-                                    );
+                                    println!("   {}: {}", date_display, format_size(size));
                                 }
                             }
                         }
