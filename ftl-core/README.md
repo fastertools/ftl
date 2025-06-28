@@ -1,70 +1,33 @@
-# ftl-core
+# FTL Core
 
-Core library for building WebAssembly-based MCP (Model Context Protocol) tools.
+This crate provides the core building blocks for creating FTL tools. It is the open-source foundation of the FTL platform, designed for performance, safety, and efficiency.
 
-## Overview
+## Purpose
 
-`ftl-core` provides a lightweight, WebAssembly-optimized implementation of the MCP server protocol. It's designed to compile to small WASM binaries (typically under 500KB) suitable for edge deployment.
+`ftl-core` is the library that developers will use to implement the logic of their tools. It provides the necessary abstractions to integrate with the FTL runtime and the Model Context Protocol (MCP) without needing to know the low-level details.
+
+## Key Components
+
+- **`Tool` Trait:** The central abstraction for all FTL tools. It defines the interface that the FTL runtime uses to execute a tool.
+- **`ftl_mcp_server!` Macro:** A macro that generates the necessary boilerplate to expose a `Tool` implementation as a WebAssembly component that can be served over MCP.
+- **`ToolResult` and `ToolError`:** Standardized types for returning success and error states from a tool.
+- **Prelude:** The `ftl_core::prelude` module re-exports the most commonly used items for convenience.
 
 ## Usage
 
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-ftl-core = "0.1"
-```
-
-Then implement a tool:
+To create a new tool, you will typically add `ftl-core` as a dependency in your `Cargo.toml` and implement the `Tool` trait.
 
 ```rust
 use ftl_core::prelude::*;
-use serde_json::json;
 
 #[derive(Clone)]
 struct MyTool;
 
 impl Tool for MyTool {
-    fn name(&self) -> &'static str {
-        "my_tool"
-    }
-
-    fn description(&self) -> &'static str {
-        "My awesome tool"
-    }
-
-    fn input_schema(&self) -> serde_json::Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "Input text"
-                }
-            },
-            "required": ["input"]
-        })
-    }
-
-    fn call(&self, args: &serde_json::Value) -> Result<ToolResult, ToolError> {
-        let input = args["input"].as_str()
-            .ok_or_else(|| ToolError::InvalidArguments("input required".to_string()))?;
-        
-        Ok(ToolResult::text(format!("Processed: {}", input)))
-    }
+    // ... implementation ...
 }
 
-// Create the WebAssembly component
 ftl_core::ftl_mcp_server!(MyTool);
 ```
 
-## Features
-
-- **Minimal dependencies** - Optimized for small WASM binary size
-- **MCP protocol support** - Full JSON-RPC 2.0 implementation
-- **Memory efficient** - Uses custom allocator optimized for edge environments
-- **Type safe** - Strong typing with serde serialization
-
-## License
-
-Apache-2.0
+For more detailed information on developing tools, please see the main project [documentation](../docs/developing-tools.md).
