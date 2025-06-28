@@ -15,7 +15,7 @@ A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) pro
 
 </div>
 
-FTL is a platform for developing and deploying high-performance, low-latency tools for AI agents. It provides a complete developer experience for the entire lifecycle of creating, testing, and deploying WebAssembly-based tools that are designed to be called by AI agents and other autonomous systems.
+FTL is a platform for developing and deploying high-performance, low-latency tools for AI agents. It provides a complete developer experience for the entire lifecycle of creating, testing, and deploying WebAssembly-based [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools that are designed to be called by AI agents and other autonomous systems.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point for developers using the FTL platform.
 
@@ -95,7 +95,7 @@ This will deploy your tool to the FTL Edge, where it can be called by your AI ag
 
 ## Documentation
 
-For more detailed documentation, please see the `docs` directory in this repository.
+For more detailed documentation, please see the [docs](./docs/introduction.md) directory in this repository.
 
 ## Contributing
 
