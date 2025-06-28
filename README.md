@@ -4,7 +4,7 @@
 
 Portable tools for AI agents
 
-A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) project
+A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) project.
 
 [![CI](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/fastertools/core/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
