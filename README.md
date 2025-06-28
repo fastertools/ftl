@@ -17,23 +17,10 @@ A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) pro
 
 FTL is a framework for building and deploying high-performance, low-latency tools for AI agents. It provides a complete developer experience for the entire lifecycle of creating, testing, and deploying WebAssembly-based tools that are designed to be called by AI agents and other autonomous systems.
 
-At [Faster Than Light](https://ftl.tools), we're building the low-latency appendages that allow agents deployed in realtime worlds like vehicles, trading and IoT to interact with the world near instantly. Our vision is to become nervous system for AI reflexes that will unlock the next generation of critical automation in worlds where **microseconds mean everything**.
-
-## The Action Latency Bottleneck
-
-As AI agents get faster at *thinking*, the bottleneck shifts to how quickly they can *act*. Existing tools for agents are often not performant, secure, or easily deployable, especially for real-time applications. FTL solves this problem by providing a toolchain for building tools that are:
-
 - **Fast:** Built in Rust and compiled to WebAssembly for near-native performance.
 - **Secure:** Sandboxed by default using the WebAssembly component model.
 - **Portable:** Can be deployed to any Wasm-compliant runtime.
 - **Easy to build:** The `ftl` CLI abstracts away the complexities of the underlying build system.
-
-## FTL Platform
-
-The FTL platform consists of two main components:
-
-- **FTL Core (FOSS):** An open-source standard library of composable low-level utilities for performance-sensitive AI agents. Implemented in Rust for maximum speed, memory safety, and efficiency.
-- **FTL Edge (PaaS):** A commercial, edge-native, Platform-as-a-Service that delivers the FTL Core tools and developer-managed custom tools to agents as managed services with super-low latency anywhere in the world.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point for developers using the FTL platform.
 
