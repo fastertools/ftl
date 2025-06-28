@@ -126,7 +126,7 @@ jobs:
       - name: Publish ftl-core
         if: steps.check-core.outputs.skip != 'true'
         run: |
-          cd ftl-core
+          cd crates/ftl-core
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -145,21 +145,21 @@ jobs:
             echo "Attempt $i/12: ftl-core not yet indexed..."
           done
       
-      - name: Check if ftl CLI already published
+      - name: Check if ftl-cli already published
         id: check-cli
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl --limit 1 | grep -q "ftl = \"$VERSION\""; then
+          if cargo search ftl-cli --limit 1 | grep -q "ftl-cli = \"$VERSION\""; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "ftl CLI version $VERSION already published"
+            echo "ftl-cli version $VERSION already published"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       
-      - name: Publish ftl CLI
+      - name: Publish ftl-cli
         if: steps.check-cli.outputs.skip != 'true'
         run: |
-          cd ftl-cli
+          cd crates/ftl-cli
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

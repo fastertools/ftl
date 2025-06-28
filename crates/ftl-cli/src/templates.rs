@@ -61,13 +61,13 @@ allowed_hosts = []
     // 1. Creating tools within ftl-cli repository (use relative paths)
     // 2. Creating tools in subdirectories of ftl-cli (use ../../ftl-core)
     // 3. Creating tools outside ftl-cli (use crates.io version once published)
-    let ftl_core_dep = if target_dir.join("../ftl-core").exists() {
+    let ftl_core_dep = if target_dir.join("../../crates/ftl-core").exists() {
         // Tool is being created directly in ftl-cli directory
-        "{ path = \"../ftl-core\" }".to_string()
-    } else if target_dir.join("../../ftl-core").exists() {
+        "{ path = \"../../crates/ftl-core\" }".to_string()
+    } else if target_dir.join("../../../crates/ftl-core").exists() {
         // Tool is being created in a subdirectory of ftl-cli (e.g.,
         // test_validation/tool_name)
-        "{ path = \"../../ftl-core\" }".to_string()
+        "{ path = \"../../../crates/ftl-core\" }".to_string()
     } else {
         // Tool is being created outside ftl-cli repository
         // Use crates.io version once published

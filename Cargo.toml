@@ -1,14 +1,15 @@
 [workspace]
-members = ["ftl-cli", "ftl-core"]
+members = ["crates/ftl-cli", "crates/ftl-core"]
 exclude = ["demo_hash", "toolkit-*"]
 resolver = "2"
 
 # Don't build CLI for wasm target
 [workspace.metadata.cargo-all-features]
+skip_packages = ["ftl-cli"]
 skip_targets = ["wasm32-wasip1"]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 authors = ["FTL Contributors"]
 edition = "2024"
 license = "Apache-2.0"
