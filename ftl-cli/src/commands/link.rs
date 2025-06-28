@@ -72,8 +72,8 @@ pub async fn execute(name: String, path: Option<String>) -> Result<()> {
     println!();
     println!("You can now:");
     println!("  ftl deploy         # Deploy updates to the linked tool");
-    println!("  ftl logs {}      # View logs", name);
-    println!("  ftl status {}    # Check status", name);
+    println!("  ftl logs {name}      # View logs");
+    println!("  ftl status {name}    # Check status");
 
     Ok(())
 }

@@ -3,15 +3,9 @@ use std::{fs, path::PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FtlConfig {
     pub username: Option<String>,
-}
-
-impl Default for FtlConfig {
-    fn default() -> Self {
-        Self { username: None }
-    }
 }
 
 impl FtlConfig {
@@ -67,7 +61,7 @@ impl FtlConfig {
     pub fn get_app_prefix(&self) -> String {
         self.username
             .as_ref()
-            .map(|u| format!("{}-", u))
+            .map(|u| format!("{u}-"))
             .unwrap_or_else(|| "ftl-".to_string())
     }
 }

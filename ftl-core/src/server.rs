@@ -73,8 +73,7 @@ impl<T: Tool> McpServer<T> {
 
         if tool_name != self.tool.name() {
             return Err(McpError::ToolError(ToolError::InvalidArguments(format!(
-                "Unknown tool: {}",
-                tool_name
+                "Unknown tool: {tool_name}"
             ))));
         }
 
@@ -130,7 +129,7 @@ mod tests {
 
         fn call(&self, args: &Value) -> Result<ToolResult, ToolError> {
             if let Some(input) = args.get("input").and_then(|v| v.as_str()) {
-                Ok(ToolResult::text(format!("Processed: {}", input)))
+                Ok(ToolResult::text(format!("Processed: {input}")))
             } else {
                 Err(ToolError::InvalidArguments("Missing input".to_string()))
             }

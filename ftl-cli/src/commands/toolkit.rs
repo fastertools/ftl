@@ -78,7 +78,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             let done = comp.len();
 
             if done < tools_count {
-                pb.set_message(format!("completed {}", tool_name));
+                pb.set_message(format!("completed {tool_name}"));
             }
 
             // Find and copy WASM
@@ -102,7 +102,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             std::fs::copy(&wasm_path, &dest_path)?;
 
             // Path relative to .ftl/ directory
-            Ok((tool_name, format!("../{}", wasm_filename)))
+            Ok((tool_name, format!("../{wasm_filename}")))
         });
     }
 
@@ -142,7 +142,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             .iter()
             .map(|tool_name| ToolkitTool {
                 name: tool_name.clone(),
-                route: format!("/{}", tool_name),
+                route: format!("/{tool_name}"),
             })
             .collect(),
     };
@@ -166,12 +166,12 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     println!("Toolkit directory: {}", toolkit_dir.display());
     println!("Tools included:");
     for tool in &tools {
-        println!("  - {}", tool);
+        println!("  - {tool}");
     }
     println!();
     println!("Next steps:");
-    println!("  ftl toolkit serve {}  # Serve locally", name);
-    println!("  ftl toolkit deploy {} # Deploy to FTL Edge", name);
+    println!("  ftl toolkit serve {name}  # Serve locally");
+    println!("  ftl toolkit deploy {name} # Deploy to FTL Edge");
 
     Ok(())
 }
@@ -202,8 +202,8 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
     println!();
     println!("{} Starting toolkit server...", style("▶").green());
     println!();
-    println!("  Toolkit: {}", name);
-    println!("  URL: http://localhost:{}", port);
+    println!("  Toolkit: {name}");
+    println!("  URL: http://localhost:{port}");
 
     // Load toolkit manifest to show available routes
     let manifest_path = toolkit_dir.join("toolkit.toml");
@@ -221,7 +221,7 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
     let mut child = Command::new("spin")
         .arg("up")
         .arg("--listen")
-        .arg(format!("127.0.0.1:{}", port))
+        .arg(format!("127.0.0.1:{port}"))
         .arg("--from")
         .arg(".ftl/spin.toml")
         .current_dir(&toolkit_dir)
@@ -286,7 +286,7 @@ pub async fn deploy(name: String) -> Result<()> {
             || stderr.contains("No terminal available")
             || stderr.contains("must use --create-name")
         {
-            spinner.set_message(format!("Creating new toolkit: {}...", app_name));
+            spinner.set_message(format!("Creating new toolkit: {app_name}..."));
             Command::new("spin")
                 .args([
                     "aka",
@@ -338,8 +338,8 @@ pub async fn deploy(name: String) -> Result<()> {
     println!();
     println!("{} Toolkit deployed successfully!", style("✓").green());
     println!();
-    println!("Toolkit: {}", name);
-    println!("URL: {}", base_url);
+    println!("Toolkit: {name}");
+    println!("URL: {base_url}");
 
     // Show available routes
     let manifest_path = toolkit_dir.join("toolkit.toml");

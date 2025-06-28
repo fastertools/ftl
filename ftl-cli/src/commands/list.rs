@@ -38,7 +38,7 @@ pub async fn execute() -> Result<()> {
         println!("  ftl deploy <tool-name>");
     } else {
         // Print the output as-is (spin aka app list has nice formatting)
-        print!("{}", stdout);
+        print!("{stdout}");
     }
 
     Ok(())

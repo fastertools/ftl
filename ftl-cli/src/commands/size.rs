@@ -20,8 +20,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let tool_name = &manifest.tool.name;
     let build_profile = &manifest.build.profile;
 
-    println!("📊 Size analysis for tool: {}", tool_name);
-    println!("   Profile: {}", build_profile);
+    println!("📊 Size analysis for tool: {tool_name}");
+    println!("   Profile: {build_profile}");
 
     // Determine the profile directory based on manifest
     let profile_dir = match build_profile.as_str() {
@@ -50,7 +50,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     if let Ok(modified) = metadata.modified() {
         if let Ok(elapsed) = std::time::SystemTime::now().duration_since(modified) {
             let age = format_duration(elapsed.as_secs());
-            println!("   Built: {}", age);
+            println!("   Built: {age}");
         }
     }
 
@@ -88,10 +88,10 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 let import_count = content.matches("(import ").count();
                 let export_count = content.matches("(export ").count();
 
-                println!("   Functions: {}", func_count);
-                println!("   Types: {}", type_count);
-                println!("   Imports: {}", import_count);
-                println!("   Exports: {}", export_count);
+                println!("   Functions: {func_count}");
+                println!("   Types: {type_count}");
+                println!("   Imports: {import_count}");
+                println!("   Exports: {export_count}");
             }
         }
 
@@ -123,7 +123,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 });
 
                 for section in sections.iter().take(if verbose { 20 } else { 5 }) {
-                    println!("   {}", section);
+                    println!("   {section}");
                 }
 
                 if verbose && sections.len() > 20 {
@@ -158,7 +158,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                     imports.sort_by(|a, b| b.1.cmp(&a.1));
 
                     for (module, count) in imports {
-                        println!("   {}: {} imports", module, count);
+                        println!("   {module}: {count} imports");
                     }
 
                     println!("\n💡 Import Tips:");
@@ -200,7 +200,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                             }
 
                             // Show last 5 entries
-                            for (_i, entry) in entries.iter().rev().take(5).enumerate() {
+                            for entry in entries.iter().rev().take(5) {
                                 if let Some(size) = entry["size"].as_u64() {
                                     let date_display =
                                         if let Some(timestamp) = entry["timestamp"].as_u64() {
@@ -209,7 +209,11 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                                             entry["date"].as_str().unwrap_or("Unknown").to_string()
                                         };
 
-                                    println!("   {}: {}", date_display, format_size(size));
+                                    println!(
+                                        "   {}: {}",
+                                        date_display,
+                                        format_size(size)
+                                    );
                                 }
                             }
                         }
@@ -245,10 +249,10 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             .any(|f| f.contains("-O") || f.contains("--optimize"));
 
         if !has_opt_flags {
-            suggestions.push(format!(
-                "Add wasm-opt optimization to ftl.toml:\n     [optimization]\n     flags = \
-                 [\"-O3\", \"--enable-bulk-memory\"]"
-            ));
+            suggestions.push(
+                "Add wasm-opt optimization to ftl.toml:\n     [optimization]\n     flags =                  [\"-O3\", \"--enable-bulk-memory\"]"
+                    .to_string(),
+            );
         } else {
             // Check if they could use more aggressive optimization
             let has_o3_or_higher = manifest.optimization.flags.iter().any(|f| {
@@ -298,7 +302,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             if i > 0 {
                 println!();
             }
-            println!("   {}", suggestion);
+            println!("   {suggestion}");
         }
     } // End of verbose mode optimization suggestions
 
@@ -328,8 +332,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
         if verbose && transitive_deps > 20 {
             println!();
             println!("   📦 Dependency Analysis:");
-            println!("      Direct dependencies: {}", direct_deps);
-            println!("      Total (including transitive): {}", transitive_deps);
+            println!("      Direct dependencies: {direct_deps}");
+            println!("      Total (including transitive): {transitive_deps}");
 
             if transitive_deps > 50 {
                 println!("      ⚠️  High dependency count may significantly increase binary size");
@@ -368,7 +372,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 if !significant_deps.is_empty() {
                     println!("\n💡 Heaviest dependencies:");
                     for (name, weight) in significant_deps {
-                        println!("   • {} (brings in ~{} crates)", name, weight);
+                        println!("   • {name} (brings in ~{weight} crates)");
                     }
                 }
             }
@@ -494,7 +498,7 @@ fn save_size_to_history(tool_dir: &Path, size: u64) -> Result<()> {
         .as_secs();
 
     // Format date simply
-    let date = format!("{}", timestamp);
+    let date = format!("{timestamp}");
 
     // Add new entry
     history.push(serde_json::json!({

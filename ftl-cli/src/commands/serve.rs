@@ -87,24 +87,19 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     let watcher_task = tokio::task::spawn_blocking(move || {
         let mut debouncer = Debouncer::new(Duration::from_millis(500));
 
-        loop {
-            match rx.recv() {
-                Ok(event) => {
-                    if debouncer.should_trigger() {
-                        // Set rebuild flag
-                        rebuild_flag.store(true, Ordering::Relaxed);
+        while let Ok(event) = rx.recv() {
+            if debouncer.should_trigger() {
+                // Set rebuild flag
+                rebuild_flag.store(true, Ordering::Relaxed);
 
-                        // Display changed files
-                        for path in &event.paths {
-                            if let Ok(rel_path) = path.strip_prefix(&tool_path_clone) {
-                                println!("\n📝 Changed: {}", rel_path.display());
-                            }
-                        }
-
-                        println!("🔄 Reloading...");
+                // Display changed files
+                for path in &event.paths {
+                    if let Ok(rel_path) = path.strip_prefix(&tool_path_clone) {
+                        println!("\n📝 Changed: {}", rel_path.display());
                     }
                 }
-                Err(_) => break,
+
+                println!("🔄 Reloading...");
             }
         }
     });
@@ -116,8 +111,8 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
         style("▶").green()
     );
     println!();
-    println!("  Tool: {}", tool_path);
-    println!("  URL: http://localhost:{}/mcp", port);
+    println!("  Tool: {tool_path}");
+    println!("  URL: http://localhost:{port}/mcp");
     println!("  Watching for changes in src/");
     println!();
     println!("Press Ctrl+C to stop");
@@ -160,13 +155,13 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                                     server = new_server;
                                 }
                                 Err(e) => {
-                                    println!("❌ Failed to restart server: {}", e);
+                                    println!("❌ Failed to restart server: {e}");
                                     println!("   Fix the issue and save to retry");
                                 }
                             }
                         }
                         Err(e) => {
-                            println!("❌ Build failed: {}", e);
+                            println!("❌ Build failed: {e}");
                             println!("   Fix the error and save to retry");
 
                             // Restart server anyway (will serve last good build)

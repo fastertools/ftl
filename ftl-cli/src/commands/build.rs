@@ -143,7 +143,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
         println!("{} Build successful!", style("✓").green());
         println!("  Binary: {}", wasm_path.display());
         println!("  Size: {}", format_size(size));
-        println!("  Profile: {}", build_profile);
+        println!("  Profile: {build_profile}");
     }
 
     Ok(())

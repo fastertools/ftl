@@ -69,9 +69,9 @@ pub async fn execute(tool_path: String) -> Result<()> {
             println!("    -d '{{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}}'");
             println!();
             println!("Manage your deployment:");
-            println!("  ftl status {}", app_name);
-            println!("  ftl logs {}", app_name);
-            println!("  ftl delete {}", app_name);
+            println!("  ftl status {app_name}");
+            println!("  ftl logs {app_name}");
+            println!("  ftl delete {app_name}");
             Ok(())
         }
         Err(e) => {

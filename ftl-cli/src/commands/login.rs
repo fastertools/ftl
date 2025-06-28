@@ -37,27 +37,23 @@ pub async fn execute() -> Result<()> {
     // Print stdout and look for username
     let stdout_handle = std::thread::spawn(move || {
         let mut username = None;
-        for line in stdout_reader.lines() {
-            if let Ok(line) = line {
-                println!("{}", line);
-                if line.starts_with("Welcome, ") && line.ends_with(".") {
-                    // Extract username from "Welcome, username."
-                    let user = line
-                        .trim_start_matches("Welcome, ")
-                        .trim_end_matches(".")
-                        .to_string();
-                    username = Some(user);
-                }
+        for line in stdout_reader.lines().map_while(Result::ok) {
+            println!("{line}");
+            if line.starts_with("Welcome, ") && line.ends_with('.') {
+                // Extract username from "Welcome, username."
+                let user = line
+                    .trim_start_matches("Welcome, ")
+                    .trim_end_matches('.')
+                    .to_string();
+                username = Some(user);
             }
         }
         username
     });
 
     // Print stderr
-    for line in stderr_reader.lines() {
-        if let Ok(line) = line {
-            eprintln!("{}", line);
-        }
+    for line in stderr_reader.lines().map_while(Result::ok) {
+        eprintln!("{line}");
     }
 
     let status = child.wait()?;

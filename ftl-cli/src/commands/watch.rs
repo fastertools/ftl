@@ -29,9 +29,9 @@ pub async fn execute(tool_path: String) -> Result<()> {
 
     println!("👀 Watching for changes... (Press Ctrl+C to stop)");
     println!("   Watching:");
-    println!("   - {}/src/", tool_path);
-    println!("   - {}/Cargo.toml", tool_path);
-    println!("   - {}/ftl.toml", tool_path);
+    println!("   - {tool_path}/src/");
+    println!("   - {tool_path}/Cargo.toml");
+    println!("   - {tool_path}/ftl.toml");
 
     // Process file change events
     let mut debouncer = Debouncer::new(Duration::from_millis(500));
@@ -58,7 +58,7 @@ pub async fn execute(tool_path: String) -> Result<()> {
                 match build::execute(Some(tool_path.clone()), None).await {
                     Ok(_) => println!("✅ Build successful"),
                     Err(e) => {
-                        println!("❌ Build failed: {}", e);
+                        println!("❌ Build failed: {e}");
                         warn!("Build error: {}", e);
                     }
                 }

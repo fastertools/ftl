@@ -11,7 +11,7 @@ pub async fn execute(name: String) -> Result<()> {
         anyhow::bail!("Tool directory '{}' not found", name);
     }
 
-    println!("🔍 Validating tool: {}", name);
+    println!("🔍 Validating tool: {name}");
 
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -41,7 +41,7 @@ pub async fn execute(name: String) -> Result<()> {
                 }
             }
             Err(e) => {
-                errors.push(format!("Invalid ftl.toml: {}", e));
+                errors.push(format!("Invalid ftl.toml: {e}"));
             }
         }
     }
@@ -88,7 +88,7 @@ pub async fn execute(name: String) -> Result<()> {
                 }
             }
             Err(e) => {
-                errors.push(format!("Failed to read Cargo.toml: {}", e));
+                errors.push(format!("Failed to read Cargo.toml: {e}"));
             }
         }
     }
@@ -111,7 +111,7 @@ pub async fn execute(name: String) -> Result<()> {
                 }
             }
             Err(e) => {
-                errors.push(format!("Failed to read src/lib.rs: {}", e));
+                errors.push(format!("Failed to read src/lib.rs: {e}"));
             }
         }
     }
@@ -129,13 +129,13 @@ pub async fn execute(name: String) -> Result<()> {
         Ok(output) => {
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                errors.push(format!("Cargo check failed:\n{}", stderr));
+                errors.push(format!("Cargo check failed:\n{stderr}"));
             } else {
                 println!("✅ Cargo check passed");
             }
         }
         Err(e) => {
-            warnings.push(format!("Could not run cargo check: {}", e));
+            warnings.push(format!("Could not run cargo check: {e}"));
         }
     }
 
@@ -147,17 +147,17 @@ pub async fn execute(name: String) -> Result<()> {
         Ok(())
     } else {
         if !warnings.is_empty() {
-            println!("\n⚠️  Warnings ({}):", warnings.len());
+            println!("\n⚠️  Warnings ({})", warnings.len());
             for warning in warnings {
-                println!("   - {}", warning);
+                println!("   - {warning}");
             }
         }
 
         if !errors.is_empty() {
-            println!("\n❌ Errors ({}):", errors.len());
+            println!("\n❌ Errors ({})", errors.len());
             let error_count = errors.len();
             for error in errors {
-                println!("   - {}", error);
+                println!("   - {error}");
             }
             anyhow::bail!("Validation failed with {} error(s)", error_count);
         }

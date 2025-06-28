@@ -35,18 +35,10 @@ pub struct OptimizationConfig {
     pub flags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RuntimeConfig {
     #[serde(default)]
     pub allowed_hosts: Vec<String>,
-}
-
-impl Default for RuntimeConfig {
-    fn default() -> Self {
-        Self {
-            allowed_hosts: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

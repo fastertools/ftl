@@ -98,7 +98,7 @@ impl JsonRpcError {
     pub fn method_not_found(method: String) -> Self {
         Self {
             code: -32601,
-            message: format!("Method not found: {}", method),
+            message: format!("Method not found: {method}"),
             data: None,
         }
     }

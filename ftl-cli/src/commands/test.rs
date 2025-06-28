@@ -31,25 +31,25 @@ async fn test_tool(tool_path: &str) -> Result<()> {
     }
 
     info!("Running tests for '{}'...", tool_path);
-    println!("🧪 Running tests for '{}'...", tool_path);
+    println!("🧪 Running tests for '{tool_path}'...");
 
     let output = cmd.output().context("Failed to execute cargo test")?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
-        println!("{}", stdout);
-        println!("✅ All tests passed for '{}'", tool_path);
+        println!("{stdout}");
+        println!("✅ All tests passed for '{tool_path}'");
         Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        println!("❌ Tests failed for '{}'", tool_path);
+        println!("❌ Tests failed for '{tool_path}'");
         if !stdout.is_empty() {
-            println!("\nOutput:\n{}", stdout);
+            println!("\nOutput:\n{stdout}");
         }
         if !stderr.is_empty() {
-            println!("\nErrors:\n{}", stderr);
+            println!("\nErrors:\n{stderr}");
         }
 
         // Check if it's because no tests exist

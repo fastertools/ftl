@@ -46,7 +46,7 @@ pub async fn execute(name: Option<String>) -> Result<()> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    print!("{}", stdout);
+    print!("{stdout}");
 
     Ok(())
 }

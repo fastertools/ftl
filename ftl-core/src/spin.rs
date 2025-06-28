@@ -47,7 +47,7 @@ fn handle_mcp_request<T: Tool>(server: McpServer<T>, req: Request) -> Result<Res
             Ok(json_req) => {
                 let response_data = server.handle_request(json_req);
                 let response_json = serde_json::to_string(&response_data)
-                    .map_err(|e| format!("Failed to serialize response: {}", e))?;
+                    .map_err(|e| format!("Failed to serialize response: {e}"))?;
 
                 Ok(Response::builder()
                     .status(200)
@@ -59,12 +59,12 @@ fn handle_mcp_request<T: Tool>(server: McpServer<T>, req: Request) -> Result<Res
                     .build())
             }
             Err(e) => {
-                eprintln!("Failed to parse JSON-RPC request: {}", e);
+                eprintln!("Failed to parse JSON-RPC request: {e}");
                 let error_response =
                     crate::types::JsonRpcResponse::error(None, -32700, "Parse error");
 
                 let response_json = serde_json::to_string(&error_response)
-                    .map_err(|e| format!("Failed to serialize error response: {}", e))?;
+                    .map_err(|e| format!("Failed to serialize error response: {e}"))?;
                 Ok(Response::builder()
                     .status(400)
                     .header("Access-Control-Allow-Origin", "*")
@@ -76,12 +76,12 @@ fn handle_mcp_request<T: Tool>(server: McpServer<T>, req: Request) -> Result<Res
             }
         },
         Err(e) => {
-            eprintln!("Failed to read request body: {}", e);
+            eprintln!("Failed to read request body: {e}");
             let error_response =
                 crate::types::JsonRpcResponse::error(None, -32700, "Failed to read request body");
 
             let response_json = serde_json::to_string(&error_response)
-                .map_err(|e| format!("Failed to serialize error response: {}", e))?;
+                .map_err(|e| format!("Failed to serialize error response: {e}"))?;
             Ok(Response::builder()
                 .status(400)
                 .header("Access-Control-Allow-Origin", "*")
@@ -96,7 +96,7 @@ fn handle_mcp_request<T: Tool>(server: McpServer<T>, req: Request) -> Result<Res
 
 fn read_request_body(req: &Request) -> Result<String, String> {
     String::from_utf8(req.body().to_vec())
-        .map_err(|e| format!("Failed to parse request body as UTF-8: {}", e))
+        .map_err(|e| format!("Failed to parse request body as UTF-8: {e}"))
 }
 
 /// Macro to create the main entry point for a tool server

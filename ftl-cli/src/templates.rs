@@ -82,7 +82,7 @@ version = "{{{{version}}}}"
 edition = "2021"
 
 [dependencies]
-ftl-core = {}
+ftl-core = {ftl_core_dep}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 anyhow = "1.0"
@@ -105,8 +105,7 @@ opt-level = 1
 debug = true
 
 [workspace]
-"#,
-        ftl_core_dep
+"#
     );
 
     let cargo_toml = handlebars.render_template(&cargo_toml_template, &data)?;

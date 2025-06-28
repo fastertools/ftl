@@ -97,11 +97,10 @@ component = "{}"
 
             content.push_str(&format!(
                 r#"
-[component.{}]
-source = "{}"
-allowed_outbound_hosts = {:?}
-"#,
-                tool_name, wasm_path, allowed_hosts
+[component.{tool_name}]
+source = "{wasm_path}"
+allowed_outbound_hosts = {allowed_hosts:?}
+"#
             ));
         }
 
