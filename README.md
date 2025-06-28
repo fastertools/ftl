@@ -19,7 +19,7 @@ FTL is a framework for building and deploying high-performance, low-latency tool
 
 - **Fast:** Built in Rust and compiled to WebAssembly for near-native performance.
 - **Secure:** Sandboxed by default using the WebAssembly component model.
-- **Portable:** Can be deployed to any Wasm-compliant runtime.
+- **Portable:** Can be deployed to any Wasm-compliant runtime. Out of the box support for FTL Edge.
 - **Easy to build:** The `ftl` CLI abstracts away the complexities of the underlying build system.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point for developers using the FTL platform.
