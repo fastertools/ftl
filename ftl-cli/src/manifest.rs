@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolManifest {
@@ -75,30 +76,33 @@ impl ToolManifest {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path.as_ref())
             .with_context(|| format!("Failed to read manifest from {:?}", path.as_ref()))?;
-        
+
         toml::from_str(&content)
             .with_context(|| format!("Failed to parse manifest from {:?}", path.as_ref()))
     }
-    
+
     #[allow(dead_code)]
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let content = toml::to_string_pretty(self)
-            .context("Failed to serialize manifest")?;
-        
+        let content = toml::to_string_pretty(self).context("Failed to serialize manifest")?;
+
         std::fs::write(path.as_ref(), content)
             .with_context(|| format!("Failed to write manifest to {:?}", path.as_ref()))
     }
-    
+
     pub fn validate(&self) -> Result<()> {
         // Validate tool name (should be lowercase with hyphens)
-        if !self.tool.name.chars().all(|c| c.is_lowercase() || c == '-' || c.is_numeric()) {
+        if !self
+            .tool
+            .name
+            .chars()
+            .all(|c| c.is_lowercase() || c == '-' || c.is_numeric())
+        {
             anyhow::bail!("Tool name must be lowercase with hyphens (e.g., my-tool)");
         }
-        
+
         // Validate version
-        semver::Version::parse(&self.tool.version)
-            .context("Invalid version format")?;
-        
+        semver::Version::parse(&self.tool.version).context("Invalid version format")?;
+
         Ok(())
     }
 }
@@ -107,15 +111,15 @@ impl ToolkitManifest {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path.as_ref())
             .with_context(|| format!("Failed to read toolkit manifest from {:?}", path.as_ref()))?;
-        
+
         toml::from_str(&content)
             .with_context(|| format!("Failed to parse toolkit manifest from {:?}", path.as_ref()))
     }
-    
+
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let content = toml::to_string_pretty(self)
-            .context("Failed to serialize toolkit manifest")?;
-        
+        let content =
+            toml::to_string_pretty(self).context("Failed to serialize toolkit manifest")?;
+
         std::fs::write(path.as_ref(), content)
             .with_context(|| format!("Failed to write toolkit manifest to {:?}", path.as_ref()))
     }
@@ -124,7 +128,7 @@ impl ToolkitManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_manifest_parsing() {
         let manifest_str = r#"
@@ -143,7 +147,7 @@ flags = ["-O4", "--enable-simd"]
 [runtime]
 allowed_hosts = []
 "#;
-        
+
         let manifest: ToolManifest = toml::from_str(manifest_str).unwrap();
         assert_eq!(manifest.tool.name, "json-query");
         assert_eq!(manifest.build.profile, "release");

@@ -1,6 +1,8 @@
-use crate::manifest::{ToolManifest, ToolkitManifest};
-use anyhow::Result;
 use std::path::Path;
+
+use anyhow::Result;
+
+use crate::manifest::{ToolManifest, ToolkitManifest};
 
 pub struct SpinConfig {
     pub content: String,
@@ -10,7 +12,11 @@ impl SpinConfig {
     pub fn from_tool(manifest: &ToolManifest, wasm_path: &Path) -> Result<Self> {
         // Build command based on profile
         // Note: Cargo uses "dev" as the profile name but "debug" as the directory name
-        let cargo_profile = if manifest.build.profile == "debug" { "dev" } else { &manifest.build.profile };
+        let cargo_profile = if manifest.build.profile == "debug" {
+            "dev"
+        } else {
+            &manifest.build.profile
+        };
         let build_command = format!(
             "cargo build --target wasm32-wasip1 --profile {}{}",
             cargo_profile,
@@ -52,7 +58,10 @@ build.command = "{}"
         Ok(Self { content })
     }
 
-    pub fn from_toolkit(manifest: &ToolkitManifest, tool_paths: &[(String, String)]) -> Result<Self> {
+    pub fn from_toolkit(
+        manifest: &ToolkitManifest,
+        tool_paths: &[(String, String)],
+    ) -> Result<Self> {
         let mut content = format!(
             r#"spin_manifest_version = 2
 
@@ -62,9 +71,7 @@ version = "{}"
 description = "{}"
 authors = ["FTL Toolkit"]
 "#,
-            manifest.toolkit.name,
-            manifest.toolkit.version,
-            manifest.toolkit.description
+            manifest.toolkit.name, manifest.toolkit.version, manifest.toolkit.description
         );
 
         // Add triggers and components for each tool
@@ -75,14 +82,14 @@ authors = ["FTL Toolkit"]
 route = "{}/..."
 component = "{}"
 "#,
-                tool.route,
-                tool.name
+                tool.route, tool.name
             ));
         }
 
         // Add component definitions
         for (tool_name, wasm_path) in tool_paths {
-            let allowed_hosts = manifest.tools
+            let allowed_hosts = manifest
+                .tools
                 .iter()
                 .find(|t| t.name == *tool_name)
                 .map(|_| Vec::<String>::new())
@@ -94,9 +101,7 @@ component = "{}"
 source = "{}"
 allowed_outbound_hosts = {:?}
 "#,
-                tool_name,
-                wasm_path,
-                allowed_hosts
+                tool_name, wasm_path, allowed_hosts
             ));
         }
 
@@ -109,11 +114,7 @@ allowed_outbound_hosts = {:?}
     }
 }
 
-pub fn generate_development_config(
-    tool_name: &str,
-    port: u16,
-    wasm_path: &Path,
-) -> Result<String> {
+pub fn generate_development_config(tool_name: &str, port: u16, wasm_path: &Path) -> Result<String> {
     Ok(format!(
         r#"# Development configuration for {} on port {}
 spin_manifest_version = 2
@@ -147,7 +148,9 @@ build.watch = ["src/**/*.rs", "Cargo.toml", "ftl.toml"]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::{ToolConfig, ToolManifest, BuildConfig, OptimizationConfig, RuntimeConfig};
+    use crate::manifest::{
+        BuildConfig, OptimizationConfig, RuntimeConfig, ToolConfig, ToolManifest,
+    };
 
     #[test]
     fn test_tool_spin_generation() {

@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
 
 /// Get the path to a tool's manifest file
 pub fn get_manifest_path<P: AsRef<Path>>(tool_path: P) -> PathBuf {
@@ -15,8 +16,9 @@ pub fn get_ftl_dir<P: AsRef<Path>>(tool_path: P) -> PathBuf {
 pub fn get_wasm_path<P: AsRef<Path>>(tool_path: P, tool_name: &str, profile: &str) -> PathBuf {
     let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
     let profile_dir = get_profile_dir(profile);
-    
-    tool_path.as_ref()
+
+    tool_path
+        .as_ref()
         .join("target")
         .join("wasm32-wasip1")
         .join(profile_dir)
@@ -37,7 +39,7 @@ pub fn validate_tool_exists<P: AsRef<Path>>(tool_path: P) -> Result<()> {
     if !path.exists() {
         anyhow::bail!("Tool directory '{}' not found", path.display());
     }
-    
+
     let manifest_path = get_manifest_path(path);
     if !manifest_path.exists() {
         anyhow::bail!(
@@ -45,7 +47,7 @@ pub fn validate_tool_exists<P: AsRef<Path>>(tool_path: P) -> Result<()> {
             path.display()
         );
     }
-    
+
     Ok(())
 }
 
@@ -65,14 +67,14 @@ pub fn ensure_ftl_dir<P: AsRef<Path>>(tool_path: P) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_profile_dir_mapping() {
         assert_eq!(get_profile_dir("dev"), "debug");
         assert_eq!(get_profile_dir("release"), "release");
         assert_eq!(get_profile_dir("custom"), "custom");
     }
-    
+
     #[test]
     fn test_wasm_filename() {
         let path = get_wasm_path(".", "my-tool", "release");

@@ -34,13 +34,13 @@ pub struct JsonRpcError {
 pub enum McpError {
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
-    
+
     #[error("Method not found: {0}")]
     MethodNotFound(String),
-    
+
     #[error("Tool error: {0}")]
     ToolError(#[from] ToolError),
-    
+
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
 }
@@ -49,13 +49,13 @@ pub enum McpError {
 pub enum ToolError {
     #[error("Invalid arguments: {0}")]
     InvalidArguments(String),
-    
+
     #[error("Execution error: {0}")]
     ExecutionError(String),
-    
+
     #[error("Network error: {0}")]
     NetworkError(String),
-    
+
     #[error("Timeout")]
     Timeout,
 }
@@ -94,7 +94,7 @@ impl JsonRpcError {
             data: None,
         }
     }
-    
+
     pub fn method_not_found(method: String) -> Self {
         Self {
             code: -32601,
@@ -102,7 +102,7 @@ impl JsonRpcError {
             data: None,
         }
     }
-    
+
     pub fn internal_error(message: String) -> Self {
         Self {
             code: -32603,
@@ -129,8 +129,9 @@ impl JsonRpcResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn test_jsonrpc_request_serialization() {
@@ -181,7 +182,7 @@ mod tests {
     #[test]
     fn test_tool_result_creation() {
         let result = ToolResult::text("Hello, world!".to_string());
-        
+
         assert_eq!(result.result_type, "content");
         assert_eq!(result.content.len(), 1);
         assert_eq!(result.content[0].content_type, "text");

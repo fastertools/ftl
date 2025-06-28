@@ -1,15 +1,16 @@
+use std::process::Command;
+
 use anyhow::Result;
 use console::style;
-use std::process::Command;
 
 use crate::common::tool_paths::validate_tool_exists;
 
 pub async fn execute(path: Option<String>) -> Result<()> {
     let tool_path = path.unwrap_or_else(|| ".".to_string());
-    
+
     // Validate tool directory exists
     validate_tool_exists(&tool_path)?;
-    
+
     // Check if spin is installed
     if which::which("spin").is_err() {
         anyhow::bail!(
@@ -20,9 +21,7 @@ pub async fn execute(path: Option<String>) -> Result<()> {
     // Check if .ftl/spin.toml exists
     let spin_toml = std::path::Path::new(&tool_path).join(".ftl/spin.toml");
     if !spin_toml.exists() {
-        anyhow::bail!(
-            ".ftl/spin.toml not found. This tool doesn't appear to be built."
-        );
+        anyhow::bail!(".ftl/spin.toml not found. This tool doesn't appear to be built.");
     }
 
     println!("{} Unlinking tool from deployment...", style("→").cyan());
@@ -36,14 +35,10 @@ pub async fn execute(path: Option<String>) -> Result<()> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("not logged in") || stderr.contains("authentication") {
-            anyhow::bail!(
-                "Not authenticated with FTL Edge. Please run: ftl login"
-            );
+            anyhow::bail!("Not authenticated with FTL Edge. Please run: ftl login");
         }
         if stderr.contains("not linked") || stderr.contains("No app linked") {
-            anyhow::bail!(
-                "This tool is not linked to any deployment."
-            );
+            anyhow::bail!("This tool is not linked to any deployment.");
         }
         anyhow::bail!("Failed to unlink tool:\n{}", stderr);
     }

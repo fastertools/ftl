@@ -1,6 +1,7 @@
+use std::process::Command;
+
 use anyhow::Result;
 use console::style;
-use std::process::Command;
 
 use crate::common::deploy_utils::infer_app_name;
 
@@ -18,7 +19,11 @@ pub async fn execute(name: Option<String>) -> Result<()> {
         None => infer_app_name(".")?,
     };
 
-    println!("{} Getting status for: {}", style("→").cyan(), style(&app_name).bold());
+    println!(
+        "{} Getting status for: {}",
+        style("→").cyan(),
+        style(&app_name).bold()
+    );
     println!();
 
     // Run spin aka app status with --app-name flag
@@ -29,13 +34,11 @@ pub async fn execute(name: Option<String>) -> Result<()> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("not logged in") || stderr.contains("authentication") {
-            anyhow::bail!(
-                "Not authenticated with FTL Edge. Please run: ftl login"
-            );
+            anyhow::bail!("Not authenticated with FTL Edge. Please run: ftl login");
         }
         if stderr.contains("not found") || stderr.contains("does not exist") {
             anyhow::bail!(
-                "Tool/toolkit '{}' not found. Use 'ftl list' to see deployed tools and toolkits.", 
+                "Tool/toolkit '{}' not found. Use 'ftl list' to see deployed tools and toolkits.",
                 app_name
             );
         }

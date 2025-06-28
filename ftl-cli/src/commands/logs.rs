@@ -1,6 +1,7 @@
+use std::process::{Command, Stdio};
+
 use anyhow::Result;
 use console::style;
-use std::process::{Command, Stdio};
 
 use crate::common::deploy_utils::infer_app_name;
 
@@ -18,10 +19,14 @@ pub async fn execute(name: Option<String>, _follow: bool, tail: Option<usize>) -
         None => infer_app_name(".")?,
     };
 
-    println!("{} Fetching logs for: {}", style("→").cyan(), style(&app_name).bold());
-    
+    println!(
+        "{} Fetching logs for: {}",
+        style("→").cyan(),
+        style(&app_name).bold()
+    );
+
     let mut args = vec!["aka", "app", "logs", "--app-name", &app_name];
-    
+
     // Add tail option if specified
     let tail_str;
     if let Some(lines) = tail {
@@ -29,7 +34,7 @@ pub async fn execute(name: Option<String>, _follow: bool, tail: Option<usize>) -
         args.push("--tail");
         args.push(&tail_str);
     }
-    
+
     // Note: spin aka app logs doesn't support --follow yet
 
     // Run spin aka app logs with inherited stdio for real-time output

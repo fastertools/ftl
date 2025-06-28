@@ -30,7 +30,6 @@ space_before_colon = false
 space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
-remove_blank_lines_at_start_or_end_of_block = true
 combine_control_expr = true
 overflow_delimited_expr = false
 struct_field_align_threshold = 0

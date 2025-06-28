@@ -10,7 +10,11 @@ use crate::common::{
 };
 
 pub async fn execute(tool_path: String) -> Result<()> {
-    println!("{} Deploying tool: {}", style("→").cyan(), style(&tool_path).bold());
+    println!(
+        "{} Deploying tool: {}",
+        style("→").cyan(),
+        style(&tool_path).bold()
+    );
 
     // Validate tool exists and load manifest
     validate_tool_exists(&tool_path)?;
@@ -35,22 +39,22 @@ pub async fn execute(tool_path: String) -> Result<()> {
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
             .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     );
     spinner.set_message("Deploying to FTL Edge...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
-    
+
     // Load config and generate app name with user prefix
     let config = FtlConfig::load().unwrap_or_default();
     let app_name = format!("{}{}", config.get_app_prefix(), tool_name);
-    
+
     // Deploy with the generated app name in a separate thread
     let tool_path_clone = tool_path.clone();
     let app_name_clone = app_name.clone();
     let deployment_result = tokio::task::spawn_blocking(move || {
         deploy_to_akamai(&tool_path_clone, Some(&app_name_clone))
     });
-    
+
     // Wait for deployment to complete
     match deployment_result.await.unwrap() {
         Ok(deployment_info) => {

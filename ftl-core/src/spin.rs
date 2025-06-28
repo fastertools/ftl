@@ -1,9 +1,9 @@
-use crate::server::McpServer;
-use crate::tool::Tool;
-use crate::types::JsonRpcRequest;
 use spin_sdk::http::{Method, Request, Response};
 
-/// Create a handler function for serving a single FTL Core tool as an MCP server over HTTP
+use crate::{server::McpServer, tool::Tool, types::JsonRpcRequest};
+
+/// Create a handler function for serving a single FTL Core tool as an MCP
+/// server over HTTP
 ///
 /// This function handles all HTTP/CORS details and delegates MCP protocol
 /// handling to the McpServer.
@@ -109,9 +109,15 @@ fn read_request_body(req: &Request) -> Result<String, String> {
 /// struct MyTool;
 ///
 /// impl Tool for MyTool {
-///     fn name(&self) -> &'static str { "my-tool" }
-///     fn description(&self) -> &'static str { "Example tool" }
-///     fn input_schema(&self) -> serde_json::Value { serde_json::json!({}) }
+///     fn name(&self) -> &'static str {
+///         "my-tool"
+///     }
+///     fn description(&self) -> &'static str {
+///         "Example tool"
+///     }
+///     fn input_schema(&self) -> serde_json::Value {
+///         serde_json::json!({})
+///     }
 ///     fn call(&self, _args: &serde_json::Value) -> Result<ToolResult, ToolError> {
 ///         Ok(ToolResult::text("Hello".to_string()))
 ///     }

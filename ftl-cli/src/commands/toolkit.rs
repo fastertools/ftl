@@ -1,18 +1,20 @@
+use std::{path::PathBuf, process::Command, sync::Arc};
+
 use anyhow::{Context, Result};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::Arc;
 use tokio::task::JoinSet;
 
-use crate::common::config::FtlConfig;
-use crate::manifest::{ToolkitConfig, ToolkitManifest, ToolkitTool};
-use crate::spin_generator::SpinConfig;
+use crate::{
+    common::config::FtlConfig,
+    manifest::{ToolkitConfig, ToolkitManifest, ToolkitTool},
+    spin_generator::SpinConfig,
+};
 
 pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
-    println!("{} Building toolkit: {} with {} tools", 
-        style("→").cyan(), 
+    println!(
+        "{} Building toolkit: {} with {} tools",
+        style("→").cyan(),
         style(&name).bold(),
         tools.len()
     );
@@ -37,7 +39,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     println!();
     println!("Tools to build: {}", tools.join(", "));
     println!();
-    
+
     // Create a single progress bar that shows overall progress
     let pb = ProgressBar::new(tools.len() as u64);
     pb.set_style(
@@ -45,41 +47,40 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             .template("{spinner:.cyan} [{bar:30.cyan/blue}] {pos}/{len} {msg}")
             .unwrap()
             .progress_chars("█▉▊▋▌▍▎▏  ")
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     );
     pb.set_message("🔨 Building...");
     pb.enable_steady_tick(std::time::Duration::from_millis(80));
-    
+
     let mut tasks = JoinSet::new();
     let completed = Arc::new(std::sync::Mutex::new(Vec::new()));
-    
+
     for tool_name in tools.clone() {
         let toolkit_dir = toolkit_dir.clone();
         let pb = pb.clone();
         let completed = completed.clone();
         let tools_count = tools.len();
-        
+
         tasks.spawn(async move {
             // Build the tool quietly
-            let build_result = crate::commands::build::execute_quiet(
-                &tool_name, 
-                Some("release".to_string())
-            ).await;
-            
+            let build_result =
+                crate::commands::build::execute_quiet(&tool_name, Some("release".to_string()))
+                    .await;
+
             if let Err(e) = build_result {
                 return Err(anyhow::anyhow!("Failed to build {}: {}", tool_name, e));
             }
-            
+
             // Update progress
             pb.inc(1);
             let mut comp = completed.lock().unwrap();
             comp.push(tool_name.clone());
             let done = comp.len();
-            
+
             if done < tools_count {
                 pb.set_message(format!("completed {}", tool_name));
             }
-            
+
             // Find and copy WASM
             let tool_dir = PathBuf::from(&tool_name);
             let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
@@ -90,7 +91,10 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
                 .join(&wasm_filename);
 
             if !wasm_path.exists() {
-                return Err(anyhow::anyhow!("WASM binary not found for tool: {}", tool_name));
+                return Err(anyhow::anyhow!(
+                    "WASM binary not found for tool: {}",
+                    tool_name
+                ));
             }
 
             // Copy WASM to toolkit directory
@@ -101,7 +105,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             Ok((tool_name, format!("../{}", wasm_filename)))
         });
     }
-    
+
     // Wait for all builds to complete
     let mut tool_paths = Vec::new();
     while let Some(result) = tasks.join_next().await {
@@ -117,12 +121,12 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             }
         }
     }
-    
+
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{prefix:.green} [{bar:30.green}] {pos}/{len} {msg}")
             .unwrap()
-            .progress_chars("█▉▊▋▌▍▎▏  ")
+            .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     pb.set_prefix("✓");
     pb.finish_with_message("✓ All tools built successfully");
@@ -150,7 +154,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     // Create .ftl directory in toolkit
     let ftl_dir = toolkit_dir.join(".ftl");
     std::fs::create_dir_all(&ftl_dir)?;
-    
+
     // Generate spin.toml for toolkit
     let spin_config = SpinConfig::from_toolkit(&toolkit_manifest, &tool_paths)?;
     let spin_path = ftl_dir.join("spin.toml");
@@ -173,15 +177,19 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
 }
 
 pub async fn serve(name: String, port: u16) -> Result<()> {
-    println!("{} Serving toolkit: {} on port {}", 
-        style("→").cyan(), 
+    println!(
+        "{} Serving toolkit: {} on port {}",
+        style("→").cyan(),
         style(&name).bold(),
         style(port).yellow()
     );
 
     let toolkit_dir = PathBuf::from(&name);
     if !toolkit_dir.exists() {
-        anyhow::bail!("Toolkit '{}' not found. Build it first with: ftl toolkit build", name);
+        anyhow::bail!(
+            "Toolkit '{}' not found. Build it first with: ftl toolkit build",
+            name
+        );
     }
 
     // Check if spin.toml exists
@@ -196,7 +204,7 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
     println!();
     println!("  Toolkit: {}", name);
     println!("  URL: http://localhost:{}", port);
-    
+
     // Load toolkit manifest to show available routes
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {
@@ -205,7 +213,7 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
             println!("    - {}/mcp", tool.route);
         }
     }
-    
+
     println!();
     println!("Press Ctrl+C to stop");
     println!();
@@ -233,11 +241,18 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
 }
 
 pub async fn deploy(name: String) -> Result<()> {
-    println!("{} Deploying toolkit: {}", style("→").cyan(), style(&name).bold());
+    println!(
+        "{} Deploying toolkit: {}",
+        style("→").cyan(),
+        style(&name).bold()
+    );
 
     let toolkit_dir = PathBuf::from(&name);
     if !toolkit_dir.exists() {
-        anyhow::bail!("Toolkit '{}' not found. Build it first with: ftl toolkit build", name);
+        anyhow::bail!(
+            "Toolkit '{}' not found. Build it first with: ftl toolkit build",
+            name
+        );
     }
 
     // Deploy using spin aka with spinner
@@ -246,15 +261,15 @@ pub async fn deploy(name: String) -> Result<()> {
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
             .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     );
     spinner.set_message("Deploying to FTL Edge...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
-    
+
     // Load config and generate app name with user prefix
     let config = FtlConfig::load().unwrap_or_default();
     let app_name = format!("{}{}", config.get_app_prefix(), name);
-    
+
     // Try deploying without --create-name first (for existing apps)
     let output = Command::new("spin")
         .args(["aka", "deploy", "--from", ".ftl/spin.toml", "--no-confirm"])
@@ -265,10 +280,23 @@ pub async fn deploy(name: String) -> Result<()> {
     let output = if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         // If it fails because app doesn't exist, try with --create-name
-        if stderr.contains("no app") || stderr.contains("not found") || stderr.contains("does not exist") || stderr.contains("No terminal available") || stderr.contains("must use --create-name") {
+        if stderr.contains("no app")
+            || stderr.contains("not found")
+            || stderr.contains("does not exist")
+            || stderr.contains("No terminal available")
+            || stderr.contains("must use --create-name")
+        {
             spinner.set_message(format!("Creating new toolkit: {}...", app_name));
             Command::new("spin")
-                .args(["aka", "deploy", "--from", ".ftl/spin.toml", "--create-name", &app_name, "--no-confirm"])
+                .args([
+                    "aka",
+                    "deploy",
+                    "--from",
+                    ".ftl/spin.toml",
+                    "--create-name",
+                    &app_name,
+                    "--no-confirm",
+                ])
                 .current_dir(&toolkit_dir)
                 .output()
                 .context("Failed to run spin aka deploy with --create-name")?
@@ -283,10 +311,7 @@ pub async fn deploy(name: String) -> Result<()> {
 
     if !output.status.success() {
         println!("{} Deployment failed", style("✗").red());
-        anyhow::bail!(
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr));
     }
 
     // Parse deployment URL
@@ -294,13 +319,17 @@ pub async fn deploy(name: String) -> Result<()> {
     let full_url = output_str
         .lines()
         .find(|line| line.contains("https://"))
-        .and_then(|line| line.split_whitespace().find(|word| word.starts_with("https://")))
+        .and_then(|line| {
+            line.split_whitespace()
+                .find(|word| word.starts_with("https://"))
+        })
         .unwrap_or("(URL not found in output)");
-    
+
     // Extract base URL (remove any path components)
     let base_url = if let Some(domain_end) = full_url.find(".tech") {
-        &full_url[..domain_end + 5]  // Include ".tech"
-    } else if let Some(first_slash) = full_url[8..].find('/') {  // Skip "https://"
+        &full_url[..domain_end + 5] // Include ".tech"
+    } else if let Some(first_slash) = full_url[8..].find('/') {
+        // Skip "https://"
         &full_url[..8 + first_slash]
     } else {
         full_url
@@ -311,7 +340,7 @@ pub async fn deploy(name: String) -> Result<()> {
     println!();
     println!("Toolkit: {}", name);
     println!("URL: {}", base_url);
-    
+
     // Show available routes
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {

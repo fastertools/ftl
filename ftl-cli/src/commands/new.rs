@@ -1,18 +1,26 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Input};
-use std::path::PathBuf;
 
 use crate::templates;
 
 pub async fn execute(name: String, description: Option<String>) -> Result<()> {
-    println!("{} Creating new tool: {}", style("→").cyan(), style(&name).bold());
+    println!(
+        "{} Creating new tool: {}",
+        style("→").cyan(),
+        style(&name).bold()
+    );
 
     // Validate tool name
-    if !name.chars().all(|c| c.is_lowercase() || c == '-' || c.is_numeric()) {
+    if !name
+        .chars()
+        .all(|c| c.is_lowercase() || c == '-' || c.is_numeric())
+    {
         anyhow::bail!("Tool name must be lowercase with hyphens (e.g., my-tool)");
     }
-    
+
     // Don't allow leading or trailing hyphens, or double hyphens
     if name.starts_with('-') || name.ends_with('-') || name.contains("--") {
         anyhow::bail!("Tool name cannot start or end with hyphens, or contain double hyphens");
@@ -21,11 +29,9 @@ pub async fn execute(name: String, description: Option<String>) -> Result<()> {
     // Get description interactively if not provided
     let description = match description {
         Some(d) => d,
-        None => {
-            Input::<String>::with_theme(&ColorfulTheme::default())
-                .with_prompt("Tool description")
-                .interact_text()?
-        }
+        None => Input::<String>::with_theme(&ColorfulTheme::default())
+            .with_prompt("Tool description")
+            .interact_text()?,
     };
 
     // Determine target directory

@@ -1,10 +1,12 @@
-use crate::types::{ToolError, ToolResult};
 use serde_json::Value;
+
+use crate::types::{ToolError, ToolResult};
 
 /// Trait that all FTL Core tools must implement
 ///
-/// This trait defines a single computational tool optimized for WebAssembly performance.
-/// FTL Core follows the "1 tool per server" architecture for maximum efficiency.
+/// This trait defines a single computational tool optimized for WebAssembly
+/// performance. FTL Core follows the "1 tool per server" architecture for
+/// maximum efficiency.
 pub trait Tool: Clone {
     /// The name of the tool (used in MCP tool calls)
     fn name(&self) -> &'static str;

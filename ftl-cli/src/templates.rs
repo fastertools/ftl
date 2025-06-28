@@ -1,7 +1,8 @@
+use std::path::Path;
+
 use anyhow::Result;
 use handlebars::Handlebars;
 use serde_json::json;
-use std::path::Path;
 
 pub fn create_tool(name: &str, description: &str, target_dir: &Path) -> Result<()> {
     // Create directory structure
@@ -64,16 +65,18 @@ allowed_hosts = []
         // Tool is being created directly in ftl-cli directory
         "{ path = \"../ftl-core\" }".to_string()
     } else if target_dir.join("../../ftl-core").exists() {
-        // Tool is being created in a subdirectory of ftl-cli (e.g., test_validation/tool_name)
+        // Tool is being created in a subdirectory of ftl-cli (e.g.,
+        // test_validation/tool_name)
         "{ path = \"../../ftl-core\" }".to_string()
     } else {
         // Tool is being created outside ftl-cli repository
         // Use crates.io version once published
         "{ version = \"0.1\" }".to_string()
     };
-    
+
     // Create Cargo.toml
-    let cargo_toml_template = format!(r#"[package]
+    let cargo_toml_template = format!(
+        r#"[package]
 name = "{{{{tool_name}}}}"
 version = "{{{{version}}}}"
 edition = "2021"
@@ -102,7 +105,9 @@ opt-level = 1
 debug = true
 
 [workspace]
-"#, ftl_core_dep);
+"#,
+        ftl_core_dep
+    );
 
     let cargo_toml = handlebars.render_template(&cargo_toml_template, &data)?;
     std::fs::write(target_dir.join("Cargo.toml"), cargo_toml)?;

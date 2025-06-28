@@ -1,6 +1,7 @@
+use std::process::Command;
+
 use anyhow::Result;
 use console::style;
-use std::process::Command;
 
 pub async fn execute() -> Result<()> {
     // Check if spin is installed
@@ -10,26 +11,25 @@ pub async fn execute() -> Result<()> {
         );
     }
 
-    println!("{} Listing deployed tools and toolkits...", style("→").cyan());
+    println!(
+        "{} Listing deployed tools and toolkits...",
+        style("→").cyan()
+    );
     println!();
 
     // Run spin aka app list
-    let output = Command::new("spin")
-        .args(["aka", "app", "list"])
-        .output()?;
+    let output = Command::new("spin").args(["aka", "app", "list"]).output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("not logged in") || stderr.contains("authentication") {
-            anyhow::bail!(
-                "Not authenticated with FTL Edge. Please run: ftl login"
-            );
+            anyhow::bail!("Not authenticated with FTL Edge. Please run: ftl login");
         }
         anyhow::bail!("Failed to list tools and toolkits:\n{}", stderr);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Check if there are no apps
     if stdout.trim().is_empty() || stdout.contains("No apps") {
         println!("No tools or toolkits deployed yet.");

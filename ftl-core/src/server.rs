@@ -1,6 +1,9 @@
-use crate::tool::{Tool, ToolInfo};
-use crate::types::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, McpError, ToolError};
 use serde_json::{json, Value};
+
+use crate::{
+    tool::{Tool, ToolInfo},
+    types::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, McpError, ToolError},
+};
 
 pub struct McpServer<T: Tool> {
     tool: T,
@@ -61,18 +64,18 @@ impl<T: Tool> McpServer<T> {
     }
 
     fn handle_tools_call(&self, params: Option<Value>) -> Result<Value, McpError> {
-        let params = params.ok_or_else(|| {
-            McpError::InvalidRequest("Missing params for tools/call".to_string())
-        })?;
+        let params = params
+            .ok_or_else(|| McpError::InvalidRequest("Missing params for tools/call".to_string()))?;
 
         let tool_name = params["name"]
             .as_str()
             .ok_or_else(|| McpError::InvalidRequest("Missing tool name".to_string()))?;
 
         if tool_name != self.tool.name() {
-            return Err(McpError::ToolError(ToolError::InvalidArguments(
-                format!("Unknown tool: {}", tool_name),
-            )));
+            return Err(McpError::ToolError(ToolError::InvalidArguments(format!(
+                "Unknown tool: {}",
+                tool_name
+            ))));
         }
 
         let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
@@ -95,10 +98,13 @@ impl<T: Tool> McpServer<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::tool::Tool;
-    use crate::types::{ToolError, ToolResult};
     use serde_json::json;
+
+    use super::*;
+    use crate::{
+        tool::Tool,
+        types::{ToolError, ToolResult},
+    };
 
     #[derive(Clone)]
     struct TestTool;
@@ -143,7 +149,7 @@ mod tests {
 
         let response = server.handle_request(request);
         assert!(response.error.is_none());
-        
+
         let result = response.result.unwrap();
         assert_eq!(result["protocolVersion"], "2025-03-26");
         assert_eq!(result["serverInfo"]["name"], "ftl-test_tool");
@@ -161,7 +167,7 @@ mod tests {
 
         let response = server.handle_request(request);
         assert!(response.error.is_none());
-        
+
         let result = response.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
         assert_eq!(tools.len(), 1);
@@ -186,7 +192,7 @@ mod tests {
 
         let response = server.handle_request(request);
         assert!(response.error.is_none());
-        
+
         let result = response.result.unwrap();
         assert_eq!(result["content"][0]["text"], "Processed: hello");
     }

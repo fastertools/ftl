@@ -1,7 +1,10 @@
+use std::{
+    io::{BufRead, BufReader},
+    process::{Command, Stdio},
+};
+
 use anyhow::Result;
 use console::style;
-use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
 
 use crate::common::config::FtlConfig;
 
@@ -26,11 +29,11 @@ pub async fn execute() -> Result<()> {
 
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
-    
+
     // Read output line by line, looking for "Welcome, username."
     let stdout_reader = BufReader::new(stdout);
     let stderr_reader = BufReader::new(stderr);
-    
+
     // Print stdout and look for username
     let stdout_handle = std::thread::spawn(move || {
         let mut username = None;
@@ -39,7 +42,8 @@ pub async fn execute() -> Result<()> {
                 println!("{}", line);
                 if line.starts_with("Welcome, ") && line.ends_with(".") {
                     // Extract username from "Welcome, username."
-                    let user = line.trim_start_matches("Welcome, ")
+                    let user = line
+                        .trim_start_matches("Welcome, ")
                         .trim_end_matches(".")
                         .to_string();
                     username = Some(user);
@@ -48,30 +52,30 @@ pub async fn execute() -> Result<()> {
         }
         username
     });
-    
+
     // Print stderr
     for line in stderr_reader.lines() {
         if let Ok(line) = line {
             eprintln!("{}", line);
         }
     }
-    
+
     let status = child.wait()?;
     let captured_username = stdout_handle.join().unwrap();
 
     if status.success() {
         println!();
         println!("{} Successfully logged in to FTL Edge!", style("✓").green());
-        
+
         // Load existing config
         let mut config = FtlConfig::load().unwrap_or_default();
-        
+
         // Save username if we captured it
         if let Some(username) = captured_username {
             config.username = Some(username.clone());
             config.save()?;
         }
-        
+
         println!();
         println!("You can now:");
         println!("  • Deploy tools with: ftl deploy");

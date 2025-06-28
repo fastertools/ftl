@@ -1,6 +1,6 @@
+use std::{path::Path, process::Command};
+
 use anyhow::{Context, Result};
-use std::path::Path;
-use std::process::Command;
 use tracing::info;
 
 use crate::manifest::ToolManifest;
@@ -12,7 +12,7 @@ pub async fn execute(name: String) -> Result<()> {
     }
 
     println!("🔍 Validating tool: {}", name);
-    
+
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
@@ -25,21 +25,20 @@ pub async fn execute(name: String) -> Result<()> {
         match ToolManifest::load(&manifest_path) {
             Ok(manifest) => {
                 info!("Manifest loaded successfully");
-                
+
                 // Validate manifest fields
                 if manifest.tool.name.is_empty() {
                     errors.push("Tool name cannot be empty".to_string());
                 }
-                
+
                 if manifest.tool.description.is_empty() {
                     warnings.push("Tool description is empty".to_string());
                 }
-                
+
                 // Validate version format
                 if !is_valid_version(&manifest.tool.version) {
                     errors.push(format!("Invalid version format: {}", manifest.tool.version));
                 }
-                
             }
             Err(e) => {
                 errors.push(format!("Invalid ftl.toml: {}", e));
@@ -55,9 +54,9 @@ pub async fn execute(name: String) -> Result<()> {
         // Validate Cargo.toml
         match std::fs::read_to_string(&cargo_path) {
             Ok(content) => {
-                let cargo_toml: toml::Value = content.parse()
-                    .context("Failed to parse Cargo.toml")?;
-                
+                let cargo_toml: toml::Value =
+                    content.parse().context("Failed to parse Cargo.toml")?;
+
                 // Check for required dependencies
                 if let Some(deps) = cargo_toml.get("dependencies") {
                     if deps.get("ftl-core").is_none() {
@@ -66,16 +65,20 @@ pub async fn execute(name: String) -> Result<()> {
                 } else {
                     errors.push("No dependencies section in Cargo.toml".to_string());
                 }
-                
+
                 // Check crate type
                 if let Some(lib) = cargo_toml.get("lib") {
                     if let Some(crate_types) = lib.get("crate-type") {
-                        let types = crate_types.as_array()
+                        let types = crate_types
+                            .as_array()
                             .and_then(|arr| arr.first())
                             .and_then(|v| v.as_str());
-                        
+
                         if types != Some("cdylib") {
-                            errors.push("Library crate-type must be [\"cdylib\"] for WebAssembly".to_string());
+                            errors.push(
+                                "Library crate-type must be [\"cdylib\"] for WebAssembly"
+                                    .to_string(),
+                            );
                         }
                     } else {
                         errors.push("Missing crate-type in [lib] section".to_string());
@@ -101,9 +104,10 @@ pub async fn execute(name: String) -> Result<()> {
                 if !content.contains("impl Tool for") {
                     warnings.push("No Tool trait implementation found in src/lib.rs".to_string());
                 }
-                
+
                 if !content.contains("ftl_mcp_server!") {
-                    errors.push("Missing ftl_mcp_server! macro invocation in src/lib.rs".to_string());
+                    errors
+                        .push("Missing ftl_mcp_server! macro invocation in src/lib.rs".to_string());
                 }
             }
             Err(e) => {
@@ -137,7 +141,7 @@ pub async fn execute(name: String) -> Result<()> {
 
     // Print results
     println!("\n📋 Validation Results:");
-    
+
     if errors.is_empty() && warnings.is_empty() {
         println!("✅ All checks passed!");
         Ok(())
@@ -148,7 +152,7 @@ pub async fn execute(name: String) -> Result<()> {
                 println!("   - {}", warning);
             }
         }
-        
+
         if !errors.is_empty() {
             println!("\n❌ Errors ({}):", errors.len());
             let error_count = errors.len();
@@ -157,7 +161,7 @@ pub async fn execute(name: String) -> Result<()> {
             }
             anyhow::bail!("Validation failed with {} error(s)", error_count);
         }
-        
+
         Ok(())
     }
 }
@@ -168,10 +172,9 @@ fn is_valid_version(version: &str) -> bool {
     if parts.len() != 3 {
         return false;
     }
-    
+
     parts.iter().all(|part| part.parse::<u32>().is_ok())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -182,11 +185,10 @@ mod tests {
         assert!(is_valid_version("1.0.0"));
         assert!(is_valid_version("0.1.0"));
         assert!(is_valid_version("10.20.30"));
-        
+
         assert!(!is_valid_version("1.0"));
         assert!(!is_valid_version("1.0.0.0"));
         assert!(!is_valid_version("1.a.0"));
         assert!(!is_valid_version(""));
     }
-
 }
