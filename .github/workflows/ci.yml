@@ -90,24 +90,6 @@ jobs:
         run: |
           cargo build --package ftl-core --target wasm32-wasip1
 
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-      
-      - name: Install tarpaulin
-        run: cargo binstall cargo-tarpaulin --no-confirm --force
-      
-      - name: Generate coverage
-        run: cargo tarpaulin --out Xml --all-features
-
   security:
     name: Security Audit
     runs-on: ubuntu-latest
