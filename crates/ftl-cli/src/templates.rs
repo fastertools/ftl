@@ -56,18 +56,18 @@ allowed_hosts = []
     let ftl_toml = handlebars.render_template(ftl_toml_template, &data)?;
     std::fs::write(target_dir.join("ftl.toml"), ftl_toml)?;
 
-    // Determine ftl-core dependency based on context
+    // Determine ftl-sdk dependency based on context
     // This logic handles three scenarios:
     // 1. Creating tools within ftl-cli repository (use relative paths)
-    // 2. Creating tools in subdirectories of ftl-cli (use ../../ftl-core)
+    // 2. Creating tools in subdirectories of ftl-cli (use ../../ftl-sdk)
     // 3. Creating tools outside ftl-cli (use crates.io version once published)
-    let ftl_core_dep = if target_dir.join("../../crates/ftl-core").exists() {
+    let ftl_sdk_dep = if target_dir.join("../../crates/ftl-sdk").exists() {
         // Tool is being created directly in ftl-cli directory
-        "{ path = \"../../crates/ftl-core\" }".to_string()
-    } else if target_dir.join("../../../crates/ftl-core").exists() {
+        "{ path = \"../../crates/ftl-sdk\" }".to_string()
+    } else if target_dir.join("../../../crates/ftl-sdk").exists() {
         // Tool is being created in a subdirectory of ftl-cli (e.g.,
         // test_validation/tool_name)
-        "{ path = \"../../../crates/ftl-core\" }".to_string()
+        "{ path = \"../../../crates/ftl-sdk\" }".to_string()
     } else {
         // Tool is being created outside ftl-cli repository
         // Use crates.io version once published
@@ -82,7 +82,7 @@ version = "{{{{version}}}}"
 edition = "2024"
 
 [dependencies]
-ftl-core = {ftl_core_dep}
+ftl-sdk = {ftl_sdk_dep}
 talc = {{ version = "4.4.3", features = ["lock_api"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
@@ -113,7 +113,7 @@ debug = true
     std::fs::write(target_dir.join("Cargo.toml"), cargo_toml)?;
 
     // Create src/lib.rs
-    let lib_rs_template = r#"use ftl_core::prelude::*;
+    let lib_rs_template = r#"use ftl_sdk::prelude::*;
 use serde_json::json;
 
 // --- Global Memory Allocator ---
@@ -184,7 +184,7 @@ impl Tool for {{struct_name}} {
     }
 }
 
-ftl_core::ftl_mcp_server!({{struct_name}});
+ftl_sdk::ftl_mcp_server!({{struct_name}});
 
 #[cfg(test)]
 mod tests;
@@ -198,7 +198,7 @@ pub use {{struct_name}};
     std::fs::write(target_dir.join("src").join("lib.rs"), lib_rs)?;
 
     // Create src/tests.rs
-    let tests_rs_template = r#"use ftl_core::prelude::*;
+    let tests_rs_template = r#"use ftl_sdk::prelude::*;
 use serde_json::json;
 
 use super::TestTool;

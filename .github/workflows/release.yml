@@ -112,37 +112,37 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
       
-      - name: Check if ftl-core already published
-        id: check-core
+      - name: Check if ftl-sdk already published
+        id: check-sdk
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl-core --limit 1 | grep -q "ftl-core = \"$VERSION\""; then
+          if cargo search ftl-sdk --limit 1 | grep -q "ftl-sdk = \"$VERSION\""; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "ftl-core version $VERSION already published"
+            echo "ftl-sdk version $VERSION already published"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       
-      - name: Publish ftl-core
-        if: steps.check-core.outputs.skip != 'true'
+      - name: Publish ftl-sdk
+        if: steps.check-sdk.outputs.skip != 'true'
         run: |
-          cd crates/ftl-core
+          cd crates/ftl-sdk
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       
       - name: Wait for crates.io to index
-        if: steps.check-core.outputs.skip != 'true'
+        if: steps.check-sdk.outputs.skip != 'true'
         run: |
-          echo "Waiting for ftl-core to be indexed on crates.io..."
+          echo "Waiting for ftl-sdk to be indexed on crates.io..."
           for i in {1..12}; do
             sleep 10
             VERSION=$(grep '^version' ../Cargo.toml | head -1 | cut -d'"' -f2)
-            if cargo search ftl-core --limit 1 | grep -q "ftl-core = \"$VERSION\""; then
-              echo "ftl-core is now available on crates.io"
+            if cargo search ftl-sdk --limit 1 | grep -q "ftl-sdk = \"$VERSION\""; then
+              echo "ftl-sdk is now available on crates.io"
               break
             fi
-            echo "Attempt $i/12: ftl-core not yet indexed..."
+            echo "Attempt $i/12: ftl-sdk not yet indexed..."
           done
       
       - name: Check if ftl-cli already published
