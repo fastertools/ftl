@@ -178,7 +178,7 @@ impl Tool for {{struct_name}} {
             .ok_or_else(|| ToolError::InvalidArguments("input is required".to_string()))?;
 
         // TODO: Implement your tool logic here
-        let result = format!("Processed: {}", input);
+        let result = format!("Processed: {input}");
 
         Ok(ToolResult::text(result))
     }
@@ -191,16 +191,17 @@ mod tests;
 
 // Export the tool struct for tests
 #[cfg(test)]
-pub use {{struct_name}} as TestTool;
+pub use {{struct_name}};
 "#;
 
     let lib_rs = handlebars.render_template(lib_rs_template, &data)?;
     std::fs::write(target_dir.join("src").join("lib.rs"), lib_rs)?;
 
     // Create src/tests.rs
-    let tests_rs_template = r#"use super::TestTool;
-use ftl_core::prelude::*;
+    let tests_rs_template = r#"use ftl_core::prelude::*;
 use serde_json::json;
+
+use super::TestTool;
 
 #[test]
 fn test_tool_metadata() {
@@ -221,7 +222,8 @@ fn test_tool_call() {
     assert!(!result.content.is_empty());
     let text = &result.content[0].text;
     assert!(text.contains("test input"));
-}"#;
+}
+"#;
 
     let tests_rs = handlebars.render_template(tests_rs_template, &data)?;
     std::fs::write(target_dir.join("src").join("tests.rs"), tests_rs)?;
@@ -300,6 +302,62 @@ Cargo.lock
 *.wasm
 "#;
     std::fs::write(target_dir.join(".gitignore"), gitignore)?;
+
+    // Create rustfmt.toml
+    let rustfmt_toml = r#"# Rust formatting configuration
+edition = "2024"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+format_code_in_doc_comments = true
+normalize_comments = true
+normalize_doc_attributes = true
+format_strings = true
+format_macro_matchers = true
+format_macro_bodies = true
+empty_item_single_line = true
+struct_lit_single_line = true
+fn_single_line = false
+where_single_line = false
+imports_indent = "Block"
+imports_layout = "Mixed"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_impl_items = false
+type_punctuation_density = "Wide"
+space_before_colon = false
+space_after_colon = true
+spaces_around_ranges = false
+binop_separator = "Front"
+combine_control_expr = true
+overflow_delimited_expr = false
+struct_field_align_threshold = 0
+enum_discrim_align_threshold = 0
+match_arm_blocks = true
+match_arm_leading_pipes = "Never"
+force_multiline_blocks = false
+fn_params_layout = "Tall"
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+trailing_semicolon = true
+trailing_comma = "Vertical"
+match_block_trailing_comma = false
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+merge_derives = true
+wrap_comments = true
+comment_width = 80
+format_generated_files = false
+skip_children = false
+"#;
+    std::fs::write(target_dir.join("rustfmt.toml"), rustfmt_toml)?;
 
     Ok(())
 }
