@@ -22,23 +22,20 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             binary: ftl
-            asset_name: ftl-linux-amd64
+            asset_name: ftl-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             binary: ftl
-            asset_name: ftl-linux-arm64
+            asset_name: ftl-aarch64-unknown-linux-gnu
           - os: macos-latest
             target: x86_64-apple-darwin
             binary: ftl
-            asset_name: ftl-darwin-amd64
+            asset_name: ftl-x86_64-apple-darwin
           - os: macos-latest
             target: aarch64-apple-darwin
             binary: ftl
-            asset_name: ftl-darwin-arm64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary: ftl.exe
-            asset_name: ftl-windows-amd64.exe
+            asset_name: ftl-aarch64-apple-darwin
+
     steps:
       - uses: actions/checkout@v4
       
@@ -98,6 +95,18 @@ jobs:
         with:
           path: binaries
       
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          for dir in binaries/*/; do
+            if [ -f "${dir}ftl" ]; then
+              asset_name=$(basename "$dir")
+              cp "${dir}ftl" "release-assets/${asset_name}"
+            fi
+          done
+          ls -la release-assets/
+        shell: bash
+      
       - name: Create Release
         id: release
         uses: softprops/action-gh-release@v2
@@ -105,12 +114,7 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            binaries/ftl-linux-amd64/ftl
-            binaries/ftl-linux-arm64/ftl
-            binaries/ftl-darwin-amd64/ftl
-            binaries/ftl-darwin-arm64/ftl
-            binaries/ftl-windows-amd64.exe/ftl.exe
+          files: release-assets/*
 
   publish-crates:
     name: Publish to crates.io
