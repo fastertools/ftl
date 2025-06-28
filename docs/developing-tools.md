@@ -4,7 +4,7 @@ At the core of FTL is the `Tool` trait. This trait defines the interface that al
 
 ## The `Tool` Trait
 
-The `Tool` trait is defined in the `ftl-core` crate:
+The `Tool` trait is defined in the `ftl-sdk` crate:
 
 ```rust
 pub trait Tool: Send + Sync + Clone {
@@ -39,14 +39,14 @@ The `ToolError` enum is used to return an error from a tool's execution. It can 
 The `ftl_mcp_server!` macro is used to create the main entry point for your tool. It takes your tool's struct as an argument and generates the necessary code to create a WebAssembly component that can be executed by the FTL runtime.
 
 ```rust
-use ftl_core::prelude::*;
+use ftl_sdk::prelude::*;
 
 #[derive(Clone)]
 struct MyTool;
 
 // ... implement the Tool trait for MyTool ...
 
-ftl_core::ftl_mcp_server!(MyTool);
+ftl_sdk::ftl_mcp_server!(MyTool);
 ```
 
 This macro will generate a `handle_request` function that will be exported from your WebAssembly component. This function will be called by the FTL runtime when your tool is executed. It will deserialize the incoming JSON-RPC request, call your tool's `call` method, and serialize the result as a JSON-RPC response.

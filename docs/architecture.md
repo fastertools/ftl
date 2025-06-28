@@ -20,9 +20,9 @@ The `ftl-cli` is the command-line interface for the FTL platform. It is responsi
 - Deploying tools to the FTL Edge.
 - Managing toolkits.
 
-### `ftl-core`
+### `ftl-sdk`
 
-The `ftl-core` crate is the core library for FTL tools. It provides:
+The `ftl-sdk` crate is the core library for FTL tools. It provides:
 
 - The `Tool` trait, which defines the interface for all FTL tools.
 - The `ftl_mcp_server!` macro, which generates the necessary boilerplate for creating a WebAssembly component that can be executed by the FTL runtime.
@@ -38,7 +38,7 @@ The FTL Edge is a commercial, managed platform for deploying and serving tools. 
 
 ## Workflow
 
-1.  **Develop:** The developer uses the `ftl` CLI to create a new tool and implement the `ftl_core::Tool` trait.
+1.  **Develop:** The developer uses the `ftl` CLI to create a new tool and implement the `ftl_sdk::Tool` trait.
 2.  **Build:** The `ftl build` command compiles the tool to a WebAssembly component.
 3.  **Test:** The `ftl serve` command starts a local development server that can be used to test the tool.
 4.  **Deploy:** The `ftl deploy` command deploys the tool to the FTL Edge.

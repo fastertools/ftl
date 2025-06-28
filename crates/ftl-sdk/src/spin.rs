@@ -2,7 +2,7 @@ use spin_sdk::http::{Method, Request, Response};
 
 use crate::{server::McpServer, tool::Tool, types::JsonRpcRequest};
 
-/// Create a handler function for serving a single FTL Core tool as an MCP
+/// Create a handler function for serving a single FTL SDK tool as an MCP
 /// server over HTTP
 ///
 /// This function handles all HTTP/CORS details and delegates MCP protocol
@@ -103,7 +103,7 @@ fn read_request_body(req: &Request) -> Result<String, String> {
 ///
 /// Example:
 /// ```rust
-/// use ftl_core::prelude::*;
+/// use ftl_sdk::prelude::*;
 ///
 /// #[derive(Clone)]
 /// struct MyTool;

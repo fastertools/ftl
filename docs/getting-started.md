@@ -26,10 +26,10 @@ cd my-tool
 
 ## 3. Implement Your Tool
 
-Open `src/lib.rs` in your favorite editor and implement the `ftl_core::Tool` trait. This trait defines the name, description, input schema, and `call` method for your tool.
+Open `src/lib.rs` in your favorite editor and implement the `ftl_sdk::Tool` trait. This trait defines the name, description, input schema, and `call` method for your tool.
 
 ```rust
-use ftl_core::prelude::*;
+use ftl_sdk::prelude::*;
 
 #[derive(Clone)]
 struct MyTool;
@@ -56,7 +56,7 @@ impl Tool for MyTool {
     }
 }
 
-ftl_core::ftl_mcp_server!(MyTool);
+ftl_sdk::ftl_mcp_server!(MyTool);
 ```
 
 ## 4. Serve Locally

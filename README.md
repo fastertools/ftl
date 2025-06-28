@@ -38,10 +38,10 @@ This will create a new directory with a simple `ftl.toml` manifest, a `Cargo.tom
 
 ### Develop Your Tool
 
-Implement the `ftl_core::Tool` trait for your tool's logic.
+Implement the `ftl_sdk::Tool` trait for your tool's logic.
 
 ```rust
-use ftl_core::prelude::*;
+use ftl_sdk::prelude::*;
 
 #[derive(Clone)]
 struct MyTool;
@@ -68,7 +68,7 @@ impl Tool for MyTool {
     }
 }
 
-ftl_core::ftl_mcp_server!(MyTool);
+ftl_sdk::ftl_mcp_server!(MyTool);
 ```
 
 ### Serve Locally
