@@ -79,7 +79,7 @@ allowed_hosts = []
         r#"[package]
 name = "{{{{tool_name}}}}"
 version = "{{{{version}}}}"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 ftl-core = {ftl_core_dep}

@@ -93,9 +93,11 @@ mod tests {
 
         let result = test_tool(tool_dir.to_str().unwrap()).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("No ftl.toml found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("No ftl.toml found")
+        );
     }
 }

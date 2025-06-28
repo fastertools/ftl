@@ -10,7 +10,7 @@ skip_targets = ["wasm32-wasip1"]
 [workspace.package]
 version = "0.1.1"
 authors = ["FTL Contributors"]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ftl-tooling/ftl-cli"
 homepage = "https://github.com/ftl-tooling/ftl-cli"

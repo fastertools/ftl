@@ -1,8 +1,8 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
@@ -20,7 +20,7 @@ use crate::{
             ensure_ftl_dir, get_profile_dir, get_spin_toml_path, get_wasm_path,
             validate_tool_exists,
         },
-        watch_utils::{setup_file_watcher, Debouncer},
+        watch_utils::{Debouncer, setup_file_watcher},
     },
     spin_generator,
 };

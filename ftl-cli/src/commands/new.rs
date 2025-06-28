@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input};
+use dialoguer::{Input, theme::ColorfulTheme};
 
 use crate::templates;
 

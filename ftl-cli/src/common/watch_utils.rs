@@ -30,11 +30,11 @@ pub fn setup_file_watcher<P: AsRef<Path>>(
     tx: Sender<Event>,
 ) -> Result<notify::RecommendedWatcher> {
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-        if let Ok(event) = res {
-            if should_rebuild(&event) {
-                debug!("File change detected: {:?}", event.paths);
-                let _ = tx.send(event);
-            }
+        if let Ok(event) = res
+            && should_rebuild(&event)
+        {
+            debug!("File change detected: {:?}", event.paths);
+            let _ = tx.send(event);
         }
     })?;
 

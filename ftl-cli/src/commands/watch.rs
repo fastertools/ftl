@@ -8,7 +8,7 @@ use crate::{
     common::{
         manifest_utils::validate_and_load_manifest,
         tool_paths::validate_tool_exists,
-        watch_utils::{setup_file_watcher, Debouncer},
+        watch_utils::{Debouncer, setup_file_watcher},
     },
 };
 
@@ -77,7 +77,7 @@ pub async fn execute(tool_path: String) -> Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use notify::{event::ModifyKind, Event, EventKind};
+    use notify::{Event, EventKind, event::ModifyKind};
 
     use crate::common::watch_utils::should_rebuild;
 
