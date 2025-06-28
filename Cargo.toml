@@ -8,7 +8,7 @@ resolver = "2"
 skip_targets = ["wasm32-wasip1"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 authors = ["FTL Contributors"]
 edition = "2024"
 license = "Apache-2.0"

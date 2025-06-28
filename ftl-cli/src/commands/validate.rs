@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_version_validation() {
         assert!(is_valid_version("1.0.0"));
-        assert!(is_valid_version("0.1.0"));
+        assert!(is_valid_version("0.0.1"));
         assert!(is_valid_version("10.20.30"));
 
         assert!(!is_valid_version("1.0"));

@@ -34,6 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory allocator: talc (2MB default allocation)
 - MCP protocol version: JSON-RPC 2.0
 
-## [0.1.0] - TBD
+## [0.0.1] - TBD
 
 Initial public release.

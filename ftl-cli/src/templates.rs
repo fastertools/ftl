@@ -26,7 +26,7 @@ pub fn create_tool(name: &str, description: &str, target_dir: &Path) -> Result<(
         "tool_name": name,
         "struct_name": struct_name,
         "description": description,
-        "version": "0.1.0",
+        "version": "0.0.1",
     });
 
     // Create ftl.toml

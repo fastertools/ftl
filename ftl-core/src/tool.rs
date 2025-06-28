@@ -43,9 +43,9 @@ pub trait Tool: Clone {
         format!("ftl-{}", self.name())
     }
 
-    /// Optional: Server version (defaults to "0.1.0")
+    /// Optional: Server version (defaults to "0.0.1")
     fn server_version(&self) -> &'static str {
-        "0.1.0"
+        "0.0.1"
     }
 
     /// Optional: Additional server capabilities

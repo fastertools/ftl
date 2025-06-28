@@ -7,7 +7,7 @@ The `ftl.toml` file is the manifest for your FTL tool. It contains metadata abou
 ```toml
 [tool]
 name = "my-tool"
-version = "0.1.0"
+version = "0.0.1"
 description = "A new tool for my agent"
 
 [build]

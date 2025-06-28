@@ -8,29 +8,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+permissions:
+  contents: write
 
+jobs:
   build-binaries:
     name: Build Binaries
-    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -59,6 +42,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        shell: bash
+      
+      - name: Validate version matches Cargo.toml
+        run: |
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          if [ "$CARGO_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "Error: Tag version (${{ steps.version.outputs.VERSION }}) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+        shell: bash
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -80,37 +77,100 @@ jobs:
           fi
         shell: bash
       
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/${{ matrix.target }}/release/${{ matrix.binary }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/octet-stream
+          name: ${{ matrix.asset_name }}
+          path: ./target/${{ matrix.target }}/release/${{ matrix.binary }}
+          if-no-files-found: error
+  
+  create-release:
+    name: Create Release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+      
+      - name: Create Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            binaries/ftl-linux-amd64/ftl
+            binaries/ftl-linux-arm64/ftl
+            binaries/ftl-darwin-amd64/ftl
+            binaries/ftl-darwin-arm64/ftl
+            binaries/ftl-windows-amd64.exe/ftl.exe
 
   publish-crates:
     name: Publish to crates.io
-    needs: build-binaries
+    needs: create-release
     runs-on: ubuntu-latest
+    if: needs.create-release.outputs.release_created
     steps:
       - uses: actions/checkout@v4
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
+      - name: Check if ftl-core already published
+        id: check-core
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          if cargo search ftl-core --limit 1 | grep -q "ftl-core = \"$VERSION\""; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "ftl-core version $VERSION already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Publish ftl-core
+        if: steps.check-core.outputs.skip != 'true'
         run: |
           cd ftl-core
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       
       - name: Wait for crates.io to index
-        run: sleep 30
+        if: steps.check-core.outputs.skip != 'true'
+        run: |
+          echo "Waiting for ftl-core to be indexed on crates.io..."
+          for i in {1..12}; do
+            sleep 10
+            VERSION=$(grep '^version' ../Cargo.toml | head -1 | cut -d'"' -f2)
+            if cargo search ftl-core --limit 1 | grep -q "ftl-core = \"$VERSION\""; then
+              echo "ftl-core is now available on crates.io"
+              break
+            fi
+            echo "Attempt $i/12: ftl-core not yet indexed..."
+          done
+      
+      - name: Check if ftl CLI already published
+        id: check-cli
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          if cargo search ftl --limit 1 | grep -q "ftl = \"$VERSION\""; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "ftl CLI version $VERSION already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
       
       - name: Publish ftl CLI
+        if: steps.check-cli.outputs.skip != 'true'
         run: |
           cd ftl-cli
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
