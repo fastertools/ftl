@@ -1,8 +1,23 @@
-# FTL - Faster Than Light Tools for AI Agents
+<div align="center">
+
+# FTL Core
+
+Portable tools for AI agents
+
+A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) project
+
+[![CI](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/fastertools/core/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.87+-orange.svg)](https://www.rust-lang.org)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
+
+[Docs](./docs/introduction.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
+
+</div>
 
 FTL is a framework for building and deploying high-performance, low-latency tools for AI agents. It provides a complete developer experience for the entire lifecycle of creating, testing, and deploying WebAssembly-based tools that are designed to be called by AI agents and other autonomous systems.
 
-At [Faster Than Light](https://ftl.dev), we're building the low-latency appendages that allow agents deployed in realtime worlds like vehicles, trading and IoT to interact with the world near instantly. Our vision is to become nervous system for AI reflexes that will unlock the next generation of critical automation in worlds where **microseconds mean everything**.
+At [Faster Than Light](https://ftl.tools), we're building the low-latency appendages that allow agents deployed in realtime worlds like vehicles, trading and IoT to interact with the world near instantly. Our vision is to become nervous system for AI reflexes that will unlock the next generation of critical automation in worlds where **microseconds mean everything**.
 
 ## The Action Latency Bottleneck
 
