@@ -50,7 +50,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ```bash
 # Clone the repository
-git clone https://github.com/ftl-tooling/ftl-cli
+git clone https://github.com/fastertools/ftl-cli
 cd ftl-cli
 
 # Build all components

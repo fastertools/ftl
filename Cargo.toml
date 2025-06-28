@@ -9,13 +9,13 @@ skip_packages = ["ftl-cli"]
 skip_targets = ["wasm32-wasip1"]
 
 [workspace.package]
-version = "0.0.4"
+version = "0.0.5"
 authors = ["FTL Contributors"]
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/ftl-tooling/ftl-cli"
-homepage = "https://github.com/ftl-tooling/ftl-cli"
-documentation = "https://docs.rs/ftl"
+repository = "https://github.com/fastertools/ftl-cli"
+homepage = "https://github.com/fastertools/ftl-cli"
+documentation = "https://crates.io/crates/ftl-cli"
 keywords = ["wasm", "mcp", "tools", "cli", "webassembly"]
 categories = ["command-line-utilities", "development-tools", "wasm"]
 
