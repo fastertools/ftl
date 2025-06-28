@@ -2,17 +2,6 @@
 //!
 //! Core MCP server implementation for building AI agent tools.
 
-// Memory allocator for WebAssembly
-#[cfg(target_arch = "wasm32")]
-#[global_allocator]
-static ALLOC: talc::Talck<talc::locking::AssumeUnlockable, talc::ClaimOnOom> = {
-    static mut ARENA: [u8; 2 * 1024 * 1024] = [0; 2 * 1024 * 1024];
-    talc::Talc::new(unsafe {
-        talc::ClaimOnOom::new(talc::Span::from_base_size(ARENA.as_mut_ptr(), ARENA.len()))
-    })
-    .lock()
-};
-
 pub mod server;
 pub mod spin;
 pub mod tool;

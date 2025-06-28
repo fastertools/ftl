@@ -83,6 +83,7 @@ edition = "2024"
 
 [dependencies]
 ftl-core = {ftl_core_dep}
+talc = {{ version = "4.4.3", features = ["lock_api"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 anyhow = "1.0"
@@ -115,8 +116,39 @@ debug = true
     let lib_rs_template = r#"use ftl_core::prelude::*;
 use serde_json::json;
 
+// --- Global Memory Allocator ---
+// FTL tools are compiled to WebAssembly, which requires a global memory
+// allocator to be defined. The `talc` allocator is used here with a
+// statically-allocated arena.
+//
+// The size of this arena is a critical trade-off:
+//   - Larger Arena: Supports more memory-intensive tools.
+//   - Smaller Arena: Results in a smaller .wasm binary size, which can improve
+//     cold start times.
+//
+// You can adjust the `ARENA_SIZE` constant below to fit your tool's specific
+// memory requirements.
+#[cfg(target_family = "wasm")]
+#[global_allocator]
+static ALLOC: talc::Talck<talc::locking::AssumeUnlockable, talc::ClaimOnOom> = {
+    use talc::*;
+    // Choose an arena size based on your tool's needs.
+    // - 64 * 1024 (64KB): For minimal tools (e.g., simple text processing).
+    // - 1 * 1024 * 1024 (1MB): A good default for most tools.
+    // - 4 * 1024 * 1024 (4MB): For data-intensive tools (e.g., image processing).
+    const ARENA_SIZE: usize = 1 * 1024 * 1024; // Default: 1MB
+    static mut ARENA: [u8; ARENA_SIZE] = [0; ARENA_SIZE];
+    Talc::new(unsafe {
+        ClaimOnOom::new(Span::from_base_size(
+            std::ptr::addr_of_mut!(ARENA).cast(),
+            ARENA_SIZE,
+        ))
+    })
+    .lock()
+};
+
 #[derive(Clone)]
-struct {{struct_name}};
+pub struct {{struct_name}};
 
 impl Tool for {{struct_name}} {
     fn name(&self) -> &'static str {
@@ -155,34 +187,44 @@ impl Tool for {{struct_name}} {
 ftl_core::ftl_mcp_server!({{struct_name}});
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn test_tool_metadata() {
-        let tool = {{struct_name}};
-        assert_eq!(tool.name(), "{{tool_name}}");
-        assert_eq!(tool.description(), "{{description}}");
-    }
-
-    #[test]
-    fn test_tool_call() {
-        let tool = {{struct_name}};
-        let args = json!({
-            "input": "test input"
-        });
-
-        let result = tool.call(&args).unwrap();
-        // Result is a text block
-        assert!(!result.content.is_empty());
-        let text = &result.content[0].text;
-        assert!(text.contains("test input"));
-    }
-}
+// Export the tool struct for tests
+#[cfg(test)]
+pub use {{struct_name}} as TestTool;
 "#;
 
     let lib_rs = handlebars.render_template(lib_rs_template, &data)?;
     std::fs::write(target_dir.join("src").join("lib.rs"), lib_rs)?;
+
+    // Create src/tests.rs
+    let tests_rs_template = r#"use super::TestTool;
+use ftl_core::prelude::*;
+use serde_json::json;
+
+#[test]
+fn test_tool_metadata() {
+    let tool = TestTool;
+    assert_eq!(tool.name(), "{{tool_name}}");
+    assert_eq!(tool.description(), "{{description}}");
+}
+
+#[test]
+fn test_tool_call() {
+    let tool = TestTool;
+    let args = json!({
+        "input": "test input"
+    });
+
+    let result = tool.call(&args).unwrap();
+    // Result is a text block
+    assert!(!result.content.is_empty());
+    let text = &result.content[0].text;
+    assert!(text.contains("test input"));
+}"#;
+
+    let tests_rs = handlebars.render_template(tests_rs_template, &data)?;
+    std::fs::write(target_dir.join("src").join("tests.rs"), tests_rs)?;
 
     // Create README.md
     let readme_template = r#"# {{tool_name}}

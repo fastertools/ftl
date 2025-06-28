@@ -1,6 +1,6 @@
 <div align="center">
 
-# FTL Core
+# `ftl`
 
 Portable tools for AI agents
 
