@@ -24,7 +24,7 @@ This repository contains the `ftl` command-line interface, which is the primary 
 ### Installation
 
 ```bash
-cargo install ftl
+cargo install ftl-cli
 ```
 
 ### Create a New Tool

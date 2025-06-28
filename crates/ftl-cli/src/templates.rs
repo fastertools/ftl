@@ -71,7 +71,7 @@ allowed_hosts = []
     } else {
         // Tool is being created outside ftl-cli repository
         // Use crates.io version once published
-        "{ version = \"0.1\" }".to_string()
+        "{ version = \"^0.0.4\" }".to_string()
     };
 
     // Create Cargo.toml
