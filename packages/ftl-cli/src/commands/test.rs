@@ -1,9 +1,10 @@
-use std::process::Command;
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tracing::info;
 
-use crate::common::{manifest_utils::validate_and_load_manifest, tool_paths::validate_tool_exists};
+use crate::{
+    common::{manifest_utils::validate_and_load_manifest, tool_paths::validate_tool_exists},
+    language::get_language_support,
+};
 
 pub async fn execute(name: Option<String>) -> Result<()> {
     let tool_path = name.unwrap_or_else(|| ".".to_string());
@@ -16,57 +17,50 @@ async fn test_tool(tool_path: &str) -> Result<()> {
     let manifest = validate_and_load_manifest(tool_path)?;
 
     info!("Testing tool: {}", manifest.tool.name);
+    println!("🧪 Running tests for '{}'...", tool_path);
 
-    // Run tests using cargo test
-    // Note: We run standard Rust unit tests, not in the WASM runtime
-    // This tests the logic without the complexity of WASM environment
-    // For full WASM component testing, consider using spin-test (experimental)
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(tool_path).arg("test").arg("--lib"); // Only run library tests, not integration tests
-
-    // Add any features from the manifest
-    if !manifest.build.features.is_empty() {
-        cmd.arg("--features");
-        cmd.arg(manifest.build.features.join(","));
-    }
-
-    info!("Running tests for '{}'...", tool_path);
-    println!("🧪 Running tests for '{tool_path}'...");
-
-    let output = cmd.output().context("Failed to execute cargo test")?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        println!("{stdout}");
-        println!("✅ All tests passed for '{tool_path}'");
-        Ok(())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        println!("❌ Tests failed for '{tool_path}'");
-        if !stdout.is_empty() {
-            println!("\nOutput:\n{stdout}");
+    // Get language support and run tests
+    let language_support = get_language_support(manifest.tool.language);
+    
+    // Use the language-specific test implementation
+    match language_support.test(&manifest, std::path::Path::new(tool_path)) {
+        Ok(_) => {
+            println!("✅ All tests passed for '{tool_path}'");
+            Ok(())
         }
-        if !stderr.is_empty() {
-            println!("\nErrors:\n{stderr}");
-        }
+        Err(e) => {
+            println!("❌ Tests failed for '{tool_path}'");
+            
+            // Provide helpful message for missing tests
+            let error_msg = e.to_string();
+            if error_msg.contains("0 tests") || error_msg.contains("could not find") {
+                println!(
+                    "\n💡 No tests found. Your tool template includes example tests in {}",
+                    match manifest.tool.language {
+                        crate::language::Language::Rust => "src/lib.rs",
+                        crate::language::Language::JavaScript => "src/index.test.js",
+                    }
+                );
+                println!("   The tests verify basic tool functionality like name and description.");
+                println!("\nTo add more tests:");
+                match manifest.tool.language {
+                    crate::language::Language::Rust => {
+                        println!("   1. Add #[test] functions to src/lib.rs");
+                        println!("   2. Test your tool's logic without needing WASM runtime");
+                        println!("   3. Use standard Rust testing patterns");
+                    }
+                    crate::language::Language::JavaScript => {
+                        println!("   1. Add test files matching *.test.js or *.spec.js");
+                        println!("   2. Use your preferred JavaScript testing framework");
+                        println!("   3. Tests run in Node.js, not in the WASM runtime");
+                    }
+                }
+                println!("\nNote: These are unit tests that run natively, not in WASM.");
+                println!("For WASM runtime testing, consider spin-test (experimental).");
+            }
 
-        // Check if it's because no tests exist
-        if stdout.contains("0 tests") || stderr.contains("could not find") {
-            println!(
-                "\n💡 No tests found. Your tool template includes example tests in src/lib.rs"
-            );
-            println!("   The tests verify basic tool functionality like name and description.");
-            println!("\nTo add more tests:");
-            println!("   1. Add #[test] functions to src/lib.rs");
-            println!("   2. Test your tool's logic without needing WASM runtime");
-            println!("   3. Use standard Rust testing patterns");
-            println!("\nNote: These are unit tests that run in native Rust, not in WASM.");
-            println!("For WASM runtime testing, consider spin-test (experimental).");
+            Err(e)
         }
-
-        anyhow::bail!("Tests failed for '{}'", tool_path);
     }
 }
 

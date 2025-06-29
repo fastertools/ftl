@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -11,7 +11,7 @@ use crate::{
         spin_utils::check_spin_installed,
         tool_paths::{ensure_ftl_dir, get_profile_dir, get_spin_toml_path, get_wasm_path},
     },
-    language::{get_language_support, Language},
+    language::{Language, get_language_support},
     spin_generator::SpinConfig,
 };
 
@@ -53,7 +53,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
 
     // Determine build profile
     let build_profile = profile.unwrap_or_else(|| manifest.build.profile.clone());
-    
+
     // Get language support
     let language_support = get_language_support(manifest.tool.language);
 
@@ -78,8 +78,9 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
             spin_config.save(&spin_path)?;
         }
         Language::JavaScript => {
-            // For JavaScript, spin.toml is already in .ftl directory (moved during project creation)
-            // We don't need to generate or copy it
+            // For JavaScript, spin.toml is already in .ftl directory (moved
+            // during project creation) We don't need to generate or
+            // copy it
         }
     }
 
@@ -103,7 +104,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
 
     // Validate language environment
     language_support.validate_environment()?;
-    
+
     // Run the language-specific build
     language_support.build(&manifest, std::path::Path::new(tool_path))?;
 
@@ -115,10 +116,12 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
         Language::Rust => get_wasm_path(tool_path, &tool_name, &build_profile),
         Language::JavaScript => {
             // For JS/TS, Spin puts the WASM in dist/{tool-name}.wasm
-            PathBuf::from(tool_path).join("dist").join(format!("{}.wasm", tool_name))
+            PathBuf::from(tool_path)
+                .join("dist")
+                .join(format!("{}.wasm", tool_name))
         }
     };
-    
+
     if !wasm_path.exists() {
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
     }

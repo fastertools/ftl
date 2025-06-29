@@ -4,9 +4,16 @@ use anyhow::Result;
 use console::style;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
-use crate::{language::{Language, get_language_support}, templates};
+use crate::{
+    language::{Language, get_language_support},
+    templates,
+};
 
-pub async fn execute(name: String, description: Option<String>, language: Option<String>) -> Result<()> {
+pub async fn execute(
+    name: String,
+    description: Option<String>,
+    language: Option<String>,
+) -> Result<()> {
     println!(
         "{} Creating new tool: {}",
         style("→").cyan(),
@@ -36,10 +43,12 @@ pub async fn execute(name: String, description: Option<String>, language: Option
 
     // Determine language
     let selected_language = match language {
-        Some(lang_str) => {
-            Language::from_str(&lang_str)
-                .ok_or_else(|| anyhow::anyhow!("Invalid language: {}. Valid options are: rust, javascript", lang_str))?
-        }
+        Some(lang_str) => Language::from_str(&lang_str).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Invalid language: {}. Valid options are: rust, javascript",
+                lang_str
+            )
+        })?,
         None => {
             // Interactive language selection
             let languages = vec!["rust", "javascript"];
@@ -48,7 +57,7 @@ pub async fn execute(name: String, description: Option<String>, language: Option
                 .items(&languages)
                 .default(0)
                 .interact()?;
-            
+
             Language::from_str(languages[selection]).unwrap()
         }
     };
@@ -61,7 +70,7 @@ pub async fn execute(name: String, description: Option<String>, language: Option
 
     // Create tool using language-specific support
     let language_support = get_language_support(selected_language);
-    
+
     // Use templates for Rust (existing), or language-specific for others
     match selected_language {
         Language::Rust => {
@@ -77,7 +86,7 @@ pub async fn execute(name: String, description: Option<String>, language: Option
         Language::Rust => "src/lib.rs",
         Language::JavaScript => "src/index.js",
     };
-    
+
     println!(
         r#"
 {} {} tool created successfully!

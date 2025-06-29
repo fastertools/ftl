@@ -6,13 +6,12 @@ use serde_json::json;
 
 use crate::language::Language;
 
+#[allow(dead_code)]
 pub struct Template {
     pub name: String,
     pub description: String,
     pub language: Language,
 }
-
-
 
 pub fn create_tool(name: &str, description: &str, target_dir: &Path) -> Result<()> {
     // Create directory structure
@@ -69,7 +68,8 @@ allowed_hosts = []
     // Determine ftl-sdk-rs dependency based on context
     // This logic handles three scenarios:
     // 1. Creating tools within ftl-cli repository (use relative paths)
-    // 2. Creating tools in subdirectories of ftl-cli (use ../../packages/ftl-sdk-rs)
+    // 2. Creating tools in subdirectories of ftl-cli (use
+    //    ../../packages/ftl-sdk-rs)
     // 3. Creating tools outside ftl-cli (use crates.io version once published)
     let ftl_sdk_dep = if target_dir.join("../../packages/ftl-sdk-rs").exists() {
         // Tool is being created directly in ftl-cli directory

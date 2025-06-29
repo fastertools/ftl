@@ -1,10 +1,12 @@
-use anyhow::{Context, Result};
-use std::path::Path;
-use std::process::Command;
+use std::{path::Path, process::Command};
 
-use crate::language::{Language, LanguageSupport};
-use crate::manifest::Manifest;
-use crate::templates::{self, Template};
+use anyhow::{Context, Result};
+
+use crate::{
+    language::{Language, LanguageSupport},
+    manifest::Manifest,
+    templates::{self, Template},
+};
 
 pub struct RustSupport;
 
@@ -19,7 +21,13 @@ impl LanguageSupport for RustSupport {
         Language::Rust
     }
 
-    fn new_project(&self, name: &str, description: &str, _template: &str, path: &Path) -> Result<()> {
+    fn new_project(
+        &self,
+        name: &str,
+        description: &str,
+        _template: &str,
+        path: &Path,
+    ) -> Result<()> {
         // Use existing template generation logic
         templates::create_tool(name, description, path)?;
         Ok(())
@@ -37,10 +45,7 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo build")?;
 
         if !output.status.success() {
-            anyhow::bail!(
-                "Build failed:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            anyhow::bail!("Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
         }
 
         // Run wasm-opt if available
@@ -63,10 +68,7 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo test")?;
 
         if !output.status.success() {
-            anyhow::bail!(
-                "Tests failed:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            anyhow::bail!("Tests failed:\n{}", String::from_utf8_lossy(&output.stderr));
         }
 
         Ok(())
@@ -96,8 +98,8 @@ impl LanguageSupport for RustSupport {
         let installed_targets = String::from_utf8_lossy(&output.stdout);
         if !installed_targets.contains("wasm32-wasip1") {
             anyhow::bail!(
-                "The wasm32-wasip1 target is not installed. \
-                Please run: rustup target add wasm32-wasip1"
+                "The wasm32-wasip1 target is not installed. Please run: rustup target add \
+                 wasm32-wasip1"
             );
         }
 
@@ -110,7 +112,7 @@ impl RustSupport {
         // Check if wasm-opt is available
         if Command::new("wasm-opt").arg("--version").output().is_ok() {
             println!("Optimizing WASM with wasm-opt...");
-            
+
             let output = Command::new("wasm-opt")
                 .args(&[
                     "-O3",

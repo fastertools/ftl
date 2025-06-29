@@ -207,7 +207,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     match cli.command {
-        Command::New { name, description, language } => commands::new::execute(name, description, language).await,
+        Command::New {
+            name,
+            description,
+            language,
+        } => commands::new::execute(name, description, language).await,
         Command::Build {
             name,
             profile,

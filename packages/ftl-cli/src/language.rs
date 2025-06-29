@@ -1,10 +1,9 @@
+use std::{fmt, path::Path};
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::path::Path;
 
-use crate::manifest::Manifest;
-use crate::templates::Template;
+use crate::{manifest::Manifest, templates::Template};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -37,6 +36,7 @@ impl Language {
         }
     }
 
+    #[allow(dead_code)]
     pub fn detect_from_path(path: &Path) -> Option<Self> {
         // Check for language-specific files
         if path.join("Cargo.toml").exists() {
@@ -48,6 +48,7 @@ impl Language {
         None
     }
 
+    #[allow(dead_code)]
     pub fn file_extension(&self) -> &'static str {
         match self {
             Language::Rust => "rs",
@@ -55,10 +56,12 @@ impl Language {
         }
     }
 
+    #[allow(dead_code)]
     pub fn source_dir(&self) -> &'static str {
         "src"
     }
 
+    #[allow(dead_code)]
     pub fn build_output_path(&self) -> &'static str {
         match self {
             Language::Rust => "target/wasm32-wasip1/release",
@@ -66,6 +69,7 @@ impl Language {
         }
     }
 
+    #[allow(dead_code)]
     pub fn wasm_file_name(&self) -> &'static str {
         match self {
             Language::Rust => "{name}.wasm",
@@ -75,19 +79,21 @@ impl Language {
 }
 
 pub trait LanguageSupport: Send + Sync {
+    #[allow(dead_code)]
     fn language(&self) -> Language;
-    fn new_project(&self, name: &str, description: &str, template: &str, path: &Path) -> Result<()>;
+    fn new_project(&self, name: &str, description: &str, template: &str, path: &Path)
+    -> Result<()>;
     fn build(&self, manifest: &Manifest, path: &Path) -> Result<()>;
     fn test(&self, manifest: &Manifest, path: &Path) -> Result<()>;
+    #[allow(dead_code)]
     fn get_templates(&self) -> Vec<Template>;
     fn validate_environment(&self) -> Result<()>;
 }
 
-pub mod rust;
 pub mod javascript;
+pub mod rust;
 
-use self::javascript::JavaScriptSupport;
-use self::rust::RustSupport;
+use self::{javascript::JavaScriptSupport, rust::RustSupport};
 
 pub fn get_language_support(language: Language) -> Box<dyn LanguageSupport> {
     match language {
@@ -114,6 +120,7 @@ impl PackageManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn install_command(&self) -> &'static str {
         match self {
             PackageManager::Npm => "npm install",
@@ -130,6 +137,7 @@ impl PackageManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn exec_command(&self, cmd: &str) -> String {
         match self {
             PackageManager::Npm => format!("npx {}", cmd),

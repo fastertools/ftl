@@ -45,7 +45,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     }
 
     // Check WASM binary exists and determine spin.toml path
-    let (wasm_path, spin_toml_path) = match manifest.tool.language {
+    let (_wasm_path, spin_toml_path) = match manifest.tool.language {
         Language::Rust => {
             let wasm = get_wasm_path(&tool_path, &tool_name, &manifest.build.profile);
             if !wasm.exists() {
@@ -55,11 +55,11 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                     tool_path
                 );
             }
-            
+
             // Ensure .ftl directory and spin.toml exist for Rust
             ensure_ftl_dir(&tool_path)?;
             let spin_path = get_spin_toml_path(&tool_path);
-            
+
             if !spin_path.exists() {
                 // Generate development spin.toml if it doesn't exist
                 let profile_dir = get_profile_dir(&manifest.build.profile);
@@ -70,16 +70,21 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                     .join(profile_dir)
                     .join(&wasm_filename);
 
-                let spin_content =
-                    spin_generator::generate_development_config(&tool_name, port, &relative_wasm_path)?;
+                let spin_content = spin_generator::generate_development_config(
+                    &tool_name,
+                    port,
+                    &relative_wasm_path,
+                )?;
                 std::fs::write(&spin_path, spin_content)?;
             }
-            
+
             (wasm, spin_path)
         }
         Language::JavaScript => {
             // For JS/TS, use Spin's generated paths
-            let wasm = PathBuf::from(&tool_path).join("dist").join(format!("{}.wasm", tool_name));
+            let wasm = PathBuf::from(&tool_path)
+                .join("dist")
+                .join(format!("{}.wasm", tool_name));
             if !wasm.exists() {
                 anyhow::bail!(
                     "WASM binary not found at: {}. Run 'ftl build {}' first.",
@@ -87,13 +92,16 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                     tool_path
                 );
             }
-            
+
             // Use spin.toml from .ftl directory
             let spin_path = get_spin_toml_path(&tool_path);
             if !spin_path.exists() {
-                anyhow::bail!("spin.toml not found in .ftl directory. Run 'ftl build {}' first.", tool_path);
+                anyhow::bail!(
+                    "spin.toml not found in .ftl directory. Run 'ftl build {}' first.",
+                    tool_path
+                );
             }
-            
+
             (wasm, spin_path)
         }
     };
