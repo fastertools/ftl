@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -61,20 +61,40 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     ensure_ftl_dir(tool_path)?;
     check_spin_installed()?;
 
-    // For JavaScript/TypeScript, Spin already has its own spin.toml, so we don't need to generate one
-    if manifest.tool.language == Language::Rust {
-        // Generate spin.toml with build configuration for Rust
-        let profile_dir = get_profile_dir(&build_profile);
-        let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-        let relative_wasm_path = PathBuf::from("..")
-            .join("target")
-            .join("wasm32-wasip1")
-            .join(profile_dir)
-            .join(&wasm_filename);
+    // Generate spin.toml in .ftl directory
+    match manifest.tool.language {
+        Language::Rust => {
+            // Generate spin.toml with build configuration for Rust
+            let profile_dir = get_profile_dir(&build_profile);
+            let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
+            let relative_wasm_path = PathBuf::from("..")
+                .join("target")
+                .join("wasm32-wasip1")
+                .join(profile_dir)
+                .join(&wasm_filename);
 
-        let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
-        let spin_path = get_spin_toml_path(tool_path);
-        spin_config.save(&spin_path)?;
+            let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
+            let spin_path = get_spin_toml_path(tool_path);
+            spin_config.save(&spin_path)?;
+        }
+        Language::JavaScript => {
+            // For JavaScript, copy the existing spin.toml to .ftl/spin.toml
+            let source_spin = PathBuf::from(tool_path).join("spin.toml");
+            let dest_spin = get_spin_toml_path(tool_path);
+            
+            if source_spin.exists() {
+                std::fs::copy(&source_spin, &dest_spin)
+                    .context("Failed to copy spin.toml to .ftl directory")?;
+            } else {
+                // If no spin.toml exists, generate one
+                let relative_wasm_path = PathBuf::from("..")
+                    .join("dist")
+                    .join(format!("{}.wasm", tool_name));
+
+                let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
+                spin_config.save(&dest_spin)?;
+            }
+        }
     }
 
     // Create progress bar (only if not quiet)
@@ -115,6 +135,14 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     
     if !wasm_path.exists() {
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
+    }
+
+    // For JavaScript, also copy the WASM to .ftl/dist directory for deployment
+    if let Language::JavaScript = manifest.tool.language {
+        let ftl_dist_dir = PathBuf::from(tool_path).join(".ftl").join("dist");
+        std::fs::create_dir_all(&ftl_dist_dir)?;
+        let dest_wasm = ftl_dist_dir.join(format!("{}.wasm", tool_name));
+        std::fs::copy(&wasm_path, &dest_wasm)?;
     }
 
     // Step 3: Run wasm-opt (post-build optimization) - only for Rust
