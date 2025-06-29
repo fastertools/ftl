@@ -160,17 +160,17 @@ impl LanguageSupport for JavaScriptSupport {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             if !stdout.is_empty() {
                 println!("\nOutput:\n{}", stdout);
             }
             if !stderr.is_empty() {
                 println!("\nErrors:\n{}", stderr);
             }
-            
+
             anyhow::bail!("Tests failed");
         }
-        
+
         println!("{}", String::from_utf8_lossy(&output.stdout));
         Ok(())
     }

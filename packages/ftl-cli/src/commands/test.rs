@@ -21,7 +21,7 @@ async fn test_tool(tool_path: &str) -> Result<()> {
 
     // Get language support and run tests
     let language_support = get_language_support(manifest.tool.language);
-    
+
     // Use the language-specific test implementation
     match language_support.test(&manifest, std::path::Path::new(tool_path)) {
         Ok(_) => {
@@ -30,7 +30,7 @@ async fn test_tool(tool_path: &str) -> Result<()> {
         }
         Err(e) => {
             println!("❌ Tests failed for '{tool_path}'");
-            
+
             // Provide helpful message for missing tests
             let error_msg = e.to_string();
             if error_msg.contains("0 tests") || error_msg.contains("could not find") {
