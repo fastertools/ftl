@@ -88,7 +88,7 @@ jobs:
       
       - name: Build WASM targets
         run: |
-          cargo build --package ftl-sdk --target wasm32-wasip1
+          cargo build --package ftl-sdk-rs --target wasm32-wasip1
 
   security:
     name: Security Audit

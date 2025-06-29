@@ -66,18 +66,18 @@ allowed_hosts = []
     let ftl_toml = handlebars.render_template(ftl_toml_template, &data)?;
     std::fs::write(target_dir.join("ftl.toml"), ftl_toml)?;
 
-    // Determine ftl-sdk dependency based on context
+    // Determine ftl-sdk-rs dependency based on context
     // This logic handles three scenarios:
     // 1. Creating tools within ftl-cli repository (use relative paths)
-    // 2. Creating tools in subdirectories of ftl-cli (use ../../ftl-sdk)
+    // 2. Creating tools in subdirectories of ftl-cli (use ../../packages/ftl-sdk-rs)
     // 3. Creating tools outside ftl-cli (use crates.io version once published)
-    let ftl_sdk_dep = if target_dir.join("../../crates/ftl-sdk").exists() {
+    let ftl_sdk_dep = if target_dir.join("../../packages/ftl-sdk-rs").exists() {
         // Tool is being created directly in ftl-cli directory
-        "{ path = \"../../crates/ftl-sdk\" }".to_string()
-    } else if target_dir.join("../../../crates/ftl-sdk").exists() {
+        "{ path = \"../../packages/ftl-sdk-rs\" }".to_string()
+    } else if target_dir.join("../../../packages/ftl-sdk-rs").exists() {
         // Tool is being created in a subdirectory of ftl-cli (e.g.,
         // test_validation/tool_name)
-        "{ path = \"../../../crates/ftl-sdk\" }".to_string()
+        "{ path = \"../../../packages/ftl-sdk-rs\" }".to_string()
     } else {
         // Tool is being created outside ftl-cli repository
         // Use crates.io version once published
@@ -92,7 +92,7 @@ version = "{{{{version}}}}"
 edition = "2024"
 
 [dependencies]
-ftl-sdk = {ftl_sdk_dep}
+ftl-sdk-rs = {ftl_sdk_dep}
 talc = {{ version = "4.4.3", features = ["lock_api"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
@@ -123,7 +123,7 @@ debug = true
     std::fs::write(target_dir.join("Cargo.toml"), cargo_toml)?;
 
     // Create src/lib.rs
-    let lib_rs_template = r#"use ftl_sdk::prelude::*;
+    let lib_rs_template = r#"use ftl_sdk_rs::prelude::*;
 use serde_json::json;
 
 // --- Global Memory Allocator ---
@@ -208,7 +208,7 @@ pub use {{struct_name}};
     std::fs::write(target_dir.join("src").join("lib.rs"), lib_rs)?;
 
     // Create src/tests.rs
-    let tests_rs_template = r#"use ftl_sdk::prelude::*;
+    let tests_rs_template = r#"use ftl_sdk_rs::prelude::*;
 use serde_json::json;
 
 use super::TestTool;

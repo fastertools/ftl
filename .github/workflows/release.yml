@@ -112,10 +112,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
       
-      - name: Publish ftl-sdk
+      - name: Publish ftl-sdk-rs
         if: steps.check-sdk.outputs.skip != 'true'
         run: |
-          cd crates/ftl-sdk
+          cd packages/ftl-sdk-rs
           cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -123,7 +123,47 @@ jobs:
       - name: Publish ftl-cli
         if: steps.check-cli.outputs.skip != 'true'
         run: |
-          cd crates/ftl-cli
+          cd packages/ftl-cli
           cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: needs.create-release.outputs.release_created
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Validate version matches
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./packages/ftl-sdk-js/package.json').version")
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_VERSION)"
+            exit 1
+          fi
+      
+      - name: Install dependencies
+        run: |
+          cd packages/ftl-sdk-js
+          npm ci
+      
+      - name: Run tests
+        run: |
+          cd packages/ftl-sdk-js
+          npm test
+      
+      - name: Publish to npm
+        run: |
+          cd packages/ftl-sdk-js
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

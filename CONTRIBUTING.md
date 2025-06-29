@@ -68,7 +68,7 @@ cargo build --release
 ```
 ftl-cli/
 ├── ftl-cli/        # Main CLI implementation
-├── ftl-sdk/       # Core MCP server library
+├── ftl-sdk-rs/    # Core MCP server library
 ├── ftl-runtime/    # Runtime abstraction layer
 └── examples/       # Example tools
 ```
@@ -87,7 +87,7 @@ ftl-cli/
 ### Error Handling
 
 - Use `anyhow::Result` for fallible functions in the CLI
-- Use `thiserror` for library errors in ftl-sdk and ftl-runtime
+- Use `thiserror` for library errors in ftl-sdk-rs and ftl-runtime
 - Provide helpful error messages with context
 - Chain errors appropriately using `.context()`
 
@@ -148,7 +148,7 @@ When adding a new CLI command:
 
 ### Modifying Core APIs
 
-Changes to `ftl-sdk` APIs require careful consideration:
+Changes to `ftl-sdk-rs` APIs require careful consideration:
 
 1. Maintain backward compatibility when possible
 2. Document breaking changes clearly

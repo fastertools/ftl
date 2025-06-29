@@ -4,21 +4,21 @@ This crate provides the core building blocks for creating FTL tools. It is the o
 
 ## Purpose
 
-`ftl-sdk` is the library that developers will use to implement the logic of their tools. It provides the necessary abstractions to integrate with the FTL runtime and the Model Context Protocol (MCP) without needing to know the low-level details.
+`ftl-sdk-rs` is the library that developers will use to implement the logic of their tools. It provides the necessary abstractions to integrate with the FTL runtime and the Model Context Protocol (MCP) without needing to know the low-level details.
 
 ## Key Components
 
 - **`Tool` Trait:** The central abstraction for all FTL tools. It defines the interface that the FTL runtime uses to execute a tool.
 - **`ftl_mcp_server!` Macro:** A macro that generates the necessary boilerplate to expose a `Tool` implementation as a WebAssembly component that can be served over MCP.
 - **`ToolResult` and `ToolError`:** Standardized types for returning success and error states from a tool.
-- **Prelude:** The `ftl_sdk::prelude` module re-exports the most commonly used items for convenience.
+- **Prelude:** The `ftl_sdk_rs::prelude` module re-exports the most commonly used items for convenience.
 
 ## Usage
 
-To create a new tool, you will typically add `ftl-sdk` as a dependency in your `Cargo.toml` and implement the `Tool` trait.
+To create a new tool, you will typically add `ftl-sdk-rs` as a dependency in your `Cargo.toml` and implement the `Tool` trait.
 
 ```rust
-use ftl_sdk::prelude::*;
+use ftl_sdk_rs::prelude::*;
 
 #[derive(Clone)]
 struct MyTool;
@@ -27,7 +27,7 @@ impl Tool for MyTool {
     // ... implementation ...
 }
 
-ftl_sdk::ftl_mcp_server!(MyTool);
+ftl_sdk_rs::ftl_mcp_server!(MyTool);
 ```
 
 For more detailed information on developing tools, please see the main project [documentation](../docs/developing-tools.md).

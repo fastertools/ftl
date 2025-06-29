@@ -59,8 +59,8 @@ pub async fn execute(name: String) -> Result<()> {
 
                 // Check for required dependencies
                 if let Some(deps) = cargo_toml.get("dependencies") {
-                    if deps.get("ftl-sdk").is_none() {
-                        errors.push("Missing ftl-sdk dependency in Cargo.toml".to_string());
+                    if deps.get("ftl-sdk-rs").is_none() {
+                        errors.push("Missing ftl-sdk-rs dependency in Cargo.toml".to_string());
                     }
                 } else {
                     errors.push("No dependencies section in Cargo.toml".to_string());

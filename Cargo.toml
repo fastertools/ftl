@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ftl-cli", "crates/ftl-sdk"]
+members = ["packages/ftl-cli", "packages/ftl-sdk-rs"]
 exclude = ["demo_hash", "toolkit-*"]
 resolver = "2"
 

@@ -1,5 +1,5 @@
 [package]
-name = "ftl-sdk"
+name = "ftl-sdk-rs"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

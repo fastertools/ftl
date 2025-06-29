@@ -12,7 +12,7 @@ FTL provides a complete developer experience for the entire lifecycle of creatin
 
 ### Tools
 
-A **tool** is a self-contained piece of code that performs a specific task. Tools are implemented in Rust by implementing the `ftl_sdk::Tool` trait. They are compiled to WebAssembly and can be deployed to any Wasm-compliant runtime.
+A **tool** is a self-contained piece of code that performs a specific task. Tools are implemented in Rust by implementing the `ftl_sdk_rs::Tool` trait. They are compiled to WebAssembly and can be deployed to any Wasm-compliant runtime.
 
 ### Toolkits
 

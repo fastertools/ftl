@@ -588,7 +588,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ftl-sdk"
+name = "ftl-sdk-rs"
 version = "0.0.5"
 dependencies = [
  "serde",
