@@ -39,6 +39,6 @@ fn main() {
     };
 
     // Set environment variables that will be available at compile time
-    println!("cargo:rustc-env=FTL_SDK_RS_VERSION={}", ftl_sdk_rs_version);
-    println!("cargo:rustc-env=FTL_SDK_JS_VERSION={}", ftl_sdk_js_version);
+    println!("cargo:rustc-env=FTL_SDK_RS_VERSION={ftl_sdk_rs_version}");
+    println!("cargo:rustc-env=FTL_SDK_JS_VERSION={ftl_sdk_js_version}");
 }

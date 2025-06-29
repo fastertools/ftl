@@ -67,7 +67,7 @@ allowed_hosts = []
 
     // Get the SDK version from compile-time constant
     let sdk_version = env!("FTL_SDK_RS_VERSION");
-    let ftl_sdk_dep = format!("{{ version = \"^{}\" }}", sdk_version);
+    let ftl_sdk_dep = format!("{{ version = \"^{sdk_version}\" }}");
 
     // Create Cargo.toml
     let cargo_toml_template = format!(
