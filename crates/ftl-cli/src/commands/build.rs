@@ -78,22 +78,8 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
             spin_config.save(&spin_path)?;
         }
         Language::JavaScript => {
-            // For JavaScript, copy the existing spin.toml to .ftl/spin.toml
-            let source_spin = PathBuf::from(tool_path).join("spin.toml");
-            let dest_spin = get_spin_toml_path(tool_path);
-            
-            if source_spin.exists() {
-                std::fs::copy(&source_spin, &dest_spin)
-                    .context("Failed to copy spin.toml to .ftl directory")?;
-            } else {
-                // If no spin.toml exists, generate one
-                let relative_wasm_path = PathBuf::from("..")
-                    .join("dist")
-                    .join(format!("{}.wasm", tool_name));
-
-                let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
-                spin_config.save(&dest_spin)?;
-            }
+            // For JavaScript, spin.toml is already in .ftl directory (moved during project creation)
+            // We don't need to generate or copy it
         }
     }
 

@@ -88,10 +88,10 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                 );
             }
             
-            // Use the project's own spin.toml
-            let spin_path = PathBuf::from(&tool_path).join("spin.toml");
+            // Use spin.toml from .ftl directory
+            let spin_path = get_spin_toml_path(&tool_path);
             if !spin_path.exists() {
-                anyhow::bail!("spin.toml not found in JavaScript/TypeScript project");
+                anyhow::bail!("spin.toml not found in .ftl directory. Run 'ftl build {}' first.", tool_path);
             }
             
             (wasm, spin_path)

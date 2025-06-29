@@ -75,6 +75,17 @@ impl LanguageSupport for JavaScriptSupport {
             );
         }
 
+        // Move spin.toml to .ftl directory
+        let spin_toml_src = path.join("spin.toml");
+        let ftl_dir = path.join(".ftl");
+        fs::create_dir_all(&ftl_dir)?;
+        let spin_toml_dest = ftl_dir.join("spin.toml");
+        
+        if spin_toml_src.exists() {
+            fs::rename(&spin_toml_src, &spin_toml_dest)
+                .context("Failed to move spin.toml to .ftl directory")?;
+        }
+        
         // Overlay FTL-specific files
         
         // 1. Add ftl.toml
@@ -102,9 +113,10 @@ impl LanguageSupport for JavaScriptSupport {
     }
 
     fn build(&self, _manifest: &Manifest, path: &Path) -> Result<()> {
-        // Simply delegate to spin build
+        // Run spin build with spin.toml from .ftl directory
+        let spin_toml_path = path.join(".ftl/spin.toml");
         let output = Command::new("spin")
-            .args(&["build"])
+            .args(&["build", "-f", spin_toml_path.to_str().unwrap()])
             .current_dir(path)
             .output()
             .context("Failed to run spin build")?;

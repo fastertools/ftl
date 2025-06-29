@@ -1,6 +1,6 @@
 {
-  "name": "@ftl/sdk-js",
-  "version": "0.1.0",
+  "name": "@fastertools/ftl-sdk-js",
+  "version": "0.0.1",
   "description": "JavaScript SDK for building FTL MCP tools",
   "main": "src/index.js",
   "type": "module",
@@ -26,5 +26,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
