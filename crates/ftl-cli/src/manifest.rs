@@ -3,6 +3,11 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::language::Language;
+
+// Type alias for backwards compatibility
+pub type Manifest = ToolManifest;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolManifest {
     pub tool: ToolConfig,
@@ -19,6 +24,8 @@ pub struct ToolConfig {
     pub name: String,
     pub version: String,
     pub description: String,
+    #[serde(default)]
+    pub language: Language,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

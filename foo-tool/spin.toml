@@ -1,0 +1,18 @@
+spin_manifest_version = 2
+
+[application]
+authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+description = ""
+name = "foo-tool"
+version = "0.1.0"
+
+[[trigger.http]]
+route = "/..."
+component = "foo-tool"
+
+[component.foo-tool]
+source = "dist/foo-tool.wasm"
+exclude_files = ["**/node_modules"]
+[component.foo-tool.build]
+command = ["npm install", "npm run build"]
+watch = ["src/**/*.js"]

@@ -1,0 +1,43 @@
+import { ftlTool, Tool, ToolResult, ToolError } from '@ftl/sdk-js';
+
+/**
+ * {{description}}
+ */
+class {{tool_name_class}} extends Tool {
+  get name() {
+    return '{{name}}';
+  }
+
+  get description() {
+    return '{{description}}';
+  }
+
+  get inputSchema() {
+    return {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input text to process'
+        }
+      },
+      required: ['input']
+    };
+  }
+
+  execute(args) {
+    const { input } = args;
+    
+    if (!input) {
+      throw ToolError.invalidArguments('Input is required');
+    }
+    
+    // TODO: Implement your tool logic here
+    const result = `Processed: ${input}`;
+    
+    return ToolResult.text(result);
+  }
+}
+
+// Register the tool with FTL
+ftlTool(new {{tool_name_class}}());

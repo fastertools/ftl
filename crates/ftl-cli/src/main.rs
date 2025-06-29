@@ -6,6 +6,7 @@ use tracing_subscriber::EnvFilter;
 
 mod commands;
 mod common;
+mod language;
 mod manifest;
 mod spin_generator;
 mod templates;
@@ -33,6 +34,9 @@ enum Command {
         /// Description of the tool
         #[arg(short, long)]
         description: Option<String>,
+        /// Programming language to use (rust, javascript)
+        #[arg(short, long)]
+        language: Option<String>,
     },
 
     /// Build a tool
@@ -203,7 +207,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     match cli.command {
-        Command::New { name, description } => commands::new::execute(name, description).await,
+        Command::New { name, description, language } => commands::new::execute(name, description, language).await,
         Command::Build {
             name,
             profile,

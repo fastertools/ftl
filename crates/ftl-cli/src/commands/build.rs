@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use console::style;
@@ -11,6 +11,7 @@ use crate::{
         spin_utils::check_spin_installed,
         tool_paths::{ensure_ftl_dir, get_profile_dir, get_spin_toml_path, get_wasm_path},
     },
+    language::{get_language_support, Language},
     spin_generator::SpinConfig,
 };
 
@@ -52,23 +53,29 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
 
     // Determine build profile
     let build_profile = profile.unwrap_or_else(|| manifest.build.profile.clone());
+    
+    // Get language support
+    let language_support = get_language_support(manifest.tool.language);
 
     // Ensure .ftl directory exists and check spin is installed
     ensure_ftl_dir(tool_path)?;
     check_spin_installed()?;
 
-    // Generate spin.toml with build configuration
-    let profile_dir = get_profile_dir(&build_profile);
-    let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-    let relative_wasm_path = PathBuf::from("..")
-        .join("target")
-        .join("wasm32-wasip1")
-        .join(profile_dir)
-        .join(&wasm_filename);
+    // For JavaScript/TypeScript, Spin already has its own spin.toml, so we don't need to generate one
+    if manifest.tool.language == Language::Rust {
+        // Generate spin.toml with build configuration for Rust
+        let profile_dir = get_profile_dir(&build_profile);
+        let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
+        let relative_wasm_path = PathBuf::from("..")
+            .join("target")
+            .join("wasm32-wasip1")
+            .join(profile_dir)
+            .join(&wasm_filename);
 
-    let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
-    let spin_path = get_spin_toml_path(tool_path);
-    spin_config.save(&spin_path)?;
+        let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
+        let spin_path = get_spin_toml_path(tool_path);
+        spin_config.save(&spin_path)?;
+    }
 
     // Create progress bar (only if not quiet)
     let pb = if quiet {
@@ -84,54 +91,59 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
         pb
     };
 
-    // Step 1: Run spin build
-    pb.set_message("Running spin build...");
+    // Step 1: Run language-specific build
+    pb.set_message(format!("Building {} tool...", manifest.tool.language));
     pb.inc(1);
 
-    let spin_output = Command::new("spin")
-        .arg("build")
-        .arg("-f")
-        .arg(".ftl/spin.toml")
-        .current_dir(tool_path)
-        .output()?;
-
-    if !spin_output.status.success() {
-        let stderr = String::from_utf8_lossy(&spin_output.stderr);
-        anyhow::bail!("Spin build failed:\n{}", stderr);
-    }
+    // Validate language environment
+    language_support.validate_environment()?;
+    
+    // Run the language-specific build
+    language_support.build(&manifest, std::path::Path::new(tool_path))?;
 
     // Step 2: Verify WASM was built
     pb.set_message("Verifying build output...");
     pb.inc(1);
 
-    let wasm_path = get_wasm_path(tool_path, &tool_name, &build_profile);
+    let wasm_path = match manifest.tool.language {
+        Language::Rust => get_wasm_path(tool_path, &tool_name, &build_profile),
+        Language::JavaScript => {
+            // For JS/TS, Spin puts the WASM in dist/{tool-name}.wasm
+            PathBuf::from(tool_path).join("dist").join(format!("{}.wasm", tool_name))
+        }
+    };
+    
     if !wasm_path.exists() {
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
     }
 
-    // Step 3: Run wasm-opt (post-build optimization)
-    pb.set_message("Optimizing WASM binary...");
-    pb.inc(1);
+    // Step 3: Run wasm-opt (post-build optimization) - only for Rust
+    if manifest.tool.language == Language::Rust {
+        pb.set_message("Optimizing WASM binary...");
+        pb.inc(1);
 
-    // Always include flags to match Rust's target features
-    let mut wasm_opt_flags = vec![
-        "--enable-simd".to_string(),
-        "--enable-bulk-memory".to_string(),
-        "--enable-mutable-globals".to_string(),
-        "--enable-sign-ext".to_string(),
-        "--enable-nontrapping-float-to-int".to_string(),
-        "--enable-reference-types".to_string(),
-    ];
+        // Always include flags to match Rust's target features
+        let mut wasm_opt_flags = vec![
+            "--enable-simd".to_string(),
+            "--enable-bulk-memory".to_string(),
+            "--enable-mutable-globals".to_string(),
+            "--enable-sign-ext".to_string(),
+            "--enable-nontrapping-float-to-int".to_string(),
+            "--enable-reference-types".to_string(),
+        ];
 
-    // Add user-specified flags
-    if !manifest.optimization.flags.is_empty() {
-        wasm_opt_flags.extend(manifest.optimization.flags.clone());
+        // Add user-specified flags
+        if !manifest.optimization.flags.is_empty() {
+            wasm_opt_flags.extend(manifest.optimization.flags.clone());
+        } else {
+            // Default optimization if none specified
+            wasm_opt_flags.push("-O2".to_string());
+        }
+
+        optimize_wasm(&wasm_path, &wasm_opt_flags)?;
     } else {
-        // Default optimization if none specified
-        wasm_opt_flags.push("-O2".to_string());
+        pb.inc(1);
     }
-
-    optimize_wasm(&wasm_path, &wasm_opt_flags)?;
 
     pb.finish_with_message("Build complete!");
 

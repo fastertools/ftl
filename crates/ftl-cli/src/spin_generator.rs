@@ -2,7 +2,10 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::manifest::{ToolManifest, ToolkitManifest};
+use crate::{
+    language::Language,
+    manifest::{ToolManifest, ToolkitManifest},
+};
 
 pub struct SpinConfig {
     pub content: String,
@@ -10,22 +13,30 @@ pub struct SpinConfig {
 
 impl SpinConfig {
     pub fn from_tool(manifest: &ToolManifest, wasm_path: &Path) -> Result<Self> {
-        // Build command based on profile
-        // Note: Cargo uses "dev" as the profile name but "debug" as the directory name
-        let cargo_profile = if manifest.build.profile == "debug" {
-            "dev"
-        } else {
-            &manifest.build.profile
-        };
-        let build_command = format!(
-            "cargo build --target wasm32-wasip1 --profile {}{}",
-            cargo_profile,
-            if manifest.build.features.is_empty() {
-                String::new()
-            } else {
-                format!(" --features {}", manifest.build.features.join(","))
+        // Build command based on language and profile
+        let build_command = match manifest.tool.language {
+            Language::Rust => {
+                // Note: Cargo uses "dev" as the profile name but "debug" as the directory name
+                let cargo_profile = if manifest.build.profile == "debug" {
+                    "dev"
+                } else {
+                    &manifest.build.profile
+                };
+                format!(
+                    "cargo build --target wasm32-wasip1 --profile {}{}",
+                    cargo_profile,
+                    if manifest.build.features.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" --features {}", manifest.build.features.join(","))
+                    }
+                )
             }
-        );
+            Language::JavaScript => {
+                // For JS/TS, we use npm run build which is defined in package.json
+                "npm run build".to_string()
+            }
+        };
 
         let content = format!(
             r#"spin_manifest_version = 2
@@ -147,8 +158,9 @@ build.watch = ["src/**/*.rs", "Cargo.toml", "ftl.toml"]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::{
-        BuildConfig, OptimizationConfig, RuntimeConfig, ToolConfig, ToolManifest,
+    use crate::{
+        language::Language,
+        manifest::{BuildConfig, OptimizationConfig, RuntimeConfig, ToolConfig, ToolManifest},
     };
 
     #[test]
@@ -158,6 +170,7 @@ mod tests {
                 name: "test_tool".to_string(),
                 version: "1.0.0".to_string(),
                 description: "Test tool".to_string(),
+                language: Language::Rust,
             },
             build: BuildConfig::default(),
             optimization: OptimizationConfig::default(),

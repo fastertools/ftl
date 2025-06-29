@@ -1,0 +1,23 @@
+{
+  "name": "{{name}}",
+  "version": "0.1.0",
+  "description": "{{description}}",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "webpack && mkdirp dist && j2w -i build/bundle.js -o dist/{{name}}.wasm",
+    "dev": "webpack --mode=development --watch",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@ftl/sdk-js": "^0.1.0",
+    "@spinframework/build-tools": "^1.0.1",
+    "@spinframework/wasi-http-proxy": "^1.0.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0",
+    "jest": "^29.0.0",
+    "mkdirp": "^3.0.1"
+  }
+}

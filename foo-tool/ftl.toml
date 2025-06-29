@@ -1,0 +1,11 @@
+[tool]
+name = "foo-tool"
+version = "0.1.0"
+description = "A tool that does foo"
+language = "javascript"
+
+[build]
+profile = "release"
+
+[runtime]
+allowed_hosts = []

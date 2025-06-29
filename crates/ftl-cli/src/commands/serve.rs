@@ -22,6 +22,7 @@ use crate::{
         },
         watch_utils::{Debouncer, setup_file_watcher},
     },
+    language::Language,
     spin_generator,
 };
 
@@ -43,34 +44,59 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
         crate::commands::build::execute(Some(tool_path.clone()), None).await?;
     }
 
-    // Check WASM binary exists
-    let wasm_path = get_wasm_path(&tool_path, &tool_name, &manifest.build.profile);
-    if !wasm_path.exists() {
-        anyhow::bail!(
-            "WASM binary not found at: {}. Run 'ftl build {}' first.",
-            wasm_path.display(),
-            tool_path
-        );
-    }
+    // Check WASM binary exists and determine spin.toml path
+    let (wasm_path, spin_toml_path) = match manifest.tool.language {
+        Language::Rust => {
+            let wasm = get_wasm_path(&tool_path, &tool_name, &manifest.build.profile);
+            if !wasm.exists() {
+                anyhow::bail!(
+                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
+                    wasm.display(),
+                    tool_path
+                );
+            }
+            
+            // Ensure .ftl directory and spin.toml exist for Rust
+            ensure_ftl_dir(&tool_path)?;
+            let spin_path = get_spin_toml_path(&tool_path);
+            
+            if !spin_path.exists() {
+                // Generate development spin.toml if it doesn't exist
+                let profile_dir = get_profile_dir(&manifest.build.profile);
+                let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
+                let relative_wasm_path = PathBuf::from("..")
+                    .join("target")
+                    .join("wasm32-wasip1")
+                    .join(profile_dir)
+                    .join(&wasm_filename);
 
-    // Ensure .ftl directory and spin.toml exist
-    ensure_ftl_dir(&tool_path)?;
-    let spin_path = get_spin_toml_path(&tool_path);
-
-    if !spin_path.exists() {
-        // Generate development spin.toml if it doesn't exist
-        let profile_dir = get_profile_dir(&manifest.build.profile);
-        let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-        let relative_wasm_path = PathBuf::from("..")
-            .join("target")
-            .join("wasm32-wasip1")
-            .join(profile_dir)
-            .join(&wasm_filename);
-
-        let spin_content =
-            spin_generator::generate_development_config(&tool_name, port, &relative_wasm_path)?;
-        std::fs::write(&spin_path, spin_content)?;
-    }
+                let spin_content =
+                    spin_generator::generate_development_config(&tool_name, port, &relative_wasm_path)?;
+                std::fs::write(&spin_path, spin_content)?;
+            }
+            
+            (wasm, spin_path)
+        }
+        Language::JavaScript => {
+            // For JS/TS, use Spin's generated paths
+            let wasm = PathBuf::from(&tool_path).join("dist").join(format!("{}.wasm", tool_name));
+            if !wasm.exists() {
+                anyhow::bail!(
+                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
+                    wasm.display(),
+                    tool_path
+                );
+            }
+            
+            // Use the project's own spin.toml
+            let spin_path = PathBuf::from(&tool_path).join("spin.toml");
+            if !spin_path.exists() {
+                anyhow::bail!("spin.toml not found in JavaScript/TypeScript project");
+            }
+            
+            (wasm, spin_path)
+        }
+    };
 
     // Check spin is installed
     check_spin_installed()?;
@@ -118,7 +144,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     println!("Press Ctrl+C to stop");
     println!();
 
-    let mut server = start_spin_server(&tool_path, port, Some(&spin_path))?;
+    let mut server = start_spin_server(&tool_path, port, Some(&spin_toml_path))?;
 
     // Main server loop with rebuild handling
     let rebuild_check = should_rebuild.clone();
@@ -150,7 +176,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                             sleep(Duration::from_millis(100)).await;
 
                             // Restart server
-                            match start_spin_server(&tool_path, port, Some(&spin_path)) {
+                            match start_spin_server(&tool_path, port, Some(&spin_toml_path)) {
                                 Ok(new_server) => {
                                     server = new_server;
                                 }
@@ -165,7 +191,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                             println!("   Fix the error and save to retry");
 
                             // Restart server anyway (will serve last good build)
-                            if let Ok(new_server) = start_spin_server(&tool_path, port, Some(&spin_path)) {
+                            if let Ok(new_server) = start_spin_server(&tool_path, port, Some(&spin_toml_path)) {
                                 server = new_server;
                             }
                         }

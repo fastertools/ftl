@@ -1,0 +1,30 @@
+{
+  "name": "@ftl/sdk-js",
+  "version": "0.1.0",
+  "description": "JavaScript SDK for building FTL MCP tools",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint src/**/*.js"
+  },
+  "keywords": [
+    "ftl",
+    "mcp",
+    "model-context-protocol",
+    "webassembly",
+    "spin"
+  ],
+  "author": "FTL Contributors",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "itty-router": "^5.0.18"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
