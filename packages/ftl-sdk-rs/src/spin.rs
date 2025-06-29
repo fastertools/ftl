@@ -103,7 +103,7 @@ fn read_request_body(req: &Request) -> Result<String, String> {
 ///
 /// Example:
 /// ```rust
-/// use ftl_sdk::prelude::*;
+/// use ftl_sdk_rs::prelude::*;
 ///
 /// #[derive(Clone)]
 /// struct MyTool;
