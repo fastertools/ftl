@@ -118,7 +118,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
             // For JS/TS, Spin puts the WASM in dist/{tool-name}.wasm
             PathBuf::from(tool_path)
                 .join("dist")
-                .join(format!("{}.wasm", tool_name))
+                .join(format!("{tool_name}.wasm"))
         }
     };
 
@@ -130,7 +130,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     if let Language::JavaScript = manifest.tool.language {
         let ftl_dist_dir = PathBuf::from(tool_path).join(".ftl").join("dist");
         std::fs::create_dir_all(&ftl_dist_dir)?;
-        let dest_wasm = ftl_dist_dir.join(format!("{}.wasm", tool_name));
+        let dest_wasm = ftl_dist_dir.join(format!("{tool_name}.wasm"));
         std::fs::copy(&wasm_path, &dest_wasm)?;
     }
 

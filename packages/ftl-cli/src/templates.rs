@@ -194,7 +194,7 @@ impl Tool for {{struct_name}} {
     }
 }
 
-ftl_sdk::ftl_mcp_server!({{struct_name}});
+ftl_sdk_rs::ftl_mcp_server!({{struct_name}});
 
 #[cfg(test)]
 mod tests;

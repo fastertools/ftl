@@ -2,7 +2,7 @@
 
 # `ftl`
 
-Portable tools for AI agents
+Fast tools for AI agents
 
 A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) project.
 

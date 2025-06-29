@@ -39,7 +39,7 @@ impl LanguageSupport for RustSupport {
 
         // Build the project
         let output = Command::new("cargo")
-            .args(&["build", "--target", "wasm32-wasip1", "--release"])
+            .args(["build", "--target", "wasm32-wasip1", "--release"])
             .current_dir(path)
             .output()
             .context("Failed to execute cargo build")?;
@@ -91,7 +91,7 @@ impl LanguageSupport for RustSupport {
 
         // Check if the wasm32-wasip1 target is installed
         let output = Command::new("rustup")
-            .args(&["target", "list", "--installed"])
+            .args(["target", "list", "--installed"])
             .output()
             .context("Failed to check installed Rust targets")?;
 
@@ -114,7 +114,7 @@ impl RustSupport {
             println!("Optimizing WASM with wasm-opt...");
 
             let output = Command::new("wasm-opt")
-                .args(&[
+                .args([
                     "-O3",
                     "--enable-simd",
                     "--enable-bulk-memory",

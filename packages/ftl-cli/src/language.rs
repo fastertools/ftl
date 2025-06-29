@@ -5,17 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{manifest::Manifest, templates::Template};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
+    #[default]
     Rust,
     JavaScript,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Language::Rust
-    }
 }
 
 impl fmt::Display for Language {
@@ -131,18 +126,18 @@ impl PackageManager {
 
     pub fn run_command(&self, script: &str) -> String {
         match self {
-            PackageManager::Npm => format!("npm run {}", script),
-            PackageManager::Yarn => format!("yarn {}", script),
-            PackageManager::Pnpm => format!("pnpm {}", script),
+            PackageManager::Npm => format!("npm run {script}"),
+            PackageManager::Yarn => format!("yarn {script}"),
+            PackageManager::Pnpm => format!("pnpm {script}"),
         }
     }
 
     #[allow(dead_code)]
     pub fn exec_command(&self, cmd: &str) -> String {
         match self {
-            PackageManager::Npm => format!("npx {}", cmd),
-            PackageManager::Yarn => format!("yarn {}", cmd),
-            PackageManager::Pnpm => format!("pnpm exec {}", cmd),
+            PackageManager::Npm => format!("npx {cmd}"),
+            PackageManager::Yarn => format!("yarn {cmd}"),
+            PackageManager::Pnpm => format!("pnpm exec {cmd}"),
         }
     }
 }

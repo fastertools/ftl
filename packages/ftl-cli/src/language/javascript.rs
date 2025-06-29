@@ -59,7 +59,7 @@ impl LanguageSupport for JavaScriptSupport {
     ) -> Result<()> {
         // Use spin new to create the project
         let output = Command::new("spin")
-            .args(&[
+            .args([
                 "new",
                 "-t",
                 "http-js",
@@ -135,7 +135,7 @@ impl LanguageSupport for JavaScriptSupport {
         // Run spin build with spin.toml from .ftl directory
         let spin_toml_path = path.join(".ftl/spin.toml");
         let output = Command::new("spin")
-            .args(&["build", "-f", spin_toml_path.to_str().unwrap()])
+            .args(["build", "-f", spin_toml_path.to_str().unwrap()])
             .current_dir(path)
             .output()
             .context("Failed to run spin build")?;
@@ -162,10 +162,10 @@ impl LanguageSupport for JavaScriptSupport {
             let stdout = String::from_utf8_lossy(&output.stdout);
 
             if !stdout.is_empty() {
-                println!("\nOutput:\n{}", stdout);
+                println!("\nOutput:\n{stdout}");
             }
             if !stderr.is_empty() {
-                println!("\nErrors:\n{}", stderr);
+                println!("\nErrors:\n{stderr}");
             }
 
             anyhow::bail!("Tests failed");
@@ -193,13 +193,13 @@ impl LanguageSupport for JavaScriptSupport {
         let version = String::from_utf8_lossy(&output.stdout);
         let version_parts: Vec<&str> = version.trim().trim_start_matches('v').split('.').collect();
 
-        if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
-            if major < 18 {
-                anyhow::bail!(
-                    "Node.js version {} is too old. Please install Node.js 18 or later.",
-                    version.trim()
-                );
-            }
+        if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok())
+            && major < 18
+        {
+            anyhow::bail!(
+                "Node.js version {} is too old. Please install Node.js 18 or later.",
+                version.trim()
+            );
         }
 
         Ok(())

@@ -84,7 +84,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
             // For JS/TS, use Spin's generated paths
             let wasm = PathBuf::from(&tool_path)
                 .join("dist")
-                .join(format!("{}.wasm", tool_name));
+                .join(format!("{tool_name}.wasm"));
             if !wasm.exists() {
                 anyhow::bail!(
                     "WASM binary not found at: {}. Run 'ftl build {}' first.",
