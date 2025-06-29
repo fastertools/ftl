@@ -39,5 +39,10 @@ class {{tool_name_class}} extends Tool {
   }
 }
 
-// Register the tool with FTL
-ftlTool(new {{tool_name_class}}());
+// Export the class for testing
+export { {{tool_name_class}} };
+
+// Register the tool with FTL (only when not in test environment)
+if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
+  ftlTool(new {{tool_name_class}}());
+}

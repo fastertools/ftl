@@ -25,6 +25,36 @@ pub fn get_wasm_path<P: AsRef<Path>>(tool_path: P, tool_name: &str, profile: &st
         .join(wasm_filename)
 }
 
+/// Get the path to a tool's WASM binary based on language
+pub fn get_wasm_path_for_language<P: AsRef<Path>>(
+    tool_path: P,
+    tool_name: &str,
+    profile: &str,
+    language: crate::language::Language,
+) -> PathBuf {
+    use crate::language::Language;
+
+    match language {
+        Language::Rust => {
+            let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
+            let profile_dir = get_profile_dir(profile);
+            tool_path
+                .as_ref()
+                .join("target")
+                .join("wasm32-wasip1")
+                .join(profile_dir)
+                .join(wasm_filename)
+        }
+        Language::JavaScript => {
+            // JavaScript tools output to dist directory
+            tool_path
+                .as_ref()
+                .join("dist")
+                .join(format!("{tool_name}.wasm"))
+        }
+    }
+}
+
 /// Get the profile directory name based on the profile
 pub fn get_profile_dir(profile: &str) -> &str {
     match profile {

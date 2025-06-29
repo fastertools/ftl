@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path, process::Command};
 use anyhow::{Context, Result};
 use serde_json;
 
-use crate::manifest::ToolManifest;
+use crate::{common::tool_paths, manifest::ToolManifest};
 
 pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let tool_dir = Path::new(&tool_path);
@@ -19,23 +19,14 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let manifest = ToolManifest::load(&manifest_path)?;
     let tool_name = &manifest.tool.name;
     let build_profile = &manifest.build.profile;
+    let language = manifest.tool.language;
 
     println!("📊 Size analysis for tool: {tool_name}");
     println!("   Profile: {build_profile}");
 
-    // Determine the profile directory based on manifest
-    let profile_dir = match build_profile.as_str() {
-        "dev" => "debug",
-        _ => build_profile,
-    };
-
-    // Check if WASM file exists - convert hyphens to underscores for Cargo's naming
-    // convention
-    let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-    let wasm_path = tool_dir
-        .join("target/wasm32-wasip1")
-        .join(profile_dir)
-        .join(&wasm_filename);
+    // Get the WASM path based on the language
+    let wasm_path =
+        tool_paths::get_wasm_path_for_language(tool_dir, tool_name, build_profile, language);
 
     if !wasm_path.exists() {
         println!("\n⚠️  WASM binary not found. Building first...");

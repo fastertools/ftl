@@ -33,10 +33,14 @@ impl JavaScriptSupport {
             })
             .collect::<String>();
 
+        // Get the SDK version from compile-time constant
+        let sdk_version = env!("FTL_SDK_JS_VERSION");
+
         let data = json!({
             "name": name,
             "description": description,
             "tool_name_class": tool_name_class,
+            "sdk_version": sdk_version,
         });
 
         handlebars
@@ -127,6 +131,10 @@ impl LanguageSupport for JavaScriptSupport {
             description,
         )?;
         fs::write(path.join("test/tool.test.js"), test_js)?;
+
+        // 6. Add vitest.config.js
+        let vitest_config = include_str!("../templates/javascript/vitest.config.js");
+        fs::write(path.join("vitest.config.js"), vitest_config)?;
 
         Ok(())
     }

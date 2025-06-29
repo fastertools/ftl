@@ -9,7 +9,7 @@ use console::style;
 
 use crate::common::{
     manifest_utils::load_manifest_and_name,
-    tool_paths::{get_profile_dir, get_wasm_path, validate_tool_exists},
+    tool_paths::{self, get_profile_dir, validate_tool_exists},
 };
 
 const WASI_ADAPTER_URL: &str = "https://github.com/bytecodealliance/wasmtime/releases/download/v22.0.0/wasi_snapshot_preview1.reactor.wasm";
@@ -35,9 +35,11 @@ pub async fn execute(
 
     // Determine build profile
     let build_profile = profile.unwrap_or_else(|| manifest.build.profile.clone());
+    let language = manifest.tool.language;
 
-    // Get the WASM path
-    let wasm_path = get_wasm_path(&tool_path, &tool_name, &build_profile);
+    // Get the WASM path based on language
+    let wasm_path =
+        tool_paths::get_wasm_path_for_language(&tool_path, &tool_name, &build_profile, language);
 
     if !wasm_path.exists() {
         anyhow::bail!(
@@ -57,12 +59,23 @@ pub async fn execute(
     let output_path = match output {
         Some(path) => path,
         None => {
-            let profile_dir = get_profile_dir(&build_profile);
-            PathBuf::from(&tool_path)
-                .join("target")
-                .join("wasm32-wasip1")
-                .join(profile_dir)
-                .join(format!("{}.component.wasm", tool_name.replace('-', "_")))
+            use crate::language::Language;
+            match language {
+                Language::Rust => {
+                    let profile_dir = get_profile_dir(&build_profile);
+                    PathBuf::from(&tool_path)
+                        .join("target")
+                        .join("wasm32-wasip1")
+                        .join(profile_dir)
+                        .join(format!("{}.component.wasm", tool_name.replace('-', "_")))
+                }
+                Language::JavaScript => {
+                    // For JavaScript, put the component next to the WASM file in dist
+                    PathBuf::from(&tool_path)
+                        .join("dist")
+                        .join(format!("{tool_name}.component.wasm"))
+                }
+            }
         }
     };
 
@@ -71,32 +84,55 @@ pub async fn execute(
         fs::create_dir_all(parent)?;
     }
 
-    // Download WASI adapter if not already cached
-    let adapter_path = get_wasi_adapter_path()?;
-    if !adapter_path.exists() {
-        println!("{} Downloading WASI adapter...", style("→").cyan());
-        download_wasi_adapter(&adapter_path).await?;
-    }
-
-    // Run wasm-tools component new
-    println!("{} Creating WASM component...", style("→").cyan());
-
-    let output = Command::new("wasm-tools")
+    // Check if the WASM file is already a component
+    let validate_output = Command::new("wasm-tools")
         .args([
-            "component",
-            "new",
+            "validate",
             wasm_path.to_str().unwrap(),
-            "-o",
-            output_path.to_str().unwrap(),
-            "--adapt",
-            adapter_path.to_str().unwrap(),
+            "--features",
+            "component-model",
         ])
         .output()
-        .context("Failed to run wasm-tools")?;
+        .context("Failed to run wasm-tools validate")?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("Failed to create WASM component:\n{}", stderr);
+    let is_already_component = validate_output.status.success();
+
+    if is_already_component {
+        // For JavaScript, the WASM is already a component, just copy it
+        println!(
+            "{} WASM is already a component, copying...",
+            style("→").cyan()
+        );
+        fs::copy(&wasm_path, &output_path).context("Failed to copy component")?;
+    } else {
+        // For Rust, we need to componentize the module
+        // Download WASI adapter if not already cached
+        let adapter_path = get_wasi_adapter_path()?;
+        if !adapter_path.exists() {
+            println!("{} Downloading WASI adapter...", style("→").cyan());
+            download_wasi_adapter(&adapter_path).await?;
+        }
+
+        // Run wasm-tools component new
+        println!("{} Creating WASM component...", style("→").cyan());
+
+        let output = Command::new("wasm-tools")
+            .args([
+                "component",
+                "new",
+                wasm_path.to_str().unwrap(),
+                "-o",
+                output_path.to_str().unwrap(),
+                "--adapt",
+                adapter_path.to_str().unwrap(),
+            ])
+            .output()
+            .context("Failed to run wasm-tools")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Failed to create WASM component:\n{}", stderr);
+        }
     }
 
     let component_size = fs::metadata(&output_path)?.len();

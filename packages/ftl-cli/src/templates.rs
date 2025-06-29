@@ -65,24 +65,9 @@ allowed_hosts = []
     let ftl_toml = handlebars.render_template(ftl_toml_template, &data)?;
     std::fs::write(target_dir.join("ftl.toml"), ftl_toml)?;
 
-    // Determine ftl-sdk-rs dependency based on context
-    // This logic handles three scenarios:
-    // 1. Creating tools within ftl-cli repository (use relative paths)
-    // 2. Creating tools in subdirectories of ftl-cli (use
-    //    ../../packages/ftl-sdk-rs)
-    // 3. Creating tools outside ftl-cli (use crates.io version once published)
-    let ftl_sdk_dep = if target_dir.join("../../packages/ftl-sdk-rs").exists() {
-        // Tool is being created directly in ftl-cli directory
-        "{ path = \"../../packages/ftl-sdk-rs\" }".to_string()
-    } else if target_dir.join("../../../packages/ftl-sdk-rs").exists() {
-        // Tool is being created in a subdirectory of ftl-cli (e.g.,
-        // test_validation/tool_name)
-        "{ path = \"../../../packages/ftl-sdk-rs\" }".to_string()
-    } else {
-        // Tool is being created outside ftl-cli repository
-        // Use crates.io version once published
-        "{ version = \"^0.0.9\" }".to_string()
-    };
+    // Get the SDK version from compile-time constant
+    let sdk_version = env!("FTL_SDK_RS_VERSION");
+    let ftl_sdk_dep = format!("{{ version = \"^{}\" }}", sdk_version);
 
     // Create Cargo.toml
     let cargo_toml_template = format!(

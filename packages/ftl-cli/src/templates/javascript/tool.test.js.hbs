@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { {{tool_name_class}} } from '../src/index.js';
 
 describe('{{tool_name_class}}', () => {
@@ -7,26 +8,26 @@ describe('{{tool_name_class}}', () => {
     tool = new {{tool_name_class}}();
   });
 
-  test('should have correct metadata', () => {
+  it('should have correct metadata', () => {
     expect(tool.name).toBe('{{name}}');
     expect(tool.description).toBe('{{description}}');
   });
 
-  test('should define input schema', () => {
+  it('should define input schema', () => {
     const schema = tool.inputSchema;
     expect(schema.type).toBe('object');
     expect(schema.properties.input).toBeDefined();
     expect(schema.required).toContain('input');
   });
 
-  test('should process valid input', () => {
+  it('should process valid input', () => {
     const result = tool.execute({ input: 'test' });
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe('text');
     expect(result.content[0].text).toContain('test');
   });
 
-  test('should throw error for missing input', () => {
+  it('should throw error for missing input', () => {
     expect(() => tool.execute({})).toThrow('Input is required');
   });
 });

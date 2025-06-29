@@ -9,7 +9,7 @@ use crate::{
         build_utils::{format_size, get_file_size, optimize_wasm},
         manifest_utils::load_manifest_and_name,
         spin_utils::check_spin_installed,
-        tool_paths::{ensure_ftl_dir, get_profile_dir, get_spin_toml_path, get_wasm_path},
+        tool_paths::{self, ensure_ftl_dir, get_profile_dir, get_spin_toml_path},
     },
     language::{Language, get_language_support},
     spin_generator::SpinConfig,
@@ -112,15 +112,12 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     pb.set_message("Verifying build output...");
     pb.inc(1);
 
-    let wasm_path = match manifest.tool.language {
-        Language::Rust => get_wasm_path(tool_path, &tool_name, &build_profile),
-        Language::JavaScript => {
-            // For JS/TS, Spin puts the WASM in dist/{tool-name}.wasm
-            PathBuf::from(tool_path)
-                .join("dist")
-                .join(format!("{tool_name}.wasm"))
-        }
-    };
+    let wasm_path = tool_paths::get_wasm_path_for_language(
+        tool_path,
+        &tool_name,
+        &build_profile,
+        manifest.tool.language,
+    );
 
     if !wasm_path.exists() {
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
