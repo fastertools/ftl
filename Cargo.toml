@@ -9,7 +9,7 @@ skip_packages = ["ftl-cli"]
 skip_targets = ["wasm32-wasip1"]
 
 [workspace.package]
-version = "0.0.7"
+version = "0.0.8"
 authors = ["FTL Contributors"]
 edition = "2024"
 license = "Apache-2.0"

@@ -1,11 +1,12 @@
 {
   "name": "@fastertools/ftl-sdk-js",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "JavaScript SDK for building FTL MCP tools",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "jest",
+    "test": "vitest run",
+    "watch": "vitest watch",
     "lint": "eslint src/**/*.js"
   },
   "keywords": [
@@ -21,7 +22,7 @@
     "itty-router": "^5.0.18"
   },
   "devDependencies": {
-    "jest": "^29.0.0",
+    "vitest": "^2.0.4",
     "eslint": "^8.0.0"
   },
   "engines": {
