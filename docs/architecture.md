@@ -32,7 +32,7 @@ The `ftl-sdk-rs` crate is the core library for FTL tools. It provides:
 
 ### FTL Edge
 
-The FTL Edge is a commercial, managed platform for deploying and serving tools. It is a global network of edge servers that can execute tools with "sub-millisecond compute overhead." The FTL Edge is responsible for:
+The FTL Edge is a managed platform for deploying and serving tools. It is a global network of edge servers that can execute efficient tools with sub-millisecond compute overhead. The FTL Edge is responsible for:
 
 - Hosting and serving FTL tools.
 - Scaling the execution of tools to meet demand.

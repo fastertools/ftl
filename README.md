@@ -143,6 +143,8 @@ curl -X POST http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"my-tool","arguments":{"input":"test"}},"id":1}'
 ```
 
+Each FTL tool is a complete MCP server that exposes a single tool. When you deploy an individual tool, you're deploying a standalone MCP server. Toolkits (described below) bundle multiple tools together with a gateway that provides a unified MCP server interface.
+
 ### Deploy to FTL Edge
 
 ```bash
@@ -153,42 +155,76 @@ This will deploy your tool to the FTL Edge, where it can be called by your AI ag
 
 ## Toolkits
 
-FTL supports bundling multiple tools together as a toolkit, with an automatic gateway that provides a unified MCP endpoint.
+FTL supports bundling multiple tools together as a toolkit, providing a powerful way to create comprehensive agent capabilities. Toolkits leverage the WebAssembly component model to enable secure, high-performance composition of tools.
+
+### Architecture
+
+Each FTL tool is a self-contained WebAssembly component that implements its own MCP server exposing a single tool. Toolkits take this further by:
+
+- **Component Composition**: Multiple WebAssembly components (tools) are bundled together using the component model
+- **Automatic Gateway**: FTL generates a gateway component that acts as a logical MCP server over all tools
+- **Language Agnostic**: Each tool can be written in a different language (Rust, JavaScript, etc.), allowing you to mix languages within a single toolkit. Through the gateway component, this means that you can expose a polyglot MCP server, with tools implemented in the language most appropriate for its task.
+- **Local Development**: Toolkits work seamlessly both locally and when deployed to the edge
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────┐
+│                 Toolkit                         │
+├─────────────────────────────────────────────────┤
+│  Gateway Component (MCP Server)                 │
+│    ├─ /mcp (unified endpoint)                  │
+│    └─ Routes to:                               │
+│         ├─ Rust Tool 1 (MCP Server)            │
+│         ├─ JavaScript Tool 2 (MCP Server)      │
+│         └─ Rust Tool 3 (MCP Server)            │
+└─────────────────────────────────────────────────┘
+```
+
+The gateway component:
+- Exposes a single MCP endpoint that aggregates all tools
+- Dynamically discovers tools at runtime
+- Routes `tools/call` requests to the appropriate tool component
+- Maintains protocol compatibility across all tools
+- The request is passed from the gateway component to the tool in memory without leaving the host process. This is fast.
 
 ### Create a Toolkit
 
 ```bash
-# Build multiple tools first
-ftl new foo
-ftl new bar
-ftl new baz
+# Build individual tools (can be different languages)
+ftl build rust-analyzer    # Rust tool
+ftl build js-formatter     # JavaScript tool  
+ftl build data-processor   # Another Rust tool
 
 # Bundle them as a toolkit
-ftl toolkit build --name my-toolkit foo bar baz
+ftl toolkit build --name dev-toolkit rust-analyzer js-formatter data-processor
 ```
 
 ### Serve a Toolkit Locally
 
 ```bash
-ftl toolkit serve my-toolkit
+ftl toolkit serve dev-toolkit
 ```
 
 This starts a local server with:
 - `/mcp` - Unified endpoint that aggregates all tools
-- `/tool1/mcp` - Direct access to individual tools
-- `/tool2/mcp`
-- `/tool3/mcp`
+- `/rust-analyzer/mcp` - Direct access to individual tool
+- `/js-formatter/mcp` - Direct access to individual tool
+- `/data-processor/mcp` - Direct access to individual tool
 
 ### Deploy a Toolkit
 
 ```bash
-ftl toolkit deploy my-toolkit
+ftl toolkit deploy dev-toolkit
 ```
 
-The gateway automatically handles:
-- Tool discovery across all bundled tools
-- Request routing to the appropriate tool
-- Protocol compatibility between tools
+### Benefits
+
+- **Single Integration Point**: AI agents connect to one MCP endpoint to access all tools
+- **Mixed Language Support**: Combine Rust tools for performance-critical operations with JavaScript tools for rapid development
+- **Component Isolation**: Each tool runs in its own sandboxed WebAssembly module
+- **Local-First Development**: Test complete toolkits locally before deployment
+- **Dynamic Composition**: Add or remove tools without changing agent configurations
 
 ## Documentation
 
