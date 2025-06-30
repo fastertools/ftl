@@ -209,8 +209,7 @@ graph TD
 ```
 
 The gateway component:
-- Exposes a single MCP endpoint that aggregates all tools
-- Dynamically discovers tools at runtime
+- Exposes a Streamable HTTP /mcp endpoint that exposes an MCP server over all individual tool components
 - Routes `tools/call` requests to the appropriate tool component
 - Maintains protocol compatibility across all tools
 - The request is passed from the gateway component to the tool in memory without leaving the host process. This is fast.
