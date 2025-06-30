@@ -1,6 +1,6 @@
 {
   "name": "@fastertools/ftl-sdk-js",
-  "version": "0.0.10",
+  "version": "0.0.13",
   "description": "JavaScript SDK for building FTL MCP tools",
   "main": "src/index.js",
   "type": "module",

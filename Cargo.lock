@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-cli"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -589,13 +589,14 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk-rs"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "serde",
  "serde_json",
  "spin-sdk",
  "talc",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

@@ -150,7 +150,7 @@ impl Response {
             }),
         }
     }
-    
+
     /// Create an error response without an ID (for parse errors)
     pub fn error_without_id(code: ErrorCode, message: String, data: Option<Value>) -> Self {
         Self {

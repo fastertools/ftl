@@ -89,15 +89,15 @@ base = "/"
         );
 
         // Add gateway component first
-        content.push_str(&format!(
+        content.push_str(
             r#"
 # Gateway component that aggregates all tools
 [[trigger.http]]
 id = "gateway"
 component = "gateway"
 route = "/gateway/mcp"
-"#
-        ));
+"#,
+        );
 
         // Add triggers and components for each tool
         for tool in &manifest.tools {
@@ -113,7 +113,7 @@ route = "{}/mcp"
         }
 
         // Add gateway component definition
-        content.push_str(&format!(
+        content.push_str(
             r#"
 [component.gateway]
 source = "../gateway.wasm"
@@ -121,8 +121,8 @@ source = "../gateway.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.gateway.build]
 command = "cargo build --target wasm32-wasip1 --release --manifest-path=gateway/Cargo.toml"
-"#
-        ));
+"#,
+        );
 
         // Add component definitions for tools
         for (tool_name, wasm_path) in tool_paths {

@@ -142,17 +142,17 @@ impl LanguageSupport for JavaScriptSupport {
     fn build(&self, _manifest: &Manifest, path: &Path) -> Result<()> {
         // Run spin build with spin.toml from .ftl directory
         let spin_toml_path = path.join(".ftl/spin.toml");
-        
+
         // Ensure the spin.toml exists
         if !spin_toml_path.exists() {
             anyhow::bail!("spin.toml not found at: {}", spin_toml_path.display());
         }
-        
+
         // Convert to absolute path to avoid issues with relative paths
         let absolute_spin_toml = spin_toml_path
             .canonicalize()
             .context("Failed to resolve spin.toml path")?;
-        
+
         let output = Command::new("spin")
             .args(["build", "-f", absolute_spin_toml.to_str().unwrap()])
             .current_dir(path)
