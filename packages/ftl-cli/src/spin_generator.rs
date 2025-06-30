@@ -81,8 +81,22 @@ name = "{}"
 version = "{}"
 description = "{}"
 authors = ["FTL Toolkit"]
+
+[application.trigger.http]
+base = "/"
 "#,
             manifest.toolkit.name, manifest.toolkit.version, manifest.toolkit.description
+        );
+
+        // Add gateway component first
+        content.push_str(
+            r#"
+# Gateway component that aggregates all tools
+[[trigger.http]]
+id = "gateway"
+component = "gateway"
+route = "/gateway/mcp"
+"#,
         );
 
         // Add triggers and components for each tool
@@ -90,14 +104,27 @@ authors = ["FTL Toolkit"]
             content.push_str(&format!(
                 r#"
 [[trigger.http]]
-route = "{}/..."
+id = "{}"
 component = "{}"
+route = "{}/mcp"
 "#,
-                tool.route, tool.name
+                tool.name, tool.name, tool.route
             ));
         }
 
-        // Add component definitions
+        // Add gateway component definition
+        content.push_str(
+            r#"
+[component.gateway]
+source = "../gateway.wasm"
+# Gateway needs to communicate with local tools
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.gateway.build]
+command = "cargo build --target wasm32-wasip1 --release --manifest-path=gateway/Cargo.toml"
+"#,
+        );
+
+        // Add component definitions for tools
         for (tool_name, wasm_path) in tool_paths {
             let allowed_hosts = manifest
                 .tools

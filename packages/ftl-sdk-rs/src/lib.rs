@@ -2,17 +2,21 @@
 //!
 //! Core MCP server implementation for building AI agent tools.
 
+pub mod gateway;
+pub mod mcp;
 pub mod server;
 pub mod spin;
 pub mod tool;
 pub mod types;
 
+#[cfg(test)]
+mod gateway_test;
+
 // Re-export commonly used items
+pub use gateway::{GatewayConfig, GatewayHandler, McpGateway, ToolEndpoint};
 pub use server::McpServer;
 pub use tool::Tool;
 pub use types::{JsonRpcRequest, JsonRpcResponse, ToolError, ToolResult};
-
-// The macro is already exported by spin module
 
 /// Convenient re-exports for tool implementations
 pub mod prelude {
