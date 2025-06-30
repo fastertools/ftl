@@ -29,16 +29,38 @@ cargo install ftl-cli
 
 ### Create a New Tool
 
+<details>
+<summary><b>🦀 Rust</b></summary>
+
 ```bash
-ftl new my-tool --description "A new tool for my agent"
-cd my-tool
+ftl new my-tool --rust
 ```
 
-This will create a new directory with a simple `ftl.toml` manifest, a `Cargo.toml` file, and a `src/lib.rs` file with a boilerplate tool implementation.
+This creates a new directory with:
+- `ftl.toml` - Tool manifest
+- `Cargo.toml` - Rust dependencies
+- `src/lib.rs` - Tool implementation
+
+</details>
+
+<details>
+<summary><b>🟨 JavaScript</b></summary>
+
+```bash
+ftl new my-tool --javascript
+```
+
+This creates a new directory with:
+- `ftl.toml` - Tool manifest
+- `package.json` - Node dependencies
+- `src/index.js` - Tool implementation
+
+</details>
 
 ### Develop Your Tool
 
-Implement the `ftl_sdk_rs::Tool` trait for your tool's logic.
+<details open>
+<summary><b>🦀 Rust Implementation</b></summary>
 
 ```rust
 use ftl_sdk_rs::prelude::*;
@@ -70,6 +92,42 @@ impl Tool for MyTool {
 
 ftl_sdk_rs::ftl_mcp_server!(MyTool);
 ```
+
+</details>
+
+<details>
+<summary><b>🟨 JavaScript Implementation</b></summary>
+
+```javascript
+import { Tool } from '@fastertools/ftl-sdk-js';
+
+export default class MyTool extends Tool {
+    get name() { return 'my-tool'; }
+    get description() { return 'My tool description'; }
+    
+    get inputSchema() {
+        return {
+            type: 'object',
+            properties: {
+                input: { type: 'string' }
+            },
+            required: ['input']
+        };
+    }
+    
+    async execute(args) {
+        const { input } = args;
+        
+        if (!input) {
+            throw new ToolError.invalidArguments('input required');
+        }
+        
+        return ToolResult.text(`Processed: ${input}`);
+    }
+}
+```
+
+</details>
 
 ### Serve Locally
 
