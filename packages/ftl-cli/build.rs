@@ -31,7 +31,7 @@ fn main() {
         package_json
             .get("version")
             .and_then(|v| v.as_str())
-            .unwrap_or("0.0.14")
+            .unwrap()
             .to_string()
     } else {
         // Use same version as Rust SDK as fallback
