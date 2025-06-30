@@ -32,7 +32,7 @@ impl SpinConfig {
                     }
                 )
             }
-            Language::JavaScript => {
+            Language::JavaScript | Language::TypeScript => {
                 // For JS/TS, we use npm run build which is defined in package.json
                 "npm run build".to_string()
             }

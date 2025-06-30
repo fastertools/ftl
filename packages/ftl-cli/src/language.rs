@@ -11,6 +11,7 @@ pub enum Language {
     #[default]
     Rust,
     JavaScript,
+    TypeScript,
 }
 
 impl fmt::Display for Language {
@@ -18,6 +19,7 @@ impl fmt::Display for Language {
         match self {
             Language::Rust => write!(f, "rust"),
             Language::JavaScript => write!(f, "javascript"),
+            Language::TypeScript => write!(f, "typescript"),
         }
     }
 }
@@ -27,6 +29,7 @@ impl Language {
         match s.to_lowercase().as_str() {
             "rust" => Some(Language::Rust),
             "javascript" | "js" => Some(Language::JavaScript),
+            "typescript" | "ts" => Some(Language::TypeScript),
             _ => None,
         }
     }
@@ -38,6 +41,10 @@ impl Language {
             return Some(Language::Rust);
         }
         if path.join("package.json").exists() {
+            // Check if tsconfig.json exists to differentiate TypeScript from JavaScript
+            if path.join("tsconfig.json").exists() {
+                return Some(Language::TypeScript);
+            }
             return Some(Language::JavaScript);
         }
         None
@@ -48,6 +55,7 @@ impl Language {
         match self {
             Language::Rust => "rs",
             Language::JavaScript => "js",
+            Language::TypeScript => "ts",
         }
     }
 
@@ -61,6 +69,7 @@ impl Language {
         match self {
             Language::Rust => "target/wasm32-wasip1/release",
             Language::JavaScript => "target",
+            Language::TypeScript => "target",
         }
     }
 
@@ -69,6 +78,7 @@ impl Language {
         match self {
             Language::Rust => "{name}.wasm",
             Language::JavaScript => "tool.wasm",
+            Language::TypeScript => "tool.wasm",
         }
     }
 }
@@ -87,13 +97,15 @@ pub trait LanguageSupport: Send + Sync {
 
 pub mod javascript;
 pub mod rust;
+pub mod typescript;
 
-use self::{javascript::JavaScriptSupport, rust::RustSupport};
+use self::{javascript::JavaScriptSupport, rust::RustSupport, typescript::TypeScriptSupport};
 
 pub fn get_language_support(language: Language) -> Box<dyn LanguageSupport> {
     match language {
         Language::Rust => Box::new(RustSupport::new()),
         Language::JavaScript => Box::new(JavaScriptSupport::new()),
+        Language::TypeScript => Box::new(TypeScriptSupport::new()),
     }
 }
 

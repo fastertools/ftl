@@ -87,7 +87,7 @@ This creates a new directory with:
 - `src/index.js` - Tool implementation
 
 ```javascript
-import { Tool } from '@fastertools/ftl-sdk-js';
+import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
 
 export default class MyTool extends Tool {
     get name() { return 'my-tool'; }
@@ -103,11 +103,55 @@ export default class MyTool extends Tool {
         };
     }
     
-    async execute(args) {
+    execute(args) {
         const { input } = args;
         
         if (!input) {
-            throw new ToolError.invalidArguments('input required');
+            throw ToolError.invalidArguments('input required');
+        }
+        
+        return ToolResult.text(`Processed: ${input}`);
+    }
+}
+```
+
+</details>
+
+<details>
+<summary><b>🔷 TypeScript</b></summary>
+
+```bash
+ftl new my-tool --typescript
+```
+
+This creates a new directory with:
+- `ftl.toml` - Tool manifest
+- `package.json` - Node dependencies
+- `tsconfig.json` - TypeScript configuration
+- `src/index.ts` - Tool implementation
+
+```typescript
+import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
+
+export default class MyTool extends Tool {
+    get name(): string { return 'my-tool'; }
+    get description(): string { return 'My tool description'; }
+    
+    get inputSchema() {
+        return {
+            type: 'object',
+            properties: {
+                input: { type: 'string' }
+            },
+            required: ['input']
+        };
+    }
+    
+    execute(args: { input: string }): ToolResult {
+        const { input } = args;
+        
+        if (!input) {
+            throw ToolError.invalidArguments('input required');
         }
         
         return ToolResult.text(`Processed: ${input}`);
@@ -182,10 +226,11 @@ The gateway component:
 # Build individual tools (can be different languages)
 ftl build rust-analyzer    # Rust tool
 ftl build js-formatter     # JavaScript tool  
+ftl build ts-linter        # TypeScript tool
 ftl build data-processor   # Another Rust tool
 
 # Bundle them as a toolkit
-ftl toolkit build --name dev-toolkit rust-analyzer js-formatter data-processor
+ftl toolkit build --name dev-toolkit rust-analyzer js-formatter ts-linter data-processor
 ```
 
 ### Serve a Toolkit Locally
@@ -209,7 +254,7 @@ ftl toolkit deploy dev-toolkit
 ### Benefits
 
 - **Single Integration Point**: AI agents connect to one MCP endpoint to access all tools
-- **Mixed Language Support**: Combine Rust tools for performance-critical operations with JavaScript tools for rapid development
+- **Mixed Language Support**: Combine Rust tools for performance-critical operations with JavaScript/TypeScript tools for rapid development
 - **Component Isolation**: Each tool runs in its own sandboxed WebAssembly module
 - **Local-First Development**: Test complete toolkits locally before deployment
 - **Dynamic Composition**: Add or remove tools without changing agent configurations

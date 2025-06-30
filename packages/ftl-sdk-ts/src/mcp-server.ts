@@ -1,22 +1,40 @@
-import { ToolError } from './types.js';
+import { Tool } from './tool.js';
+import { ToolError, JsonRpcRequest, JsonRpcResponse, JsonRpcError } from './types.js';
+
+/**
+ * MCP initialization parameters
+ */
+interface InitializeParams {
+  protocolVersion?: string;
+  capabilities?: Record<string, any>;
+  clientInfo?: {
+    name: string;
+    version?: string;
+  };
+}
+
+/**
+ * MCP tools/call parameters
+ */
+interface ToolsCallParams {
+  name: string;
+  arguments?: any;
+}
 
 /**
  * MCP Server implementation
  */
 export class McpServer {
-  /**
-   * @param {import('./tool.js').Tool} tool - The tool instance
-   */
-  constructor(tool) {
+  private tool: Tool;
+
+  constructor(tool: Tool) {
     this.tool = tool;
   }
 
   /**
    * Handle a JSON-RPC request
-   * @param {import('./types.js').JsonRpcRequest} request - The request
-   * @returns {import('./types.js').JsonRpcResponse} The response
    */
-  handleRequest(request) {
+  handleRequest(request: JsonRpcRequest): JsonRpcResponse {
     const requestId = request.id ?? null;
     
     try {
@@ -27,7 +45,7 @@ export class McpServer {
         result,
         id: requestId
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         jsonrpc: '2.0',
         error: this.errorToJsonRpc(error),
@@ -38,12 +56,11 @@ export class McpServer {
 
   /**
    * Process a request and return the result
-   * @private
    */
-  processRequest(request) {
+  private processRequest(request: JsonRpcRequest): any {
     switch (request.method) {
       case 'initialize':
-        return this.handleInitialize(request.params);
+        return this.handleInitialize(request.params as InitializeParams);
       
       case 'initialized':
         return { status: 'ok' };
@@ -52,7 +69,7 @@ export class McpServer {
         return this.handleToolsList();
       
       case 'tools/call':
-        return this.handleToolsCall(request.params);
+        return this.handleToolsCall(request.params as ToolsCallParams);
       
       default:
         throw new McpError(`Method not found: ${request.method}`, -32601);
@@ -61,9 +78,8 @@ export class McpServer {
 
   /**
    * Handle initialize request
-   * @private
    */
-  handleInitialize(params) {
+  private handleInitialize(params?: InitializeParams): any {
     return {
       protocolVersion: '2025-03-26',
       serverInfo: {
@@ -76,9 +92,8 @@ export class McpServer {
 
   /**
    * Handle tools/list request
-   * @private
    */
-  handleToolsList() {
+  private handleToolsList(): any {
     return {
       tools: [{
         name: this.tool.name,
@@ -90,9 +105,8 @@ export class McpServer {
 
   /**
    * Handle tools/call request
-   * @private
    */
-  handleToolsCall(params) {
+  private handleToolsCall(params: ToolsCallParams): any {
     if (!params || typeof params !== 'object') {
       throw new McpError('Invalid params', -32602);
     }
@@ -109,7 +123,7 @@ export class McpServer {
       
       // Return the result content
       return result;
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof ToolError) {
         throw new McpError(error.message, -32603, {
           code: error.code,
@@ -122,9 +136,8 @@ export class McpServer {
 
   /**
    * Convert an error to JSON-RPC format
-   * @private
    */
-  errorToJsonRpc(error) {
+  private errorToJsonRpc(error: any): JsonRpcError {
     if (error instanceof McpError) {
       return {
         code: error.code,
@@ -143,10 +156,12 @@ export class McpServer {
 
 /**
  * MCP-specific error
- * @private
  */
 class McpError extends Error {
-  constructor(message, code, data = undefined) {
+  code: number;
+  data?: any;
+
+  constructor(message: string, code: number, data?: any) {
     super(message);
     this.name = 'McpError';
     this.code = code;

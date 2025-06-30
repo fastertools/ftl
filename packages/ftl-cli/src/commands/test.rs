@@ -39,6 +39,7 @@ async fn test_tool(tool_path: &str) -> Result<()> {
                     match manifest.tool.language {
                         crate::language::Language::Rust => "src/lib.rs",
                         crate::language::Language::JavaScript => "src/index.test.js",
+                        crate::language::Language::TypeScript => "src/index.test.ts",
                     }
                 );
                 println!("   The tests verify basic tool functionality like name and description.");
@@ -52,6 +53,11 @@ async fn test_tool(tool_path: &str) -> Result<()> {
                     crate::language::Language::JavaScript => {
                         println!("   1. Add test files matching *.test.js or *.spec.js");
                         println!("   2. Use your preferred JavaScript testing framework");
+                        println!("   3. Tests run in Node.js, not in the WASM runtime");
+                    }
+                    crate::language::Language::TypeScript => {
+                        println!("   1. Add test files matching *.test.ts or *.spec.ts");
+                        println!("   2. Use your preferred TypeScript testing framework");
                         println!("   3. Tests run in Node.js, not in the WASM runtime");
                     }
                 }

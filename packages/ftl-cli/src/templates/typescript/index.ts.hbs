@@ -4,11 +4,11 @@ import { ftlTool, Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
  * {{description}}
  */
 class {{tool_name_class}} extends Tool {
-  get name() {
+  get name(): string {
     return '{{name}}';
   }
 
-  get description() {
+  get description(): string {
     return '{{description}}';
   }
 
@@ -25,7 +25,7 @@ class {{tool_name_class}} extends Tool {
     };
   }
 
-  execute(args) {
+  execute(args: { input: string }): ToolResult {
     const { input } = args;
     
     if (!input) {

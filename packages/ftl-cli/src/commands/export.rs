@@ -69,8 +69,8 @@ pub async fn execute(
                         .join(profile_dir)
                         .join(format!("{}.component.wasm", tool_name.replace('-', "_")))
                 }
-                Language::JavaScript => {
-                    // For JavaScript, put the component next to the WASM file in dist
+                Language::JavaScript | Language::TypeScript => {
+                    // For JavaScript/TypeScript, put the component next to the WASM file in dist
                     PathBuf::from(&tool_path)
                         .join("dist")
                         .join(format!("{tool_name}.component.wasm"))

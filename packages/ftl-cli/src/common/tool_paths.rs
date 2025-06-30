@@ -45,8 +45,8 @@ pub fn get_wasm_path_for_language<P: AsRef<Path>>(
                 .join(profile_dir)
                 .join(wasm_filename)
         }
-        Language::JavaScript => {
-            // JavaScript tools output to dist directory
+        Language::JavaScript | Language::TypeScript => {
+            // JavaScript/TypeScript tools output to dist directory
             tool_path
                 .as_ref()
                 .join("dist")

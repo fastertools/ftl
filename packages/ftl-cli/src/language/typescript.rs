@@ -8,9 +8,9 @@ use crate::{
     templates::Template,
 };
 
-pub struct JavaScriptSupport;
+pub struct TypeScriptSupport;
 
-impl JavaScriptSupport {
+impl TypeScriptSupport {
     pub fn new() -> Self {
         Self
     }
@@ -49,9 +49,9 @@ impl JavaScriptSupport {
     }
 }
 
-impl LanguageSupport for JavaScriptSupport {
+impl LanguageSupport for TypeScriptSupport {
     fn language(&self) -> Language {
-        Language::JavaScript
+        Language::TypeScript
     }
 
     fn new_project(
@@ -61,12 +61,12 @@ impl LanguageSupport for JavaScriptSupport {
         _template: &str,
         path: &Path,
     ) -> Result<()> {
-        // Use spin new to create the project
+        // Use spin new to create the project with TypeScript template
         let output = Command::new("spin")
             .args([
                 "new",
                 "-t",
-                "http-js",
+                "http-ts",
                 "-o",
                 path.to_str().unwrap(),
                 "--accept-defaults",
@@ -77,7 +77,7 @@ impl LanguageSupport for JavaScriptSupport {
 
         if !output.status.success() {
             anyhow::bail!(
-                "Failed to create JavaScript project with spin new:\n{}",
+                "Failed to create TypeScript project with spin new:\n{}",
                 String::from_utf8_lossy(&output.stderr)
             );
         }
@@ -97,44 +97,48 @@ impl LanguageSupport for JavaScriptSupport {
 
         // 1. Add ftl.toml
         let ftl_toml = self.render_template(
-            include_str!("../templates/javascript/ftl.toml.hbs"),
+            include_str!("../templates/typescript/ftl.toml.hbs"),
             name,
             description,
         )?;
         fs::write(path.join("ftl.toml"), ftl_toml)?;
 
-        // 2. Replace src/index.js with MCP implementation
-        let index_js = self.render_template(
-            include_str!("../templates/javascript/index.js.hbs"),
+        // 2. Replace src/index.ts with MCP implementation
+        let index_ts = self.render_template(
+            include_str!("../templates/typescript/index.ts.hbs"),
             name,
             description,
         )?;
-        fs::write(path.join("src/index.js"), index_js)?;
+        fs::write(path.join("src/index.ts"), index_ts)?;
 
-        // 3. Update package.json to include @ftl/sdk-js
+        // 3. Update package.json to include @ftl/sdk-js and TypeScript dependencies
         let package_json = self.render_template(
-            include_str!("../templates/javascript/package.json.hbs"),
+            include_str!("../templates/typescript/package.json.hbs"),
             name,
             description,
         )?;
         fs::write(path.join("package.json"), package_json)?;
 
-        // 4. Replace webpack.config.js
-        let webpack_config = include_str!("../templates/javascript/webpack.config.js");
+        // 4. Replace webpack.config.js with TypeScript version
+        let webpack_config = include_str!("../templates/typescript/webpack.config.js");
         fs::write(path.join("webpack.config.js"), webpack_config)?;
 
-        // 5. Create test directory and test file
+        // 5. Add tsconfig.json
+        let tsconfig = include_str!("../templates/typescript/tsconfig.json");
+        fs::write(path.join("tsconfig.json"), tsconfig)?;
+
+        // 6. Create test directory and test file
         fs::create_dir_all(path.join("test"))?;
-        let test_js = self.render_template(
-            include_str!("../templates/javascript/tool.test.js.hbs"),
+        let test_ts = self.render_template(
+            include_str!("../templates/typescript/tool.test.ts.hbs"),
             name,
             description,
         )?;
-        fs::write(path.join("test/tool.test.js"), test_js)?;
+        fs::write(path.join("test/tool.test.ts"), test_ts)?;
 
-        // 6. Add vitest.config.js
-        let vitest_config = include_str!("../templates/javascript/vitest.config.js");
-        fs::write(path.join("vitest.config.js"), vitest_config)?;
+        // 7. Add vitest.config.ts
+        let vitest_config = include_str!("../templates/typescript/vitest.config.ts");
+        fs::write(path.join("vitest.config.ts"), vitest_config)?;
 
         Ok(())
     }
@@ -197,8 +201,8 @@ impl LanguageSupport for JavaScriptSupport {
     fn get_templates(&self) -> Vec<Template> {
         vec![Template {
             name: "default".to_string(),
-            description: "Default JavaScript FTL tool template".to_string(),
-            language: Language::JavaScript,
+            description: "Default TypeScript FTL tool template".to_string(),
+            language: Language::TypeScript,
         }]
     }
 

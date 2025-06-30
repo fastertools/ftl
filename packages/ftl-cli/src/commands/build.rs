@@ -77,10 +77,10 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
             let spin_path = get_spin_toml_path(tool_path);
             spin_config.save(&spin_path)?;
         }
-        Language::JavaScript => {
-            // For JavaScript, spin.toml is already in .ftl directory (moved
-            // during project creation) We don't need to generate or
-            // copy it
+        Language::JavaScript | Language::TypeScript => {
+            // For JavaScript/TypeScript, spin.toml is already in .ftl directory
+            // (moved during project creation) We don't need to
+            // generate or copy it
         }
     }
 
@@ -123,8 +123,12 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
     }
 
-    // For JavaScript, also copy the WASM to .ftl/dist directory for deployment
-    if let Language::JavaScript = manifest.tool.language {
+    // For JavaScript/TypeScript, also copy the WASM to .ftl/dist directory for
+    // deployment
+    if matches!(
+        manifest.tool.language,
+        Language::JavaScript | Language::TypeScript
+    ) {
         let ftl_dist_dir = PathBuf::from(tool_path).join(".ftl").join("dist");
         std::fs::create_dir_all(&ftl_dist_dir)?;
         let dest_wasm = ftl_dist_dir.join(format!("{tool_name}.wasm"));

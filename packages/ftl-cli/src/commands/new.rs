@@ -45,13 +45,13 @@ pub async fn execute(
     let selected_language = match language {
         Some(lang_str) => Language::from_str(&lang_str).ok_or_else(|| {
             anyhow::anyhow!(
-                "Invalid language: {}. Valid options are: rust, javascript",
+                "Invalid language: {}. Valid options are: rust, javascript, typescript",
                 lang_str
             )
         })?,
         None => {
             // Interactive language selection
-            let languages = vec!["rust", "javascript"];
+            let languages = vec!["rust", "javascript", "typescript"];
             let selection = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Select programming language")
                 .items(&languages)
@@ -76,7 +76,7 @@ pub async fn execute(
         Language::Rust => {
             templates::create_tool(&name, &description, &target_dir)?;
         }
-        Language::JavaScript => {
+        Language::JavaScript | Language::TypeScript => {
             language_support.new_project(&name, &description, "default", &target_dir)?;
         }
     }
@@ -85,6 +85,7 @@ pub async fn execute(
     let main_file = match selected_language {
         Language::Rust => "src/lib.rs",
         Language::JavaScript => "src/index.js",
+        Language::TypeScript => "src/index.ts",
     };
 
     println!(

@@ -3,16 +3,22 @@ import { McpServer } from './mcp-server.js';
 import { Tool } from './tool.js';
 import { ToolResult, ToolError } from './types.js';
 
+// Define FetchEvent type for WebWorker environment
+interface FetchEvent extends Event {
+  request: Request;
+  respondWith(response: Response | Promise<Response>): void;
+}
+
 /**
  * Register an FTL tool and set up the fetch event listener
- * @param {Tool} tool - The tool implementation
+ * @param tool - The tool implementation
  */
-export function ftlTool(tool) {
+export function ftlTool(tool: Tool): void {
   const server = new McpServer(tool);
   const router = AutoRouter();
 
   // MCP endpoint
-  router.post('/mcp', async (request) => {
+  router.post('/mcp', async (request: Request) => {
     try {
       // In Spin, we use async/await with request.text()
       const bodyText = await request.text();
@@ -24,7 +30,7 @@ export function ftlTool(tool) {
       return new Response(JSON.stringify(response), {
         headers: { 'Content-Type': 'application/json' }
       });
-    } catch (error) {
+    } catch (error: any) {
       return new Response(JSON.stringify({
         jsonrpc: '2.0',
         error: {
@@ -56,8 +62,10 @@ export function ftlTool(tool) {
   // 404 handler
   router.all('*', () => new Response('Not Found', { status: 404 }));
   
-  addEventListener('fetch', (event) => {
-    event.respondWith(router.fetch(event.request));
+  // Register fetch event listener
+  addEventListener('fetch', (event: Event) => {
+    const fetchEvent = event as FetchEvent;
+    fetchEvent.respondWith(router.fetch(fetchEvent.request));
   });
 }
 

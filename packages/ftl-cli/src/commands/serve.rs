@@ -80,7 +80,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
 
             (wasm, spin_path)
         }
-        Language::JavaScript => {
+        Language::JavaScript | Language::TypeScript => {
             // For JS/TS, use Spin's generated paths
             let wasm = PathBuf::from(&tool_path)
                 .join("dist")
