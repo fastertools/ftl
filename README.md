@@ -195,7 +195,7 @@ Each FTL tool is a self-contained WebAssembly component that implements its own 
 - **Component Composition**: Multiple WebAssembly components (tools) are bundled together using the component model.
 - **Automatic Gateway**: FTL generates a gateway component that acts as a logical MCP server over each tool in the toolkit. The hop between the gateway component and the tool component happens fast, in memory.
 - **Language Agnostic**: Each tool can be written in a different language (Rust, JavaScript, etc.), allowing you to mix languages within a single toolkit / MCP server.
-- **Fast Inter-Tool calls**: Tools within a toolkit can be chained directly via instant in-memory calls.
+- **Fast Tool Chaining**: Tools within a toolkit can be chained directly via instant in-memory calls.
 - **Local Development**: Toolkits work seamlessly both locally and when deployed to the edge.
 
 ### How It Works
