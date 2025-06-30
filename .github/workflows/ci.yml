@@ -86,6 +86,32 @@ jobs:
         run: |
           cargo build --package ftl-sdk-rs --target wasm32-wasip1
 
+  test-typescript-sdk:
+    name: Test TypeScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          cd packages/ftl-sdk-ts
+          npm ci
+      
+      - name: Build TypeScript SDK
+        run: |
+          cd packages/ftl-sdk-ts
+          npm run build
+      
+      - name: Run tests
+        run: |
+          cd packages/ftl-sdk-ts
+          npm test
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest

@@ -144,7 +144,7 @@ jobs:
       
       - name: Validate version matches
         run: |
-          PACKAGE_VERSION=$(node -p "require('./packages/ftl-sdk-js/package.json').version")
+          PACKAGE_VERSION=$(node -p "require('./packages/ftl-sdk-ts/package.json').version")
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
             echo "Error: Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_VERSION)"
@@ -153,17 +153,22 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd packages/ftl-sdk-js
+          cd packages/ftl-sdk-ts
           npm ci
+      
+      - name: Build TypeScript SDK
+        run: |
+          cd packages/ftl-sdk-ts
+          npm run build
       
       - name: Run tests
         run: |
-          cd packages/ftl-sdk-js
+          cd packages/ftl-sdk-ts
           npm test
       
       - name: Publish to npm
         run: |
-          cd packages/ftl-sdk-js
+          cd packages/ftl-sdk-ts
           npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
