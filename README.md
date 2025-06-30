@@ -93,6 +93,45 @@ ftl deploy
 
 This will deploy your tool to the FTL Edge, where it can be called by your AI agents.
 
+## Toolkits
+
+FTL supports bundling multiple tools together as a toolkit, with an automatic gateway that provides a unified MCP endpoint.
+
+### Create a Toolkit
+
+```bash
+# Build multiple tools first
+ftl build tool1
+ftl build tool2
+ftl build tool3
+
+# Bundle them as a toolkit
+ftl toolkit build --name my-toolkit tool1 tool2 tool3
+```
+
+### Serve a Toolkit Locally
+
+```bash
+ftl toolkit serve my-toolkit
+```
+
+This starts a local server with:
+- `/gateway/mcp` - Unified endpoint that aggregates all tools
+- `/tool1/mcp` - Direct access to individual tools
+- `/tool2/mcp`
+- `/tool3/mcp`
+
+### Deploy a Toolkit
+
+```bash
+ftl toolkit deploy my-toolkit
+```
+
+The gateway automatically handles:
+- Tool discovery across all bundled tools
+- Request routing to the appropriate tool
+- Protocol compatibility between tools
+
 ## Documentation
 
 For more detailed documentation, please see the [docs](./docs/introduction.md) directory in this repository.

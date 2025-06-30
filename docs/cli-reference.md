@@ -86,7 +86,11 @@ Manage toolkits (collections of tools).
 
 ### `ftl toolkit build`
 
-Build a toolkit from multiple tools.
+Build a toolkit from multiple tools. This command:
+- Builds each specified tool in release mode
+- Bundles all tool WebAssembly modules together
+- Automatically generates a gateway component that provides a unified MCP endpoint
+- Creates a deployable toolkit directory with all components
 
 ```bash
 ftl toolkit build --name <name> <tools...>
@@ -98,11 +102,18 @@ ftl toolkit build --name <name> <tools...>
 
 #### Arguments
 
-- `<tools...>`: The tools to include in the toolkit.
+- `<tools...>`: The tools to include in the toolkit. Each tool must exist as a directory in the current working directory.
 
 ### `ftl toolkit serve`
 
-Serve a toolkit locally.
+Serve a toolkit locally. This starts a development server with:
+- `/gateway/mcp` - Unified MCP endpoint that aggregates all tools in the toolkit
+- `/<tool-name>/mcp` - Individual endpoints for each tool (e.g., `/tool1/mcp`, `/tool2/mcp`)
+
+The gateway endpoint supports all standard MCP operations:
+- `initialize` - Initialize the connection
+- `tools/list` - List all available tools across the toolkit
+- `tools/call` - Call any tool in the toolkit
 
 ```bash
 ftl toolkit serve <name> [OPTIONS]
@@ -110,7 +121,7 @@ ftl toolkit serve <name> [OPTIONS]
 
 #### Arguments
 
-- `<name>`: The name of the toolkit.
+- `<name>`: The name of the toolkit directory.
 
 #### Options
 
