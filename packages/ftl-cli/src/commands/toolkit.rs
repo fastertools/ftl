@@ -81,28 +81,38 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
                 pb.set_message(format!("completed {tool_name}"));
             }
 
-            // Find and copy WASM
+            // Find and copy WASM - check multiple locations
             let tool_dir = PathBuf::from(&tool_name);
             let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-            let wasm_path = tool_dir
+            
+            // Try Rust path first
+            let rust_wasm_path = tool_dir
                 .join("target")
                 .join("wasm32-wasip1")
                 .join("release")
                 .join(&wasm_filename);
-
-            if !wasm_path.exists() {
+            
+            // Try JavaScript path
+            let js_wasm_filename = format!("{}.wasm", tool_name);
+            let js_wasm_path = tool_dir.join("dist").join(&js_wasm_filename);
+            
+            let (wasm_path, final_wasm_filename) = if rust_wasm_path.exists() {
+                (rust_wasm_path, wasm_filename)
+            } else if js_wasm_path.exists() {
+                (js_wasm_path, js_wasm_filename)
+            } else {
                 return Err(anyhow::anyhow!(
                     "WASM binary not found for tool: {}",
                     tool_name
                 ));
-            }
+            };
 
             // Copy WASM to toolkit directory
-            let dest_path = toolkit_dir.join(&wasm_filename);
+            let dest_path = toolkit_dir.join(&final_wasm_filename);
             std::fs::copy(&wasm_path, &dest_path)?;
 
             // Path relative to .ftl/ directory
-            Ok((tool_name, format!("../{wasm_filename}")))
+            Ok((tool_name, format!("../{final_wasm_filename}")))
         });
     }
 
@@ -131,6 +141,9 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     pb.set_prefix("✓");
     pb.finish_with_message("✓ All tools built successfully");
 
+    println!();
+    println!("{} Building gateway component...", style("→").cyan());
+
     // Create toolkit manifest
     let toolkit_manifest = ToolkitManifest {
         toolkit: ToolkitConfig {
@@ -145,6 +158,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
                 route: format!("/{tool_name}"),
             })
             .collect(),
+        gateway: None, // Gateway is opt-in
     };
 
     // Save toolkit manifest
@@ -154,6 +168,44 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     // Create .ftl directory in toolkit
     let ftl_dir = toolkit_dir.join(".ftl");
     std::fs::create_dir_all(&ftl_dir)?;
+
+    // Generate gateway code
+    generate_gateway_code(&toolkit_dir, &toolkit_manifest)?;
+
+    // Build the gateway
+    let gateway_output = Command::new("cargo")
+        .args([
+            "build",
+            "--target",
+            "wasm32-wasip1",
+            "--release",
+            "--manifest-path",
+            "gateway/Cargo.toml",
+        ])
+        .current_dir(&toolkit_dir)
+        .output()
+        .context("Failed to build gateway")?;
+
+    if !gateway_output.status.success() {
+        anyhow::bail!(
+            "Gateway build failed: {}",
+            String::from_utf8_lossy(&gateway_output.stderr)
+        );
+    }
+
+    // Copy gateway WASM to toolkit directory
+    let gateway_wasm_path = toolkit_dir
+        .join("gateway")
+        .join("target")
+        .join("wasm32-wasip1")
+        .join("release")
+        .join(format!("{}_gateway.wasm", toolkit_manifest.toolkit.name.replace('-', "_")));
+    
+    let gateway_dest = toolkit_dir.join("gateway.wasm");
+    std::fs::copy(&gateway_wasm_path, &gateway_dest)
+        .context("Failed to copy gateway WASM")?;
+
+    println!("{} Gateway built successfully", style("✓").green());
 
     // Generate spin.toml for toolkit
     let spin_config = SpinConfig::from_toolkit(&toolkit_manifest, &tool_paths)?;
@@ -209,6 +261,10 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {
         println!("  Routes:");
+        println!(
+            "    - {} (aggregates all tools)",
+            style("/gateway/mcp").yellow()
+        );
         for tool in &manifest.tools {
             println!("    - {}/mcp", tool.route);
         }
@@ -345,10 +401,90 @@ pub async fn deploy(name: String) -> Result<()> {
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {
         println!("Available endpoints:");
+        println!("  - {}/gateway/mcp (aggregates all tools)", base_url);
         for tool in &manifest.tools {
             println!("  - {}{}/mcp", base_url, tool.route);
         }
     }
+
+    Ok(())
+}
+
+/// Generate the gateway code for a toolkit
+fn generate_gateway_code(toolkit_dir: &PathBuf, manifest: &ToolkitManifest) -> Result<()> {
+    // Create gateway directory
+    let gateway_dir = toolkit_dir.join("gateway");
+    std::fs::create_dir_all(&gateway_dir)?;
+
+    // Get the SDK version from compile-time constant
+    let sdk_version = env!("FTL_SDK_RS_VERSION");
+    
+    // Generate Cargo.toml
+    let cargo_toml = format!(
+        r#"[package]
+name = "{}-gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ftl-sdk-rs = {{ version = "^{}" }}
+spin-sdk = "3.1.1"
+serde = {{ version = "1.0", features = ["derive"] }}
+serde_json = "1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]"#,
+        manifest.toolkit.name,
+        sdk_version
+    );
+    std::fs::write(gateway_dir.join("Cargo.toml"), cargo_toml)?;
+
+    // Create src directory
+    let src_dir = gateway_dir.join("src");
+    std::fs::create_dir_all(&src_dir)?;
+
+    // Generate lib.rs with gateway configuration
+    let lib_rs = format!(
+        r#"use ftl_sdk_rs::{{ftl_mcp_gateway, gateway::{{GatewayConfig, ToolEndpoint}}, mcp::ServerInfo}};
+
+// Configure the gateway with all tools in the toolkit
+fn create_gateway_config() -> GatewayConfig {{
+    GatewayConfig {{
+        tools: vec![
+{}
+        ],
+        server_info: ServerInfo {{
+            name: "{}-gateway".to_string(),
+            version: "{}".to_string(),
+        }},
+        // Base URL is empty - gateway uses component IDs directly
+        base_url: "".to_string(),
+    }}
+}}
+
+// Create the gateway component
+ftl_mcp_gateway!(create_gateway_config());"#,
+        manifest
+            .tools
+            .iter()
+            .map(|tool| {
+                format!(
+                    r#"            ToolEndpoint {{
+                name: "{}".to_string(),
+                route: "{}".to_string(),
+                description: None,
+            }},"#,
+                    tool.name, tool.route
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        manifest.toolkit.name,
+        manifest.toolkit.version
+    );
+    std::fs::write(src_dir.join("lib.rs"), lib_rs)?;
 
     Ok(())
 }

@@ -1,0 +1,11 @@
+[tool]
+name = "echo-tool"
+version = "0.1.0"
+description = "Simple echo tool for testing"
+language = "rust"
+
+[build]
+profile = "release"
+
+[runtime]
+allowed_hosts = []

@@ -1,0 +1,11 @@
+[tool]
+name = "math-tool"
+version = "0.1.0"
+description = "Basic math operations tool"
+language = "rust"
+
+[build]
+profile = "release"
+
+[runtime]
+allowed_hosts = []

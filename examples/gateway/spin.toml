@@ -1,0 +1,42 @@
+spin_manifest_version = 2
+
+[application]
+name = "mcp-gateway-example"
+version = "0.1.0"
+description = "Example MCP gateway that aggregates multiple tools"
+
+# Gateway component that proxies to all tools
+[[trigger.http]]
+route = "/gateway/mcp/..."
+component = "gateway"
+
+[component.gateway]
+source = "target/wasm32-wasip1/release/mcp_gateway_example.wasm"
+# Allow the gateway to make requests to the tool components
+allowed_outbound_hosts = ["http://self"]
+[component.gateway.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
+# Example tool components (these would be your actual tools)
+[[trigger.http]]
+route = "/weather/mcp/..."
+component = "weather-tool"
+
+[component.weather-tool]
+source = "../weather/target/wasm32-wasip1/release/weather_tool.wasm"
+allowed_outbound_hosts = ["https://api.weather.com"]
+
+[[trigger.http]]
+route = "/calculator/mcp/..."
+component = "calculator-tool"
+
+[component.calculator-tool]
+source = "../calculator/target/wasm32-wasip1/release/calculator_tool.wasm"
+
+[[trigger.http]]
+route = "/translator/mcp/..."
+component = "translator-tool"
+
+[component.translator-tool]
+source = "../translator/target/wasm32-wasip1/release/translator_tool.wasm"
+allowed_outbound_hosts = ["https://api.translator.com"]

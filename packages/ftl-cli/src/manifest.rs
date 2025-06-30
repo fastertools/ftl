@@ -52,6 +52,8 @@ pub struct RuntimeConfig {
 pub struct ToolkitManifest {
     pub toolkit: ToolkitConfig,
     pub tools: Vec<ToolkitTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gateway: Option<GatewayConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +67,26 @@ pub struct ToolkitConfig {
 pub struct ToolkitTool {
     pub name: String,
     pub route: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewayConfig {
+    #[serde(default = "default_gateway_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_gateway_route")]
+    pub route: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_version: Option<String>,
+}
+
+fn default_gateway_enabled() -> bool {
+    false
+}
+
+fn default_gateway_route() -> String {
+    "/gateway".to_string()
 }
 
 fn default_profile() -> String {
