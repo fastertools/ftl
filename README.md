@@ -41,27 +41,6 @@ This creates a new directory with:
 - `Cargo.toml` - Rust dependencies
 - `src/lib.rs` - Tool implementation
 
-</details>
-
-<details>
-<summary><b>🟨 JavaScript</b></summary>
-
-```bash
-ftl new my-tool --javascript
-```
-
-This creates a new directory with:
-- `ftl.toml` - Tool manifest
-- `package.json` - Node dependencies
-- `src/index.js` - Tool implementation
-
-</details>
-
-### Develop Your Tool
-
-<details open>
-<summary><b>🦀 Rust Implementation</b></summary>
-
 ```rust
 use ftl_sdk_rs::prelude::*;
 
@@ -96,7 +75,16 @@ ftl_sdk_rs::ftl_mcp_server!(MyTool);
 </details>
 
 <details>
-<summary><b>🟨 JavaScript Implementation</b></summary>
+<summary><b>🟨 JavaScript</b></summary>
+
+```bash
+ftl new my-tool --javascript
+```
+
+This creates a new directory with:
+- `ftl.toml` - Tool manifest
+- `package.json` - Node dependencies
+- `src/index.js` - Tool implementation
 
 ```javascript
 import { Tool } from '@fastertools/ftl-sdk-js';
