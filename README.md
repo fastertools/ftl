@@ -13,7 +13,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a [WebAssembly](https://webassembly.org) framework for developing and deploying fast, edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
+FTL is a platform for developing and deploying fast, edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point.
 
