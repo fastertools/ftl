@@ -4,8 +4,6 @@
 
 Fast tools for AI agents
 
-A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) project.
-
 [![CI](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/fastertools/core/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.87+-orange.svg)](https://www.rust-lang.org)
@@ -15,7 +13,7 @@ A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) pro
 
 </div>
 
-FTL is a framework for developing and deploying fast, edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
+FTL is a [WebAssembly](https://webassembly.org) framework for developing and deploying fast, edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point.
 
