@@ -47,7 +47,7 @@ FTL supports bundling multiple tools into a single deployable unit called a tool
 - Unified configuration and deployment
 
 The gateway component:
-- Provides a single MCP endpoint (`/gateway/mcp`) that aggregates all tools
+- Provides a single MCP endpoint (`/mcp`) that aggregates all tools
 - Handles tool discovery dynamically
 - Routes tool calls to the appropriate component
 - Maintains individual tool endpoints for direct access

@@ -101,12 +101,12 @@ FTL supports bundling multiple tools together as a toolkit, with an automatic ga
 
 ```bash
 # Build multiple tools first
-ftl build tool1
-ftl build tool2
-ftl build tool3
+ftl new foo
+ftl new bar
+ftl new baz
 
 # Bundle them as a toolkit
-ftl toolkit build --name my-toolkit tool1 tool2 tool3
+ftl toolkit build --name my-toolkit foo bar baz
 ```
 
 ### Serve a Toolkit Locally
@@ -116,7 +116,7 @@ ftl toolkit serve my-toolkit
 ```
 
 This starts a local server with:
-- `/gateway/mcp` - Unified endpoint that aggregates all tools
+- `/mcp` - Unified endpoint that aggregates all tools
 - `/tool1/mcp` - Direct access to individual tools
 - `/tool2/mcp`
 - `/tool3/mcp`

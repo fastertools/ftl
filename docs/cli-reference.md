@@ -107,7 +107,7 @@ ftl toolkit build --name <name> <tools...>
 ### `ftl toolkit serve`
 
 Serve a toolkit locally. This starts a development server with:
-- `/gateway/mcp` - Unified MCP endpoint that aggregates all tools in the toolkit
+- `/mcp` - Unified MCP endpoint that aggregates all tools in the toolkit
 - `/<tool-name>/mcp` - Individual endpoints for each tool (e.g., `/tool1/mcp`, `/tool2/mcp`)
 
 The gateway endpoint supports all standard MCP operations:

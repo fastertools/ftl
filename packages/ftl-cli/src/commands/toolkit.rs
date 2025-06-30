@@ -267,10 +267,7 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {
         println!("  Routes:");
-        println!(
-            "    - {} (aggregates all tools)",
-            style("/gateway/mcp").yellow()
-        );
+        println!("    - {} (aggregates all tools)", style("/mcp").yellow());
         for tool in &manifest.tools {
             println!("    - {}/mcp", tool.route);
         }
@@ -407,7 +404,7 @@ pub async fn deploy(name: String) -> Result<()> {
     let manifest_path = toolkit_dir.join("toolkit.toml");
     if let Ok(manifest) = ToolkitManifest::load(&manifest_path) {
         println!("Available endpoints:");
-        println!("  - {base_url}/gateway/mcp (aggregates all tools)");
+        println!("  - {base_url}/mcp (aggregates all tools)");
         for tool in &manifest.tools {
             println!("  - {}{}/mcp", base_url, tool.route);
         }

@@ -95,7 +95,7 @@ base = "/"
 [[trigger.http]]
 id = "gateway"
 component = "gateway"
-route = "/gateway/mcp"
+route = "/mcp"
 "#,
         );
 

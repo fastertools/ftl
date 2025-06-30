@@ -95,7 +95,7 @@ This allows the gateway to make HTTP requests to other components within the sam
 ftl toolkit serve my-toolkit
 ```
 
-Access the gateway at: `http://localhost:3000/gateway/mcp`
+Access the gateway at: `http://localhost:3000/mcp`
 
 ### Production Deployment
 
@@ -103,7 +103,7 @@ Access the gateway at: `http://localhost:3000/gateway/mcp`
 ftl toolkit deploy my-toolkit
 ```
 
-The deployed URL will include the gateway endpoint at `/gateway/mcp`.
+The deployed URL will include the gateway endpoint at `/mcp`.
 
 ## Limitations
 
