@@ -78,7 +78,7 @@ edition = "2024"
 
 [dependencies]
 ftl-sdk-rs = {ftl_sdk_dep}
-talc = {{ version = "4.4.3", features = ["lock_api"] }}
+talc = {{ version = "4.4.3", default-features = false }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 anyhow = "1.0"
