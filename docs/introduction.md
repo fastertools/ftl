@@ -24,7 +24,7 @@ A **toolkit** is a collection of tools that are deployed together as a single un
 
 ### FTL Edge
 
-**FTL Edge** is a commercial, managed platform for deploying and serving tools. It provides a global network of edge servers that can execute tools with "sub-millisecond compute overhead."
+**FTL Edge** is a managed platform for deploying and serving tools. It provides a global network of edge servers that can execute tools with sub-millisecond compute overhead.
 
 ## Why FTL?
 

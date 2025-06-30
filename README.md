@@ -15,7 +15,7 @@ A [Rust](https://www.rust-lang.org) + [WebAssembly](https://webassembly.org) pro
 
 </div>
 
-FTL is a platform for edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
+FTL is a framework for developing and deploying fast, edge-hosted [Model Context Protocol](https://modelcontextprotocol.io/introduction) tools for AI agents.
 
 This repository contains the `ftl` command-line interface, which is the primary entry point for developers using the FTL platform.
 
