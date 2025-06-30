@@ -174,7 +174,7 @@ curl -X POST http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"my-tool","arguments":{"input":"test"}},"id":1}'
 ```
 
-Each FTL tool is a complete MCP server that exposes a single tool. When you deploy an individual tool, you're deploying a standalone MCP server. Toolkits (described below) bundle multiple tools together with a gateway that provides a unified MCP server interface.
+Each FTL tool is a complete MCP server that exposes a single tool. When you deploy an individual tool, you're deploying a standalone MCP server. Toolkits (described below) bundle multiple tools together with a gateway that acts as a unified MCP server over multiple tools.
 
 ### Deploy to FTL Edge
 
@@ -182,7 +182,7 @@ Each FTL tool is a complete MCP server that exposes a single tool. When you depl
 ftl deploy
 ```
 
-This will deploy your tool to the FTL Edge, where it can be called by your AI agents.
+This will deploy your tool to FTL Edge, where it can be called by your AI agents.
 
 ## Toolkits
 
@@ -201,15 +201,11 @@ Each FTL tool is a self-contained WebAssembly component that implements its own 
 
 ```mermaid
 graph TD
-    Client[AI Agent] -->|tools/call| Gateway
-    Gateway[Gateway Component / MCP Server] --> MCP[/mcp unified endpoint]
-    MCP --> Rust1[Rust Tool 1]
-    MCP --> JS2[JavaScript Tool 2]
-    MCP --> TS3[TypeScript Tool 3]
-    
-    Rust1 -.-> |MCP Server| Rust1
-    JS2 -.-> |MCP Server| JS2
-    TS3 -.-> |MCP Server| TS3
+    Client[AI agent] -->|tools/call| Gateway
+    Gateway["Gateway component (/mcp)"]
+    Gateway -->|/rs-tool/mcp| Rust["Rust tool server"]
+    Gateway -->|/js-tool/mcp| JS["JavaScript tool server"]
+    Gateway -->|/ts-tool/mcp| TS["TypeScript tool server"]
 ```
 
 The gateway component:
@@ -223,10 +219,10 @@ The gateway component:
 
 ```bash
 # Build individual tools (can be different languages)
-ftl build rust-analyzer    # Rust tool
-ftl build js-formatter     # JavaScript tool  
-ftl build ts-linter        # TypeScript tool
-ftl build data-processor   # Another Rust tool
+ftl new rust-analyzer    # Rust tool
+ftl new js-formatter     # JavaScript tool  
+ftl new ts-linter        # TypeScript tool
+ftl new data-processor   # Another Rust tool
 
 # Bundle them as a toolkit
 ftl toolkit build --name dev-toolkit rust-analyzer js-formatter ts-linter data-processor
