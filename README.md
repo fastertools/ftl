@@ -71,50 +71,6 @@ impl Tool for MyTool {
 
 ftl_sdk_rs::ftl_mcp_server!(MyTool);
 ```
-
-</details>
-
-<details>
-<summary><b>🟨 JavaScript</b></summary>
-
-```bash
-ftl new my-tool --javascript
-```
-
-This creates a new directory with:
-- `ftl.toml` - Tool manifest
-- `package.json` - Node dependencies
-- `src/index.js` - Tool implementation
-
-```javascript
-import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
-
-export default class MyTool extends Tool {
-    get name() { return 'my-tool'; }
-    get description() { return 'My tool description'; }
-    
-    get inputSchema() {
-        return {
-            type: 'object',
-            properties: {
-                input: { type: 'string' }
-            },
-            required: ['input']
-        };
-    }
-    
-    execute(args) {
-        const { input } = args;
-        
-        if (!input) {
-            throw ToolError.invalidArguments('input required');
-        }
-        
-        return ToolResult.text(`Processed: ${input}`);
-    }
-}
-```
-
 </details>
 
 <details>
@@ -148,6 +104,51 @@ export default class MyTool extends Tool {
     }
     
     execute(args: { input: string }): ToolResult {
+        const { input } = args;
+        
+        if (!input) {
+            throw ToolError.invalidArguments('input required');
+        }
+        
+        return ToolResult.text(`Processed: ${input}`);
+    }
+}
+```
+
+</details>
+
+</details>
+
+<details>
+<summary><b>🟨 JavaScript</b></summary>
+
+```bash
+ftl new my-tool --javascript
+```
+
+This creates a new directory with:
+- `ftl.toml` - Tool manifest
+- `package.json` - Node dependencies
+- `src/index.js` - Tool implementation
+
+```javascript
+import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
+
+export default class MyTool extends Tool {
+    get name() { return 'my-tool'; }
+    get description() { return 'My tool description'; }
+    
+    get inputSchema() {
+        return {
+            type: 'object',
+            properties: {
+                input: { type: 'string' }
+            },
+            required: ['input']
+        };
+    }
+    
+    execute(args) {
         const { input } = args;
         
         if (!input) {
@@ -200,17 +201,17 @@ Each FTL tool is a self-contained WebAssembly component that implements its own 
 
 ### How It Works
 
-```
-┌─────────────────────────────────────────────────┐
-│                 Toolkit                         │
-├─────────────────────────────────────────────────┤
-│  Gateway Component (MCP Server)                 │
-│    ├─ /mcp (unified endpoint)                  │
-│    └─ Routes to:                               │
-│         ├─ Rust Tool 1 (MCP Server)            │
-│         ├─ JavaScript Tool 2 (MCP Server)      │
-│         └─ Rust Tool 3 (MCP Server)            │
-└─────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Client[AI Agent] -->|tools/call| Gateway
+    Gateway[Gateway Component / MCP Server] --> MCP[/mcp unified endpoint]
+    MCP --> Rust1[Rust Tool 1]
+    MCP --> JS2[JavaScript Tool 2]
+    MCP --> TS3[TypeScript Tool 3]
+    
+    Rust1 -.-> |MCP Server| Rust1
+    JS2 -.-> |MCP Server| JS2
+    TS3 -.-> |MCP Server| TS3
 ```
 
 The gateway component:
@@ -243,6 +244,7 @@ This starts a local server with:
 - `/mcp` - Unified endpoint that aggregates all tools
 - `/rust-analyzer/mcp` - Direct access to individual tool
 - `/js-formatter/mcp` - Direct access to individual tool
+- `/ts-linter/mcp` - Direct access to individual tool
 - `/data-processor/mcp` - Direct access to individual tool
 
 ### Deploy a Toolkit
