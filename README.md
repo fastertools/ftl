@@ -25,16 +25,6 @@ This repository contains the `ftl` command-line interface, which is the primary 
 cargo install ftl-cli
 ```
 
-FTL requires Spin v3.3.1 to run WebAssembly tools. FTL manages its own Spin installation in `~/.ftl/bin` to ensure version compatibility. This won't affect any system-wide Spin installations you may have.
-
-- When you first use FTL, it will prompt to install Spin (even if you have Spin installed system-wide)
-- Set `FTL_AUTO_INSTALL=true` to skip the prompt
-- Manually manage FTL's Spin with `ftl spin` commands:
-  - `ftl spin install` - Install Spin v3.3.1 in ~/.ftl/bin
-  - `ftl spin update` - Update to the latest supported version
-  - `ftl spin remove` - Remove FTL-managed Spin
-  - `ftl spin info` - Show installation details
-
 ### Create a New Tool
 
 <details>
@@ -306,19 +296,7 @@ just build-wasm   # Build the SDK for WASM target
 just spin-install # Install FTL-managed Spin
 
 # See all available commands
-just
-```
-
-### Alternative: Using Cargo Aliases
-
-If you prefer not to install cargo-make, you can use the cargo aliases in `.cargo/config.toml`:
-
-```bash
-cargo fmt-check    # Check formatting
-cargo lint         # Run clippy with CI settings
-cargo test-all     # Run all tests
-cargo fix-fmt      # Auto-fix formatting
-cargo fix-clippy   # Auto-fix clippy warnings
+just --list
 ```
 
 ## Contributing
