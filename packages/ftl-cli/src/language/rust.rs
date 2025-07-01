@@ -2,11 +2,7 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result};
 
-use crate::{
-    language::{Language, LanguageSupport},
-    manifest::Manifest,
-    templates::{self, Template},
-};
+use crate::{language::LanguageSupport, manifest::Manifest, templates};
 
 pub struct RustSupport;
 
@@ -17,10 +13,6 @@ impl RustSupport {
 }
 
 impl LanguageSupport for RustSupport {
-    fn language(&self) -> Language {
-        Language::Rust
-    }
-
     fn new_project(
         &self,
         name: &str,
@@ -72,14 +64,6 @@ impl LanguageSupport for RustSupport {
         }
 
         Ok(())
-    }
-
-    fn get_templates(&self) -> Vec<Template> {
-        vec![Template {
-            name: "default".to_string(),
-            description: "Default Rust FTL tool template".to_string(),
-            language: Language::Rust,
-        }]
     }
 
     fn validate_environment(&self) -> Result<()> {

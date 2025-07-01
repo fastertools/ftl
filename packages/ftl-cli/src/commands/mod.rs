@@ -9,6 +9,7 @@ pub mod logs;
 pub mod new;
 pub mod serve;
 pub mod size;
+pub mod spin;
 pub mod status;
 pub mod test;
 pub mod toolkit;

@@ -6,31 +6,22 @@ use std::{
 use anyhow::{Context, Result};
 use tracing::{debug, info};
 
-/// Check if spin CLI is available
-pub fn check_spin_installed() -> Result<()> {
-    if which::which("spin").is_err() {
-        anyhow::bail!(
-            "Spin CLI not found. Please install it from: https://developer.fermyon.com/spin/install"
-        );
-    }
-    Ok(())
-}
+use super::spin_installer::check_and_install_spin;
 
-/// Start a spin server for development
-pub fn start_spin_server<P: AsRef<Path>>(
+/// Start a spin server for development (with spin path provided)
+pub fn start_spin_server_with_path<P: AsRef<Path>>(
+    spin_path: &Path,
     tool_path: P,
     port: u16,
     spin_toml_path: Option<&Path>,
 ) -> Result<Child> {
-    check_spin_installed()?;
-
     let spin_toml = spin_toml_path
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| tool_path.as_ref().join(".ftl/spin.toml"));
 
     info!("Starting Spin server on port {}", port);
 
-    let child = Command::new("spin")
+    let child = Command::new(spin_path)
         .arg("up")
         .arg("--listen")
         .arg(format!("127.0.0.1:{port}"))
@@ -46,13 +37,12 @@ pub fn start_spin_server<P: AsRef<Path>>(
 }
 
 /// Deploy to FTL EdgeWorkers using Spin
-#[allow(dead_code)]
-pub fn deploy_to_akamai<P: AsRef<Path>>(
+pub async fn deploy_to_akamai<P: AsRef<Path>>(
     tool_path: P,
     app_name: Option<&str>,
 ) -> Result<DeploymentInfo> {
-    check_spin_installed()?;
-    check_akamai_auth()?;
+    let spin_path = check_and_install_spin().await?;
+    check_akamai_auth(&spin_path).await?;
 
     let tool_path = tool_path.as_ref();
     let spin_toml = tool_path.join(".ftl/spin.toml");
@@ -75,7 +65,7 @@ pub fn deploy_to_akamai<P: AsRef<Path>>(
         "Checking if app is already linked from: {:?}",
         spin_toml_abs
     );
-    let status_output = Command::new("spin")
+    let status_output = Command::new(&spin_path)
         .args([
             "aka",
             "app",
@@ -99,7 +89,7 @@ pub fn deploy_to_akamai<P: AsRef<Path>>(
     // If app is linked, deploy without --create-name
     if app_linked {
         debug!("App is linked, deploying without --create-name");
-        let output = Command::new("spin")
+        let output = Command::new(&spin_path)
             .args([
                 "aka",
                 "deploy",
@@ -126,7 +116,7 @@ pub fn deploy_to_akamai<P: AsRef<Path>>(
 
     info!("Creating new tool(kit): {}", app_name);
 
-    let output = Command::new("spin")
+    let output = Command::new(&spin_path)
         .args([
             "aka",
             "deploy",
@@ -149,9 +139,8 @@ pub fn deploy_to_akamai<P: AsRef<Path>>(
 }
 
 /// Check if Akamai CLI is authenticated
-#[allow(dead_code)]
-pub fn check_akamai_auth() -> Result<bool> {
-    let output = Command::new("spin")
+pub async fn check_akamai_auth(spin_path: &Path) -> Result<bool> {
+    let output = Command::new(spin_path)
         .args(["aka", "apps", "list"])
         .output()
         .context("Failed to check Akamai authentication")?;
@@ -167,13 +156,11 @@ pub fn check_akamai_auth() -> Result<bool> {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct DeploymentInfo {
     pub app_name: String,
     pub url: String,
 }
 
-#[allow(dead_code)]
 fn parse_deployment_info(output: &str) -> Result<DeploymentInfo> {
     // Parse deployment output to extract URL and app name
     // Example output: "- string-formatter: https://...aka.fermyon.tech/mcp (wildcard)"

@@ -162,6 +162,24 @@ enum Command {
         #[command(subcommand)]
         command: ToolkitCommand,
     },
+
+    /// Manage Spin installation
+    Spin {
+        #[command(subcommand)]
+        command: SpinCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SpinCommand {
+    /// Install Spin
+    Install,
+    /// Update Spin to the latest supported version
+    Update,
+    /// Remove Spin (if installed by FTL)
+    Remove,
+    /// Show Spin installation info
+    Info,
 }
 
 #[derive(Subcommand)]
@@ -255,6 +273,12 @@ async fn main() -> Result<()> {
             ToolkitCommand::Build { name, tools } => commands::toolkit::build(name, tools).await,
             ToolkitCommand::Serve { name, port } => commands::toolkit::serve(name, port).await,
             ToolkitCommand::Deploy { name } => commands::toolkit::deploy(name).await,
+        },
+        Command::Spin { command } => match command {
+            SpinCommand::Install => commands::spin::install().await,
+            SpinCommand::Update => commands::spin::update().await,
+            SpinCommand::Remove => commands::spin::remove().await,
+            SpinCommand::Info => commands::spin::info().await,
         },
     }
 }

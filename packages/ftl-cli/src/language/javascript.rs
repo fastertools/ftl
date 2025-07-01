@@ -3,9 +3,9 @@ use std::{fs, path::Path, process::Command};
 use anyhow::{Context, Result};
 
 use crate::{
-    language::{Language, LanguageSupport, PackageManager},
+    common::spin_installer::check_and_install_spin,
+    language::{LanguageSupport, PackageManager},
     manifest::Manifest,
-    templates::Template,
 };
 
 pub struct JavaScriptSupport;
@@ -50,10 +50,6 @@ impl JavaScriptSupport {
 }
 
 impl LanguageSupport for JavaScriptSupport {
-    fn language(&self) -> Language {
-        Language::JavaScript
-    }
-
     fn new_project(
         &self,
         name: &str,
@@ -61,8 +57,21 @@ impl LanguageSupport for JavaScriptSupport {
         _template: &str,
         path: &Path,
     ) -> Result<()> {
+        // Get spin path using blocking runtime
+        let spin_path = tokio::runtime::Handle::try_current()
+            .ok()
+            .and_then(|handle| {
+                tokio::task::block_in_place(|| handle.block_on(check_and_install_spin()).ok())
+            })
+            .unwrap_or_else(|| {
+                // If no runtime exists, create one
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(check_and_install_spin())
+                    .expect("Failed to install Spin")
+            });
+
         // Use spin new to create the project
-        let output = Command::new("spin")
+        let output = Command::new(&spin_path)
             .args([
                 "new",
                 "-t",
@@ -73,7 +82,7 @@ impl LanguageSupport for JavaScriptSupport {
                 name,
             ])
             .output()
-            .context("Failed to run spin new. Is Spin installed?")?;
+            .context("Failed to run spin new")?;
 
         if !output.status.success() {
             anyhow::bail!(
@@ -140,6 +149,19 @@ impl LanguageSupport for JavaScriptSupport {
     }
 
     fn build(&self, _manifest: &Manifest, path: &Path) -> Result<()> {
+        // Get spin path using blocking runtime
+        let spin_path = tokio::runtime::Handle::try_current()
+            .ok()
+            .and_then(|handle| {
+                tokio::task::block_in_place(|| handle.block_on(check_and_install_spin()).ok())
+            })
+            .unwrap_or_else(|| {
+                // If no runtime exists, create one
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(check_and_install_spin())
+                    .expect("Failed to install Spin")
+            });
+
         // Run spin build with spin.toml from .ftl directory
         let spin_toml_path = path.join(".ftl/spin.toml");
 
@@ -153,7 +175,7 @@ impl LanguageSupport for JavaScriptSupport {
             .canonicalize()
             .context("Failed to resolve spin.toml path")?;
 
-        let output = Command::new("spin")
+        let output = Command::new(&spin_path)
             .args(["build", "-f", absolute_spin_toml.to_str().unwrap()])
             .current_dir(path)
             .output()
@@ -192,14 +214,6 @@ impl LanguageSupport for JavaScriptSupport {
 
         println!("{}", String::from_utf8_lossy(&output.stdout));
         Ok(())
-    }
-
-    fn get_templates(&self) -> Vec<Template> {
-        vec![Template {
-            name: "default".to_string(),
-            description: "Default JavaScript FTL tool template".to_string(),
-            language: Language::JavaScript,
-        }]
     }
 
     fn validate_environment(&self) -> Result<()> {

@@ -18,13 +18,6 @@ pub fn validate_and_load_manifest<P: AsRef<Path>>(tool_path: P) -> Result<ToolMa
     load_tool_manifest(tool_path)
 }
 
-/// Get the tool name from the manifest, handling "." as current directory
-#[allow(dead_code)]
-pub fn get_tool_name<P: AsRef<Path>>(tool_path: P) -> Result<String> {
-    let manifest = load_tool_manifest(&tool_path)?;
-    Ok(manifest.tool.name)
-}
-
 /// Load and validate a tool manifest, returning both the manifest and resolved
 /// tool name
 pub fn load_manifest_and_name<P: AsRef<Path>>(tool_path: P) -> Result<(ToolManifest, String)> {

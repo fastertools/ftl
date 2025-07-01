@@ -8,7 +8,7 @@ use crate::{
     common::{
         build_utils::{format_size, get_file_size, optimize_wasm},
         manifest_utils::load_manifest_and_name,
-        spin_utils::check_spin_installed,
+        spin_installer::check_and_install_spin,
         tool_paths::{self, ensure_ftl_dir, get_profile_dir, get_spin_toml_path},
     },
     language::{Language, get_language_support},
@@ -59,7 +59,7 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
 
     // Ensure .ftl directory exists and check spin is installed
     ensure_ftl_dir(tool_path)?;
-    check_spin_installed()?;
+    check_and_install_spin().await?;
 
     // Generate spin.toml in .ftl directory
     match manifest.tool.language {
