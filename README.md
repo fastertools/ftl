@@ -31,7 +31,7 @@ cargo install ftl-cli
 <summary><b>🦀 Rust</b></summary>
 
 ```bash
-ftl new my-tool --rust
+ftl new my-tool --language rust
 ```
 
 This creates a new directory with:
@@ -75,7 +75,7 @@ ftl_sdk_rs::ftl_mcp_server!(MyTool);
 <summary><b>🔷 TypeScript</b></summary>
 
 ```bash
-ftl new my-tool --typescript
+ftl new my-tool --language typescript
 ```
 
 This creates a new directory with:
@@ -121,7 +121,7 @@ export default class MyTool extends Tool {
 <summary><b>🟨 JavaScript</b></summary>
 
 ```bash
-ftl new my-tool --javascript
+ftl new my-tool --language javascript
 ```
 
 This creates a new directory with:
