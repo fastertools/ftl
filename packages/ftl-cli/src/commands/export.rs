@@ -138,7 +138,8 @@ pub async fn execute(
     println!();
     println!("{} Export successful!", style("✓").green());
     println!("  Component: {}", output_path.display());
-    println!("  Size: {}", format_file_size(component_size));
+    let size = format_file_size(component_size);
+    println!("  Size: {size}");
     println!();
     println!("You can now serve this component with:");
     println!("  wasmtime serve -Scli {}", output_path.display());
@@ -184,5 +185,6 @@ fn format_file_size(size: u64) -> String {
         unit_index += 1;
     }
 
-    format!("{:.2} {}", size, UNITS[unit_index])
+    let unit = UNITS[unit_index];
+    format!("{size:.2} {unit}")
 }

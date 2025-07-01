@@ -41,7 +41,8 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
 
     // Build all tools in parallel
     println!();
-    println!("Tools to build: {}", tools.join(", "));
+    let tools_list = tools.join(", ");
+    println!("Tools to build: {tools_list}");
     println!();
 
     // Create a single progress bar that shows overall progress
@@ -131,7 +132,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
             }
             Err(e) => {
                 pb.abandon();
-                return Err(anyhow::anyhow!("Task failed: {}", e));
+                return Err(anyhow::anyhow!("Task failed: {e}"));
             }
         }
     }
@@ -149,11 +150,12 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     println!("{} Building gateway component...", style("→").cyan());
 
     // Create toolkit manifest
+    let tool_count = tools.len();
     let toolkit_manifest = ToolkitManifest {
         toolkit: ToolkitConfig {
             name: name.clone(),
             version: "1.0.0".to_string(),
-            description: format!("Toolkit containing {} tools", tools.len()),
+            description: format!("Toolkit containing {tool_count} tools"),
         },
         tools: tools
             .iter()
@@ -269,7 +271,8 @@ pub async fn serve(name: String, port: u16) -> Result<()> {
         println!("  Routes:");
         println!("    - {} (aggregates all tools)", style("/mcp").yellow());
         for tool in &manifest.tools {
-            println!("    - {}/mcp", tool.route);
+            let route = &tool.route;
+            println!("    - {route}/mcp");
         }
     }
 
@@ -327,7 +330,7 @@ pub async fn deploy(name: String) -> Result<()> {
 
     // Load config and generate app name with user prefix
     let config = FtlConfig::load().unwrap_or_default();
-    let app_name = format!("{}{}", config.get_app_prefix(), name);
+    let app_name = format!("{}{name}", config.get_app_prefix());
 
     // Try deploying without --create-name first (for existing apps)
     let output = Command::new("spin")
@@ -407,7 +410,8 @@ pub async fn deploy(name: String) -> Result<()> {
         println!("Available endpoints:");
         println!("  - {base_url}/mcp (aggregates all tools)");
         for tool in &manifest.tools {
-            println!("  - {}{}/mcp", base_url, tool.route);
+            let route = &tool.route;
+            println!("  - {base_url}{route}/mcp");
         }
     }
 

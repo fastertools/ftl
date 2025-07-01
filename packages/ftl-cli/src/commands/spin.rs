@@ -104,7 +104,8 @@ pub async fn info() -> Result<()> {
 
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout);
-            println!("  Version: {}", version.trim());
+            let version = version.trim();
+            println!("  Version: {version}");
         }
         println!();
     }
@@ -121,13 +122,14 @@ pub async fn info() -> Result<()> {
 
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout);
-                println!("  Version: {}", version.trim());
+                let version = version.trim();
+                println!("  Version: {version}");
             }
             println!();
         }
     }
 
-    println!("FTL requires Spin v{}", SPIN_REQUIRED_VERSION);
+    println!("FTL requires Spin v{SPIN_REQUIRED_VERSION}");
     println!();
 
     if found_ftl_managed {
@@ -135,15 +137,13 @@ pub async fn info() -> Result<()> {
     } else if which::which("spin").is_ok() {
         println!("⚠️  System Spin found, but FTL prefers its own managed version");
         println!(
-            "   Run 'ftl spin install' to install Spin v{} in ~/.ftl/bin",
-            SPIN_REQUIRED_VERSION
+            "   Run 'ftl spin install' to install Spin v{SPIN_REQUIRED_VERSION} in ~/.ftl/bin"
         );
         println!("   This ensures version compatibility and won't affect your system installation");
     } else {
         println!("❌ Spin is not installed");
         println!(
-            "   Run 'ftl spin install' to install Spin v{} in ~/.ftl/bin",
-            SPIN_REQUIRED_VERSION
+            "   Run 'ftl spin install' to install Spin v{SPIN_REQUIRED_VERSION} in ~/.ftl/bin"
         );
     }
 

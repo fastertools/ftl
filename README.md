@@ -273,26 +273,52 @@ For more detailed documentation, please see the [docs](./docs/introduction.md) d
 
 ### Running CI Checks Locally
 
-Before pushing changes, you can run the same checks that CI runs:
+This project uses [just](https://github.com/casey/just) for task automation. Install it with:
 
 ```bash
-# Run all CI checks
-./scripts/ci-local.sh
+cargo install-just
+# or install all dev tools:
+cargo install-dev-tools
+```
 
-# Or run individual checks
+Then you can run:
+
+```bash
+# Run all CI checks (same as CI)
+just ci
+
+# Individual checks
+just fmt-check    # Check formatting
+just lint         # Run clippy with CI settings  
+just test-all     # Run all tests
+
+# Development helpers
+just fix          # Fix formatting and clippy warnings
+just fix-fmt      # Auto-fix formatting only
+just fix-clippy   # Auto-fix clippy warnings only
+
+# Quick checks
+just dev          # Format and lint (quick check)
+just pre-push     # Fix and test before pushing
+
+# Other tasks
+just build-wasm   # Build the SDK for WASM target
+just spin-install # Install FTL-managed Spin
+
+# See all available commands
+just
+```
+
+### Alternative: Using Cargo Aliases
+
+If you prefer not to install cargo-make, you can use the cargo aliases in `.cargo/config.toml`:
+
+```bash
 cargo fmt-check    # Check formatting
 cargo lint         # Run clippy with CI settings
 cargo test-all     # Run all tests
-```
-
-### Cargo Aliases
-
-The project includes helpful cargo aliases in `.cargo/config.toml`:
-
-```bash
 cargo fix-fmt      # Auto-fix formatting
 cargo fix-clippy   # Auto-fix clippy warnings
-cargo build-wasm   # Build the SDK for WASM target
 ```
 
 ## Contributing

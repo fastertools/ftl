@@ -96,8 +96,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
             let spin_path = get_spin_toml_path(&tool_path);
             if !spin_path.exists() {
                 anyhow::bail!(
-                    "spin.toml not found in .ftl directory. Run 'ftl build {}' first.",
-                    tool_path
+                    "spin.toml not found in .ftl directory. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -172,7 +171,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
 
                     // Stop current server
                     if let Err(e) = server.kill() {
-                        warn!("Failed to stop server: {}", e);
+                        warn!("Failed to stop server: {e}");
                     }
                     let _ = server.wait();
 
@@ -213,7 +212,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     // Cleanup
     drop(watcher_task);
     if let Err(e) = server.kill() {
-        debug!("Failed to stop server during cleanup: {}", e);
+        debug!("Failed to stop server during cleanup: {e}");
     }
 
     Ok(())

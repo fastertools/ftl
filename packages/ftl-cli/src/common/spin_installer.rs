@@ -139,7 +139,7 @@ async fn download_spin(url: &str) -> Result<(PathBuf, tempfile::TempDir)> {
         .get(url)
         .send()
         .await
-        .with_context(|| format!("Failed to download from {}", url))?;
+        .with_context(|| format!("Failed to download from {url}"))?;
 
     if !response.status().is_success() {
         anyhow::bail!(
@@ -229,7 +229,7 @@ fn extract_tar_gz(archive_path: &PathBuf, target_path: &PathBuf) -> Result<()> {
     );
 
     let file = fs::File::open(archive_path)
-        .with_context(|| format!("Failed to open archive file at {:?}", archive_path))?;
+        .with_context(|| format!("Failed to open archive file at {archive_path:?}"))?;
     let gz = GzDecoder::new(file);
     let mut archive = Archive::new(gz);
 
