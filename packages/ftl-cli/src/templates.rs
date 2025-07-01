@@ -174,10 +174,6 @@ ftl_sdk_rs::ftl_mcp_server!({{struct_name}});
 
 #[cfg(test)]
 mod tests;
-
-// Export the tool struct for tests
-#[cfg(test)]
-pub use {{struct_name}};
 "#;
 
     let lib_rs = handlebars.render_template(lib_rs_template, &data)?;
@@ -187,18 +183,18 @@ pub use {{struct_name}};
     let tests_rs_template = r#"use ftl_sdk_rs::prelude::*;
 use serde_json::json;
 
-use super::TestTool;
+use super::{{struct_name}};
 
 #[test]
 fn test_tool_metadata() {
-    let tool = TestTool;
+    let tool = {{struct_name}};
     assert_eq!(tool.name(), "{{tool_name}}");
     assert_eq!(tool.description(), "{{description}}");
 }
 
 #[test]
 fn test_tool_call() {
-    let tool = TestTool;
+    let tool = {{struct_name}};
     let args = json!({
         "input": "test input"
     });
