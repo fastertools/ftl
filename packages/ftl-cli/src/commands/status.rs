@@ -38,11 +38,10 @@ pub async fn execute(name: Option<String>) -> Result<()> {
         }
         if stderr.contains("not found") || stderr.contains("does not exist") {
             anyhow::bail!(
-                "Tool/toolkit '{}' not found. Use 'ftl list' to see deployed tools and toolkits.",
-                app_name
+                "Tool/toolkit '{app_name}' not found. Use 'ftl list' to see deployed tools and toolkits."
             );
         }
-        anyhow::bail!("Failed to get tool/toolkit status:\n{}", stderr);
+        anyhow::bail!("Failed to get tool/toolkit status:\n{stderr}");
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

@@ -65,17 +65,15 @@ pub async fn execute(name: Option<String>, yes: bool) -> Result<()> {
         }
         if stderr.contains("not found") || stderr.contains("does not exist") {
             anyhow::bail!(
-                "Tool/toolkit '{}' not found. Use 'ftl list' to see deployed tools and toolkits.",
-                app_name
+                "Tool/toolkit '{app_name}' not found. Use 'ftl list' to see deployed tools and toolkits."
             );
         }
-        anyhow::bail!("Failed to delete tool/toolkit:\n{}", stderr);
+        anyhow::bail!("Failed to delete tool/toolkit:\n{stderr}");
     }
 
     println!(
-        "{} Tool/toolkit '{}' deleted successfully",
-        style("✓").green(),
-        app_name
+        "{} Tool/toolkit '{app_name}' deleted successfully",
+        style("✓").green()
     );
 
     Ok(())

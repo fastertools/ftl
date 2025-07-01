@@ -20,13 +20,13 @@ pub fn optimize_wasm(wasm_path: &Path, optimization_flags: &[String]) -> Result<
         cmd.arg(flag);
     }
 
-    info!("Optimizing WASM with flags: {:?}", optimization_flags);
+    info!("Optimizing WASM with flags: {optimization_flags:?}");
 
     let output = cmd.output().context("Failed to execute wasm-opt")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("wasm-opt failed:\n{}", stderr);
+        anyhow::bail!("wasm-opt failed:\n{stderr}");
     }
 
     // Replace original with optimized version
@@ -38,8 +38,10 @@ pub fn optimize_wasm(wasm_path: &Path, optimization_flags: &[String]) -> Result<
 
 /// Get the size of a file in bytes
 pub fn get_file_size(path: &Path) -> Result<u64> {
-    let metadata = std::fs::metadata(path)
-        .with_context(|| format!("Failed to get metadata for {}", path.display()))?;
+    let metadata = std::fs::metadata(path).with_context(|| {
+        let display = path.display();
+        format!("Failed to get metadata for {display}")
+    })?;
     Ok(metadata.len())
 }
 

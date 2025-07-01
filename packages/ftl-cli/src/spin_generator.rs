@@ -22,15 +22,13 @@ impl SpinConfig {
                 } else {
                     &manifest.build.profile
                 };
-                format!(
-                    "cargo build --target wasm32-wasip1 --profile {}{}",
-                    cargo_profile,
-                    if manifest.build.features.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" --features {}", manifest.build.features.join(","))
-                    }
-                )
+                let features = if manifest.build.features.is_empty() {
+                    String::new()
+                } else {
+                    let features_str = manifest.build.features.join(",");
+                    format!(" --features {features_str}")
+                };
+                format!("cargo build --target wasm32-wasip1 --profile {cargo_profile}{features}")
             }
             Language::JavaScript | Language::TypeScript => {
                 // For JS/TS, we use npm run build which is defined in package.json

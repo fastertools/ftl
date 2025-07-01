@@ -3,9 +3,9 @@ use std::{fs, path::Path, process::Command};
 use anyhow::{Context, Result};
 
 use crate::{
-    language::{Language, LanguageSupport, PackageManager},
+    common::spin_installer::check_and_install_spin,
+    language::{LanguageSupport, PackageManager},
     manifest::Manifest,
-    templates::Template,
 };
 
 pub struct TypeScriptSupport;
@@ -45,15 +45,11 @@ impl TypeScriptSupport {
 
         handlebars
             .render_template(template_str, &data)
-            .map_err(|e| anyhow::anyhow!("Template rendering failed: {}", e))
+            .map_err(|e| anyhow::anyhow!("Template rendering failed: {e}"))
     }
 }
 
 impl LanguageSupport for TypeScriptSupport {
-    fn language(&self) -> Language {
-        Language::TypeScript
-    }
-
     fn new_project(
         &self,
         name: &str,
@@ -61,8 +57,21 @@ impl LanguageSupport for TypeScriptSupport {
         _template: &str,
         path: &Path,
     ) -> Result<()> {
+        // Get spin path using blocking runtime
+        let spin_path = tokio::runtime::Handle::try_current()
+            .ok()
+            .and_then(|handle| {
+                tokio::task::block_in_place(|| handle.block_on(check_and_install_spin()).ok())
+            })
+            .unwrap_or_else(|| {
+                // If no runtime exists, create one
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(check_and_install_spin())
+                    .expect("Failed to install Spin")
+            });
+
         // Use spin new to create the project with TypeScript template
-        let output = Command::new("spin")
+        let output = Command::new(&spin_path)
             .args([
                 "new",
                 "-t",
@@ -73,7 +82,7 @@ impl LanguageSupport for TypeScriptSupport {
                 name,
             ])
             .output()
-            .context("Failed to run spin new. Is Spin installed?")?;
+            .context("Failed to run spin new")?;
 
         if !output.status.success() {
             anyhow::bail!(
@@ -144,12 +153,26 @@ impl LanguageSupport for TypeScriptSupport {
     }
 
     fn build(&self, _manifest: &Manifest, path: &Path) -> Result<()> {
+        // Get spin path using blocking runtime
+        let spin_path = tokio::runtime::Handle::try_current()
+            .ok()
+            .and_then(|handle| {
+                tokio::task::block_in_place(|| handle.block_on(check_and_install_spin()).ok())
+            })
+            .unwrap_or_else(|| {
+                // If no runtime exists, create one
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(check_and_install_spin())
+                    .expect("Failed to install Spin")
+            });
+
         // Run spin build with spin.toml from .ftl directory
         let spin_toml_path = path.join(".ftl/spin.toml");
 
         // Ensure the spin.toml exists
         if !spin_toml_path.exists() {
-            anyhow::bail!("spin.toml not found at: {}", spin_toml_path.display());
+            let display = spin_toml_path.display();
+            anyhow::bail!("spin.toml not found at: {display}");
         }
 
         // Convert to absolute path to avoid issues with relative paths
@@ -157,14 +180,15 @@ impl LanguageSupport for TypeScriptSupport {
             .canonicalize()
             .context("Failed to resolve spin.toml path")?;
 
-        let output = Command::new("spin")
+        let output = Command::new(&spin_path)
             .args(["build", "-f", absolute_spin_toml.to_str().unwrap()])
             .current_dir(path)
             .output()
             .context("Failed to run spin build")?;
 
         if !output.status.success() {
-            anyhow::bail!("Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Build failed:\n{stderr}");
         }
 
         Ok(())
@@ -194,16 +218,9 @@ impl LanguageSupport for TypeScriptSupport {
             anyhow::bail!("Tests failed");
         }
 
-        println!("{}", String::from_utf8_lossy(&output.stdout));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("{stdout}");
         Ok(())
-    }
-
-    fn get_templates(&self) -> Vec<Template> {
-        vec![Template {
-            name: "default".to_string(),
-            description: "Default TypeScript FTL tool template".to_string(),
-            language: Language::TypeScript,
-        }]
     }
 
     fn validate_environment(&self) -> Result<()> {
@@ -218,9 +235,9 @@ impl LanguageSupport for TypeScriptSupport {
 
         if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
             if major < 18 {
+                let version = version.trim();
                 anyhow::bail!(
-                    "Node.js version {} is too old. Please install Node.js 18 or later.",
-                    version.trim()
+                    "Node.js version {version} is too old. Please install Node.js 18 or later."
                 );
             }
         }

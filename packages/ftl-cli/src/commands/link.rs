@@ -51,9 +51,8 @@ pub async fn execute(name: String, path: Option<String>) -> Result<()> {
         }
         if stderr.contains("not found") || stderr.contains("does not exist") {
             anyhow::bail!(
-                "Tool/toolkit '{}' not found in FTL Edge. Use 'ftl list' to see available \
-                 deployments.",
-                name
+                "Tool/toolkit '{name}' not found in FTL Edge. Use 'ftl list' to see available \
+                 deployments."
             );
         }
         if stderr.contains("already linked") {
@@ -61,13 +60,12 @@ pub async fn execute(name: String, path: Option<String>) -> Result<()> {
                 "This tool is already linked to a deployment. Use 'ftl unlink' first to unlink it."
             );
         }
-        anyhow::bail!("Failed to link tool:\n{}", stderr);
+        anyhow::bail!("Failed to link tool:\n{stderr}");
     }
 
     println!(
-        "{} Tool successfully linked to '{}'",
-        style("✓").green(),
-        name
+        "{} Tool successfully linked to '{name}'",
+        style("✓").green()
     );
     println!();
     println!("You can now:");

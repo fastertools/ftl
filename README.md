@@ -25,6 +25,16 @@ This repository contains the `ftl` command-line interface, which is the primary 
 cargo install ftl-cli
 ```
 
+FTL requires Spin v3.3.1 to run WebAssembly tools. FTL manages its own Spin installation in `~/.ftl/bin` to ensure version compatibility. This won't affect any system-wide Spin installations you may have.
+
+- When you first use FTL, it will prompt to install Spin (even if you have Spin installed system-wide)
+- Set `FTL_AUTO_INSTALL=true` to skip the prompt
+- Manually manage FTL's Spin with `ftl spin` commands:
+  - `ftl spin install` - Install Spin v3.3.1 in ~/.ftl/bin
+  - `ftl spin update` - Update to the latest supported version
+  - `ftl spin remove` - Remove FTL-managed Spin
+  - `ftl spin info` - Show installation details
+
 ### Create a New Tool
 
 <details>
@@ -258,6 +268,58 @@ ftl toolkit deploy dev-toolkit
 ## Documentation
 
 For more detailed documentation, please see the [docs](./docs/introduction.md) directory in this repository.
+
+## Development
+
+### Running CI Checks Locally
+
+This project uses [just](https://github.com/casey/just) for task automation. Install it with:
+
+```bash
+cargo install-just
+# or install all dev tools:
+cargo install-dev-tools
+```
+
+Then you can run:
+
+```bash
+# Run all CI checks (same as CI)
+just ci
+
+# Individual checks
+just fmt-check    # Check formatting
+just lint         # Run clippy with CI settings  
+just test-all     # Run all tests
+
+# Development helpers
+just fix          # Fix formatting and clippy warnings
+just fix-fmt      # Auto-fix formatting only
+just fix-clippy   # Auto-fix clippy warnings only
+
+# Quick checks
+just dev          # Format and lint (quick check)
+just pre-push     # Fix and test before pushing
+
+# Other tasks
+just build-wasm   # Build the SDK for WASM target
+just spin-install # Install FTL-managed Spin
+
+# See all available commands
+just
+```
+
+### Alternative: Using Cargo Aliases
+
+If you prefer not to install cargo-make, you can use the cargo aliases in `.cargo/config.toml`:
+
+```bash
+cargo fmt-check    # Check formatting
+cargo lint         # Run clippy with CI settings
+cargo test-all     # Run all tests
+cargo fix-fmt      # Auto-fix formatting
+cargo fix-clippy   # Auto-fix clippy warnings
+```
 
 ## Contributing
 

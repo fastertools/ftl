@@ -2,11 +2,7 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result};
 
-use crate::{
-    language::{Language, LanguageSupport},
-    manifest::Manifest,
-    templates::{self, Template},
-};
+use crate::{language::LanguageSupport, manifest::Manifest, templates};
 
 pub struct RustSupport;
 
@@ -17,10 +13,6 @@ impl RustSupport {
 }
 
 impl LanguageSupport for RustSupport {
-    fn language(&self) -> Language {
-        Language::Rust
-    }
-
     fn new_project(
         &self,
         name: &str,
@@ -45,7 +37,8 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo build")?;
 
         if !output.status.success() {
-            anyhow::bail!("Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Build failed:\n{stderr}");
         }
 
         // Run wasm-opt if available
@@ -68,18 +61,11 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo test")?;
 
         if !output.status.success() {
-            anyhow::bail!("Tests failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Tests failed:\n{stderr}");
         }
 
         Ok(())
-    }
-
-    fn get_templates(&self) -> Vec<Template> {
-        vec![Template {
-            name: "default".to_string(),
-            description: "Default Rust FTL tool template".to_string(),
-            language: Language::Rust,
-        }]
     }
 
     fn validate_environment(&self) -> Result<()> {
@@ -126,10 +112,8 @@ impl RustSupport {
                 .context("Failed to run wasm-opt")?;
 
             if !output.status.success() {
-                eprintln!(
-                    "Warning: wasm-opt optimization failed:\n{}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("Warning: wasm-opt optimization failed:\n{stderr}");
             }
         }
 

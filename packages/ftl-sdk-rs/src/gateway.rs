@@ -148,7 +148,8 @@ impl McpGateway {
                 }
                 Err(e) => {
                     // Log error but continue with other tools
-                    eprintln!("Failed to fetch tools from {}: {}", endpoint.name, e);
+                    let name = &endpoint.name;
+                    eprintln!("Failed to fetch tools from {name}: {e}");
                 }
             }
         }

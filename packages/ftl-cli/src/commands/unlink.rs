@@ -40,7 +40,7 @@ pub async fn execute(path: Option<String>) -> Result<()> {
         if stderr.contains("not linked") || stderr.contains("No app linked") {
             anyhow::bail!("This tool is not linked to any deployment.");
         }
-        anyhow::bail!("Failed to unlink tool:\n{}", stderr);
+        anyhow::bail!("Failed to unlink tool:\n{stderr}");
     }
 
     println!("{} Tool successfully unlinked", style("✓").green());

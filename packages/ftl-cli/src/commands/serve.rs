@@ -15,7 +15,8 @@ use tracing::{debug, warn};
 use crate::{
     common::{
         manifest_utils::load_manifest_and_name,
-        spin_utils::{check_spin_installed, start_spin_server},
+        spin_installer::check_and_install_spin,
+        spin_utils::start_spin_server_with_path,
         tool_paths::{
             ensure_ftl_dir, get_profile_dir, get_spin_toml_path, get_wasm_path,
             validate_tool_exists,
@@ -49,10 +50,9 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
         Language::Rust => {
             let wasm = get_wasm_path(&tool_path, &tool_name, &manifest.build.profile);
             if !wasm.exists() {
+                let display = wasm.display();
                 anyhow::bail!(
-                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
-                    wasm.display(),
-                    tool_path
+                    "WASM binary not found at: {display}. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -86,10 +86,9 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                 .join("dist")
                 .join(format!("{tool_name}.wasm"));
             if !wasm.exists() {
+                let display = wasm.display();
                 anyhow::bail!(
-                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
-                    wasm.display(),
-                    tool_path
+                    "WASM binary not found at: {display}. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -97,8 +96,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
             let spin_path = get_spin_toml_path(&tool_path);
             if !spin_path.exists() {
                 anyhow::bail!(
-                    "spin.toml not found in .ftl directory. Run 'ftl build {}' first.",
-                    tool_path
+                    "spin.toml not found in .ftl directory. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -106,8 +104,8 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
         }
     };
 
-    // Check spin is installed
-    check_spin_installed()?;
+    // Check spin is installed and get the path
+    let spin_path = check_and_install_spin().await?;
 
     // Set up hot reload
     let should_rebuild = Arc::new(AtomicBool::new(false));
@@ -129,7 +127,8 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                 // Display changed files
                 for path in &event.paths {
                     if let Ok(rel_path) = path.strip_prefix(&tool_path_clone) {
-                        println!("\n📝 Changed: {}", rel_path.display());
+                        let display = rel_path.display();
+                        println!("\n📝 Changed: {display}");
                     }
                 }
 
@@ -152,7 +151,8 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     println!("Press Ctrl+C to stop");
     println!();
 
-    let mut server = start_spin_server(&tool_path, port, Some(&spin_toml_path))?;
+    let mut server =
+        start_spin_server_with_path(&spin_path, &tool_path, port, Some(&spin_toml_path))?;
 
     // Main server loop with rebuild handling
     let rebuild_check = should_rebuild.clone();
@@ -171,7 +171,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
 
                     // Stop current server
                     if let Err(e) = server.kill() {
-                        warn!("Failed to stop server: {}", e);
+                        warn!("Failed to stop server: {e}");
                     }
                     let _ = server.wait();
 
@@ -184,7 +184,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                             sleep(Duration::from_millis(100)).await;
 
                             // Restart server
-                            match start_spin_server(&tool_path, port, Some(&spin_toml_path)) {
+                            match start_spin_server_with_path(&spin_path, &tool_path, port, Some(&spin_toml_path)) {
                                 Ok(new_server) => {
                                     server = new_server;
                                 }
@@ -199,7 +199,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                             println!("   Fix the error and save to retry");
 
                             // Restart server anyway (will serve last good build)
-                            if let Ok(new_server) = start_spin_server(&tool_path, port, Some(&spin_toml_path)) {
+                            if let Ok(new_server) = start_spin_server_with_path(&spin_path, &tool_path, port, Some(&spin_toml_path)) {
                                 server = new_server;
                             }
                         }
@@ -212,7 +212,7 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
     // Cleanup
     drop(watcher_task);
     if let Err(e) = server.kill() {
-        debug!("Failed to stop server during cleanup: {}", e);
+        debug!("Failed to stop server during cleanup: {e}");
     }
 
     Ok(())

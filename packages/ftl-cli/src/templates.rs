@@ -4,15 +4,6 @@ use anyhow::Result;
 use handlebars::Handlebars;
 use serde_json::json;
 
-use crate::language::Language;
-
-#[allow(dead_code)]
-pub struct Template {
-    pub name: String,
-    pub description: String,
-    pub language: Language,
-}
-
 pub fn create_tool(name: &str, description: &str, target_dir: &Path) -> Result<()> {
     // Create directory structure
     std::fs::create_dir_all(target_dir)?;

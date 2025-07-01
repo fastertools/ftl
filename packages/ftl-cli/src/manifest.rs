@@ -102,14 +102,6 @@ impl ToolManifest {
             .with_context(|| format!("Failed to parse manifest from {:?}", path.as_ref()))
     }
 
-    #[allow(dead_code)]
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let content = toml::to_string_pretty(self).context("Failed to serialize manifest")?;
-
-        std::fs::write(path.as_ref(), content)
-            .with_context(|| format!("Failed to write manifest to {:?}", path.as_ref()))
-    }
-
     pub fn validate(&self) -> Result<()> {
         // Validate tool name (should be lowercase with hyphens)
         if !self
