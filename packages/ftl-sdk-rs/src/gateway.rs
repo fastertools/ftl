@@ -132,16 +132,17 @@ impl McpGateway {
             // Send request to tool endpoint
             match self.forward_request(&tool_url, list_request).await {
                 Ok(response) => {
-                    if let Some(result) = response.result
-                        && let Ok(list_response) =
+                    if let Some(result) = response.result {
+                        if let Ok(list_response) =
                             serde_json::from_value::<ListToolsResponse>(result)
-                    {
-                        for mut tool in list_response.tools {
-                            // Override description if configured
-                            if let Some(desc) = &endpoint.description {
-                                tool.description = Some(desc.clone());
+                        {
+                            for mut tool in list_response.tools {
+                                // Override description if configured
+                                if let Some(desc) = &endpoint.description {
+                                    tool.description = Some(desc.clone());
+                                }
+                                all_tools.push(tool);
                             }
-                            all_tools.push(tool);
                         }
                     }
                 }

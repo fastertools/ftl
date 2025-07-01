@@ -38,11 +38,11 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let wasm_size = metadata.len();
 
     // Get build time
-    if let Ok(modified) = metadata.modified()
-        && let Ok(elapsed) = std::time::SystemTime::now().duration_since(modified)
-    {
-        let age = format_duration(elapsed.as_secs());
-        println!("   Built: {age}");
+    if let Ok(modified) = metadata.modified() {
+        if let Ok(elapsed) = std::time::SystemTime::now().duration_since(modified) {
+            let age = format_duration(elapsed.as_secs());
+            println!("   Built: {age}");
+        }
     }
 
     println!("\n📦 Binary Sizes:");
@@ -70,20 +70,20 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             .arg("--print-offsets")
             .output();
 
-        if let Ok(output) = output
-            && output.status.success()
-        {
-            // Count sections
-            let content = String::from_utf8_lossy(&output.stdout);
-            let func_count = content.matches("(func ").count();
-            let type_count = content.matches("(type ").count();
-            let import_count = content.matches("(import ").count();
-            let export_count = content.matches("(export ").count();
+        if let Ok(output) = output {
+            if output.status.success() {
+                // Count sections
+                let content = String::from_utf8_lossy(&output.stdout);
+                let func_count = content.matches("(func ").count();
+                let type_count = content.matches("(type ").count();
+                let import_count = content.matches("(import ").count();
+                let export_count = content.matches("(export ").count();
 
-            println!("   Functions: {func_count}");
-            println!("   Types: {type_count}");
-            println!("   Imports: {import_count}");
-            println!("   Exports: {export_count}");
+                println!("   Functions: {func_count}");
+                println!("   Types: {type_count}");
+                println!("   Imports: {import_count}");
+                println!("   Exports: {export_count}");
+            }
         }
 
         // Get section sizes
@@ -93,33 +93,33 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             .arg("--section-offsets")
             .output();
 
-        if let Ok(output) = output
-            && output.status.success()
-        {
-            let content = String::from_utf8_lossy(&output.stdout);
-            println!("\n📋 Section Breakdown:");
+        if let Ok(output) = output {
+            if output.status.success() {
+                let content = String::from_utf8_lossy(&output.stdout);
+                println!("\n📋 Section Breakdown:");
 
-            // Parse section info
-            let mut sections = Vec::new();
-            for line in content.lines() {
-                if line.contains("section") && line.contains("size") {
-                    sections.push(line.trim().to_string());
+                // Parse section info
+                let mut sections = Vec::new();
+                for line in content.lines() {
+                    if line.contains("section") && line.contains("size") {
+                        sections.push(line.trim().to_string());
+                    }
                 }
-            }
 
-            // Sort sections by size if possible
-            sections.sort_by(|a, b| {
-                let size_a = extract_size_from_section(a).unwrap_or(0);
-                let size_b = extract_size_from_section(b).unwrap_or(0);
-                size_b.cmp(&size_a)
-            });
+                // Sort sections by size if possible
+                sections.sort_by(|a, b| {
+                    let size_a = extract_size_from_section(a).unwrap_or(0);
+                    let size_b = extract_size_from_section(b).unwrap_or(0);
+                    size_b.cmp(&size_a)
+                });
 
-            for section in sections.iter().take(if verbose { 20 } else { 5 }) {
-                println!("   {section}");
-            }
+                for section in sections.iter().take(if verbose { 20 } else { 5 }) {
+                    println!("   {section}");
+                }
 
-            if verbose && sections.len() > 20 {
-                println!("   ... and {} more sections", sections.len() - 20);
+                if verbose && sections.len() > 20 {
+                    println!("   ... and {} more sections", sections.len() - 20);
+                }
             }
         }
 
@@ -132,70 +132,77 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 .arg(&wasm_path)
                 .output();
 
-            if let Ok(output) = output
-                && output.status.success()
-            {
-                let content = String::from_utf8_lossy(&output.stdout);
-                let mut import_counts: HashMap<String, usize> = HashMap::new();
+            if let Ok(output) = output {
+                if output.status.success() {
+                    let content = String::from_utf8_lossy(&output.stdout);
+                    let mut import_counts: HashMap<String, usize> = HashMap::new();
 
-                for line in content.lines() {
-                    if line.contains("(import \"")
-                        && let Some(module) = extract_import_module(line)
-                    {
-                        *import_counts.entry(module).or_insert(0) += 1;
+                    for line in content.lines() {
+                        if line.contains("(import \"") {
+                            if let Some(module) = extract_import_module(line) {
+                                *import_counts.entry(module).or_insert(0) += 1;
+                            }
+                        }
                     }
+
+                    let mut imports: Vec<_> = import_counts.into_iter().collect();
+                    imports.sort_by(|a, b| b.1.cmp(&a.1));
+
+                    for (module, count) in imports {
+                        println!("   {module}: {count} imports");
+                    }
+
+                    println!("\n💡 Import Tips:");
+                    println!("   - Each import adds startup overhead");
+                    println!("   - Consider bundling multiple operations into single imports");
+                    println!("   - Lazy-load optional functionality");
                 }
-
-                let mut imports: Vec<_> = import_counts.into_iter().collect();
-                imports.sort_by(|a, b| b.1.cmp(&a.1));
-
-                for (module, count) in imports {
-                    println!("   {module}: {count} imports");
-                }
-
-                println!("\n💡 Import Tips:");
-                println!("   - Each import adds startup overhead");
-                println!("   - Consider bundling multiple operations into single imports");
-                println!("   - Lazy-load optional functionality");
             }
 
             // Show size history if available
             let size_history_path = tool_dir.join(".ftl").join("size_history.json");
             if size_history_path.exists() {
                 println!("\n📈 Size History:");
-                if let Ok(history) = std::fs::read_to_string(&size_history_path)
-                    && let Ok(history_data) = serde_json::from_str::<serde_json::Value>(&history)
-                    && let Some(entries) = history_data.as_array()
-                {
-                    let current_size_in_history = entries
-                        .last()
-                        .and_then(|e| e["size"].as_u64())
-                        .unwrap_or(wasm_size);
+                if let Ok(history) = std::fs::read_to_string(&size_history_path) {
+                    if let Ok(history_data) = serde_json::from_str::<serde_json::Value>(&history) {
+                        if let Some(entries) = history_data.as_array() {
+                            let current_size_in_history = entries
+                                .last()
+                                .and_then(|e| e["size"].as_u64())
+                                .unwrap_or(wasm_size);
 
-                    // Show current if different from last recorded
-                    if current_size_in_history != wasm_size {
-                        println!(
-                            "   Current: {} ({})",
-                            format_size(wasm_size),
-                            if wasm_size > current_size_in_history {
-                                format!("+{}", format_size(wasm_size - current_size_in_history))
-                            } else {
-                                format!("-{}", format_size(current_size_in_history - wasm_size))
+                            // Show current if different from last recorded
+                            if current_size_in_history != wasm_size {
+                                println!(
+                                    "   Current: {} ({})",
+                                    format_size(wasm_size),
+                                    if wasm_size > current_size_in_history {
+                                        format!(
+                                            "+{}",
+                                            format_size(wasm_size - current_size_in_history)
+                                        )
+                                    } else {
+                                        format!(
+                                            "-{}",
+                                            format_size(current_size_in_history - wasm_size)
+                                        )
+                                    }
+                                );
                             }
-                        );
-                    }
 
-                    // Show last 5 entries
-                    for entry in entries.iter().rev().take(5) {
-                        if let Some(size) = entry["size"].as_u64() {
-                            let date_display = if let Some(timestamp) = entry["timestamp"].as_u64()
-                            {
-                                format_timestamp(timestamp)
-                            } else {
-                                entry["date"].as_str().unwrap_or("Unknown").to_string()
-                            };
+                            // Show last 5 entries
+                            for entry in entries.iter().rev().take(5) {
+                                if let Some(size) = entry["size"].as_u64() {
+                                    let date_display =
+                                        if let Some(timestamp) = entry["timestamp"].as_u64() {
+                                            format_timestamp(timestamp)
+                                        } else {
+                                            entry["date"].as_str().unwrap_or("Unknown").to_string()
+                                        };
 
-                            println!("   {}: {}", date_display, format_size(size));
+                                    println!("   {}: {}", date_display, format_size(size));
+                                }
+                            }
                         }
                     }
                 }
@@ -329,31 +336,31 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
         }
 
         // Always show heaviest dependencies (in both normal and verbose modes)
-        if let Some(member_id) = workspace_member
-            && let Some(package) = metadata.packages.iter().find(|p| &p.id == member_id)
-        {
-            let mut dep_weights: Vec<(String, usize)> = Vec::new();
+        if let Some(member_id) = workspace_member {
+            if let Some(package) = metadata.packages.iter().find(|p| &p.id == member_id) {
+                let mut dep_weights: Vec<(String, usize)> = Vec::new();
 
-            for dep in &package.dependencies {
-                // Count how many packages depend on this dependency
-                let weight = count_dependency_weight(&metadata, &dep.name);
-                dep_weights.push((dep.name.clone(), weight));
-            }
+                for dep in &package.dependencies {
+                    // Count how many packages depend on this dependency
+                    let weight = count_dependency_weight(&metadata, &dep.name);
+                    dep_weights.push((dep.name.clone(), weight));
+                }
 
-            // Sort by weight
-            dep_weights.sort_by(|a, b| b.1.cmp(&a.1));
+                // Sort by weight
+                dep_weights.sort_by(|a, b| b.1.cmp(&a.1));
 
-            // Show top 5 if any are significant
-            let significant_deps: Vec<_> = dep_weights
-                .iter()
-                .take(5)
-                .filter(|(_, weight)| *weight > 5)
-                .collect();
+                // Show top 5 if any are significant
+                let significant_deps: Vec<_> = dep_weights
+                    .iter()
+                    .take(5)
+                    .filter(|(_, weight)| *weight > 5)
+                    .collect();
 
-            if !significant_deps.is_empty() {
-                println!("\n💡 Heaviest dependencies:");
-                for (name, weight) in significant_deps {
-                    println!("   • {name} (brings in ~{weight} crates)");
+                if !significant_deps.is_empty() {
+                    println!("\n💡 Heaviest dependencies:");
+                    for (name, weight) in significant_deps {
+                        println!("   • {name} (brings in ~{weight} crates)");
+                    }
                 }
             }
         }
