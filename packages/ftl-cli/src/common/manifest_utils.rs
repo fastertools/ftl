@@ -8,8 +8,10 @@ use crate::manifest::ToolManifest;
 /// Load a tool manifest from a tool directory
 pub fn load_tool_manifest<P: AsRef<Path>>(tool_path: P) -> Result<ToolManifest> {
     let manifest_path = get_manifest_path(&tool_path);
-    ToolManifest::load(&manifest_path)
-        .with_context(|| format!("Failed to load manifest from '{}'", manifest_path.display()))
+    ToolManifest::load(&manifest_path).with_context(|| {
+        let display = manifest_path.display();
+        format!("Failed to load manifest from '{display}'")
+    })
 }
 
 /// Validate that a tool exists and load its manifest

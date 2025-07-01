@@ -8,12 +8,12 @@ use crate::{common::tool_paths, manifest::ToolManifest};
 pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let tool_dir = Path::new(&tool_path);
     if !tool_dir.exists() {
-        anyhow::bail!("Tool directory '{}' not found", tool_path);
+        anyhow::bail!("Tool directory '{tool_path}' not found");
     }
 
     let manifest_path = tool_dir.join("ftl.toml");
     if !manifest_path.exists() {
-        anyhow::bail!("No ftl.toml found in '{}'", tool_path);
+        anyhow::bail!("No ftl.toml found in '{tool_path}'");
     }
 
     let manifest = ToolManifest::load(&manifest_path)?;
@@ -46,17 +46,16 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     }
 
     println!("\n📦 Binary Sizes:");
-    println!("   WASM: {}", format_size(wasm_size));
+    let wasm_size_str = format_size(wasm_size);
+    println!("   WASM: {wasm_size_str}");
 
     // Check for optimized version if using wasm-opt
     let opt_wasm_path = wasm_path.with_extension("opt.wasm");
     if opt_wasm_path.exists() {
         let opt_size = std::fs::metadata(&opt_wasm_path)?.len();
-        println!(
-            "   Optimized WASM: {} ({}% reduction)",
-            format_size(opt_size),
-            ((wasm_size - opt_size) * 100 / wasm_size)
-        );
+        let opt_size_str = format_size(opt_size);
+        let reduction = (wasm_size - opt_size) * 100 / wasm_size;
+        println!("   Optimized WASM: {opt_size_str} ({reduction}% reduction)");
     }
 
     // Run wasm-tools if available to get detailed info
@@ -173,21 +172,15 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
 
                             // Show current if different from last recorded
                             if current_size_in_history != wasm_size {
-                                println!(
-                                    "   Current: {} ({})",
-                                    format_size(wasm_size),
-                                    if wasm_size > current_size_in_history {
-                                        format!(
-                                            "+{}",
-                                            format_size(wasm_size - current_size_in_history)
-                                        )
-                                    } else {
-                                        format!(
-                                            "-{}",
-                                            format_size(current_size_in_history - wasm_size)
-                                        )
-                                    }
-                                );
+                                let current_str = format_size(wasm_size);
+                                let diff_str = if wasm_size > current_size_in_history {
+                                    let diff = format_size(wasm_size - current_size_in_history);
+                                    format!("+{diff}")
+                                } else {
+                                    let diff = format_size(current_size_in_history - wasm_size);
+                                    format!("-{diff}")
+                                };
+                                println!("   Current: {current_str} ({diff_str})");
                             }
 
                             // Show last 5 entries
@@ -200,7 +193,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                                             entry["date"].as_str().unwrap_or("Unknown").to_string()
                                         };
 
-                                    println!("   {}: {}", date_display, format_size(size));
+                                    let size_str = format_size(size);
+                                    println!("   {date_display}: {size_str}");
                                 }
                             }
                         }
@@ -247,10 +241,10 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             });
 
             if !has_o3_or_higher {
+                let flags = &manifest.optimization.flags;
                 suggestions.push(format!(
-                    "Consider more aggressive optimization in ftl.toml:\n     Current: {:?}\n     \
-                     Try: [\"-O3\"] or [\"-Oz\"] for size",
-                    manifest.optimization.flags
+                    "Consider more aggressive optimization in ftl.toml:\n     Current: {flags:?}\n     \
+                     Try: [\"-O3\"] or [\"-Oz\"] for size"
                 ));
             }
         }
@@ -258,10 +252,10 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
         // Profile suggestions
         match manifest.build.profile.as_str() {
             "dev" | "debug" => {
+                let profile = &manifest.build.profile;
                 suggestions.push(format!(
-                    "Using '{}' profile - switch to 'release' for smaller binaries:\n     \
-                     [build]\n     profile = \"release\"",
-                    manifest.build.profile
+                    "Using '{profile}' profile - switch to 'release' for smaller binaries:\n     \
+                     [build]\n     profile = \"release\""
                 ));
             }
             "release" => {
@@ -380,9 +374,12 @@ fn format_size(bytes: u64) -> String {
     }
 
     if unit_index == 0 {
-        format!("{} {}", size as u64, UNITS[unit_index])
+        let size_int = size as u64;
+        let unit = UNITS[unit_index];
+        format!("{size_int} {unit}")
     } else {
-        format!("{:.2} {}", size, UNITS[unit_index])
+        let unit = UNITS[unit_index];
+        format!("{size:.2} {unit}")
     }
 }
 

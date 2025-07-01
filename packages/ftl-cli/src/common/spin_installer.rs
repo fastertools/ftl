@@ -35,10 +35,7 @@ pub async fn check_and_install_spin() -> Result<PathBuf> {
     let auto_install = env::var("FTL_AUTO_INSTALL").unwrap_or_default() == "true";
 
     if !auto_install {
-        eprintln!(
-            "⚠️  FTL requires Spin v{} to run WebAssembly tools.",
-            SPIN_REQUIRED_VERSION
-        );
+        eprintln!("⚠️  FTL requires Spin v{SPIN_REQUIRED_VERSION} to run WebAssembly tools.");
         eprintln!("This will be installed in ~/.ftl/bin (not system-wide).");
 
         if which::which("spin").is_ok() {
@@ -69,7 +66,7 @@ pub async fn check_and_install_spin() -> Result<PathBuf> {
 }
 
 async fn install_spin(bin_dir: &PathBuf, spin_path: &PathBuf) -> Result<()> {
-    info!("Installing Spin v{}", SPIN_REQUIRED_VERSION);
+    info!("Installing Spin v{SPIN_REQUIRED_VERSION}");
 
     // Create bin directory
     fs::create_dir_all(bin_dir).context("Failed to create FTL bin directory")?;
@@ -88,17 +85,17 @@ async fn install_spin(bin_dir: &PathBuf, spin_path: &PathBuf) -> Result<()> {
 
     // Verify spin binary exists and is executable
     if !spin_path.exists() {
-        anyhow::bail!("Spin binary not found at {:?} after extraction", spin_path);
+        anyhow::bail!("Spin binary not found at {spin_path:?} after extraction");
     }
 
     let plugin_output = Command::new(spin_path)
         .args(["plugin", "install", "aka"])
         .output()
-        .with_context(|| format!("Failed to run spin at {:?}", spin_path))?;
+        .with_context(|| format!("Failed to run spin at {spin_path:?}"))?;
 
     if !plugin_output.status.success() {
         let stderr = String::from_utf8_lossy(&plugin_output.stderr);
-        eprintln!("⚠️  Warning: Failed to install Akamai plugin: {}", stderr);
+        eprintln!("⚠️  Warning: Failed to install Akamai plugin: {stderr}");
         eprintln!("   You can install it manually with: spin plugin install aka");
     } else {
         println!(
@@ -117,11 +114,11 @@ fn get_download_url() -> Result<String> {
         ("macos", "x86_64") => "macos-amd64",
         ("macos", "aarch64") => "macos-aarch64",
         ("windows", "x86_64") => "windows-amd64",
-        _ => anyhow::bail!(
-            "Unsupported platform: {} {}",
-            env::consts::OS,
-            env::consts::ARCH
-        ),
+        _ => {
+            let os = env::consts::OS;
+            let arch = env::consts::ARCH;
+            anyhow::bail!("Unsupported platform: {os} {arch}")
+        }
     };
 
     let extension = if env::consts::OS == "windows" {
@@ -131,8 +128,7 @@ fn get_download_url() -> Result<String> {
     };
 
     Ok(format!(
-        "{}/v{}/spin-v{}-{}.{}",
-        SPIN_RELEASES_URL, SPIN_REQUIRED_VERSION, SPIN_REQUIRED_VERSION, platform, extension
+        "{SPIN_RELEASES_URL}/v{SPIN_REQUIRED_VERSION}/spin-v{SPIN_REQUIRED_VERSION}-{platform}.{extension}"
     ))
 }
 
@@ -303,7 +299,7 @@ fn ensure_akamai_plugin(spin_path: &PathBuf) -> Result<()> {
 
     if !install_output.status.success() {
         let stderr = String::from_utf8_lossy(&install_output.stderr);
-        eprintln!("⚠️  Warning: Failed to install Akamai plugin: {}", stderr);
+        eprintln!("⚠️  Warning: Failed to install Akamai plugin: {stderr}");
         eprintln!("   You can install it manually with: spin plugin install aka");
     } else {
         debug!("Akamai plugin installed successfully");

@@ -25,7 +25,7 @@ pub async fn execute() -> Result<()> {
         if stderr.contains("not logged in") || stderr.contains("authentication") {
             anyhow::bail!("Not authenticated with FTL Edge. Please run: ftl login");
         }
-        anyhow::bail!("Failed to list tools and toolkits:\n{}", stderr);
+        anyhow::bail!("Failed to list tools and toolkits:\n{stderr}");
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

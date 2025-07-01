@@ -8,7 +8,7 @@ use crate::manifest::ToolManifest;
 pub async fn execute(name: String) -> Result<()> {
     let tool_dir = Path::new(&name);
     if !tool_dir.exists() {
-        anyhow::bail!("Tool directory '{}' not found", name);
+        anyhow::bail!("Tool directory '{name}' not found");
     }
 
     println!("🔍 Validating tool: {name}");
@@ -37,7 +37,8 @@ pub async fn execute(name: String) -> Result<()> {
 
                 // Validate version format
                 if !is_valid_version(&manifest.tool.version) {
-                    errors.push(format!("Invalid version format: {}", manifest.tool.version));
+                    let version = &manifest.tool.version;
+                    errors.push(format!("Invalid version format: {version}"));
                 }
             }
             Err(e) => {
@@ -159,7 +160,7 @@ pub async fn execute(name: String) -> Result<()> {
             for error in errors {
                 println!("   - {error}");
             }
-            anyhow::bail!("Validation failed with {} error(s)", error_count);
+            anyhow::bail!("Validation failed with {error_count} error(s)");
         }
 
         Ok(())

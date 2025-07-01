@@ -42,10 +42,8 @@ pub async fn execute(
         tool_paths::get_wasm_path_for_language(&tool_path, &tool_name, &build_profile, language);
 
     if !wasm_path.exists() {
-        anyhow::bail!(
-            "WASM file not found at {}. Please run 'ftl build' first.",
-            wasm_path.display()
-        );
+        let display = wasm_path.display();
+        anyhow::bail!("WASM file not found at {display}. Please run 'ftl build' first.");
     }
 
     // Check if wasm-tools is installed
@@ -131,7 +129,7 @@ pub async fn execute(
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("Failed to create WASM component:\n{}", stderr);
+            anyhow::bail!("Failed to create WASM component:\n{stderr}");
         }
     }
 

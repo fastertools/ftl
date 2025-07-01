@@ -19,7 +19,7 @@ pub fn start_spin_server_with_path<P: AsRef<Path>>(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| tool_path.as_ref().join(".ftl/spin.toml"));
 
-    info!("Starting Spin server on port {}", port);
+    info!("Starting Spin server on port {port}");
 
     let child = Command::new(spin_path)
         .arg("up")
@@ -49,10 +49,7 @@ pub async fn deploy_to_akamai<P: AsRef<Path>>(
 
     // Check if spin.toml exists
     if !spin_toml.exists() {
-        anyhow::bail!(
-            "spin.toml not found at {:?}. Did you build the tool first?",
-            spin_toml
-        );
+        anyhow::bail!("spin.toml not found at {spin_toml:?}. Did you build the tool first?");
     }
 
     // Get absolute path for spin.toml to avoid relative path issues
@@ -61,10 +58,7 @@ pub async fn deploy_to_akamai<P: AsRef<Path>>(
         .context("Failed to get absolute path for spin.toml")?;
 
     // Check if app is already linked by running 'spin aka app status'
-    debug!(
-        "Checking if app is already linked from: {:?}",
-        spin_toml_abs
-    );
+    debug!("Checking if app is already linked from: {spin_toml_abs:?}");
     let status_output = Command::new(&spin_path)
         .args([
             "aka",
@@ -105,7 +99,7 @@ pub async fn deploy_to_akamai<P: AsRef<Path>>(
             return parse_deployment_info(&stdout);
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("Deployment failed:\n{}", stderr);
+            anyhow::bail!("Deployment failed:\n{stderr}");
         }
     }
 
@@ -114,7 +108,7 @@ pub async fn deploy_to_akamai<P: AsRef<Path>>(
         anyhow::anyhow!("Tool/toolkit not linked. First deployment requires a name")
     })?;
 
-    info!("Creating new tool(kit): {}", app_name);
+    info!("Creating new tool(kit): {app_name}");
 
     let output = Command::new(&spin_path)
         .args([

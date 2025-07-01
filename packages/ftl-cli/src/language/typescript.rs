@@ -45,7 +45,7 @@ impl TypeScriptSupport {
 
         handlebars
             .render_template(template_str, &data)
-            .map_err(|e| anyhow::anyhow!("Template rendering failed: {}", e))
+            .map_err(|e| anyhow::anyhow!("Template rendering failed: {e}"))
     }
 }
 
@@ -171,7 +171,8 @@ impl LanguageSupport for TypeScriptSupport {
 
         // Ensure the spin.toml exists
         if !spin_toml_path.exists() {
-            anyhow::bail!("spin.toml not found at: {}", spin_toml_path.display());
+            let display = spin_toml_path.display();
+            anyhow::bail!("spin.toml not found at: {display}");
         }
 
         // Convert to absolute path to avoid issues with relative paths
@@ -186,7 +187,8 @@ impl LanguageSupport for TypeScriptSupport {
             .context("Failed to run spin build")?;
 
         if !output.status.success() {
-            anyhow::bail!("Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Build failed:\n{stderr}");
         }
 
         Ok(())
@@ -216,7 +218,8 @@ impl LanguageSupport for TypeScriptSupport {
             anyhow::bail!("Tests failed");
         }
 
-        println!("{}", String::from_utf8_lossy(&output.stdout));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("{stdout}");
         Ok(())
     }
 
@@ -232,9 +235,9 @@ impl LanguageSupport for TypeScriptSupport {
 
         if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
             if major < 18 {
+                let version = version.trim();
                 anyhow::bail!(
-                    "Node.js version {} is too old. Please install Node.js 18 or later.",
-                    version.trim()
+                    "Node.js version {version} is too old. Please install Node.js 18 or later."
                 );
             }
         }

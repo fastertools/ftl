@@ -16,7 +16,8 @@ async fn test_tool(tool_path: &str) -> Result<()> {
     validate_tool_exists(tool_path)?;
     let manifest = validate_and_load_manifest(tool_path)?;
 
-    info!("Testing tool: {}", manifest.tool.name);
+    let name = &manifest.tool.name;
+    info!("Testing tool: {name}");
     println!("🧪 Running tests for '{tool_path}'...");
 
     // Get language support and run tests

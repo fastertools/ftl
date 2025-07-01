@@ -37,7 +37,8 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo build")?;
 
         if !output.status.success() {
-            anyhow::bail!("Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Build failed:\n{stderr}");
         }
 
         // Run wasm-opt if available
@@ -60,7 +61,8 @@ impl LanguageSupport for RustSupport {
             .context("Failed to execute cargo test")?;
 
         if !output.status.success() {
-            anyhow::bail!("Tests failed:\n{}", String::from_utf8_lossy(&output.stderr));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Tests failed:\n{stderr}");
         }
 
         Ok(())
@@ -110,10 +112,8 @@ impl RustSupport {
                 .context("Failed to run wasm-opt")?;
 
             if !output.status.success() {
-                eprintln!(
-                    "Warning: wasm-opt optimization failed:\n{}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("Warning: wasm-opt optimization failed:\n{stderr}");
             }
         }
 

@@ -99,7 +99,8 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     };
 
     // Step 1: Run language-specific build
-    pb.set_message(format!("Building {} tool...", manifest.tool.language));
+    let language = manifest.tool.language;
+    pb.set_message(format!("Building {language} tool..."));
     pb.inc(1);
 
     // Validate language environment

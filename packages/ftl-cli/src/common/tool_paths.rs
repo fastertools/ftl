@@ -67,15 +67,14 @@ pub fn get_profile_dir(profile: &str) -> &str {
 pub fn validate_tool_exists<P: AsRef<Path>>(tool_path: P) -> Result<()> {
     let path = tool_path.as_ref();
     if !path.exists() {
-        anyhow::bail!("Tool directory '{}' not found", path.display());
+        let display = path.display();
+        anyhow::bail!("Tool directory '{display}' not found");
     }
 
     let manifest_path = get_manifest_path(path);
     if !manifest_path.exists() {
-        anyhow::bail!(
-            "No ftl.toml found in '{}'. Is this an FTL tool directory?",
-            path.display()
-        );
+        let display = path.display();
+        anyhow::bail!("No ftl.toml found in '{display}'. Is this an FTL tool directory?");
     }
 
     Ok(())
@@ -89,8 +88,10 @@ pub fn get_spin_toml_path<P: AsRef<Path>>(tool_path: P) -> PathBuf {
 /// Ensure the .ftl directory exists
 pub fn ensure_ftl_dir<P: AsRef<Path>>(tool_path: P) -> Result<PathBuf> {
     let ftl_dir = get_ftl_dir(tool_path);
-    std::fs::create_dir_all(&ftl_dir)
-        .with_context(|| format!("Failed to create .ftl directory at {}", ftl_dir.display()))?;
+    std::fs::create_dir_all(&ftl_dir).with_context(|| {
+        let display = ftl_dir.display();
+        format!("Failed to create .ftl directory at {display}")
+    })?;
     Ok(ftl_dir)
 }
 

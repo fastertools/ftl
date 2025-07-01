@@ -45,8 +45,7 @@ pub async fn execute(
     let selected_language = match language {
         Some(lang_str) => Language::from_str(&lang_str).ok_or_else(|| {
             anyhow::anyhow!(
-                "Invalid language: {}. Valid options are: rust, javascript, typescript",
-                lang_str
+                "Invalid language: {lang_str}. Valid options are: rust, javascript, typescript"
             )
         })?,
         None => {
@@ -65,7 +64,7 @@ pub async fn execute(
     // Determine target directory
     let target_dir = PathBuf::from(&name);
     if target_dir.exists() {
-        anyhow::bail!("Directory '{}' already exists", name);
+        anyhow::bail!("Directory '{name}' already exists");
     }
 
     // Create tool using language-specific support
@@ -90,24 +89,21 @@ pub async fn execute(
 
     println!(
         r#"
-{} {} tool created successfully!
+{} {selected_language} tool created successfully!
 
 Next steps:
-  1. cd {}
+  1. cd {name}
   2. ftl build      # Build your tool
   3. ftl test       # Run the included tests
   4. ftl serve      # Start development server
 
-Then edit {} to implement your tool logic!
+Then edit {main_file} to implement your tool logic!
 
 Other commands:
   ftl deploy      # Deploy to FTL Edge
   ftl validate    # Validate tool configuration
   ftl size        # Show binary size details"#,
-        style("✓").green(),
-        selected_language,
-        name,
-        main_file
+        style("✓").green()
     );
 
     Ok(())

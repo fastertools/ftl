@@ -269,6 +269,32 @@ ftl toolkit deploy dev-toolkit
 
 For more detailed documentation, please see the [docs](./docs/introduction.md) directory in this repository.
 
+## Development
+
+### Running CI Checks Locally
+
+Before pushing changes, you can run the same checks that CI runs:
+
+```bash
+# Run all CI checks
+./scripts/ci-local.sh
+
+# Or run individual checks
+cargo fmt-check    # Check formatting
+cargo lint         # Run clippy with CI settings
+cargo test-all     # Run all tests
+```
+
+### Cargo Aliases
+
+The project includes helpful cargo aliases in `.cargo/config.toml`:
+
+```bash
+cargo fix-fmt      # Auto-fix formatting
+cargo fix-clippy   # Auto-fix clippy warnings
+cargo build-wasm   # Build the SDK for WASM target
+```
+
 ## Contributing
 
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for more information.

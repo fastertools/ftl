@@ -1,0 +1,12 @@
+[alias]
+# Individual CI commands
+fmt-check = "fmt --all -- --check"
+lint = "clippy --all-targets --all-features -- -D warnings"
+test-all = "test --all-features"
+
+# Development helpers
+fix-clippy = "clippy --all-targets --all-features --fix --allow-dirty --allow-staged"
+fix-fmt = "fmt --all"
+
+# Build commands
+build-wasm = "build --package ftl-sdk-rs --target wasm32-wasip1"

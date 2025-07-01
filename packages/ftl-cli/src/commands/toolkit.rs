@@ -35,7 +35,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
     for tool_name in &tools {
         let tool_dir = PathBuf::from(tool_name);
         if !tool_dir.join("ftl.toml").exists() {
-            anyhow::bail!("Tool '{}' not found", tool_name);
+            anyhow::bail!("Tool '{tool_name}' not found");
         }
     }
 
@@ -72,7 +72,7 @@ pub async fn build(name: String, tools: Vec<String>) -> Result<()> {
                     .await;
 
             if let Err(e) = build_result {
-                return Err(anyhow::anyhow!("Failed to build {}: {}", tool_name, e));
+                return Err(anyhow::anyhow!("Failed to build {tool_name}: {e}"));
             }
 
             // Update progress
@@ -370,7 +370,8 @@ pub async fn deploy(name: String) -> Result<()> {
 
     if !output.status.success() {
         println!("{} Deployment failed", style("✗").red());
-        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("{stderr}");
     }
 
     // Parse deployment URL

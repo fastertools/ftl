@@ -50,10 +50,9 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
         Language::Rust => {
             let wasm = get_wasm_path(&tool_path, &tool_name, &manifest.build.profile);
             if !wasm.exists() {
+                let display = wasm.display();
                 anyhow::bail!(
-                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
-                    wasm.display(),
-                    tool_path
+                    "WASM binary not found at: {display}. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -87,10 +86,9 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                 .join("dist")
                 .join(format!("{tool_name}.wasm"));
             if !wasm.exists() {
+                let display = wasm.display();
                 anyhow::bail!(
-                    "WASM binary not found at: {}. Run 'ftl build {}' first.",
-                    wasm.display(),
-                    tool_path
+                    "WASM binary not found at: {display}. Run 'ftl build {tool_path}' first."
                 );
             }
 
@@ -130,7 +128,8 @@ pub async fn execute(tool_path: String, port: u16, build_first: bool) -> Result<
                 // Display changed files
                 for path in &event.paths {
                     if let Ok(rel_path) = path.strip_prefix(&tool_path_clone) {
-                        println!("\n📝 Changed: {}", rel_path.display());
+                        let display = rel_path.display();
+                        println!("\n📝 Changed: {display}");
                     }
                 }
 

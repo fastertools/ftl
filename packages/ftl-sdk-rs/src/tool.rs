@@ -40,7 +40,8 @@ pub trait Tool: Clone {
 
     /// Optional: Custom server name (defaults to tool name)
     fn server_name(&self) -> String {
-        format!("ftl-{}", self.name())
+        let name = self.name();
+        format!("ftl-{name}")
     }
 
     /// Optional: Server version (defaults to "0.0.1")

@@ -29,8 +29,10 @@ impl FtlConfig {
             return Ok(Self::default());
         }
 
-        let content = fs::read_to_string(&config_file)
-            .with_context(|| format!("Failed to read config from {}", config_file.display()))?;
+        let content = fs::read_to_string(&config_file).with_context(|| {
+            let display = config_file.display();
+            format!("Failed to read config from {display}")
+        })?;
 
         let config =
             serde_json::from_str(&content).with_context(|| "Failed to parse config file")?;
@@ -42,17 +44,17 @@ impl FtlConfig {
     pub fn save(&self) -> Result<()> {
         let config_dir = Self::config_dir()?;
         fs::create_dir_all(&config_dir).with_context(|| {
-            format!(
-                "Failed to create config directory at {}",
-                config_dir.display()
-            )
+            let display = config_dir.display();
+            format!("Failed to create config directory at {display}")
         })?;
 
         let config_file = Self::config_file()?;
         let content = serde_json::to_string_pretty(self)?;
 
-        fs::write(&config_file, content)
-            .with_context(|| format!("Failed to write config to {}", config_file.display()))?;
+        fs::write(&config_file, content).with_context(|| {
+            let display = config_file.display();
+            format!("Failed to write config to {display}")
+        })?;
 
         Ok(())
     }

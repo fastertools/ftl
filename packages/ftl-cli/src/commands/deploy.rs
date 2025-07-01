@@ -48,7 +48,8 @@ pub async fn execute(tool_path: String) -> Result<()> {
 
     // Load config and generate app name with user prefix
     let config = FtlConfig::load().unwrap_or_default();
-    let app_name = format!("{}{}", config.get_app_prefix(), tool_name);
+    let prefix = config.get_app_prefix();
+    let app_name = format!("{prefix}{tool_name}");
 
     // Deploy with the generated app name
     let deployment_result = deploy_to_akamai(&tool_path, Some(&app_name)).await;
@@ -61,7 +62,8 @@ pub async fn execute(tool_path: String) -> Result<()> {
             let full_url = if deployment_info.url.ends_with("/mcp") {
                 deployment_info.url.clone()
             } else {
-                format!("{}/mcp", deployment_info.url.trim_end_matches('/'))
+                let url = deployment_info.url.trim_end_matches('/');
+                format!("{url}/mcp")
             };
 
             println!("{} Deployment successful!", style("✓").green());
@@ -69,20 +71,21 @@ pub async fn execute(tool_path: String) -> Result<()> {
             println!("  URL: {}", style(&full_url).yellow().bold());
             println!();
             println!("Test your tool:");
-            println!("  curl -X POST {} \\", full_url);
+            println!("  curl -X POST {full_url} \\");
             println!("    -H \"Content-Type: application/json\" \\");
             println!("    -d '{{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}}'");
             println!();
             println!("Manage your deployment:");
-            println!("  ftl status {}", deployment_info.app_name);
-            println!("  ftl logs {}", deployment_info.app_name);
-            println!("  ftl delete {}", deployment_info.app_name);
+            let app_name = &deployment_info.app_name;
+            println!("  ftl status {app_name}");
+            println!("  ftl logs {app_name}");
+            println!("  ftl delete {app_name}");
             Ok(())
         }
         Err(e) => {
             spinner.finish_and_clear();
             println!("{} Deployment failed", style("✗").red());
-            anyhow::bail!("{}", e);
+            anyhow::bail!("{e}");
         }
     }
 }
