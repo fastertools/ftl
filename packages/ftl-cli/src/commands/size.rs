@@ -38,11 +38,11 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
     let wasm_size = metadata.len();
 
     // Get build time
-    if let Ok(modified) = metadata.modified()
-        && let Ok(elapsed) = std::time::SystemTime::now().duration_since(modified)
-    {
-        let age = format_duration(elapsed.as_secs());
-        println!("   Built: {age}");
+    if let Ok(modified) = metadata.modified() {
+        if let Ok(elapsed) = std::time::SystemTime::now().duration_since(modified) {
+            let age = format_duration(elapsed.as_secs());
+            println!("   Built: {age}");
+        }
     }
 
     println!("\n📦 Binary Sizes:");
@@ -70,9 +70,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             .arg("--print-offsets")
             .output();
 
-        if let Ok(output) = output
-            && output.status.success()
-        {
+        if let Ok(output) = output {
+            if output.status.success() {
             // Count sections
             let content = String::from_utf8_lossy(&output.stdout);
             let func_count = content.matches("(func ").count();
@@ -84,6 +83,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             println!("   Types: {type_count}");
             println!("   Imports: {import_count}");
             println!("   Exports: {export_count}");
+            }
         }
 
         // Get section sizes
@@ -93,9 +93,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             .arg("--section-offsets")
             .output();
 
-        if let Ok(output) = output
-            && output.status.success()
-        {
+        if let Ok(output) = output {
+            if output.status.success() {
             let content = String::from_utf8_lossy(&output.stdout);
             println!("\n📋 Section Breakdown:");
 
@@ -121,6 +120,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
             if verbose && sections.len() > 20 {
                 println!("   ... and {} more sections", sections.len() - 20);
             }
+            }
         }
 
         // Verbose mode: Show detailed import analysis
@@ -132,17 +132,16 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 .arg(&wasm_path)
                 .output();
 
-            if let Ok(output) = output
-                && output.status.success()
-            {
+            if let Ok(output) = output {
+                if output.status.success() {
                 let content = String::from_utf8_lossy(&output.stdout);
                 let mut import_counts: HashMap<String, usize> = HashMap::new();
 
                 for line in content.lines() {
-                    if line.contains("(import \"")
-                        && let Some(module) = extract_import_module(line)
-                    {
-                        *import_counts.entry(module).or_insert(0) += 1;
+                    if line.contains("(import \"") {
+                        if let Some(module) = extract_import_module(line) {
+                            *import_counts.entry(module).or_insert(0) += 1;
+                        }
                     }
                 }
 
@@ -157,16 +156,16 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 println!("   - Each import adds startup overhead");
                 println!("   - Consider bundling multiple operations into single imports");
                 println!("   - Lazy-load optional functionality");
+                }
             }
 
             // Show size history if available
             let size_history_path = tool_dir.join(".ftl").join("size_history.json");
             if size_history_path.exists() {
                 println!("\n📈 Size History:");
-                if let Ok(history) = std::fs::read_to_string(&size_history_path)
-                    && let Ok(history_data) = serde_json::from_str::<serde_json::Value>(&history)
-                    && let Some(entries) = history_data.as_array()
-                {
+                if let Ok(history) = std::fs::read_to_string(&size_history_path) {
+                    if let Ok(history_data) = serde_json::from_str::<serde_json::Value>(&history) {
+                        if let Some(entries) = history_data.as_array() {
                     let current_size_in_history = entries
                         .last()
                         .and_then(|e| e["size"].as_u64())
@@ -196,6 +195,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                             };
 
                             println!("   {}: {}", date_display, format_size(size));
+                        }
+                    }
                         }
                     }
                 }
@@ -329,9 +330,8 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
         }
 
         // Always show heaviest dependencies (in both normal and verbose modes)
-        if let Some(member_id) = workspace_member
-            && let Some(package) = metadata.packages.iter().find(|p| &p.id == member_id)
-        {
+        if let Some(member_id) = workspace_member {
+            if let Some(package) = metadata.packages.iter().find(|p| &p.id == member_id) {
             let mut dep_weights: Vec<(String, usize)> = Vec::new();
 
             for dep in &package.dependencies {
@@ -355,6 +355,7 @@ pub async fn execute(tool_path: String, verbose: bool) -> Result<()> {
                 for (name, weight) in significant_deps {
                     println!("   • {name} (brings in ~{weight} crates)");
                 }
+            }
             }
         }
     }

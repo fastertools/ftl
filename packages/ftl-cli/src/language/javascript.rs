@@ -212,13 +212,13 @@ impl LanguageSupport for JavaScriptSupport {
         let version = String::from_utf8_lossy(&output.stdout);
         let version_parts: Vec<&str> = version.trim().trim_start_matches('v').split('.').collect();
 
-        if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok())
-            && major < 18
-        {
-            anyhow::bail!(
-                "Node.js version {} is too old. Please install Node.js 18 or later.",
-                version.trim()
-            );
+        if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
+            if major < 18 {
+                anyhow::bail!(
+                    "Node.js version {} is too old. Please install Node.js 18 or later.",
+                    version.trim()
+                );
+            }
         }
 
         Ok(())
