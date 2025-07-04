@@ -9,7 +9,6 @@ mod common;
 mod language;
 mod manifest;
 mod spin_generator;
-mod templates;
 
 #[derive(Parser)]
 #[command(name = "ftl")]

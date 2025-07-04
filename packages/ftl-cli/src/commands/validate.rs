@@ -1,6 +1,6 @@
 use std::{path::Path, process::Command};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tracing::info;
 
 use crate::manifest::ToolManifest;
@@ -47,84 +47,83 @@ pub async fn execute(name: String) -> Result<()> {
         }
     }
 
-    // Check Cargo.toml
-    let cargo_path = tool_dir.join("Cargo.toml");
-    if !cargo_path.exists() {
-        errors.push("Missing Cargo.toml file".to_string());
+    // Check spin.toml
+    let spin_path = tool_dir.join("spin.toml");
+    if !spin_path.exists() {
+        errors.push("Missing spin.toml file".to_string());
+    }
+
+    // Check handler directory structure
+    let handler_path = tool_dir.join("handler");
+    if !handler_path.exists() {
+        errors.push("Missing handler directory".to_string());
     } else {
-        // Validate Cargo.toml
-        match std::fs::read_to_string(&cargo_path) {
-            Ok(content) => {
-                let cargo_toml: toml::Value =
-                    content.parse().context("Failed to parse Cargo.toml")?;
+        // Check for handler Cargo.toml or package.json
+        let cargo_path = handler_path.join("Cargo.toml");
+        let package_path = handler_path.join("package.json");
+        
+        if !cargo_path.exists() && !package_path.exists() {
+            errors.push("Missing Cargo.toml or package.json in handler directory".to_string());
+        }
+        
+        // Check for WIT file
+        let wit_path = handler_path.join("wit/mcp.wit");
+        if !wit_path.exists() {
+            errors.push("Missing wit/mcp.wit file in handler directory".to_string());
+        }
+    }
 
-                // Check for required dependencies
-                if let Some(deps) = cargo_toml.get("dependencies") {
-                    if deps.get("ftl-sdk-rs").is_none() {
-                        errors.push("Missing ftl-sdk-rs dependency in Cargo.toml".to_string());
+    // Check handler source files
+    let handler_src = handler_path.join("src");
+    if !handler_src.exists() {
+        errors.push("Missing src directory in handler".to_string());
+    } else {
+        // Check for main source file (lib.rs, index.ts, or index.js)
+        let lib_rs = handler_src.join("lib.rs");
+        let index_ts = handler_src.join("index.ts");
+        let index_js = handler_src.join("index.js");
+        
+        if !lib_rs.exists() && !index_ts.exists() && !index_js.exists() {
+            errors.push("Missing main source file (lib.rs, index.ts, or index.js) in handler/src".to_string());
+        } else if lib_rs.exists() {
+            // Validate Rust handler
+            match std::fs::read_to_string(&lib_rs) {
+                Ok(content) => {
+                    if !content.contains("impl Guest for") {
+                        warnings.push("No Guest trait implementation found in handler/src/lib.rs".to_string());
                     }
-                } else {
-                    errors.push("No dependencies section in Cargo.toml".to_string());
-                }
-
-                // Check crate type
-                if let Some(lib) = cargo_toml.get("lib") {
-                    if let Some(crate_types) = lib.get("crate-type") {
-                        let types = crate_types
-                            .as_array()
-                            .and_then(|arr| arr.first())
-                            .and_then(|v| v.as_str());
-
-                        if types != Some("cdylib") {
-                            errors.push(
-                                "Library crate-type must be [\"cdylib\"] for WebAssembly"
-                                    .to_string(),
-                            );
-                        }
-                    } else {
-                        errors.push("Missing crate-type in [lib] section".to_string());
+                    if !content.contains("wit_bindgen::generate!") {
+                        errors.push("Missing wit_bindgen::generate! macro in handler/src/lib.rs".to_string());
                     }
-                } else {
-                    errors.push("Missing [lib] section in Cargo.toml".to_string());
                 }
-            }
-            Err(e) => {
-                errors.push(format!("Failed to read Cargo.toml: {e}"));
+                Err(e) => {
+                    errors.push(format!("Failed to read handler/src/lib.rs: {e}"));
+                }
             }
         }
     }
 
-    // Check source files
-    let lib_path = tool_dir.join("src/lib.rs");
-    if !lib_path.exists() {
-        errors.push("Missing src/lib.rs file".to_string());
+    // Try to run build check based on handler type
+    println!("\n📦 Running build check...");
+    let cargo_path = handler_path.join("Cargo.toml");
+    let package_path = handler_path.join("package.json");
+    
+    let check_result = if cargo_path.exists() {
+        Command::new("cargo")
+            .current_dir(&handler_path)
+            .arg("check")
+            .arg("--target")
+            .arg("wasm32-wasip1")
+            .output()
+    } else if package_path.exists() {
+        Command::new("npm")
+            .current_dir(&handler_path)
+            .arg("install")
+            .arg("--dry-run")
+            .output()
     } else {
-        // Basic validation of lib.rs content
-        match std::fs::read_to_string(&lib_path) {
-            Ok(content) => {
-                if !content.contains("impl Tool for") {
-                    warnings.push("No Tool trait implementation found in src/lib.rs".to_string());
-                }
-
-                if !content.contains("ftl_mcp_server!") {
-                    errors
-                        .push("Missing ftl_mcp_server! macro invocation in src/lib.rs".to_string());
-                }
-            }
-            Err(e) => {
-                errors.push(format!("Failed to read src/lib.rs: {e}"));
-            }
-        }
-    }
-
-    // Try to run cargo check
-    println!("\n📦 Running cargo check...");
-    let check_result = Command::new("cargo")
-        .current_dir(tool_dir)
-        .arg("check")
-        .arg("--target")
-        .arg("wasm32-wasip1")
-        .output();
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No build file found"))
+    };
 
     match check_result {
         Ok(output) => {
@@ -132,7 +131,7 @@ pub async fn execute(name: String) -> Result<()> {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 errors.push(format!("Cargo check failed:\n{stderr}"));
             } else {
-                println!("✅ Cargo check passed");
+                println!("✅ Build check passed");
             }
         }
         Err(e) => {

@@ -36,38 +36,50 @@ ftl new my-tool --language rust
 
 This creates a new directory with:
 - `ftl.toml` - Tool manifest
-- `Cargo.toml` - Rust dependencies
-- `src/lib.rs` - Tool implementation
+- `spin.toml` - Spin application configuration
+- `handler/` - Tool implementation directory
+  - `Cargo.toml` - Rust dependencies
+  - `src/lib.rs` - Tool implementation
+  - `wit/mcp.wit` - WebAssembly interface definition
 
 ```rust
-use ftl_sdk_rs::prelude::*;
+use serde_json::{json, Value};
 
-#[derive(Clone)]
-struct MyTool;
+wit_bindgen::generate!({
+    world: "mcp-handler",
+    path: "./wit",
+    exports: {
+        "component:mcp/handler": Component
+    }
+});
 
-impl Tool for MyTool {
-    fn name(&self) -> &'static str { "my-tool" }
-    fn description(&self) -> &'static str { "My tool description" }
-    
-    fn input_schema(&self) -> serde_json::Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "input": {"type": "string"}
-            },
-            "required": ["input"]
-        })
+use exports::component::mcp::handler::{Guest, Tool, ToolResult, Error as McpError};
+
+struct Component;
+
+impl Guest for Component {
+    fn list_tools() -> Vec<Tool> {
+        vec![Tool {
+            name: "my_tool".to_string(),
+            description: "My tool description".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "input": { "type": "string" }
+                },
+                "required": ["input"]
+            }).to_string(),
+        }]
     }
     
-    fn call(&self, args: &serde_json::Value) -> Result<ToolResult, ToolError> {
-        let input = args["input"].as_str()
-            .ok_or(ToolError::InvalidArguments("input required".into()))?;
-            
-        Ok(ToolResult::text(format!("Processed: {}", input)))
+    fn call_tool(name: String, arguments: String) -> ToolResult {
+        let args: Value = serde_json::from_str(&arguments).unwrap();
+        let input = args["input"].as_str().unwrap_or("No input");
+        ToolResult::Text(format!("Processed: {}", input))
     }
+    
+    // ... other required methods
 }
-
-ftl_sdk_rs::ftl_mcp_server!(MyTool);
 ```
 </details>
 
@@ -80,37 +92,44 @@ ftl new my-tool --language typescript
 
 This creates a new directory with:
 - `ftl.toml` - Tool manifest
-- `package.json` - Node dependencies
-- `tsconfig.json` - TypeScript configuration
-- `src/index.ts` - Tool implementation
+- `spin.toml` - Spin application configuration
+- `handler/` - Tool implementation directory
+  - `package.json` - Node dependencies
+  - `tsconfig.json` - TypeScript configuration
+  - `src/index.ts` - Tool implementation
+  - `wit/mcp.wit` - WebAssembly interface definition
 
 ```typescript
-import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
+import { handler } from '../generated/mcp';
 
-export default class MyTool extends Tool {
-    get name(): string { return 'my-tool'; }
-    get description(): string { return 'My tool description'; }
-    
-    get inputSchema() {
+const { Tool, ToolResult } = handler;
+
+export const Handler = {
+    listTools(): handler.Tool[] {
+        return [{
+            name: 'my-tool',
+            description: 'My tool description',
+            inputSchema: JSON.stringify({
+                type: 'object',
+                properties: {
+                    input: { type: 'string' }
+                },
+                required: ['input']
+            })
+        }];
+    },
+
+    callTool(name: string, argumentsStr: string): handler.ToolResult {
+        const args = JSON.parse(argumentsStr);
+        const input = args.input || 'No input';
         return {
-            type: 'object',
-            properties: {
-                input: { type: 'string' }
-            },
-            required: ['input']
+            tag: 'text',
+            val: `Processed: ${input}`
         };
     }
     
-    execute(args: { input: string }): ToolResult {
-        const { input } = args;
-        
-        if (!input) {
-            throw ToolError.invalidArguments('input required');
-        }
-        
-        return ToolResult.text(`Processed: ${input}`);
-    }
-}
+    // ... other required methods
+};
 ```
 
 </details>
@@ -126,36 +145,43 @@ ftl new my-tool --language javascript
 
 This creates a new directory with:
 - `ftl.toml` - Tool manifest
-- `package.json` - Node dependencies
-- `src/index.js` - Tool implementation
+- `spin.toml` - Spin application configuration
+- `handler/` - Tool implementation directory
+  - `package.json` - Node dependencies
+  - `src/index.js` - Tool implementation
+  - `wit/mcp.wit` - WebAssembly interface definition
 
 ```javascript
-import { Tool, ToolResult, ToolError } from '@fastertools/ftl-sdk-ts';
+import { handler } from '../generated/mcp.js';
 
-export default class MyTool extends Tool {
-    get name() { return 'my-tool'; }
-    get description() { return 'My tool description'; }
-    
-    get inputSchema() {
+const { Tool, ToolResult } = handler;
+
+export const Handler = {
+    listTools() {
+        return [{
+            name: 'my-tool',
+            description: 'My tool description',
+            inputSchema: JSON.stringify({
+                type: 'object',
+                properties: {
+                    input: { type: 'string' }
+                },
+                required: ['input']
+            })
+        }];
+    },
+
+    callTool(name, argumentsStr) {
+        const args = JSON.parse(argumentsStr);
+        const input = args.input || 'No input';
         return {
-            type: 'object',
-            properties: {
-                input: { type: 'string' }
-            },
-            required: ['input']
+            tag: 'text',
+            val: `Processed: ${input}`
         };
     }
     
-    execute(args) {
-        const { input } = args;
-        
-        if (!input) {
-            throw ToolError.invalidArguments('input required');
-        }
-        
-        return ToolResult.text(`Processed: ${input}`);
-    }
-}
+    // ... other required methods
+};
 ```
 
 </details>

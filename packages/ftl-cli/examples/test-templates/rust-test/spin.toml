@@ -1,0 +1,19 @@
+spin_manifest_version = 2
+
+[application]
+name = "rust-test"
+version = "0.1.0"
+authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+description = "An MCP tool written in Rust"
+
+[[trigger.http]]
+route = "/mcp"
+component = "mcp-gateway"
+
+[component.mcp-gateway]
+# Using the published gateway component
+source = { registry = "ghcr.io", package = "bowlofarugula:mcp-gateway", version = "0.1.0" }
+
+[component.mcp-gateway.dependencies]
+# Link to the local handler component
+"component:mcp/handler@0.1.0" = { path = "./handler/target/wasm32-wasip1/release/rust_test.wasm" }

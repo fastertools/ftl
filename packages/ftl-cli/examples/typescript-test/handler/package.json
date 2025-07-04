@@ -1,0 +1,24 @@
+{
+  "name": "typescript-test-handler",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An MCP tool written in TypeScript",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npm run build:types && npm run build:js && npm run build:component",
+    "build:types": "jco types wit/mcp.wit -o src/generated",
+    "build:js": "tsc",
+    "build:component": "jco componentize dist/index.js --wit wit/mcp.wit --world-name mcp-handler --out ../handler.wasm --disable all",
+    "test": "vitest",
+    "clean": "rm -rf dist generated ../handler.wasm"
+  },
+  "devDependencies": {
+    "@bytecodealliance/jco": "^1.8.1",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

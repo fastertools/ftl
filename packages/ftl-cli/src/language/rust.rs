@@ -2,7 +2,7 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result};
 
-use crate::{language::LanguageSupport, manifest::Manifest, templates};
+use crate::{language::LanguageSupport, manifest::Manifest};
 
 pub struct RustSupport;
 
@@ -15,14 +15,13 @@ impl RustSupport {
 impl LanguageSupport for RustSupport {
     fn new_project(
         &self,
-        name: &str,
-        description: &str,
+        _name: &str,
+        _description: &str,
         _template: &str,
-        path: &Path,
+        _path: &Path,
     ) -> Result<()> {
-        // Use existing template generation logic
-        templates::create_tool(name, description, path)?;
-        Ok(())
+        // This is now handled by spin templates in the new command
+        anyhow::bail!("Direct project creation is deprecated. Use 'ftl new' command instead.")
     }
 
     fn build(&self, manifest: &Manifest, path: &Path) -> Result<()> {

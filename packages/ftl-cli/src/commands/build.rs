@@ -9,10 +9,9 @@ use crate::{
         build_utils::{format_size, get_file_size, optimize_wasm},
         manifest_utils::load_manifest_and_name,
         spin_installer::check_and_install_spin,
-        tool_paths::{self, ensure_ftl_dir, get_profile_dir, get_spin_toml_path},
+        tool_paths::{self, ensure_ftl_dir, get_spin_toml_path},
     },
     language::{Language, get_language_support},
-    spin_generator::SpinConfig,
 };
 
 pub async fn execute(name: Option<String>, profile: Option<String>) -> Result<()> {
@@ -61,27 +60,11 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     ensure_ftl_dir(tool_path)?;
     check_and_install_spin().await?;
 
-    // Generate spin.toml in .ftl directory
-    match manifest.tool.language {
-        Language::Rust => {
-            // Generate spin.toml with build configuration for Rust
-            let profile_dir = get_profile_dir(&build_profile);
-            let wasm_filename = format!("{}.wasm", tool_name.replace('-', "_"));
-            let relative_wasm_path = PathBuf::from("..")
-                .join("target")
-                .join("wasm32-wasip1")
-                .join(profile_dir)
-                .join(&wasm_filename);
-
-            let spin_config = SpinConfig::from_tool(&manifest, &relative_wasm_path)?;
-            let spin_path = get_spin_toml_path(tool_path);
-            spin_config.save(&spin_path)?;
-        }
-        Language::JavaScript | Language::TypeScript => {
-            // For JavaScript/TypeScript, spin.toml is already in .ftl directory
-            // (moved during project creation) We don't need to
-            // generate or copy it
-        }
+    // Copy spin.toml to .ftl directory if it doesn't exist
+    let spin_toml_src = PathBuf::from(tool_path).join("spin.toml");
+    let spin_toml_dest = get_spin_toml_path(tool_path);
+    if spin_toml_src.exists() && !spin_toml_dest.exists() {
+        std::fs::copy(&spin_toml_src, &spin_toml_dest)?;
     }
 
     // Create progress bar (only if not quiet)
@@ -106,33 +89,59 @@ async fn build_tool(tool_path: &str, profile: Option<String>, quiet: bool) -> Re
     // Validate language environment
     language_support.validate_environment()?;
 
-    // Run the language-specific build
-    language_support.build(&manifest, std::path::Path::new(tool_path))?;
+    // Run build commands from ftl.toml
+    if let Some(commands) = &manifest.build.commands {
+        for command in commands {
+            let parts: Vec<&str> = command.split_whitespace().collect();
+            if parts.is_empty() {
+                continue;
+            }
+            
+            let output = std::process::Command::new(parts[0])
+                .args(&parts[1..])
+                .current_dir(tool_path)
+                .output()?;
+                
+            if !output.status.success() {
+                anyhow::bail!(
+                    "Build command failed: {}\n{}",
+                    command,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+        }
+    } else {
+        // Fallback to language-specific build
+        language_support.build(&manifest, std::path::Path::new(tool_path))?;
+    }
 
     // Step 2: Verify WASM was built
     pb.set_message("Verifying build output...");
     pb.inc(1);
 
-    let wasm_path = tool_paths::get_wasm_path_for_language(
-        tool_path,
-        &tool_name,
-        &build_profile,
-        manifest.tool.language,
-    );
+    // Check for handler.wasm first (new structure)
+    let wasm_path = PathBuf::from(tool_path).join("handler.wasm");
+    let wasm_path = if wasm_path.exists() {
+        wasm_path
+    } else {
+        // Fallback to old structure
+        tool_paths::get_wasm_path_for_language(
+            tool_path,
+            &tool_name,
+            &build_profile,
+            manifest.tool.language,
+        )
+    };
 
     if !wasm_path.exists() {
         anyhow::bail!("WASM binary not found at: {}", wasm_path.display());
     }
 
-    // For JavaScript/TypeScript, also copy the WASM to .ftl/dist directory for
-    // deployment
-    if matches!(
-        manifest.tool.language,
-        Language::JavaScript | Language::TypeScript
-    ) {
-        let ftl_dist_dir = PathBuf::from(tool_path).join(".ftl").join("dist");
-        std::fs::create_dir_all(&ftl_dist_dir)?;
-        let dest_wasm = ftl_dist_dir.join(format!("{tool_name}.wasm"));
+    // Copy WASM to .ftl/dist directory for deployment
+    let ftl_dist_dir = PathBuf::from(tool_path).join(".ftl").join("dist");
+    std::fs::create_dir_all(&ftl_dist_dir)?;
+    let dest_wasm = ftl_dist_dir.join("handler.wasm");
+    if wasm_path != dest_wasm {
         std::fs::copy(&wasm_path, &dest_wasm)?;
     }
 

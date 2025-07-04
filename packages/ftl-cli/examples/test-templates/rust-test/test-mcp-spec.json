@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "rust_test",
+    "arguments": {
+      "input": "Hello from Rust!"
+    }
+  },
+  "id": 4
+}

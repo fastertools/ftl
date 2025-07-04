@@ -1,0 +1,24 @@
+{
+  "name": "{{project-name | kebab_case}}-handler",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "{{project-description}}",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npm run build:types && npm run build:js && npm run build:component",
+    "build:types": "jco types wit/mcp.wit -o dist/generated",
+    "build:js": "tsc",
+    "build:component": "jco componentize dist/index.js --wit wit/mcp.wit --world-name mcp-handler --out dist/handler.wasm --disable all",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@bytecodealliance/jco": "^1.8.1",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

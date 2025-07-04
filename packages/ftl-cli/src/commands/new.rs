@@ -1,12 +1,13 @@
 use std::path::PathBuf;
+use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 use crate::{
-    language::{Language, get_language_support},
-    templates,
+    language::Language,
+    common::spin_installer::check_and_install_spin,
 };
 
 pub async fn execute(
@@ -67,24 +68,68 @@ pub async fn execute(
         anyhow::bail!("Directory '{name}' already exists");
     }
 
-    // Create tool using language-specific support
-    let language_support = get_language_support(selected_language);
+    // Get spin path
+    let spin_path = tokio::runtime::Handle::try_current()
+        .ok()
+        .and_then(|handle| {
+            tokio::task::block_in_place(|| handle.block_on(check_and_install_spin()).ok())
+        })
+        .unwrap_or_else(|| {
+            // If no runtime exists, create one
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(check_and_install_spin())
+                .expect("Failed to install Spin")
+        });
 
-    // Use templates for Rust (existing), or language-specific for others
-    match selected_language {
-        Language::Rust => {
-            templates::create_tool(&name, &description, &target_dir)?;
-        }
-        Language::JavaScript | Language::TypeScript => {
-            language_support.new_project(&name, &description, "default", &target_dir)?;
-        }
+    // Use spin new with the appropriate template
+    let template_id = match selected_language {
+        Language::Rust => "ftl-rust",
+        Language::TypeScript => "ftl-typescript",
+        Language::JavaScript => "ftl-javascript",
+    };
+
+    let template_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("templates")
+        .join(template_id);
+
+    // If template doesn't exist in binary dir, use the source templates
+    let template_path = if !template_path.exists() {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src/templates")
+            .join(template_id)
+    } else {
+        template_path
+    };
+
+    let output = Command::new(&spin_path)
+        .args([
+            "new",
+            "-t",
+            template_path.to_str().unwrap(),
+            "-o",
+            target_dir.to_str().unwrap(),
+            "--accept-defaults",
+            &name,
+        ])
+        .env("project-description", &description)
+        .output()
+        .context("Failed to run spin new")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Failed to create project with spin new:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     // Success message based on language
     let main_file = match selected_language {
-        Language::Rust => "src/lib.rs",
-        Language::JavaScript => "src/index.js",
-        Language::TypeScript => "src/index.ts",
+        Language::Rust => "handler/src/lib.rs",
+        Language::JavaScript => "handler/src/index.js",
+        Language::TypeScript => "handler/src/index.ts",
     };
 
     println!(

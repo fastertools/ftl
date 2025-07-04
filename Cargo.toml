@@ -1,6 +1,6 @@
 [workspace]
-members = ["packages/ftl-cli", "packages/ftl-sdk-rs"]
-exclude = ["demo_hash", "toolkit-*"]
+members = ["packages/ftl-cli"]
+exclude = ["demo_hash", "toolkit-*", "packages/ftl-cli/src/templates/**"]
 resolver = "2"
 
 # Don't build CLI for wasm target

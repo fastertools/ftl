@@ -424,9 +424,6 @@ fn generate_gateway_code(toolkit_dir: &Path, manifest: &ToolkitManifest) -> Resu
     let gateway_dir = toolkit_dir.join("gateway");
     std::fs::create_dir_all(&gateway_dir)?;
 
-    // Get the SDK version from compile-time constant
-    let sdk_version = env!("FTL_SDK_RS_VERSION");
-
     // Generate Cargo.toml
     let cargo_toml = format!(
         r#"[package]
@@ -435,7 +432,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ftl-sdk-rs = {{ version = "^{}" }}
+# TODO: Add gateway dependencies
 spin-sdk = "3.1.1"
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
@@ -444,7 +441,7 @@ serde_json = "1.0"
 crate-type = ["cdylib"]
 
 [workspace]"#,
-        manifest.toolkit.name, sdk_version
+        manifest.toolkit.name
     );
     std::fs::write(gateway_dir.join("Cargo.toml"), cargo_toml)?;
 
