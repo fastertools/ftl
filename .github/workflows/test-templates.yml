@@ -1,0 +1,122 @@
+name: Test Templates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-templates:
+    name: Test Templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Build ftl CLI
+        run: |
+          cd packages/ftl-cli
+          cargo build --release
+      
+      - name: Install Spin
+        run: |
+          wget -q https://github.com/fermyon/spin/releases/download/v2.8.0/spin-v2.8.0-linux-amd64.tar.gz
+          tar -xzf spin-v2.8.0-linux-amd64.tar.gz
+          sudo mv spin /usr/local/bin/
+          spin --version
+      
+      - name: Install FTL templates
+        run: |
+          spin templates install --dir packages/ftl-cli/src/templates --upgrade
+      
+      - name: Test ftl init
+        run: |
+          cd /tmp
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          cd test-project
+          test -f spin.toml
+          test -f .gitignore
+      
+      - name: Test ftl add with Rust template
+        run: |
+          cd /tmp/test-project
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-rust --language rust --description "Test Rust component"
+          test -d test-rust
+          test -f test-rust/ftl.toml
+          test -f test-rust/handler/Cargo.toml
+      
+      - name: Build Rust component
+        run: |
+          cd /tmp/test-project/test-rust
+          make build
+          test -f handler/target/wasm32-wasip1/release/test_rust.wasm
+      
+      - name: Test Rust component
+        run: |
+          cd /tmp/test-project/test-rust
+          make test
+      
+      - name: Test ftl add with TypeScript template
+        run: |
+          cd /tmp/test-project
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-ts --language typescript --description "Test TypeScript component"
+          test -d test-ts
+          test -f test-ts/ftl.toml
+          test -f test-ts/handler/package.json
+      
+      - name: Build TypeScript component
+        run: |
+          cd /tmp/test-project/test-ts
+          make build
+          test -f handler/dist/handler.wasm
+      
+      - name: Test TypeScript component
+        run: |
+          cd /tmp/test-project/test-ts
+          make test
+      
+      - name: Test ftl add with JavaScript template
+        run: |
+          cd /tmp/test-project
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-js --language javascript --description "Test JavaScript component"
+          test -d test-js
+          test -f test-js/ftl.toml
+          test -f test-js/handler/package.json
+      
+      - name: Build JavaScript component
+        run: |
+          cd /tmp/test-project/test-js
+          make build
+          test -f handler/dist/handler.wasm
+      
+      - name: Test JavaScript component
+        run: |
+          cd /tmp/test-project/test-js
+          make test
+      
+      - name: Test ftl build at project level
+        run: |
+          cd /tmp/test-project
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+      
+      - name: Test project structure
+        run: |
+          cd /tmp/test-project
+          # Verify spin.toml has all components
+          grep -q "test-rust" spin.toml
+          grep -q "test-ts" spin.toml
+          grep -q "test-js" spin.toml
+          # Verify routes
+          grep -q "/test-rust/mcp" spin.toml
+          grep -q "/test-ts/mcp" spin.toml
+          grep -q "/test-js/mcp" spin.toml

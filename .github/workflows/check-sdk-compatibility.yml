@@ -1,0 +1,121 @@
+name: Check SDK Compatibility
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'packages/ftl-sdk-*/**'
+      - 'packages/ftl-cli/src/templates/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'packages/ftl-sdk-*/**'
+      - 'packages/ftl-cli/src/templates/**'
+
+jobs:
+  check-rust-sdk:
+    name: Check Rust SDK Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Check Rust template uses correct SDK version
+        run: |
+          SDK_VERSION=$(grep '^version' packages/ftl-sdk-rust/Cargo.toml | cut -d'"' -f2)
+          TEMPLATE_VERSION=$(grep 'ftl-sdk' packages/ftl-cli/src/templates/rust/content/handler/Cargo.toml | cut -d'"' -f2)
+          
+          if [ "$SDK_VERSION" != "$TEMPLATE_VERSION" ]; then
+            echo "Error: Rust SDK version ($SDK_VERSION) does not match template version ($TEMPLATE_VERSION)"
+            echo "Please update packages/ftl-cli/src/templates/rust/content/handler/Cargo.toml"
+            exit 1
+          fi
+      
+      - name: Build Rust SDK
+        run: |
+          cd packages/ftl-sdk-rust
+          cargo build --target wasm32-wasip1
+      
+      - name: Test Rust template compilation
+        run: |
+          cd packages/ftl-cli/src/templates/rust/content/handler
+          cargo build --target wasm32-wasip1
+
+  check-typescript-sdk:
+    name: Check TypeScript SDK Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Check TypeScript template uses correct SDK version
+        run: |
+          SDK_VERSION=$(node -p "require('./packages/ftl-sdk-typescript/package.json').version")
+          TEMPLATE_VERSION=$(node -p "require('./packages/ftl-cli/src/templates/typescript/content/handler/package.json').dependencies['@fastertools/ftl-sdk']")
+          
+          # Remove any ^ or ~ prefix from template version
+          TEMPLATE_VERSION=${TEMPLATE_VERSION#^}
+          TEMPLATE_VERSION=${TEMPLATE_VERSION#~}
+          
+          if [ "$SDK_VERSION" != "$TEMPLATE_VERSION" ]; then
+            echo "Error: TypeScript SDK version ($SDK_VERSION) does not match template version ($TEMPLATE_VERSION)"
+            echo "Please update packages/ftl-cli/src/templates/typescript/content/handler/package.json"
+            exit 1
+          fi
+      
+      - name: Build TypeScript SDK
+        run: |
+          cd packages/ftl-sdk-typescript
+          npm ci
+          npm run build
+      
+      - name: Test TypeScript template compilation
+        run: |
+          cd packages/ftl-cli/src/templates/typescript/content/handler
+          # Update dependency to use local SDK
+          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:../../../../../../ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+          npm install
+          npm run build
+
+  check-javascript-sdk:
+    name: Check JavaScript SDK Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Check JavaScript template uses TypeScript SDK
+        run: |
+          # JavaScript template should use the TypeScript SDK
+          SDK_VERSION=$(node -p "require('./packages/ftl-sdk-typescript/package.json').version")
+          TEMPLATE_VERSION=$(node -p "require('./packages/ftl-cli/src/templates/javascript/content/handler/package.json').dependencies['@fastertools/ftl-sdk']")
+          
+          # Remove any ^ or ~ prefix from template version
+          TEMPLATE_VERSION=${TEMPLATE_VERSION#^}
+          TEMPLATE_VERSION=${TEMPLATE_VERSION#~}
+          
+          if [ "$SDK_VERSION" != "$TEMPLATE_VERSION" ]; then
+            echo "Error: TypeScript SDK version ($SDK_VERSION) does not match JavaScript template version ($TEMPLATE_VERSION)"
+            echo "Please update packages/ftl-cli/src/templates/javascript/content/handler/package.json"
+            exit 1
+          fi
+      
+      - name: Test JavaScript template compilation
+        run: |
+          cd packages/ftl-cli/src/templates/javascript/content/handler
+          # Update dependency to use local SDK
+          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:../../../../../../ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+          npm install
+          npm run build
