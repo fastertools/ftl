@@ -95,6 +95,17 @@ enum Command {
         path: Option<PathBuf>,
     },
 
+    /// Build and run the component, rebuilding on file changes
+    Watch {
+        /// Port to serve on
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+
+        /// Path to component (defaults to current directory)
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
+
     /// Run tests
     Test {
         /// Path to component (defaults to current directory)
@@ -233,6 +244,7 @@ async fn main() -> Result<()> {
         }
         Command::Build { release, path } => commands::build::execute(path, release).await,
         Command::Up { build, port, path } => commands::up::execute(path, port, build).await,
+        Command::Watch { port, path } => commands::watch::execute(path, port).await,
         Command::Test { path } => commands::test::execute(path).await,
         Command::Publish {
             registry,

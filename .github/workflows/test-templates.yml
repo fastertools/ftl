@@ -120,3 +120,7 @@ jobs:
           grep -q "/test-rust/mcp" spin.toml
           grep -q "/test-ts/mcp" spin.toml
           grep -q "/test-js/mcp" spin.toml
+      
+      - name: Test ftl watch command exists
+        run: |
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl watch --help

@@ -28,9 +28,8 @@ cd my-assistant
 # Add a component
 ftl add weather-tool --language typescript
 
-# Build and run locally
-ftl build
-ftl up
+# Start development server with auto-rebuild
+ftl watch
 
 # Publish to registry
 ftl publish

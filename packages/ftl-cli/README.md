@@ -22,11 +22,8 @@ cd my-assistant
 # Add a component
 ftl add weather-tool --language typescript
 
-# Build the components
-ftl build
-
-# Run locally
-ftl up
+# Start development server with auto-rebuild
+ftl watch
 
 # Publish to registry
 ftl publish
@@ -62,6 +59,12 @@ Run the component locally for development.
 
 Options:
 - `--build` - Build before running
+- `--port <port>` - Port to serve on (default: 3000)
+
+#### `ftl watch`
+Build and run the component, automatically rebuilding when files change.
+
+Options:
 - `--port <port>` - Port to serve on (default: 3000)
 
 #### `ftl test`

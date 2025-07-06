@@ -228,7 +228,7 @@ pub async fn execute(options: AddOptions) -> Result<()> {
 
 {} cd {} && make build # Build component
  
-{} ftl up --build # Build all components and start development server"#,
+{} ftl watch # Start development server with auto-rebuild"#,
         style("✓").green(),
         selected_language,
         style("📁").blue(),

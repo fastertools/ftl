@@ -7,3 +7,4 @@ pub mod registry;
 pub mod setup;
 pub mod test;
 pub mod up;
+pub mod watch;

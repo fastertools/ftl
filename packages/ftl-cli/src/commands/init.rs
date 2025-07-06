@@ -94,7 +94,7 @@ pub async fn execute(name: Option<String>, here: bool) -> Result<()> {
 
 {} Next steps:
   {}ftl add           # Add a component to the project
-  ftl up --build      # Run the project locally
+  ftl watch           # Start development server with auto-rebuild
 
 {} Example:
   {}ftl add weather-api --language typescript

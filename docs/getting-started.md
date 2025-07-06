@@ -110,10 +110,10 @@ This compiles all components in your project into optimized WebAssembly modules.
 
 ## 6. Test Locally
 
-Run your project locally for testing:
+Run your project locally with automatic rebuilds:
 
 ```bash
-ftl up
+ftl watch
 ```
 
 Test it with a curl request:
@@ -157,7 +157,7 @@ ftl add news-tool --language typescript
 ftl add calculator --language rust
 
 # Run the project with all components
-ftl up --build
+ftl watch
 ```
 
 ## 9. Deploy to Production

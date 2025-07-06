@@ -111,7 +111,24 @@ ftl up [OPTIONS]
 
 **Example:**
 ```bash
-ftl up --build --port 8080
+ftl up --port 8080
+```
+
+### `ftl watch`
+
+Build and run the component, automatically rebuilding when files change.
+
+```bash
+ftl watch [OPTIONS]
+```
+
+**Options:**
+- `-p, --port <port>`: Port to serve on (default: 3000)
+- `--path <path>`: Path to component directory
+
+**Example:**
+```bash
+ftl watch --port 8080
 ```
 
 ### `ftl test`
