@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 wit-bindgen = "0.16.0"
+serde = "1.0"
 serde_json = "1.0"
+ftl-sdk = "0.2.0"
 
 [lib]
 crate-type = ["cdylib"]

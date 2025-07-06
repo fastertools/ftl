@@ -10,17 +10,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "checkJs": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "noEmit": false,
-    "isolatedModules": true,
-    "allowSyntheticDefaultImports": true,
-    "types": []
+    "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test"]
+  "exclude": ["node_modules", "dist"]
 }
