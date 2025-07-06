@@ -30,8 +30,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          cd packages/ftl-cli
-          ./target/release/ftl setup templates --force
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
       
       - name: Test Rust workflow
         run: |
@@ -81,8 +80,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          cd packages/ftl-cli
-          ./target/release/ftl setup templates --force
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
       
       - name: Test TypeScript workflow
         run: |
@@ -132,8 +130,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          cd packages/ftl-cli
-          ./target/release/ftl setup templates --force
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
       
       - name: Test JavaScript workflow
         run: |
