@@ -23,16 +23,17 @@ pub async fn execute(path: Option<PathBuf>, port: u16) -> Result<()> {
     let args = vec!["watch", "--", "--listen", &listen_addr];
 
     println!();
-    println!("{} Starting development server with auto-rebuild...", style("▶").green());
+    println!(
+        "{} Starting development server with auto-rebuild...",
+        style("▶").green()
+    );
     println!();
-    println!("{} Watching for file changes:", style("👁").cyan());
-    println!("  • Rust components: src/**/*.rs, Cargo.toml");
-    println!("  • TypeScript components: src/**/*.ts, package.json, tsconfig.json");
-    println!("  • JavaScript components: src/**/*.js, package.json");
+    println!("{} Watching for file changes:", style("👀").cyan());
     println!();
-    println!("{} Server starting at: http://{}", style("🌐").blue(), listen_addr);
-    println!();
-    println!("{} Note: Routes will be displayed after components are built", style("ℹ").blue());
+    println!(
+        "{} Routes will be displayed after components are built",
+        style("ℹ").blue()
+    );
     println!("{} Press Ctrl+C to stop", style("⏹").yellow());
     println!();
 
