@@ -28,12 +28,10 @@ jobs:
           cd packages/ftl-cli
           cargo build --release
       
-      - name: Install Spin
-        run: |
-          wget -q https://github.com/fermyon/spin/releases/download/v2.8.0/spin-v2.8.0-linux-amd64.tar.gz
-          tar -xzf spin-v2.8.0-linux-amd64.tar.gz
-          sudo mv spin /usr/local/bin/
-          spin --version
+      - name: Setup Spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: v2.8.0
       
       - name: Install FTL templates
         run: |
