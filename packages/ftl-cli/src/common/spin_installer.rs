@@ -46,15 +46,21 @@ pub async fn check_and_install_spin() -> Result<PathBuf> {
     // If no FTL-managed version, check if spin is available in PATH
     if let Ok(system_spin_path) = which::which("spin") {
         debug!("Found system Spin in PATH at: {:?}", system_spin_path);
-        
+
         // Check if system spin version is compatible
         if let Ok(version) = get_spin_version(&system_spin_path) {
             if is_version_compatible(&version, SPIN_REQUIRED_VERSION)? {
-                debug!("System Spin version {} is compatible with required version {}", version, SPIN_REQUIRED_VERSION);
+                debug!(
+                    "System Spin version {} is compatible with required version {}",
+                    version, SPIN_REQUIRED_VERSION
+                );
                 ensure_akamai_plugin(&system_spin_path)?;
                 return Ok(system_spin_path);
             } else {
-                info!("System Spin version {} is older than required version {}", version, SPIN_REQUIRED_VERSION);
+                info!(
+                    "System Spin version {} is older than required version {}",
+                    version, SPIN_REQUIRED_VERSION
+                );
             }
         }
     }
@@ -69,7 +75,9 @@ pub async fn check_and_install_spin() -> Result<PathBuf> {
         if which::which("spin").is_ok() {
             eprintln!();
             eprintln!("Note: System Spin detected, but it's not compatible with FTL requirements.");
-            eprintln!("FTL will install its own version. Your system installation won't be affected.");
+            eprintln!(
+                "FTL will install its own version. Your system installation won't be affected."
+            );
         }
 
         // Check if we're in a terminal
@@ -347,11 +355,11 @@ fn get_spin_version(spin_path: &PathBuf) -> Result<String> {
         .arg("--version")
         .output()
         .context("Failed to get spin version")?;
-    
+
     if !output.status.success() {
         anyhow::bail!("Failed to get spin version");
     }
-    
+
     let version_str = String::from_utf8_lossy(&output.stdout);
     // Parse version from output like "spin 3.3.1 (6fd46d4 2025-06-17)"
     if let Some(version) = version_str.split_whitespace().nth(1) {
@@ -363,12 +371,12 @@ fn get_spin_version(spin_path: &PathBuf) -> Result<String> {
 
 fn is_version_compatible(actual: &str, required: &str) -> Result<bool> {
     use semver::Version;
-    
+
     let actual_version = Version::parse(actual)
-        .with_context(|| format!("Failed to parse actual version: {}", actual))?;
+        .with_context(|| format!("Failed to parse actual version: {actual}"))?;
     let required_version = Version::parse(required)
-        .with_context(|| format!("Failed to parse required version: {}", required))?;
-    
+        .with_context(|| format!("Failed to parse required version: {required}"))?;
+
     // Check if actual version is >= required version
     Ok(actual_version >= required_version)
 }

@@ -32,9 +32,13 @@ jobs:
         with:
           version: v3.3.1
       
+      - name: Install Spin templates
+        run: |
+          spin templates install --git https://github.com/fermyon/spin --upgrade
+      
       - name: Install FTL templates
         run: |
-          spin templates install --dir packages/ftl-cli/src/templates --upgrade
+          spin templates install --dir packages/ftl-cli/src --upgrade
       
       - name: Test ftl init
         run: |
