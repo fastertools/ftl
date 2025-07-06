@@ -5,30 +5,35 @@ describe('{{project-name}} MCP Handler', () => {
     describe('Tools', () => {
         it('should export at least one tool', () => {
             expect(tools).toBeDefined();
-            expect(Object.keys(tools).length).toBeGreaterThan(0);
+            expect(Array.isArray(tools)).toBe(true);
+            expect(tools.length).toBeGreaterThan(0);
         });
 
-        it('should have the {{project-name | snake_case}} tool', () => {
-            expect(tools['{{project-name | snake_case}}']).toBeDefined();
-            expect(tools['{{project-name | snake_case}}'].description).toBe('{{project-description}}');
+        it('should have the echo tool', () => {
+            const echoTool = tools.find(t => t.name === 'echo');
+            expect(echoTool).toBeDefined();
+            expect(echoTool?.description).toBe('Echo a message back to the user');
         });
 
-        it('should handle valid input for {{project-name | snake_case}} tool', async () => {
-            const tool = tools['{{project-name | snake_case}}'];
-            expect(tool.handler).toBeDefined();
+        it('should handle valid input for echo tool', async () => {
+            const echoTool = tools.find(t => t.name === 'echo');
+            expect(echoTool).toBeDefined();
+            expect(echoTool?.execute).toBeDefined();
             
-            const result = await tool.handler({ input: 'test input' });
+            const result = await echoTool?.execute({ message: 'test input' });
             expect(result).toBeDefined();
             expect(typeof result).toBe('string');
             expect(result).toContain('test input');
         });
 
-        it('should handle missing input gracefully', async () => {
-            const tool = tools['{{project-name | snake_case}}'];
+        it('should handle missing message with default', async () => {
+            const echoTool = tools.find(t => t.name === 'echo');
+            expect(echoTool).toBeDefined();
             
-            const result = await tool.handler({});
+            const result = await echoTool?.execute({});
             expect(result).toBeDefined();
             expect(typeof result).toBe('string');
+            expect(result).toContain('Hello, world!');
         });
     });
 });
