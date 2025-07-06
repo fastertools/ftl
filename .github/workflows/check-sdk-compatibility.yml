@@ -42,7 +42,17 @@ jobs:
       
       - name: Test Rust template compilation
         run: |
-          cd packages/ftl-cli/src/templates/rust/content/handler
+          # Create a temporary directory with the template
+          TEMP_DIR=$(mktemp -d)
+          cp -r packages/ftl-cli/src/templates/rust/content/handler/* $TEMP_DIR/
+          
+          # Replace template variables with test values
+          cd $TEMP_DIR
+          sed -i 's/{{project-name | snake_case}}/test_component/g' Cargo.toml
+          sed -i 's/{{project-name | kebab_case}}/test-component/g' Cargo.toml
+          sed -i 's/{{authors}}/Test Author/g' Cargo.toml
+          
+          # Build the component
           cargo build --target wasm32-wasip1
 
   check-typescript-sdk:
@@ -79,9 +89,17 @@ jobs:
       
       - name: Test TypeScript template compilation
         run: |
-          cd packages/ftl-cli/src/templates/typescript/content/handler
+          # Create a temporary directory with the template
+          TEMP_DIR=$(mktemp -d)
+          cp -r packages/ftl-cli/src/templates/typescript/content/handler/* $TEMP_DIR/
+          
+          # Replace template variables with test values
+          cd $TEMP_DIR
+          sed -i 's/{{project-name | kebab_case}}/test-component/g' package.json
+          sed -i 's/{{project-description}}/Test component/g' package.json
+          
           # Update dependency to use local SDK
-          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:../../../../../../ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:$GITHUB_WORKSPACE/packages/ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
           npm install
           npm run build
 
@@ -112,10 +130,24 @@ jobs:
             exit 1
           fi
       
+      - name: Build TypeScript SDK
+        run: |
+          cd packages/ftl-sdk-typescript
+          npm ci
+          npm run build
+      
       - name: Test JavaScript template compilation
         run: |
-          cd packages/ftl-cli/src/templates/javascript/content/handler
+          # Create a temporary directory with the template
+          TEMP_DIR=$(mktemp -d)
+          cp -r packages/ftl-cli/src/templates/javascript/content/handler/* $TEMP_DIR/
+          
+          # Replace template variables with test values
+          cd $TEMP_DIR
+          sed -i 's/{{project-name | kebab_case}}/test-component/g' package.json
+          sed -i 's/{{project-description}}/Test component/g' package.json
+          
           # Update dependency to use local SDK
-          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:../../../../../../ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+          node -e "const pkg = require('./package.json'); pkg.dependencies['@fastertools/ftl-sdk'] = 'file:$GITHUB_WORKSPACE/packages/ftl-sdk-typescript'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
           npm install
           npm run build

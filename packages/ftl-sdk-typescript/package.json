@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
+    "test": "echo 'No tests configured yet'",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
