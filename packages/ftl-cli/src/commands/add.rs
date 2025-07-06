@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result};
+use atty;
 use console::style;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
@@ -108,10 +109,17 @@ pub async fn execute(options: AddOptions) -> Result<()> {
             // Convert component name to kebab-case for the route
             let kebab_name = component_name.replace('_', "-").to_lowercase();
             let default_route = format!("/{kebab_name}/mcp");
-            Input::<String>::with_theme(&ColorfulTheme::default())
-                .with_prompt("HTTP route")
-                .default(default_route)
-                .interact_text()?
+
+            // Check if we're in a terminal
+            if atty::is(atty::Stream::Stdin) {
+                Input::<String>::with_theme(&ColorfulTheme::default())
+                    .with_prompt("HTTP route")
+                    .default(default_route)
+                    .interact_text()?
+            } else {
+                // Non-interactive mode - use default
+                default_route
+            }
         }
     };
 
@@ -164,47 +172,13 @@ pub async fn execute(options: AddOptions) -> Result<()> {
         if !using_custom_template
             && (stderr.contains("no such template") || stderr.contains("template not found"))
         {
-            println!();
-            println!(
-                "{} FTL templates not found. Installing...",
-                style("→").yellow()
-            );
-
-            // Install templates
-            let template_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-
-            let install_output = Command::new(&spin_path)
-                .args([
-                    "templates",
-                    "install",
-                    "--dir",
-                    template_dir.to_str().unwrap(),
-                    "--upgrade",
-                ])
-                .output()
-                .context("Failed to install templates")?;
-
-            if !install_output.status.success() {
-                anyhow::bail!(
-                    "Failed to install templates:\n{}",
-                    String::from_utf8_lossy(&install_output.stderr)
-                );
-            }
-
-            println!("{} Templates installed successfully!", style("✓").green());
-            println!();
-
-            // Retry spin add
-            let retry_output = spin_cmd
-                .output()
-                .context("Failed to run spin add after template installation")?;
-
-            if !retry_output.status.success() {
-                anyhow::bail!(
-                    "Failed to add component:\n{}",
-                    String::from_utf8_lossy(&retry_output.stderr)
-                );
-            }
+            eprintln!();
+            eprintln!("{} FTL templates not found.", style("✗").red());
+            eprintln!();
+            eprintln!("Please install the FTL templates by running:");
+            eprintln!("  ftl setup templates");
+            eprintln!();
+            anyhow::bail!("FTL templates not installed");
         } else {
             anyhow::bail!("Failed to add component:\n{}", stderr);
         }

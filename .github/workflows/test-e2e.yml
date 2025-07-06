@@ -44,7 +44,7 @@ jobs:
           cd test-project
           
           # Add a Rust component
-          ftl add test-rust --language rust --description "Test Rust component"
+          ftl add test-rust --language rust --description "Test Rust component" --route /test-rust/mcp
           
           # Build the component
           cd test-rust
@@ -97,7 +97,7 @@ jobs:
           cd test-project
           
           # Add a TypeScript component
-          ftl add test-ts --language typescript --description "Test TypeScript component"
+          ftl add test-ts --language typescript --description "Test TypeScript component" --route /test-ts/mcp
           
           # Build the component
           cd test-ts
@@ -150,7 +150,7 @@ jobs:
           cd test-project
           
           # Add a JavaScript component
-          ftl add test-js --language javascript --description "Test JavaScript component"
+          ftl add test-js --language javascript --description "Test JavaScript component" --route /test-js/mcp
           
           # Build the component
           cd test-js
