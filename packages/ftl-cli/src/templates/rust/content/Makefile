@@ -5,8 +5,13 @@ check-cargo-component:
 	@command -v cargo-component >/dev/null 2>&1 || { \
 		echo "cargo-component not found, installing..."; \
 		echo "This is required for building Rust WebAssembly components"; \
-		echo "This may take a few minutes on first install"; \
-		cargo install cargo-component; \
+		if command -v cargo-binstall >/dev/null 2>&1; then \
+			echo "Using cargo-binstall for faster installation"; \
+			cargo binstall cargo-component -y; \
+		else \
+			echo "cargo-binstall not found, installing from source (this may take a few minutes)"; \
+			cargo install cargo-component; \
+		fi; \
 		echo "cargo-component installed successfully!"; \
 	}
 
