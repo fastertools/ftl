@@ -24,10 +24,14 @@ This directory contains the CI/CD workflows for the FTL project.
   - Adds components with `ftl add` for all languages
   - Builds and tests each component type
 
-- **[check-sdk-compatibility.yml](./check-sdk-compatibility.yml)** - Ensures SDK versions match templates
+- **[test-e2e.yml](./test-e2e.yml)** - End-to-end tests for each language
+  - Tests full ftl workflow: init, add, build, test
+  - Runs for Rust, TypeScript, and JavaScript
+  - Ensures templates work with actual ftl commands
+
+- **[check-sdk-versions.yml](./check-sdk-versions.yml)** - Ensures SDK versions match templates
   - Verifies Rust SDK version in Rust template
   - Verifies TypeScript SDK version in TypeScript/JavaScript templates
-  - Tests template compilation with SDKs
 
 - **[check-versions.yml](./check-versions.yml)** - Checks version consistency
   - Ensures workspace and CLI versions match

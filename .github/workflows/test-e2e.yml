@@ -1,0 +1,161 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-rust-e2e:
+    name: E2E Test - Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Build ftl CLI
+        run: |
+          cd packages/ftl-cli
+          cargo build --release
+      
+      - name: Install Spin
+        run: |
+          wget -q https://github.com/fermyon/spin/releases/download/v2.8.0/spin-v2.8.0-linux-amd64.tar.gz
+          tar -xzf spin-v2.8.0-linux-amd64.tar.gz
+          sudo mv spin /usr/local/bin/
+      
+      - name: Setup ftl templates
+        run: |
+          cd packages/ftl-cli
+          ./target/release/ftl setup templates --force
+      
+      - name: Test Rust workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          cd test-project
+          
+          # Add a Rust component
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-rust --language rust --description "Test Rust component"
+          
+          # Build the component
+          cd test-rust
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+
+  test-typescript-e2e:
+    name: E2E Test - TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Build ftl CLI
+        run: |
+          cd packages/ftl-cli
+          cargo build --release
+      
+      - name: Install Spin
+        run: |
+          wget -q https://github.com/fermyon/spin/releases/download/v2.8.0/spin-v2.8.0-linux-amd64.tar.gz
+          tar -xzf spin-v2.8.0-linux-amd64.tar.gz
+          sudo mv spin /usr/local/bin/
+      
+      - name: Setup ftl templates
+        run: |
+          cd packages/ftl-cli
+          ./target/release/ftl setup templates --force
+      
+      - name: Test TypeScript workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          cd test-project
+          
+          # Add a TypeScript component
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-ts --language typescript --description "Test TypeScript component"
+          
+          # Build the component
+          cd test-ts
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+
+  test-javascript-e2e:
+    name: E2E Test - JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Build ftl CLI
+        run: |
+          cd packages/ftl-cli
+          cargo build --release
+      
+      - name: Install Spin
+        run: |
+          wget -q https://github.com/fermyon/spin/releases/download/v2.8.0/spin-v2.8.0-linux-amd64.tar.gz
+          tar -xzf spin-v2.8.0-linux-amd64.tar.gz
+          sudo mv spin /usr/local/bin/
+      
+      - name: Setup ftl templates
+        run: |
+          cd packages/ftl-cli
+          ./target/release/ftl setup templates --force
+      
+      - name: Test JavaScript workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          cd test-project
+          
+          # Add a JavaScript component
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-js --language javascript --description "Test JavaScript component"
+          
+          # Build the component
+          cd test-js
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
