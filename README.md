@@ -13,7 +13,7 @@ Build and deploy Model Context Protocol (MCP) servers on WebAssembly
 
 </div>
 
-FTL is a developer platform for building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) servers as WebAssembly components that run on the [Fermyon Spin](https://www.fermyon.com/spin) platform.
+FTL is a developer platform for building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) servers as WebAssembly components. It provides a complete workflow for creating, testing, composing, and deploying MCP components using the [Fermyon Spin](https://www.fermyon.com/spin) platform.
 
 ## Quick Start
 
@@ -31,7 +31,11 @@ ftl add weather-tool --language typescript
 # Start development server with auto-rebuild
 ftl watch
 
-# Publish to registry
+# Run tests
+ftl test
+
+# Build and deploy
+ftl build --release
 ftl publish
 ```
 
@@ -40,8 +44,10 @@ ftl publish
 - **Component-First Architecture**: Build MCP servers as reusable WebAssembly components
 - **Multi-Language Support**: Write components in Rust, TypeScript, or JavaScript  
 - **Registry Publishing**: Share components via OCI registries (GitHub, Docker Hub)
-- **Project Composition**: Combine multiple MCP components into a single Spin project
-- **Edge Deployment**: Deploy to FTL or self-host with Spin
+- **Project Composition**: Combine multiple MCP components into a single deployable unit
+- **Automatic Dependency Management**: Tools like cargo-component installed on-demand
+- **Hot Reload Development**: Auto-rebuild on file changes with `ftl watch`
+- **Edge Deployment**: Deploy anywhere Spin runs
 
 ## Creating MCP Projects
 
@@ -92,13 +98,18 @@ fn get_tools() -> Vec<Tool> {
 }
 ```
 
-## Component Lifecycle
+## Component Development Workflow
 
 ### 1. Development
 ```bash
-ftl build           # Build all components (from project root)
-ftl test            # Run tests
-ftl up --port 3000  # Run locally
+# From component directory
+ftl build           # Build the component
+ftl test            # Run component tests
+ftl watch           # Auto-rebuild on changes
+
+# From project root (with spin.toml)
+ftl build           # Build all components
+ftl up --port 3000  # Run the composed application
 ```
 
 ### 2. Publishing
@@ -116,13 +127,19 @@ ftl publish --registry docker.io --tag latest
 ftl init my-assistant
 cd my-assistant
 
-# Add components
-ftl add weather-tool --language typescript
-ftl add github-tool --language rust
-ftl add my-custom-tool --language javascript
+# Add components with custom routes
+ftl add weather-tool --language typescript --route /weather
+ftl add github-tool --language rust --route /github
+ftl add calculator --language javascript --route /calc
+
+# Each component gets its own MCP endpoint
+# /weather/mcp - Weather tool MCP endpoint
+# /github/mcp  - GitHub tool MCP endpoint  
+# /calc/mcp    - Calculator MCP endpoint
 
 # Run the composed project
-ftl up --build
+ftl watch  # Development with auto-rebuild
+ftl up     # Production mode
 ```
 
 ### 4. Deployment
@@ -140,13 +157,36 @@ FTL leverages the WebAssembly component model and Spin platform:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   MCP Client    │────▶│  Spin Project   │────▶│  MCP Component  │
+│   MCP Client    │────▶│  Spin Runtime   │────▶│  MCP Component  │
 │   (AI Agent)    │     │  (HTTP Router)  │     │ (WASM Module)   │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
-                               ├────▶ Component 1 (Rust)
-                               ├────▶ Component 2 (TypeScript)  
-                               └────▶ Component 3 (JavaScript)
+                               ├── /weather/mcp ──▶ Weather Component (TypeScript)
+                               ├── /github/mcp  ──▶ GitHub Component (Rust)
+                               └── /calc/mcp    ──▶ Calculator Component (JavaScript)
+```
+
+### Project Structure
+
+```
+my-assistant/
+├── spin.toml           # Spin manifest (project root)
+├── weather-tool/       # TypeScript component
+│   ├── ftl.toml       # Component metadata
+│   ├── Makefile       # Build automation
+│   └── handler/       # Component source
+│       ├── package.json
+│       └── src/
+├── github-tool/       # Rust component  
+│   ├── ftl.toml
+│   ├── Makefile
+│   └── handler/
+│       ├── Cargo.toml
+│       └── src/
+└── calculator/        # JavaScript component
+    ├── ftl.toml
+    ├── Makefile
+    └── handler/
 ```
 
 Each component:
@@ -159,19 +199,24 @@ Each component:
 ## Prerequisites
 
 - **Rust toolchain** (for FTL CLI)
-- **Language toolchains**:
-  - Rust: cargo with wasm32-wasip1 target
+- **Language-specific requirements**:
+  - Rust: cargo with wasm32-wasip1 target (cargo-component auto-installed)
   - TypeScript/JavaScript: Node.js 20+
-- **wkg** for publishing ([install](https://github.com/bytecodealliance/wasm-pkg-tools))
-- **Spin** (auto-installed by FTL)
+- **Optional**:
+  - wkg for publishing ([install](https://github.com/bytecodealliance/wasm-pkg-tools))
+  - cargo-binstall for faster tool installation
+- **Auto-installed**:
+  - Spin runtime (prompted on first use)
+  - cargo-component (for Rust components)
 
 ## Documentation
 
 - [Getting Started Guide](./docs/introduction.md)
+- [CLI Reference](./docs/cli-reference.md)
 - [Component Development](./docs/components.md)
 - [Publishing Components](./docs/publishing.md)
 - [Project Composition](./docs/composition.md)
-- [API Reference](./docs/api.md)
+- [SDK Reference](./docs/sdk-reference.md)
 
 ## Development
 
