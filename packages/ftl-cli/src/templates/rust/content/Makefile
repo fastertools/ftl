@@ -1,6 +1,16 @@
-.PHONY: build test clean registry-push
+.PHONY: build test clean registry-push check-cargo-component
 
-build:
+# Check if cargo-component is installed, install if not
+check-cargo-component:
+	@command -v cargo-component >/dev/null 2>&1 || { \
+		echo "cargo-component not found, installing..."; \
+		echo "This is required for building Rust WebAssembly components"; \
+		echo "This may take a few minutes on first install"; \
+		cargo install cargo-component; \
+		echo "cargo-component installed successfully!"; \
+	}
+
+build: check-cargo-component
 	cd handler && cargo component build --release --target wasm32-wasip1
 
 test:

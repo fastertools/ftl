@@ -1,4 +1,4 @@
-name: E2E Tests
+name: CLI Tests
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-rust-e2e:
-    name: E2E Test - Rust
+    name: CLI Test - Rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
           ftl build
 
   test-typescript-e2e:
-    name: E2E Test - TypeScript
+    name: CLI Test - TypeScript
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
           ftl build
 
   test-javascript-e2e:
-    name: E2E Test - JavaScript
+    name: CLI Test - JavaScript
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

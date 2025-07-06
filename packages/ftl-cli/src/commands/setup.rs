@@ -168,7 +168,10 @@ pub async fn info() -> Result<()> {
     println!();
 
     // Check for cargo-component
-    match Command::new("cargo").args(["component", "--version"]).output() {
+    match Command::new("cargo")
+        .args(["component", "--version"])
+        .output()
+    {
         Ok(output) => {
             let version = String::from_utf8_lossy(&output.stdout);
             println!("cargo-component: {} {}", style("✓").green(), version.trim());

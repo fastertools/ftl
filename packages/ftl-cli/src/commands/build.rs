@@ -73,33 +73,6 @@ pub async fn execute(path: Option<PathBuf>, release: bool) -> Result<()> {
     } else if component_path.join("handler/Cargo.toml").exists() {
         // Rust component
         let profile = if release { "release" } else { "debug" };
-        
-        // Check if cargo-component is installed
-        let cargo_component_check = Command::new("cargo")
-            .args(["component", "--version"])
-            .output();
-
-        if cargo_component_check.is_err() || !cargo_component_check.unwrap().status.success() {
-            println!("{} cargo-component not found, installing...", style("→").dim());
-            println!("  This is required for building Rust WebAssembly components");
-            println!("  This may take a few minutes on first install");
-            
-            let install_status = Command::new("cargo")
-                .args(["install", "cargo-component"])
-                .stdin(Stdio::inherit())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .context("Failed to install cargo-component")?
-                .wait()?;
-
-            if !install_status.success() {
-                anyhow::bail!("Failed to install cargo-component");
-            }
-            
-            println!("{} cargo-component installed successfully!", style("✓").green());
-        }
-        
         Command::new("cargo")
             .args(["component", "build", "--target", "wasm32-wasip1"])
             .arg(format!("--{profile}"))
