@@ -1,24 +1,4 @@
-[tool]
+[component]
 name = "{{project-name | kebab_case}}"
 version = "0.1.0"
 description = "{{project-description}}"
-
-[build]
-# Build commands are run from the handler directory
-commands = [
-    "cd handler && npm install",
-    "cd handler && npm run build"
-]
-
-[optimization]
-# See https://github.com/WebAssembly/binaryen/blob/version_123/test/lit/help/wasm-opt.test
-flags = [
-    "-O4",
-    "-Oz",
-]
-
-[runtime]
-# List of external hosts this tool is allowed to make HTTP requests to.
-# Use exact hostnames or patterns with wildcards (e.g., "*.googleapis.com").
-# Leave empty to deny all external requests.
-allowed_hosts = []

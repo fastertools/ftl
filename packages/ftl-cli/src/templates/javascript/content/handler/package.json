@@ -9,7 +9,7 @@
     "build:types": "jco types ./.wit/mcp.wit -o dist/generated",
     "build:bundle": "esbuild src/index.js --bundle --format=esm --platform=node --outfile=dist/index.js",
     "build:component": "jco componentize dist/index.js --wit ./.wit/mcp.wit --world-name mcp-handler --out dist/handler.wasm --disable all",
-    "test": "vitest",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {

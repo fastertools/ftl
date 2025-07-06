@@ -2,7 +2,7 @@
 name = "ftl-sdk"
 version = "0.2.0"
 edition = "2021"
-description = "FTL SDK for building MCP tools"
+description = "Rust SDK for building MCP components with FTL"
 license = "MIT"
 repository = "https://github.com/fastertools/ftl-cli"
 

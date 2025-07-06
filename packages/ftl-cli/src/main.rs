@@ -8,11 +8,10 @@ mod commands;
 mod common;
 mod language;
 mod manifest;
-mod spin_generator;
 
 #[derive(Parser)]
 #[command(name = "ftl")]
-#[command(about = "FTL - WebAssembly MCP tools")]
+#[command(about = "Build and deploy Model Context Protocol (MCP) servers on WebAssembly")]
 #[command(version)]
 #[command(author)]
 struct Cli {
@@ -26,185 +25,170 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Create a new tool from template
-    New {
-        /// Name of the tool
-        name: String,
-        /// Description of the tool
+    /// Initialize a new MCP project
+    Init {
+        /// Name of the project
+        name: Option<String>,
+
+        /// Create in current directory
+        #[arg(long)]
+        here: bool,
+    },
+
+    /// Add a component to the current project
+    Add {
+        /// Name of the component
+        name: Option<String>,
+
+        /// Component description
         #[arg(short, long)]
         description: Option<String>,
-        /// Programming language to use (rust, javascript)
+
+        /// Language (rust, typescript, javascript)
         #[arg(short, long)]
         language: Option<String>,
+
+        /// HTTP route for the component
+        #[arg(short, long)]
+        route: Option<String>,
+
+        /// Use a Git repository as the template source
+        #[arg(long, conflicts_with = "dir", conflicts_with = "tar")]
+        git: Option<String>,
+
+        /// The branch to use from the Git repository
+        #[arg(long, requires = "git")]
+        branch: Option<String>,
+
+        /// Use a local directory as the template source
+        #[arg(long, conflicts_with = "git", conflicts_with = "tar")]
+        dir: Option<PathBuf>,
+
+        /// Use a tarball as the template source
+        #[arg(long, conflicts_with = "git", conflicts_with = "dir")]
+        tar: Option<String>,
     },
 
-    /// Build a tool
+    /// Build the component or project
     Build {
-        /// Name of the tool to build (defaults to current directory)
-        name: Option<String>,
-        /// Build profile to use
+        /// Build in release mode
         #[arg(short, long)]
-        profile: Option<String>,
-        /// Start serving after build completes
+        release: bool,
+
+        /// Path to component (defaults to current directory)
         #[arg(short, long)]
-        serve: bool,
+        path: Option<PathBuf>,
     },
 
-    /// Serve a tool locally
-    Serve {
-        /// Name of the tool to serve (defaults to current directory)
-        name: Option<String>,
+    /// Run the component locally
+    Up {
+        /// Build before running
+        #[arg(long)]
+        build: bool,
+
         /// Port to serve on
         #[arg(short, long, default_value = "3000")]
         port: u16,
-        /// Build before serving
-        #[arg(short, long)]
-        build: bool,
+
+        /// Path to component (defaults to current directory)
+        #[arg(long)]
+        path: Option<PathBuf>,
     },
 
-    /// Run tests for a tool
+    /// Run tests
     Test {
-        /// Name of the tool to test (defaults to current directory)
-        name: Option<String>,
+        /// Path to component (defaults to current directory)
+        #[arg(short, long)]
+        path: Option<PathBuf>,
     },
 
-    /// Deploy a tool
+    /// Publish component to registry
+    Publish {
+        /// Registry URL (defaults to ghcr.io)
+        #[arg(short, long)]
+        registry: Option<String>,
+
+        /// Tag/version to publish
+        #[arg(short, long)]
+        tag: Option<String>,
+
+        /// Path to component (defaults to current directory)
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
+
+    /// Deploy the project to FTL
     Deploy {
-        /// Name of the tool to deploy (defaults to current directory)
-        name: Option<String>,
-    },
-
-    /// Export a tool as a standalone WASM component
-    Export {
-        /// Name of the tool to export (defaults to current directory)
-        name: Option<String>,
-        /// Output path for the component WASM file
+        /// Environment to deploy to
         #[arg(short, long)]
-        output: Option<PathBuf>,
-        /// Build profile to use
-        #[arg(short, long)]
-        profile: Option<String>,
+        environment: Option<String>,
     },
 
-    /// Watch a tool for changes and rebuild
-    Watch {
-        /// Name of the tool to watch (defaults to current directory)
-        name: Option<String>,
-    },
-
-    /// Validate tool configuration
-    Validate {
-        /// Name of the tool to validate (defaults to current directory)
-        name: Option<String>,
-    },
-
-    /// Show binary size information
-    Size {
-        /// Name of the tool (defaults to current directory)
-        name: Option<String>,
-        /// Show detailed analysis including sections and imports
-        #[arg(short, long)]
-        verbose: bool,
-    },
-
-    /// List deployed tools and toolkits
-    List,
-
-    /// Login to FTL Edge
-    Login,
-
-    /// Get status of a deployed tool or toolkit
-    Status {
-        /// Name of the tool or toolkit (defaults to current directory)
-        name: Option<String>,
-    },
-
-    /// Delete a deployed tool or toolkit
-    Delete {
-        /// Name of the tool or toolkit (defaults to current directory)
-        name: Option<String>,
-        /// Skip confirmation prompt
-        #[arg(short, long)]
-        yes: bool,
-    },
-
-    /// View logs from a deployed tool or toolkit
-    Logs {
-        /// Name of the tool or toolkit (defaults to current directory)
-        name: Option<String>,
-        /// Follow log output (not yet supported by spin)
-        #[arg(short, long, hide = true)]
-        follow: bool,
-        /// Number of lines to show from the end
-        #[arg(short, long)]
-        tail: Option<usize>,
-    },
-
-    /// Link current tool to an existing deployment
-    Link {
-        /// Name of the deployed tool to link to
-        name: String,
-        /// Path to the tool directory (defaults to current directory)
-        #[arg(short, long)]
-        path: Option<String>,
-    },
-
-    /// Unlink current tool from its deployment
-    Unlink {
-        /// Path to the tool directory (defaults to current directory)
-        #[arg(short, long)]
-        path: Option<String>,
-    },
-
-    /// Manage toolkits (collections of tools)
-    Toolkit {
+    /// Interact with component registries
+    Registry {
         #[command(subcommand)]
-        command: ToolkitCommand,
+        command: RegistryCommand,
     },
 
-    /// Manage Spin installation
-    Spin {
+    /// Setup and configure FTL
+    Setup {
         #[command(subcommand)]
-        command: SpinCommand,
+        command: SetupCommand,
     },
 }
 
 #[derive(Subcommand)]
-enum SpinCommand {
-    /// Install Spin
-    Install,
-    /// Update Spin to the latest supported version
-    Update,
-    /// Remove Spin (if installed by FTL)
-    Remove,
-    /// Show Spin installation info
+enum SetupCommand {
+    /// Install or update FTL templates
+    Templates {
+        /// Force reinstall even if already installed
+        #[arg(long)]
+        force: bool,
+
+        /// Use a Git repository as the template source
+        #[arg(long, conflicts_with = "dir", conflicts_with = "tar")]
+        git: Option<String>,
+
+        /// The branch to use from the Git repository
+        #[arg(long, requires = "git")]
+        branch: Option<String>,
+
+        /// Use a local directory as the template source
+        #[arg(long, conflicts_with = "git", conflicts_with = "tar")]
+        dir: Option<PathBuf>,
+
+        /// Use a tarball as the template source
+        #[arg(long, conflicts_with = "git", conflicts_with = "dir")]
+        tar: Option<String>,
+    },
+
+    /// Show current configuration
     Info,
 }
 
 #[derive(Subcommand)]
-enum ToolkitCommand {
-    /// Build a toolkit from multiple tools
-    Build {
-        /// Name of the toolkit
-        #[arg(long)]
-        name: String,
-        /// Tools to include in the toolkit
-        tools: Vec<String>,
+enum RegistryCommand {
+    /// List available components
+    List {
+        /// Registry to list from
+        #[arg(short, long)]
+        registry: Option<String>,
     },
 
-    /// Serve a toolkit locally
-    Serve {
-        /// Name of the toolkit
-        name: String,
-        /// Port to serve on
-        #[arg(short, long, default_value = "3000")]
-        port: u16,
+    /// Search for components
+    Search {
+        /// Search query
+        query: String,
+
+        /// Registry to search in
+        #[arg(short, long)]
+        registry: Option<String>,
     },
 
-    /// Deploy a toolkit to FTL Edge
-    Deploy {
-        /// Name of the toolkit
-        name: String,
+    /// Show component information
+    Info {
+        /// Component name or URL
+        component: String,
     },
 }
 
@@ -224,60 +208,44 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     match cli.command {
-        Command::New {
+        Command::Init { name, here } => commands::init::execute(name, here).await,
+        Command::Add {
             name,
             description,
             language,
-        } => commands::new::execute(name, description, language).await,
-        Command::Build {
-            name,
-            profile,
-            serve,
+            route,
+            git,
+            branch,
+            dir,
+            tar,
         } => {
-            if serve {
-                commands::build::execute_and_serve(name, profile).await
-            } else {
-                commands::build::execute(name, profile).await
+            commands::add::execute(name, description, language, route, git, branch, dir, tar).await
+        }
+        Command::Build { release, path } => commands::build::execute(path, release).await,
+        Command::Up { build, port, path } => commands::up::execute(path, port, build).await,
+        Command::Test { path } => commands::test::execute(path).await,
+        Command::Publish {
+            registry,
+            tag,
+            path,
+        } => commands::publish::execute(path, registry, tag).await,
+        Command::Deploy { environment } => commands::deploy::execute(environment).await,
+        Command::Registry { command } => match command {
+            RegistryCommand::List { registry } => commands::registry::list(registry).await,
+            RegistryCommand::Search { query, registry } => {
+                commands::registry::search(query, registry).await
             }
-        }
-        Command::Serve { name, port, build } => {
-            commands::serve::execute(name.unwrap_or_else(|| ".".to_string()), port, build).await
-        }
-        Command::Test { name } => commands::test::execute(name).await,
-        Command::Deploy { name } => {
-            commands::deploy::execute(name.unwrap_or_else(|| ".".to_string())).await
-        }
-        Command::Export {
-            name,
-            output,
-            profile,
-        } => commands::export::execute(name, output, profile).await,
-        Command::Watch { name } => {
-            commands::watch::execute(name.unwrap_or_else(|| ".".to_string())).await
-        }
-        Command::Validate { name } => {
-            commands::validate::execute(name.unwrap_or_else(|| ".".to_string())).await
-        }
-        Command::Size { name, verbose } => {
-            commands::size::execute(name.unwrap_or_else(|| ".".to_string()), verbose).await
-        }
-        Command::List => commands::list::execute().await,
-        Command::Login => commands::login::execute().await,
-        Command::Status { name } => commands::status::execute(name).await,
-        Command::Delete { name, yes } => commands::delete::execute(name, yes).await,
-        Command::Logs { name, follow, tail } => commands::logs::execute(name, follow, tail).await,
-        Command::Link { name, path } => commands::link::execute(name, path).await,
-        Command::Unlink { path } => commands::unlink::execute(path).await,
-        Command::Toolkit { command } => match command {
-            ToolkitCommand::Build { name, tools } => commands::toolkit::build(name, tools).await,
-            ToolkitCommand::Serve { name, port } => commands::toolkit::serve(name, port).await,
-            ToolkitCommand::Deploy { name } => commands::toolkit::deploy(name).await,
+            RegistryCommand::Info { component } => commands::registry::info(component).await,
         },
-        Command::Spin { command } => match command {
-            SpinCommand::Install => commands::spin::install().await,
-            SpinCommand::Update => commands::spin::update().await,
-            SpinCommand::Remove => commands::spin::remove().await,
-            SpinCommand::Info => commands::spin::info().await,
+        Command::Setup { command } => match command {
+            SetupCommand::Templates {
+                force,
+                git,
+                branch,
+                dir,
+                tar,
+            } => commands::setup::templates(force, git, branch, dir, tar).await,
+            SetupCommand::Info => commands::setup::info().await,
         },
     }
 }

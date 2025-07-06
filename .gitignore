@@ -63,3 +63,5 @@ flamegraph.svg
 # Release artifacts
 dist/
 release/
+
+.claude/

@@ -12,6 +12,25 @@ use tracing::{debug, info};
 pub const SPIN_REQUIRED_VERSION: &str = "3.3.1";
 const SPIN_RELEASES_URL: &str = "https://github.com/fermyon/spin/releases/download";
 
+/// Get the path to spin if it exists (does not install)
+pub fn get_spin_path() -> Result<PathBuf> {
+    // First check if FTL-managed Spin is installed in ~/.ftl/bin
+    let home_dir = dirs::home_dir().context("Could not determine home directory")?;
+    let ftl_bin_dir = home_dir.join(".ftl").join("bin");
+    let spin_path = ftl_bin_dir.join("spin");
+
+    if spin_path.exists() {
+        return Ok(spin_path);
+    }
+
+    // If no FTL-managed version, check if spin is available in PATH
+    if let Ok(system_spin_path) = which::which("spin") {
+        return Ok(system_spin_path);
+    }
+
+    anyhow::bail!("Spin not found")
+}
+
 pub async fn check_and_install_spin() -> Result<PathBuf> {
     // First check if FTL-managed Spin is installed in ~/.ftl/bin
     let home_dir = dirs::home_dir().context("Could not determine home directory")?;

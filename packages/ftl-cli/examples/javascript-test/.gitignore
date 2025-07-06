@@ -1,6 +1,0 @@
-node_modules/
-.ftl/
-*.wasm
-.spin/
-handler/src/generated/
-handler.wasm

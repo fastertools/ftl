@@ -10,7 +10,7 @@
     "build:js": "tsc",
     "build:bundle": "esbuild dist/index.js --bundle --format=esm --platform=node --outfile=dist/bundled.js",
     "build:component": "jco componentize dist/bundled.js --wit ./.wit/mcp.wit --world-name mcp-handler --out dist/handler.wasm --disable all",
-    "test": "vitest",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
