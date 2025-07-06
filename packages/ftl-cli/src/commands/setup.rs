@@ -167,6 +167,20 @@ pub async fn info() -> Result<()> {
     }
     println!();
 
+    // Check for cargo-component
+    match Command::new("cargo").args(["component", "--version"]).output() {
+        Ok(output) => {
+            let version = String::from_utf8_lossy(&output.stdout);
+            println!("cargo-component: {} {}", style("✓").green(), version.trim());
+        }
+        Err(_) => {
+            println!("cargo-component: {} Not installed", style("✗").red());
+            println!("  Required for building Rust components");
+            println!("  Will be installed automatically when building Rust components");
+        }
+    }
+    println!();
+
     // Check for wkg
     match Command::new("wkg").arg("--version").output() {
         Ok(output) => {

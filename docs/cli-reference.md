@@ -231,6 +231,7 @@ Displays:
 - FTL CLI version
 - Spin installation status
 - Template installation status
+- cargo-component installation status
 - wkg availability
 
 ## Registry Commands
