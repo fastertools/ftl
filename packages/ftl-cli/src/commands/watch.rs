@@ -1,101 +1,66 @@
-use std::time::Duration;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
-use anyhow::Result;
-use tracing::{debug, info, warn};
+use anyhow::{Context, Result};
+use console::style;
 
-use crate::{
-    commands::build,
-    common::{
-        manifest_utils::validate_and_load_manifest,
-        tool_paths::validate_tool_exists,
-        watch_utils::{Debouncer, setup_file_watcher},
-    },
-};
+use crate::common::spin_installer::check_and_install_spin;
 
-pub async fn execute(tool_path: String) -> Result<()> {
-    // Validate tool exists
-    validate_tool_exists(&tool_path)?;
-    let manifest = validate_and_load_manifest(&tool_path)?;
+pub async fn execute(path: Option<PathBuf>, port: u16) -> Result<()> {
+    let component_path = path.unwrap_or_else(|| PathBuf::from("."));
 
-    info!("Watching tool: {} for changes...", manifest.tool.name);
+    // Validate component directory exists
+    if !component_path.join("spin.toml").exists() {
+        anyhow::bail!("No spin.toml found. Not in a component or project directory?");
+    }
 
-    // Initial build
-    println!("🔨 Initial build...");
-    build::execute(Some(tool_path.clone()), None).await?;
+    // Get spin path
+    let spin_path = check_and_install_spin().await?;
 
-    // Set up file watcher
-    let (tx, rx) = std::sync::mpsc::channel();
-    let _watcher = setup_file_watcher(&tool_path, tx)?;
+    // Build command args
+    let listen_addr = format!("127.0.0.1:{port}");
+    // Pass arguments through to spin up
+    let args = vec!["watch", "--", "--listen", &listen_addr];
 
-    println!("👀 Watching for changes... (Press Ctrl+C to stop)");
-    println!("   Watching:");
-    println!("   - {tool_path}/src/");
-    println!("   - {tool_path}/Cargo.toml");
-    println!("   - {tool_path}/ftl.toml");
+    println!();
+    println!(
+        "{} Starting development server with auto-rebuild...",
+        style("▶").green()
+    );
+    println!();
+    println!("{} Watching for file changes:", style("👀").cyan());
+    println!();
+    println!(
+        "{} Routes will be displayed after components are built",
+        style("ℹ").blue()
+    );
+    println!("{} Press Ctrl+C to stop", style("⏹").yellow());
+    println!();
 
-    // Process file change events
-    let mut debouncer = Debouncer::new(Duration::from_millis(500));
+    // Run spin watch with inherited stdio so user can see logs
+    let mut child = Command::new(&spin_path)
+        .args(&args)
+        .current_dir(&component_path)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .context("Failed to start spin watch")?;
 
-    loop {
-        match rx.recv() {
-            Ok(event) => {
-                debug!("File change detected: {:?}", event.paths);
-
-                // Debounce rapid changes
-                if !debouncer.should_trigger() {
-                    continue;
+    // Wait for Ctrl+C
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            println!();
+            println!("{} Stopping development server...", style("■").red());
+        }
+        status = tokio::task::spawn_blocking(move || child.wait()) => {
+            if let Ok(Ok(status)) = status {
+                if !status.success() {
+                    anyhow::bail!("Spin watch exited with status: {}", status);
                 }
-
-                // Display changed files
-                for path in &event.paths {
-                    if let Ok(rel_path) = path.strip_prefix(&tool_path) {
-                        println!("📝 Changed: {}", rel_path.display());
-                    }
-                }
-
-                // Rebuild
-                println!("🔨 Rebuilding...");
-                match build::execute(Some(tool_path.clone()), None).await {
-                    Ok(_) => println!("✅ Build successful"),
-                    Err(e) => {
-                        println!("❌ Build failed: {e}");
-                        warn!("Build error: {}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("Watch error: {}", e);
-                break;
             }
         }
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use notify::{Event, EventKind, event::ModifyKind};
-
-    use crate::common::watch_utils::should_rebuild;
-
-    #[test]
-    fn test_should_rebuild() {
-        // Should rebuild for Rust files
-        let event =
-            Event::new(EventKind::Modify(ModifyKind::Any)).add_path(PathBuf::from("src/main.rs"));
-        assert!(should_rebuild(&event));
-
-        // Should rebuild for TOML files
-        let event =
-            Event::new(EventKind::Modify(ModifyKind::Any)).add_path(PathBuf::from("Cargo.toml"));
-        assert!(should_rebuild(&event));
-
-        // Should not rebuild for non-code files
-        let event =
-            Event::new(EventKind::Modify(ModifyKind::Any)).add_path(PathBuf::from("README.md"));
-        assert!(!should_rebuild(&event));
-    }
 }

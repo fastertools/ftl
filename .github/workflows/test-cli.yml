@@ -1,0 +1,167 @@
+name: CLI Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-rust-e2e:
+    name: CLI Test - Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      
+      - name: Install ftl CLI
+        run: |
+          cargo install --path packages/ftl-cli
+      
+      - name: Setup Spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: v3.3.1
+      
+      - name: Install Spin templates
+        run: |
+          spin templates install --git https://github.com/fermyon/spin --upgrade
+      
+      - name: Setup ftl templates
+        run: |
+          ftl setup templates --force
+      
+      - name: Test Rust workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          ftl init test-project
+          cd test-project
+          
+          # Add a Rust component
+          ftl add test-rust --language rust --description "Test Rust component" --route /test-rust/mcp
+          
+          # Build the component
+          cd test-rust
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          ftl build
+
+  test-typescript-e2e:
+    name: CLI Test - TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install ftl CLI
+        run: |
+          cargo install --path packages/ftl-cli
+      
+      - name: Setup Spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: v3.3.1
+      
+      - name: Install Spin templates
+        run: |
+          spin templates install --git https://github.com/fermyon/spin --upgrade
+      
+      - name: Setup ftl templates
+        run: |
+          ftl setup templates --force
+      
+      - name: Test TypeScript workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          ftl init test-project
+          cd test-project
+          
+          # Add a TypeScript component
+          ftl add test-ts --language typescript --description "Test TypeScript component" --route /test-ts/mcp
+          
+          # Build the component
+          cd test-ts
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          ftl build
+
+  test-javascript-e2e:
+    name: CLI Test - JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install ftl CLI
+        run: |
+          cargo install --path packages/ftl-cli
+      
+      - name: Setup Spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: v3.3.1
+      
+      - name: Install Spin templates
+        run: |
+          spin templates install --git https://github.com/fermyon/spin --upgrade
+      
+      - name: Setup ftl templates
+        run: |
+          ftl setup templates --force
+      
+      - name: Test JavaScript workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          ftl init test-project
+          cd test-project
+          
+          # Add a JavaScript component
+          ftl add test-js --language javascript --description "Test JavaScript component" --route /test-js/mcp
+          
+          # Build the component
+          cd test-js
+          make build
+          
+          # Run tests
+          make test
+          
+          # Build at project level
+          cd ..
+          ftl build

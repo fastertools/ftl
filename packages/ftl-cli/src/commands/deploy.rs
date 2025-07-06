@@ -1,91 +1,75 @@
-use anyhow::Result;
+use std::path::PathBuf;
+use std::process::Command;
+
+use anyhow::{Context, Result};
 use console::style;
-use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::common::{
-    config::FtlConfig,
-    manifest_utils::load_manifest_and_name,
-    spin_installer::check_and_install_spin,
-    spin_utils::{check_akamai_auth, deploy_to_akamai},
-    tool_paths::{get_spin_toml_path, validate_tool_exists},
-};
+use crate::common::spin_installer::check_and_install_spin;
 
-pub async fn execute(tool_path: String) -> Result<()> {
+pub async fn execute(environment: Option<String>) -> Result<()> {
     println!(
-        "{} Deploying tool: {}",
+        "{} Deploying project{}",
         style("→").cyan(),
-        style(&tool_path).bold()
+        environment
+            .as_ref()
+            .map(|e| format!(" to {e}"))
+            .unwrap_or_default()
     );
 
-    // Validate tool exists and load manifest
-    validate_tool_exists(&tool_path)?;
-    let (_manifest, tool_name) = load_manifest_and_name(&tool_path)?;
-
-    // Ensure tool is built with production profile
-    println!("{} Building release version...", style("→").cyan());
-    crate::commands::build::execute(Some(tool_path.clone()), Some("release".to_string())).await?;
-
-    // Check if spin.toml exists
-    let spin_path = get_spin_toml_path(&tool_path);
-    if !spin_path.exists() {
-        anyhow::bail!(".ftl/spin.toml not found. This should have been created during build.");
+    // Check if we're in a Spin project directory
+    if !PathBuf::from("spin.toml").exists() {
+        anyhow::bail!("No spin.toml found. Not in a project directory?");
     }
 
-    // Get spin path and check Akamai authentication
+    // Get spin path
     let spin_path = check_and_install_spin().await?;
-    check_akamai_auth(&spin_path).await?;
 
-    // Deploy using spin aka with spinner
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
-    );
-    spinner.set_message("Deploying to FTL Edge...");
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+    // Build the project first
+    println!("{} Building project...", style("→").dim());
+    let build_output = Command::new(&spin_path)
+        .args(["build"])
+        .output()
+        .context("Failed to build project")?;
 
-    // Load config and generate app name with user prefix
-    let config = FtlConfig::load().unwrap_or_default();
-    let prefix = config.get_app_prefix();
-    let app_name = format!("{prefix}{tool_name}");
-
-    // Deploy with the generated app name
-    let deployment_result = deploy_to_akamai(&tool_path, Some(&app_name)).await;
-
-    // Handle deployment result
-    match deployment_result {
-        Ok(deployment_info) => {
-            spinner.finish_and_clear();
-            // Ensure URL includes /mcp path
-            let full_url = if deployment_info.url.ends_with("/mcp") {
-                deployment_info.url.clone()
-            } else {
-                let url = deployment_info.url.trim_end_matches('/');
-                format!("{url}/mcp")
-            };
-
-            println!("{} Deployment successful!", style("✓").green());
-            println!("  Name: {}", style(&deployment_info.app_name).cyan());
-            println!("  URL: {}", style(&full_url).yellow().bold());
-            println!();
-            println!("Test your tool:");
-            println!("  curl -X POST {full_url} \\");
-            println!("    -H \"Content-Type: application/json\" \\");
-            println!("    -d '{{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}}'");
-            println!();
-            println!("Manage your deployment:");
-            let app_name = &deployment_info.app_name;
-            println!("  ftl status {app_name}");
-            println!("  ftl logs {app_name}");
-            println!("  ftl delete {app_name}");
-            Ok(())
-        }
-        Err(e) => {
-            spinner.finish_and_clear();
-            println!("{} Deployment failed", style("✗").red());
-            anyhow::bail!("{e}");
-        }
+    if !build_output.status.success() {
+        anyhow::bail!(
+            "Build failed:\n{}",
+            String::from_utf8_lossy(&build_output.stderr)
+        );
     }
+
+    // Deploy using spin deploy
+    println!("{} Deploying to FTL...", style("→").dim());
+    let mut deploy_args = vec!["deploy"];
+
+    if let Some(env) = &environment {
+        deploy_args.extend(["--environment-name", env]);
+    }
+
+    let deploy_output = Command::new(&spin_path)
+        .args(&deploy_args)
+        .output()
+        .context("Failed to deploy project")?;
+
+    if !deploy_output.status.success() {
+        let stderr = String::from_utf8_lossy(&deploy_output.stderr);
+
+        if stderr.contains("not logged in") {
+            anyhow::bail!("Not logged in to FTL. Run 'spin login' first.");
+        }
+
+        anyhow::bail!("Deploy failed:\n{}", stderr);
+    }
+
+    // Parse deployment URL
+    let output_str = String::from_utf8_lossy(&deploy_output.stdout);
+    if let Some(url_line) = output_str.lines().find(|l| l.contains("https://")) {
+        println!();
+        println!("{} Project deployed successfully!", style("✓").green());
+        println!("  URL: {}", style(url_line.trim()).cyan());
+    } else {
+        println!("{} Project deployed successfully!", style("✓").green());
+    }
+
+    Ok(())
 }

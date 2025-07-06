@@ -1,140 +1,285 @@
 # CLI Reference
 
-The `ftl` command-line interface is the primary entry point for developers using the FTL platform. It provides a number of commands for creating, testing, and deploying tools.
+The `ftl` command-line interface provides commands for creating, building, testing, and deploying MCP components.
 
 ## Global Options
 
-- `-v, --verbose`: Increase logging verbosity.
+- `-v, --verbose`: Increase logging verbosity (can be used multiple times)
+- `--help`: Show help information
+- `--version`: Show version information
 
-## `ftl new`
+## Project & Component Commands
 
-Create a new tool from a template.
+### `ftl init`
 
-```bash
-ftl new <name> [OPTIONS]
-```
-
-### Arguments
-
-- `<name>`: The name of the tool.
-
-### Options
-
-- `-d, --description <description>`: The description of the tool.
-
-## `ftl build`
-
-Build a tool.
+Create a new MCP project for composing components.
 
 ```bash
-ftl build [name] [OPTIONS]
+ftl init [name] [OPTIONS]
 ```
 
-### Arguments
+**Arguments:**
+- `[name]`: Project name (optional, will prompt if not provided)
 
-- `[name]`: The name of the tool to build (defaults to the current directory).
+**Options:**
+- `--here`: Initialize in current directory
 
-### Options
+**Examples:**
+```bash
+# Create a new project
+ftl init my-assistant
 
-- `-p, --profile <profile>`: The build profile to use (`dev`, `release`, or `tiny`).
-- `-s, --serve`: Start a local development server after the build completes.
+# Initialize in current directory
+ftl init my-project --here
 
-## `ftl serve`
+# Interactive mode
+ftl init
+```
 
-Serve a tool locally.
+### `ftl add`
+
+Add a new MCP component to the current project.
 
 ```bash
-ftl serve [name] [OPTIONS]
+ftl add [name] [OPTIONS]
 ```
 
-### Arguments
+**Arguments:**
+- `[name]`: Component name (optional, will prompt if not provided)
 
-- `[name]`: The name of the tool to serve (defaults to the current directory).
+**Options:**
+- `-l, --language <lang>`: Language to use (`rust`, `typescript`, `javascript`)
+- `-d, --description <desc>`: Component description
+- `-r, --route <route>`: HTTP route for the component (default: `/[name]`)
+- `--git <url>`: Use a Git repository as the template source
+- `--branch <name>`: Git branch to use (requires `--git`)
+- `--dir <path>`: Use a local directory as the template source
+- `--tar <path>`: Use a tarball as the template source
 
-### Options
+**Examples:**
+```bash
+# Add a component with specified language
+ftl add weather-api --language typescript --description "Weather data for AI agents"
 
-- `-p, --port <port>`: The port to serve on (defaults to 3000).
-- `-b, --build`: Build the tool before serving.
+# Add a component with custom route
+ftl add calculator --language rust --route /calc
 
-## `ftl test`
+# Using a custom Git template
+ftl add my-component --git https://github.com/user/template --branch main
 
-Run tests for a tool.
+# Interactive mode
+ftl add
+```
+
+### `ftl build`
+
+Build the component or project in the current directory.
 
 ```bash
-ftl test [name]
+ftl build [OPTIONS]
 ```
 
-### Arguments
+**Options:**
+- `-r, --release`: Build in release mode
+- `-p, --path <path>`: Path to component or project directory (default: current)
 
-- `[name]`: The name of the tool to test (defaults to the current directory).
+**Examples:**
+```bash
+# Build entire project (from project root with spin.toml)
+ftl build
 
-## `ftl deploy`
+# Build specific component
+cd math-tools
+ftl build --release
 
-Deploy a tool to the FTL Edge.
+# Build specific component from project root
+ftl build --path math-tools
+```
+
+### `ftl up`
+
+Run the component locally for development.
 
 ```bash
-ftl deploy [name]
+ftl up [OPTIONS]
 ```
 
-### Arguments
+**Options:**
+- `--build`: Build before running
+- `-p, --port <port>`: Port to serve on (default: 3000)
+- `--path <path>`: Path to component directory
 
-- `[name]`: The name of the tool to deploy (defaults to the current directory).
+**Example:**
+```bash
+ftl up --port 8080
+```
 
-## `ftl toolkit`
+### `ftl watch`
 
-Manage toolkits (collections of tools).
-
-### `ftl toolkit build`
-
-Build a toolkit from multiple tools. This command:
-- Builds each specified tool in release mode
-- Bundles all tool WebAssembly modules together
-- Automatically generates a gateway component that provides a unified MCP endpoint
-- Creates a deployable toolkit directory with all components
+Build and run the component, automatically rebuilding when files change.
 
 ```bash
-ftl toolkit build --name <name> <tools...>
+ftl watch [OPTIONS]
 ```
 
-#### Options
+**Options:**
+- `-p, --port <port>`: Port to serve on (default: 3000)
+- `--path <path>`: Path to component directory
 
-- `--name <name>`: The name of the toolkit.
+**Example:**
+```bash
+ftl watch --port 8080
+```
 
-#### Arguments
+### `ftl test`
 
-- `<tools...>`: The tools to include in the toolkit. Each tool must exist as a directory in the current working directory.
-
-### `ftl toolkit serve`
-
-Serve a toolkit locally. This starts a development server with:
-- `/mcp` - Unified MCP endpoint that aggregates all tools in the toolkit
-- `/<tool-name>/mcp` - Individual endpoints for each tool (e.g., `/tool1/mcp`, `/tool2/mcp`)
-
-The gateway endpoint supports all standard MCP operations:
-- `initialize` - Initialize the connection
-- `tools/list` - List all available tools across the toolkit
-- `tools/call` - Call any tool in the toolkit
+Run component tests.
 
 ```bash
-ftl toolkit serve <name> [OPTIONS]
+ftl test [OPTIONS]
 ```
 
-#### Arguments
+**Options:**
+- `-p, --path <path>`: Path to component directory
 
-- `<name>`: The name of the toolkit directory.
+**Example:**
+```bash
+ftl test
+```
 
-#### Options
+### `ftl publish`
 
-- `-p, --port <port>`: The port to serve on (defaults to 3000).
-
-### `ftl toolkit deploy`
-
-Deploy a toolkit to the FTL Edge.
+Publish component to an OCI registry.
 
 ```bash
-ftl toolkit deploy <name>
+ftl publish [OPTIONS]
 ```
 
-#### Arguments
+**Options:**
+- `-r, --registry <url>`: Registry URL (default: ghcr.io)
+- `-t, --tag <version>`: Version tag to publish
+- `--path <path>`: Path to component directory
 
-- `<name>`: The name of the toolkit.
+**Example:**
+```bash
+ftl publish --tag v1.0.0
+ftl publish --registry docker.io --tag latest
+```
+
+
+
+### `ftl deploy`
+
+Deploy the project to FTL.
+
+```bash
+ftl deploy [OPTIONS]
+```
+
+**Options:**
+- `-e, --environment <name>`: Target environment
+
+**Example:**
+```bash
+ftl deploy --environment production
+```
+
+## Configuration Commands
+
+### `ftl setup templates`
+
+Install or update FTL component templates.
+
+```bash
+ftl setup templates [OPTIONS]
+```
+
+**Options:**
+- `--force`: Force reinstall even if already installed
+- `--git <url>`: Install templates from a Git repository
+- `--branch <name>`: Git branch to use (requires `--git`)
+- `--dir <path>`: Install templates from a local directory
+- `--tar <path>`: Install templates from a tarball
+
+**Examples:**
+```bash
+# Install default FTL templates
+ftl setup templates
+
+# Install templates from a Git repository
+ftl setup templates --git https://github.com/user/ftl-templates --branch main
+
+# Install templates from a local directory
+ftl setup templates --dir ./my-templates
+
+# Install templates from a tarball
+ftl setup templates --tar ./templates.tar.gz
+
+# Force reinstall templates
+ftl setup templates --force
+```
+
+### `ftl setup info`
+
+Show FTL configuration and status.
+
+```bash
+ftl setup info
+```
+
+Displays:
+- FTL CLI version
+- Spin installation status
+- Template installation status
+- cargo-component installation status
+- wkg availability
+
+## Registry Commands
+
+### `ftl registry list`
+
+List available components (coming soon).
+
+```bash
+ftl registry list [OPTIONS]
+```
+
+**Options:**
+- `-r, --registry <url>`: Registry to list from
+
+### `ftl registry search`
+
+Search for components (coming soon).
+
+```bash
+ftl registry search <query> [OPTIONS]
+```
+
+**Arguments:**
+- `<query>`: Search query
+
+**Options:**
+- `-r, --registry <url>`: Registry to search in
+
+### `ftl registry info`
+
+Show component details (coming soon).
+
+```bash
+ftl registry info <component>
+```
+
+**Arguments:**
+- `<component>`: Component name or URL
+
+## Environment Variables
+
+- `FTL_AUTO_INSTALL`: Set to `true` to auto-install Spin without prompting
+- `RUST_LOG`: Control logging verbosity (e.g., `info`, `debug`, `trace`)
+
+## Exit Codes
+
+- `0`: Success
+- `1`: General error
+- `2`: Invalid arguments
+- `127`: Command not found
