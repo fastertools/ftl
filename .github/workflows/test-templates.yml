@@ -23,10 +23,9 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Build ftl CLI
+      - name: Install ftl CLI
         run: |
-          cd packages/ftl-cli
-          cargo build --release
+          cargo install --path packages/ftl-cli
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -40,7 +39,7 @@ jobs:
       - name: Test ftl init
         run: |
           cd /tmp
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          ftl init test-project
           cd test-project
           test -f spin.toml
           test -f .gitignore
@@ -48,7 +47,7 @@ jobs:
       - name: Test ftl add with Rust template
         run: |
           cd /tmp/test-project
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-rust --language rust --description "Test Rust component"
+          ftl add test-rust --language rust --description "Test Rust component"
           test -d test-rust
           test -f test-rust/ftl.toml
           test -f test-rust/handler/Cargo.toml
@@ -67,7 +66,7 @@ jobs:
       - name: Test ftl add with TypeScript template
         run: |
           cd /tmp/test-project
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-ts --language typescript --description "Test TypeScript component"
+          ftl add test-ts --language typescript --description "Test TypeScript component"
           test -d test-ts
           test -f test-ts/ftl.toml
           test -f test-ts/handler/package.json
@@ -86,7 +85,7 @@ jobs:
       - name: Test ftl add with JavaScript template
         run: |
           cd /tmp/test-project
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-js --language javascript --description "Test JavaScript component"
+          ftl add test-js --language javascript --description "Test JavaScript component"
           test -d test-js
           test -f test-js/ftl.toml
           test -f test-js/handler/package.json
@@ -105,7 +104,7 @@ jobs:
       - name: Test ftl build at project level
         run: |
           cd /tmp/test-project
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+          ftl build
       
       - name: Test project structure
         run: |
@@ -121,4 +120,4 @@ jobs:
       
       - name: Test ftl watch command exists
         run: |
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl watch --help
+          ftl watch --help

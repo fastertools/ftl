@@ -18,10 +18,9 @@ jobs:
         with:
           targets: wasm32-wasip1
       
-      - name: Build ftl CLI
+      - name: Install ftl CLI
         run: |
-          cd packages/ftl-cli
-          cargo build --release
+          cargo install --path packages/ftl-cli
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -30,18 +29,18 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
+          ftl setup templates --force
       
       - name: Test Rust workflow
         run: |
           # Create a test project
           WORK_DIR=$(mktemp -d)
           cd $WORK_DIR
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          ftl init test-project
           cd test-project
           
           # Add a Rust component
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-rust --language rust --description "Test Rust component"
+          ftl add test-rust --language rust --description "Test Rust component"
           
           # Build the component
           cd test-rust
@@ -52,7 +51,7 @@ jobs:
           
           # Build at project level
           cd ..
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+          ftl build
 
   test-typescript-e2e:
     name: E2E Test - TypeScript
@@ -68,10 +67,9 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Build ftl CLI
+      - name: Install ftl CLI
         run: |
-          cd packages/ftl-cli
-          cargo build --release
+          cargo install --path packages/ftl-cli
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -80,18 +78,18 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
+          ftl setup templates --force
       
       - name: Test TypeScript workflow
         run: |
           # Create a test project
           WORK_DIR=$(mktemp -d)
           cd $WORK_DIR
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          ftl init test-project
           cd test-project
           
           # Add a TypeScript component
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-ts --language typescript --description "Test TypeScript component"
+          ftl add test-ts --language typescript --description "Test TypeScript component"
           
           # Build the component
           cd test-ts
@@ -102,7 +100,7 @@ jobs:
           
           # Build at project level
           cd ..
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+          ftl build
 
   test-javascript-e2e:
     name: E2E Test - JavaScript
@@ -118,10 +116,9 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Build ftl CLI
+      - name: Install ftl CLI
         run: |
-          cd packages/ftl-cli
-          cargo build --release
+          cargo install --path packages/ftl-cli
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -130,18 +127,18 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl setup templates --force
+          ftl setup templates --force
       
       - name: Test JavaScript workflow
         run: |
           # Create a test project
           WORK_DIR=$(mktemp -d)
           cd $WORK_DIR
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl init test-project
+          ftl init test-project
           cd test-project
           
           # Add a JavaScript component
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl add test-js --language javascript --description "Test JavaScript component"
+          ftl add test-js --language javascript --description "Test JavaScript component"
           
           # Build the component
           cd test-js
@@ -152,4 +149,4 @@ jobs:
           
           # Build at project level
           cd ..
-          $GITHUB_WORKSPACE/packages/ftl-cli/target/release/ftl build
+          ftl build
