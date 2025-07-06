@@ -219,7 +219,17 @@ async fn main() -> Result<()> {
             dir,
             tar,
         } => {
-            commands::add::execute(name, description, language, route, git, branch, dir, tar).await
+            commands::add::execute(commands::add::AddOptions {
+                name,
+                description,
+                language,
+                route,
+                git,
+                branch,
+                dir,
+                tar,
+            })
+            .await
         }
         Command::Build { release, path } => commands::build::execute(path, release).await,
         Command::Up { build, port, path } => commands::up::execute(path, port, build).await,

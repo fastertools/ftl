@@ -3,9 +3,11 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Language {
     Rust,
     JavaScript,
+    #[default]
     TypeScript,
 }
 
@@ -27,11 +29,5 @@ impl fmt::Display for Language {
             Language::JavaScript => write!(f, "JavaScript"),
             Language::TypeScript => write!(f, "TypeScript"),
         }
-    }
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Language::TypeScript
     }
 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result};
@@ -130,7 +130,7 @@ pub async fn execute(
     Ok(())
 }
 
-fn find_wasm_file(component_path: &PathBuf, manifest: &ComponentManifest) -> Result<PathBuf> {
+fn find_wasm_file(component_path: &Path, manifest: &ComponentManifest) -> Result<PathBuf> {
     // Check common locations
     let candidates = vec![
         // Rust

@@ -24,9 +24,9 @@ impl ComponentManifest {
     pub fn load<P: AsRef<Path>>(base_path: P) -> Result<Self> {
         let manifest_path = base_path.as_ref().join("ftl.toml");
         let content = std::fs::read_to_string(&manifest_path)
-            .with_context(|| format!("Failed to read ftl.toml from {:?}", manifest_path))?;
+            .with_context(|| format!("Failed to read ftl.toml from {manifest_path:?}"))?;
 
         toml::from_str(&content)
-            .with_context(|| format!("Failed to parse ftl.toml from {:?}", manifest_path))
+            .with_context(|| format!("Failed to parse ftl.toml from {manifest_path:?}"))
     }
 }

@@ -75,7 +75,7 @@ pub async fn execute(path: Option<PathBuf>, release: bool) -> Result<()> {
         let profile = if release { "release" } else { "debug" };
         Command::new("cargo")
             .args(["component", "build", "--target", "wasm32-wasip1"])
-            .arg(format!("--{}", profile))
+            .arg(format!("--{profile}"))
             .current_dir(component_path.join("handler"))
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())

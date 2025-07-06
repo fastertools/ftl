@@ -40,10 +40,7 @@ pub async fn search(query: String, registry: Option<String>) -> Result<()> {
     );
     println!();
     println!("For now, you can search at:");
-    println!(
-        "  - GitHub: https://github.com/search?q=mcp+{}&type=registrypackages",
-        query
-    );
+    println!("  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages");
 
     Ok(())
 }

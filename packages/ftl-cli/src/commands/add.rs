@@ -7,16 +7,28 @@ use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 use crate::{common::spin_installer::check_and_install_spin, language::Language};
 
-pub async fn execute(
-    name: Option<String>,
-    description: Option<String>,
-    language: Option<String>,
-    route: Option<String>,
-    git: Option<String>,
-    branch: Option<String>,
-    dir: Option<PathBuf>,
-    tar: Option<String>,
-) -> Result<()> {
+pub struct AddOptions {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub language: Option<String>,
+    pub route: Option<String>,
+    pub git: Option<String>,
+    pub branch: Option<String>,
+    pub dir: Option<PathBuf>,
+    pub tar: Option<String>,
+}
+
+pub async fn execute(options: AddOptions) -> Result<()> {
+    let AddOptions {
+        name,
+        description,
+        language,
+        route,
+        git,
+        branch,
+        dir,
+        tar,
+    } = options;
     // Check if we're in a Spin project directory
     if !PathBuf::from("spin.toml").exists() {
         anyhow::bail!("No spin.toml found. Not in a Spin project directory? Run 'ftl init' first.");
@@ -95,7 +107,7 @@ pub async fn execute(
         None => {
             // Convert component name to kebab-case for the route
             let kebab_name = component_name.replace('_', "-").to_lowercase();
-            let default_route = format!("/{}/mcp", kebab_name);
+            let default_route = format!("/{kebab_name}/mcp");
             Input::<String>::with_theme(&ColorfulTheme::default())
                 .with_prompt("HTTP route")
                 .default(default_route)
@@ -137,9 +149,9 @@ pub async fn execute(
     spin_cmd.args([
         "--accept-defaults",
         "--value",
-        &format!("project-description={}", description),
+        &format!("project-description={description}"),
         "--value",
-        &format!("route={}", route),
+        &format!("route={route}"),
         &component_name,
     ]);
 
@@ -200,9 +212,9 @@ pub async fn execute(
 
     // Success message based on language
     let main_file = match selected_language {
-        Language::Rust => format!("{}/src/lib.rs", component_name),
-        Language::JavaScript => format!("{}/src/index.js", component_name),
-        Language::TypeScript => format!("{}/src/index.ts", component_name),
+        Language::Rust => format!("{component_name}/src/lib.rs"),
+        Language::JavaScript => format!("{component_name}/src/index.js"),
+        Language::TypeScript => format!("{component_name}/src/index.ts"),
     };
 
     println!(

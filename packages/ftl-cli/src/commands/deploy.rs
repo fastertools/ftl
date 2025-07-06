@@ -12,7 +12,7 @@ pub async fn execute(environment: Option<String>) -> Result<()> {
         style("→").cyan(),
         environment
             .as_ref()
-            .map(|e| format!(" to {}", e))
+            .map(|e| format!(" to {e}"))
             .unwrap_or_default()
     );
 

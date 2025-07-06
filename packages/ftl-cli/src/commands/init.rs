@@ -82,7 +82,7 @@ pub async fn execute(name: Option<String>, here: bool) -> Result<()> {
     let cd_instruction = if here {
         ""
     } else {
-        &format!("cd {} && ", project_name)
+        &format!("cd {project_name} && ")
     };
 
     println!(

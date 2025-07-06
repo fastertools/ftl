@@ -24,7 +24,7 @@ pub async fn execute(path: Option<PathBuf>, port: u16, build: bool) -> Result<()
         args.push("--build");
     }
 
-    let listen_addr = format!("127.0.0.1:{}", port);
+    let listen_addr = format!("127.0.0.1:{port}");
     args.extend(["--listen", &listen_addr]);
 
     println!();
