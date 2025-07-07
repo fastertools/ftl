@@ -16,16 +16,26 @@ pub async fn execute(force: bool) -> Result<()> {
             Ok(latest_version) => {
                 let current = Version::parse(current_version)?;
                 let latest = Version::parse(&latest_version)?;
-                
+
                 if current >= latest {
-                    println!("{} Already on latest version ({})", style("✓").green(), current_version);
+                    println!(
+                        "{} Already on latest version ({})",
+                        style("✓").green(),
+                        current_version
+                    );
                     return Ok(());
                 }
-                
-                println!("Latest version available: {}", style(&latest_version).green());
+
+                println!(
+                    "Latest version available: {}",
+                    style(&latest_version).green()
+                );
             }
             Err(_) => {
-                println!("{} Could not check for latest version, proceeding with update", style("⚠").yellow());
+                println!(
+                    "{} Could not check for latest version, proceeding with update",
+                    style("⚠").yellow()
+                );
             }
         }
     }
@@ -56,7 +66,10 @@ async fn get_latest_version() -> Result<String> {
     let client = reqwest::Client::new();
     let response = client
         .get("https://crates.io/api/v1/crates/ftl-cli")
-        .header("User-Agent", format!("ftl-cli/{}", env!("CARGO_PKG_VERSION")))
+        .header(
+            "User-Agent",
+            format!("ftl-cli/{}", env!("CARGO_PKG_VERSION")),
+        )
         .send()
         .await?;
 
@@ -65,7 +78,7 @@ async fn get_latest_version() -> Result<String> {
     }
 
     let json: serde_json::Value = response.json().await?;
-    
+
     let latest_version = json
         .get("crate")
         .and_then(|c| c.get("newest_version"))
