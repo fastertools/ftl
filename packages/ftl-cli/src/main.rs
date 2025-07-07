@@ -146,6 +146,13 @@ enum Command {
         #[command(subcommand)]
         command: SetupCommand,
     },
+
+    /// Update FTL CLI to the latest version
+    Update {
+        /// Force reinstall even if already latest version
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -218,6 +225,11 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    // Check for updates (non-blocking, once per day)
+    if let Err(e) = common::version_cache::check_and_prompt_for_update().await {
+        tracing::debug!("Version check failed: {}", e);
+    }
+
     match cli.command {
         Command::Init { name, here } => commands::init::execute(name, here).await,
         Command::Add {
@@ -269,5 +281,6 @@ async fn main() -> Result<()> {
             } => commands::setup::templates(force, git, branch, dir, tar).await,
             SetupCommand::Info => commands::setup::info().await,
         },
+        Command::Update { force } => commands::update::execute(force).await,
     }
 }
