@@ -128,9 +128,9 @@ pub async fn execute(options: AddOptions) -> Result<()> {
 
     // Use spin add with the appropriate template
     let template_id = match selected_language {
-        Language::Rust => "ftl-rust",
-        Language::TypeScript => "ftl-typescript",
-        Language::JavaScript => "ftl-javascript",
+        Language::Rust => "wasmcp-rust",
+        Language::TypeScript => "wasmcp-typescript",
+        Language::JavaScript => "wasmcp-javascript",
     };
 
     // Check if custom template source is provided
@@ -173,12 +173,12 @@ pub async fn execute(options: AddOptions) -> Result<()> {
             && (stderr.contains("no such template") || stderr.contains("template not found"))
         {
             eprintln!();
-            eprintln!("{} FTL templates not found.", style("✗").red());
+            eprintln!("{} Wasmcp templates not found.", style("✗").red());
             eprintln!();
-            eprintln!("Please install the FTL templates by running:");
+            eprintln!("Please install the wasmcp templates by running:");
             eprintln!("  ftl setup templates");
             eprintln!();
-            anyhow::bail!("FTL templates not installed");
+            anyhow::bail!("Wasmcp templates not installed");
         } else {
             anyhow::bail!("Failed to add component:\n{}", stderr);
         }

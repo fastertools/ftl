@@ -4,7 +4,7 @@ Welcome to FTL! This guide will help you understand what FTL is, how it works, a
 
 ## What is FTL?
 
-FTL (Faster Tools Library) is a developer platform for building and deploying Model Context Protocol (MCP) servers as WebAssembly components. It provides a complete workflow for creating, testing, composing, and deploying MCP components that can be used by AI agents and assistants.
+FTL (Faster Tools Library) is a command-line tool that wraps Fermyon Spin to simplify building and deploying Model Context Protocol (MCP) servers as WebAssembly components. It leverages the wasmcp templates and SDKs to provide a streamlined workflow for creating, testing, and deploying MCP servers that can be used by AI agents and assistants.
 
 FTL solves several key challenges in MCP development:
 - **Multi-language Support**: Write MCP servers in Rust, TypeScript, or JavaScript
@@ -27,11 +27,11 @@ A **project** is a collection of MCP components that are deployed together. Proj
 
 ### Component Development
 
-FTL provides SDKs for building MCP components in multiple languages:
+FTL uses the wasmcp SDKs for building MCP components in multiple languages:
 
 **TypeScript/JavaScript:**
 ```typescript
-import { createHandler } from '@fastertools/ftl-sdk';
+import { createHandler } from 'wasmcp';
 
 export const handler = createHandler({
     tools: [...],      // Your MCP tools
@@ -42,7 +42,7 @@ export const handler = createHandler({
 
 **Rust:**
 ```rust
-use ftl_sdk::*;
+use wasmcp::*;
 
 create_handler!(
     tools: get_tools,

@@ -13,7 +13,7 @@ Build and deploy Model Context Protocol (MCP) servers on WebAssembly
 
 </div>
 
-FTL is a developer platform for building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) servers as WebAssembly components. It provides a complete workflow for creating, testing, composing, and deploying MCP components using the [Fermyon Spin](https://www.fermyon.com/spin) platform.
+FTL is a command-line tool that wraps [Fermyon Spin](https://www.fermyon.com/spin) to simplify building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) servers as WebAssembly components. It uses the [wasmcp](https://github.com/fastertools/wasmcp) templates and SDKs to provide a streamlined workflow for creating, testing, and deploying MCP servers on the Fermyon Akamai platform.
 
 ## Quick Start
 
@@ -62,7 +62,7 @@ ftl add my-tool --language typescript
 
 ```typescript
 // my-tool/src/index.ts
-import { createHandler } from '@fastertools/ftl-sdk';
+import { createHandler } from 'wasmcp';
 import { tools, resources, prompts } from './features.js';
 
 export const handler = createHandler({
@@ -83,7 +83,7 @@ ftl add my-tool --language rust
 
 ```rust
 // my-tool/src/lib.rs
-use ftl_sdk::*;
+use wasmcp::*;
 
 create_handler!(
     tools: get_tools,

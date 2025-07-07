@@ -20,15 +20,15 @@ The `ftl-cli` is the command-line interface for the FTL platform. It is responsi
 - Deploying tools to the FTL Edge.
 - Managing toolkits.
 
-### `ftl-sdk-rs`
+### `wasmcp`
 
-The `ftl-sdk-rs` crate is the core library for FTL tools. It provides:
+FTL uses the `wasmcp` SDK for building MCP components. The wasmcp repository provides:
 
-- The `Tool` trait, which defines the interface for all FTL tools.
-- The `ftl_mcp_server!` macro, which generates the necessary boilerplate for creating a WebAssembly component that can be executed by the FTL runtime.
-- The `ftl_mcp_gateway!` macro for creating gateway components that aggregate multiple tools.
-- Gateway infrastructure for routing MCP requests between tools.
-- A standard library of pre-built tools for common tasks.
+- Templates for creating new MCP components in Rust, TypeScript, and JavaScript
+- The core infrastructure for building WebAssembly-based MCP servers
+- Gateway functionality for aggregating multiple tools
+- Utilities for routing MCP requests between components
+- Examples and best practices for component development
 
 ### FTL Edge
 
@@ -56,7 +56,7 @@ The gateway component:
 
 ### Individual Tools
 
-1.  **Develop:** The developer uses the `ftl` CLI to create a new tool and implement the `ftl_sdk_rs::Tool` trait.
+1.  **Develop:** The developer uses the `ftl` CLI to create a new tool using wasmcp templates and implements the MCP protocol handlers.
 2.  **Build:** The `ftl build` command compiles the tool to a WebAssembly component.
 3.  **Test:** The `ftl serve` command starts a local development server that can be used to test the tool.
 4.  **Deploy:** The `ftl deploy` command deploys the tool to the FTL Edge.
