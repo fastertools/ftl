@@ -31,7 +31,10 @@ pub async fn templates(
             || output_str.contains("wasmcp-javascript");
 
         if has_wasmcp_templates {
-            println!("{} Wasmcp templates are already installed", style("✓").green());
+            println!(
+                "{} Wasmcp templates are already installed",
+                style("✓").green()
+            );
             println!();
             println!("Use --force to reinstall/update them");
             return Ok(());

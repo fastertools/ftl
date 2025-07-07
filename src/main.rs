@@ -35,20 +35,20 @@ enum Command {
         here: bool,
     },
 
-    /// Add a component to the current project
+    /// Add MCP server to the current project
     Add {
-        /// Name of the component
+        /// Name of the MCP server
         name: Option<String>,
 
-        /// Component description
+        /// MCP server description
         #[arg(short, long)]
         description: Option<String>,
 
-        /// Language (rust, typescript, javascript)
+        /// Language (rust, typescript, javascript, etc.)
         #[arg(short, long)]
         language: Option<String>,
 
-        /// HTTP route for the component
+        /// HTTP route for the MCP server
         #[arg(short, long)]
         route: Option<String>,
 
@@ -69,18 +69,18 @@ enum Command {
         tar: Option<String>,
     },
 
-    /// Build the component or project
+    /// Build the MCP server or project
     Build {
         /// Build in release mode
         #[arg(short, long)]
         release: bool,
 
-        /// Path to component (defaults to current directory)
+        /// Path to MCP server (defaults to current directory)
         #[arg(short, long)]
         path: Option<PathBuf>,
     },
 
-    /// Run the component locally
+    /// Run the project locally
     Up {
         /// Build before running
         #[arg(long)]
@@ -90,30 +90,30 @@ enum Command {
         #[arg(short, long, default_value = "3000")]
         port: u16,
 
-        /// Path to component (defaults to current directory)
+        /// Path to MCP server (defaults to current directory)
         #[arg(long)]
         path: Option<PathBuf>,
     },
 
-    /// Build and run the component, rebuilding on file changes
+    /// Build and run the project, rebuilding on file changes
     Watch {
         /// Port to serve on
         #[arg(short, long, default_value = "3000")]
         port: u16,
 
-        /// Path to component (defaults to current directory)
+        /// Path to MCP server (defaults to current directory)
         #[arg(long)]
         path: Option<PathBuf>,
     },
 
     /// Run tests
     Test {
-        /// Path to component (defaults to current directory)
+        /// Path to MCP server (defaults to current directory)
         #[arg(short, long)]
         path: Option<PathBuf>,
     },
 
-    /// Publish component to registry
+    /// Publish MCP server to registry
     Publish {
         /// Registry URL (defaults to ghcr.io)
         #[arg(short, long)]
@@ -123,7 +123,7 @@ enum Command {
         #[arg(short, long)]
         tag: Option<String>,
 
-        /// Path to component (defaults to current directory)
+        /// Path to MCP server (defaults to current directory)
         #[arg(long)]
         path: Option<PathBuf>,
     },
@@ -135,7 +135,7 @@ enum Command {
         environment: Option<String>,
     },
 
-    /// Interact with component registries
+    /// Interact with MCP server registries
     Registry {
         #[command(subcommand)]
         command: RegistryCommand,
@@ -186,14 +186,14 @@ enum SetupCommand {
 
 #[derive(Subcommand)]
 enum RegistryCommand {
-    /// List available components
+    /// List available MCP servers
     List {
         /// Registry to list from
         #[arg(short, long)]
         registry: Option<String>,
     },
 
-    /// Search for components
+    /// Search for MCP servers
     Search {
         /// Search query
         query: String,
@@ -203,9 +203,9 @@ enum RegistryCommand {
         registry: Option<String>,
     },
 
-    /// Show component information
+    /// Show MCP server information
     Info {
-        /// Component name or URL
+        /// MCP server name or URL
         component: String,
     },
 }
