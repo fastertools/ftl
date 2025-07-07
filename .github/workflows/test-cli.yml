@@ -23,7 +23,7 @@ jobs:
       
       - name: Install ftl CLI
         run: |
-          cargo install --path packages/ftl-cli
+          cargo install --path .
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -76,7 +76,7 @@ jobs:
       
       - name: Install ftl CLI
         run: |
-          cargo install --path packages/ftl-cli
+          cargo install --path .
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -129,7 +129,7 @@ jobs:
       
       - name: Install ftl CLI
         run: |
-          cargo install --path packages/ftl-cli
+          cargo install --path .
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1

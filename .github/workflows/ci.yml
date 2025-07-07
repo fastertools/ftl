@@ -85,37 +85,7 @@ jobs:
       - name: Test build templates
         run: |
           # Test that the embedded templates are valid
-          cd packages/ftl-cli
           cargo build --release
-
-  test-sdks:
-    name: Test SDKs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Test TypeScript SDK
-        run: |
-          cd packages/ftl-sdk-typescript
-          npm ci
-          npm run build
-          npm test
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip1
-      
-      - name: Test Rust SDK
-        run: |
-          cd packages/ftl-sdk-rust
-          cargo test
-          cargo build --target wasm32-wasip1
 
   security:
     name: Security Audit
