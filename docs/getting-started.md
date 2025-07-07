@@ -50,7 +50,7 @@ Edit the component implementation in `weather-tool/src/`:
 
 ```typescript
 // weather-tool/src/features.ts
-import { createTool } from '@fastertools/ftl-sdk';
+import { createTool } from 'wasmcp';
 
 export const tools = [
     createTool({
@@ -77,7 +77,7 @@ export const prompts = [];
 
 ```rust
 // weather-tool/src/features.rs
-use ftl_sdk::*;
+use wasmcp::*;
 
 pub fn get_tools() -> Vec<Tool> {
     vec![

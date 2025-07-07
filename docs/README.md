@@ -47,12 +47,12 @@ We provide examples in multiple languages:
 
 **TypeScript:**
 ```typescript
-import { createTool } from '@fastertools/ftl-sdk';
+import { createTool } from 'wasmcp';
 ```
 
 **Rust:**
 ```rust
-use ftl_sdk::*;
+use wasmcp::*;
 ```
 
 **Bash:**

@@ -39,10 +39,10 @@ AI Agent <--> Gateway MCP Endpoint <--> Tool 1 MCP Endpoint
 
 ## Implementation
 
-The gateway is implemented using the `ftl_mcp_gateway!` macro from `ftl-sdk-rs`:
+The gateway is implemented using the wasmcp SDK's gateway functionality:
 
 ```rust
-use ftl_sdk_rs::{ftl_mcp_gateway, gateway::{GatewayConfig, ToolEndpoint}, mcp::ServerInfo};
+use wasmcp::gateway::*;
 
 fn create_gateway_config() -> GatewayConfig {
     GatewayConfig {
@@ -66,7 +66,8 @@ fn create_gateway_config() -> GatewayConfig {
     }
 }
 
-ftl_mcp_gateway!(create_gateway_config());
+// The wasmcp SDK provides the gateway macro
+create_gateway!(create_gateway_config());
 ```
 
 ## Service Discovery

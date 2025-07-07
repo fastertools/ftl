@@ -5,17 +5,17 @@ echo "🔍 Running CI checks locally..."
 echo ""
 
 echo "📝 Checking formatting..."
-cargo fmt-check
+just fmt-check
 echo "✅ Formatting check passed"
 echo ""
 
 echo "🔧 Running clippy..."
-cargo lint
+just lint
 echo "✅ Clippy passed"
 echo ""
 
 echo "🧪 Running tests..."
-cargo test-all
+just test-all
 echo "✅ Tests passed"
 echo ""
 

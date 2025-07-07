@@ -1,52 +1,71 @@
 # Developing Tools
 
-At the core of FTL is the `Tool` trait. This trait defines the interface that all FTL tools must implement. It is designed to be simple and flexible, allowing you to create a wide variety of tools.
+FTL tools are built using the wasmcp SDK, which provides templates and utilities for creating MCP components. The SDK supports multiple languages and provides a consistent interface for building tools.
 
-## The `Tool` Trait
+## Tool Interface
 
-The `Tool` trait is defined in the `ftl-sdk-rs` crate:
+When using wasmcp templates, tools implement the MCP protocol through language-specific handlers:
 
+### Rust
 ```rust
-pub trait Tool: Send + Sync + Clone {
-    fn name(&self) -> &'static str;
-    fn description(&self) -> &'static str;
-    fn input_schema(&self) -> serde_json::Value;
-    fn call(&self, args: &serde_json::Value) -> Result<ToolResult, ToolError>;
-}
+use wasmcp::*;
+
+// Define your tool with wasmcp macros
+create_handler!(
+    tools: get_tools,
+    resources: get_resources,
+    prompts: get_prompts
+);
 ```
 
-- `name`: The name of your tool. This must be unique within your FTL account.
-- `description`: A short description of your tool.
-- `input_schema`: A JSON Schema that defines the expected input for your tool. This is used to validate the arguments that are passed to your tool.
-- `call`: The main entry point for your tool. This method is called when your tool is executed. It takes a `serde_json::Value` as input and returns a `Result<ToolResult, ToolError>`.
+### TypeScript/JavaScript
+```typescript
+import { createTool, createResource, createPrompt } from 'wasmcp';
 
-## `ToolResult`
-
-The `ToolResult` enum is used to return the result of a tool's execution. It can be one of the following:
-
-- `ToolResult::text(String)`: A plain text response.
-- `ToolResult::json(serde_json::Value)`: A JSON response.
-
-## `ToolError`
-
-The `ToolError` enum is used to return an error from a tool's execution. It can be one of the following:
-
-- `ToolError::InvalidArguments(String)`: The arguments passed to the tool were invalid.
-- `ToolError::ExecutionError(String)`: An error occurred during the execution of the tool.
-
-## The `ftl_mcp_server!` Macro
-
-The `ftl_mcp_server!` macro is used to create the main entry point for your tool. It takes your tool's struct as an argument and generates the necessary code to create a WebAssembly component that can be executed by the FTL runtime.
-
-```rust
-use ftl_sdk_rs::prelude::*;
-
-#[derive(Clone)]
-struct MyTool;
-
-// ... implement the Tool trait for MyTool ...
-
-ftl_sdk_rs::ftl_mcp_server!(MyTool);
+// Export your MCP features
+export const tools = [/* your tools */];
+export const resources = [/* your resources */];
+export const prompts = [/* your prompts */];
 ```
 
-This macro will generate a `handle_request` function that will be exported from your WebAssembly component. This function will be called by the FTL runtime when your tool is executed. It will deserialize the incoming JSON-RPC request, call your tool's `call` method, and serialize the result as a JSON-RPC response.
+The wasmcp SDK handles:
+- Protocol compliance with MCP specification
+- JSON-RPC request/response handling
+- Input validation using JSON Schema
+- Error handling and reporting
+
+## Tool Responses
+
+Tools return responses in MCP-compliant formats:
+
+### Success Responses
+- Text content: Plain string responses
+- JSON content: Structured data responses
+- Mixed content: Arrays of content items
+
+### Error Handling
+The wasmcp SDK provides standard error types:
+- Invalid parameters: Schema validation failures
+- Execution errors: Runtime failures during tool execution
+- Internal errors: Unexpected errors in the tool logic
+
+## Creating Components
+
+FTL uses wasmcp templates to scaffold new components:
+
+```bash
+# Create a new TypeScript component
+ftl add my-tool --language typescript
+
+# Create a new Rust component
+ftl add my-tool --language rust
+```
+
+The templates provide:
+- Pre-configured build system (Makefile)
+- Language-specific project structure
+- MCP protocol implementation
+- Example tool implementations
+- Testing setup
+
+For more details on the wasmcp SDK and its features, visit the [wasmcp repository](https://github.com/wasmcp/wasmcp).

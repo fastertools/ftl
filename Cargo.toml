@@ -1,14 +1,5 @@
-[workspace]
-members = ["packages/ftl-cli"]
-exclude = ["demo_hash", "toolkit-*", "packages/ftl-cli/src/templates/**", "packages/ftl-sdk-rust"]
-resolver = "2"
-
-# Don't build CLI for wasm target
-[workspace.metadata.cargo-all-features]
-skip_packages = ["ftl-cli"]
-skip_targets = ["wasm32-wasip1"]
-
-[workspace.package]
+[package]
+name = "ftl-cli"
 version = "0.0.18"
 authors = ["FTL Contributors"]
 edition = "2024"
@@ -18,8 +9,19 @@ homepage = "https://github.com/fastertools/ftl-cli"
 documentation = "https://crates.io/crates/ftl-cli"
 keywords = ["wasm", "mcp", "tools", "cli", "webassembly"]
 categories = ["command-line-utilities", "development-tools", "wasm"]
+description = "CLI wrapper for Spin to build and deploy MCP servers using wasmcp templates"
+readme = "README.md"
+exclude = ["demo_hash", "toolkit-*"]
 
-[workspace.dependencies]
+[[bin]]
+name = "ftl"
+path = "src/main.rs"
+
+# This binary should not be built for wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Empty to prevent wasm builds
+
+[dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -35,6 +37,22 @@ handlebars = "6.0"
 walkdir = "2.4"
 notify = "6.1"
 include_dir = "0.7"
+cargo_metadata = "0.18"
+dirs = "5.0"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+indicatif = "0.17"
+dialoguer = "0.11"
+console = "0.15"
+semver = "1.0"
+atty = "0.2"
+futures-util = "0.3"
+flate2 = "1.0"
+tar = "0.4"
+zip = "2.2"
+
+[build-dependencies]
+toml = "0.8"
+serde_json = "1.0"
 
 # Optimization profiles
 [profile.release]

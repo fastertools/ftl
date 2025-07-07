@@ -75,7 +75,7 @@ echo-tool/
 Open `handler/src/features.ts` and modify the echo tool:
 
 ```typescript
-import { createTool } from '@fastertools/ftl-sdk';
+import { createTool } from 'wasmcp';
 
 export const tools = [
   createTool({

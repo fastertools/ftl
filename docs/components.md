@@ -50,7 +50,7 @@ cd my-tool/handler
 
 ```typescript
 // src/features.ts
-import { createTool, createResource, createPrompt } from '@fastertools/ftl-sdk';
+import { createTool, createResource, createPrompt } from 'wasmcp';
 
 // Define tools
 export const tools = [
@@ -134,7 +134,7 @@ cd my-tool/handler
 
 ```rust
 // src/lib.rs
-use ftl_sdk::*;
+use wasmcp::*;
 use serde::{Deserialize, Serialize};
 
 // Define handler
@@ -218,7 +218,7 @@ JavaScript components follow the same pattern as TypeScript but without type ann
 
 ```javascript
 // src/features.js
-import { createTool } from '@fastertools/ftl-sdk';
+import { createTool } from 'wasmcp';
 
 export const tools = [
   createTool({
@@ -252,7 +252,7 @@ Add dependencies to `handler/Cargo.toml`:
 
 ```toml
 [dependencies]
-ftl-sdk = "0.2.0"
+wasmcp = "0.2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
@@ -268,7 +268,7 @@ Add dependencies to `handler/package.json`:
 ```json
 {
   "dependencies": {
-    "@fastertools/ftl-sdk": "^0.1.0",
+    "wasmcp": "^0.1.0",
     "axios": "^1.6.0",
     "dotenv": "^16.0.0"
   },

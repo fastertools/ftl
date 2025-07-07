@@ -41,9 +41,9 @@ pre-push:
     @just fix
     @just test-all
 
-# Build WASM
-build-wasm:
-    cargo build --package ftl-sdk-rs --target wasm32-wasip1
+# Build release
+build-release:
+    cargo build --release
 
 # Install Spin
 spin-install:

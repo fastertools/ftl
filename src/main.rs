@@ -157,7 +157,7 @@ enum Command {
 
 #[derive(Subcommand)]
 enum SetupCommand {
-    /// Install or update FTL templates
+    /// Install or update wasmcp templates
     Templates {
         /// Force reinstall even if already installed
         #[arg(long)]

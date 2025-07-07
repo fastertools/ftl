@@ -67,9 +67,9 @@ cargo build --release
 
 ```
 ftl-cli/
-├── ftl-cli/        # Main CLI implementation
-├── ftl-sdk-rs/    # Core MCP server library
-├── ftl-runtime/    # Runtime abstraction layer
+├── packages/
+│   └── ftl-cli/    # Main CLI implementation
+├── templates/      # Component templates (uses wasmcp)
 └── examples/       # Example tools
 ```
 
@@ -87,9 +87,9 @@ ftl-cli/
 ### Error Handling
 
 - Use `anyhow::Result` for fallible functions in the CLI
-- Use `thiserror` for library errors in ftl-sdk-rs and ftl-runtime
 - Provide helpful error messages with context
 - Chain errors appropriately using `.context()`
+- Component errors follow wasmcp SDK patterns
 
 ### Testing
 
@@ -146,14 +146,14 @@ When adding a new CLI command:
 5. Add tests for the command
 6. Update the README with the new command
 
-### Modifying Core APIs
+### Component SDK
 
-Changes to `ftl-sdk-rs` APIs require careful consideration:
+FTL uses the wasmcp SDK for component development:
 
-1. Maintain backward compatibility when possible
-2. Document breaking changes clearly
-3. Update all dependent code
-4. Add migration guides for breaking changes
+1. Component templates are maintained in the wasmcp repository
+2. SDK updates should be coordinated with wasmcp releases
+3. Test compatibility with all supported languages (Rust, TypeScript, JavaScript)
+4. Update documentation to reflect SDK changes
 
 ## Release Process
 
