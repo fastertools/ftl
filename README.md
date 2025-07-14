@@ -13,7 +13,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a platform on the network edge that makes it easy to deploy and manage secure [Model Context Protocol](https://modelcontextprotocol.io) servers with SOTA performance. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for authoring MCP tools in any source lanaguage and running them natively on the [most distributed](https://www.akamai.com/why-akamai/global-infrastructure) edge network.
+FTL is a platform on the network edge that makes it easy to author and deploy secure [Model Context Protocol](https://modelcontextprotocol.io) servers with SOTA performance. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for authoring MCP tools in any source lanaguage and running them natively on the [most distributed](https://www.akamai.com/why-akamai/global-infrastructure) edge network.
 
 ## Why FTL?
 
@@ -35,21 +35,7 @@ cargo install ftl-cli
 ftl setup templates
 
 # Create a new project
-ftl init my-tools
-cd my-tools
-
-# Add a tool
-ftl add weather-tool --language typescript
-
-# Start development server with auto-rebuild
-ftl watch
-
-# Run tests
-ftl test
-
-# Build and deploy
-ftl build --release
-ftl deploy
+ftl init my-project
 ```
 
 ## Creating tools
@@ -57,15 +43,15 @@ ftl deploy
 <details>
 <summary><strong>🦀 Rust example</strong></summary>
 
+Add a Rust tool to a project
 ```bash
-# Create project and add Rust tool
-ftl init my-project
 cd my-project
 ftl add my-tool --language rust
 ```
 
 ```rust
 // my-tool/src/lib.rs
+
 use ftl_sdk::{tool, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
@@ -87,31 +73,30 @@ fn my_tool(input: MyToolInput) -> ToolResponse {
 <details>
 <summary><strong>🟦 TypeScript example</strong></summary>
 
+Add a TypeScript tool to a project
 ```bash
-# Create project and add TypeScript tool
-ftl init my-project
-cd my-project
 ftl add my-tool --language typescript
 ```
 
 ```typescript
 // my-tool/src/index.ts
+
 import { createTool, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
 // Define the schema using Zod
-const InputSchema = z.object({
+const ToolSchema = z.object({
   message: z.string().describe('The message to process')
 })
 
-type ToolInput = z.infer<typeof InputSchema>
+type ToolInput = z.infer<typeof ToolSchema>
 
 const tool = createTool<ToolInput>({
   metadata: {
     name: 'my_tool',
     title: 'My Tool',
     description: 'A simple MCP tool',
-    inputSchema: z.toJSONSchema(InputSchema)
+    inputSchema: z.toJSONSchema(ToolSchema)
   },
   handler: async (input) => {
     return ToolResponse.text(`Processed: ${input.message}`)
