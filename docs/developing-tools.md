@@ -1,16 +1,16 @@
 # Developing Tools
 
-FTL tools are built using the wasmcp SDK, which provides templates and utilities for creating MCP components. The SDK supports multiple languages and provides a consistent interface for building tools.
+FTL tools are built using the ftl-mcp SDK, which provides templates and utilities for creating MCP components. The SDK supports multiple languages and provides a consistent interface for building tools.
 
 ## Tool Interface
 
-When using wasmcp templates, tools implement the MCP protocol through language-specific handlers:
+When using ftl-mcp templates, tools implement the MCP protocol through language-specific handlers:
 
 ### Rust
 ```rust
-use wasmcp::*;
+use ftl-mcp::*;
 
-// Define your tool with wasmcp macros
+// Define your tool with ftl-mcp macros
 create_handler!(
     tools: get_tools,
     resources: get_resources,
@@ -20,7 +20,7 @@ create_handler!(
 
 ### TypeScript/JavaScript
 ```typescript
-import { createTool, createResource, createPrompt } from 'wasmcp';
+import { createTool, createResource, createPrompt } from 'ftl-mcp';
 
 // Export your MCP features
 export const tools = [/* your tools */];
@@ -28,7 +28,7 @@ export const resources = [/* your resources */];
 export const prompts = [/* your prompts */];
 ```
 
-The wasmcp SDK handles:
+The ftl-mcp SDK handles:
 - Protocol compliance with MCP specification
 - JSON-RPC request/response handling
 - Input validation using JSON Schema
@@ -44,14 +44,14 @@ Tools return responses in MCP-compliant formats:
 - Mixed content: Arrays of content items
 
 ### Error Handling
-The wasmcp SDK provides standard error types:
+The ftl-mcp SDK provides standard error types:
 - Invalid parameters: Schema validation failures
 - Execution errors: Runtime failures during tool execution
 - Internal errors: Unexpected errors in the tool logic
 
 ## Creating Components
 
-FTL uses wasmcp templates to scaffold new components:
+FTL uses ftl-mcp templates to scaffold new components:
 
 ```bash
 # Create a new TypeScript component
@@ -68,4 +68,4 @@ The templates provide:
 - Example tool implementations
 - Testing setup
 
-For more details on the wasmcp SDK and its features, visit the [wasmcp repository](https://github.com/wasmcp/wasmcp).
+For more details on the ftl-mcp SDK and its features, visit the [ftl-mcp repository](https://github.com/fastertools/ftl-mcp).

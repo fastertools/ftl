@@ -20,9 +20,9 @@ The `ftl-cli` is the command-line interface for the FTL platform. It is responsi
 - Deploying tools to the FTL Edge.
 - Managing toolkits.
 
-### `wasmcp`
+### `ftl-mcp`
 
-FTL uses the `wasmcp` SDK for building MCP components. The wasmcp repository provides:
+FTL uses the `ftl-mcp` SDK for building MCP components. The ftl-mcp repository provides:
 
 - Templates for creating new MCP components in Rust, TypeScript, and JavaScript
 - The core infrastructure for building WebAssembly-based MCP servers
@@ -56,7 +56,7 @@ The gateway component:
 
 ### Individual Tools
 
-1.  **Develop:** The developer uses the `ftl` CLI to create a new tool using wasmcp templates and implements the MCP protocol handlers.
+1.  **Develop:** The developer uses the `ftl` CLI to create a new tool using ftl-mcp templates and implements the MCP protocol handlers.
 2.  **Build:** The `ftl build` command compiles the tool to a WebAssembly component.
 3.  **Test:** The `ftl serve` command starts a local development server that can be used to test the tool.
 4.  **Deploy:** The `ftl deploy` command deploys the tool to the FTL Edge.

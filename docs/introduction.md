@@ -1,92 +1,73 @@
-# Introduction
+# Overview
 
-Welcome to FTL! This guide will help you understand what FTL is, how it works, and how to get started building MCP servers as WebAssembly components.
-
-## What is FTL?
-
-FTL (Faster Tools Library) is a command-line tool that wraps Fermyon Spin to simplify building and deploying Model Context Protocol (MCP) servers as WebAssembly components. It leverages the wasmcp templates and SDKs to provide a streamlined workflow for creating, testing, and deploying MCP servers that can be used by AI agents and assistants.
-
-FTL solves several key challenges in MCP development:
-- **Multi-language Support**: Write MCP servers in Rust, TypeScript, or JavaScript
-- **Component Composition**: Combine multiple MCP servers into a single deployable unit
-- **Edge Deployment**: Deploy your MCP servers anywhere using Spin's WebAssembly runtime
-- **Developer Experience**: Hot reload, automatic dependency management, and intuitive CLI
-
-## Core Concepts
-
-### MCP Components
-
-An **MCP component** is a WebAssembly module that implements the Model Context Protocol. Each component can expose:
-- **Tools**: Functions that AI agents can call to perform actions
-- **Resources**: Data sources that AI agents can read
-- **Prompts**: Reusable prompt templates for AI interactions
-
-### Projects
-
-A **project** is a collection of MCP components that are deployed together. Projects use Spin's manifest format to define routing and configuration for each component.
-
-### Component Development
-
-FTL uses the wasmcp SDKs for building MCP components in multiple languages:
-
-**TypeScript/JavaScript:**
-```typescript
-import { createHandler } from 'wasmcp';
-
-export const handler = createHandler({
-    tools: [...],      // Your MCP tools
-    resources: [...],  // Your MCP resources
-    prompts: [...]     // Your MCP prompts
-});
-```
-
-**Rust:**
-```rust
-use wasmcp::*;
-
-create_handler!(
-    tools: get_tools,
-    resources: get_resources,
-    prompts: get_prompts
-);
-```
+The FTL CLI uses the [ftl-mcp](https://github.com/fastertools/ftl-mcp) framework provide an easy DX for developing MCP servers as Wasm components.
 
 ### WebAssembly Runtime
 
-FTL uses [Spin](https://www.fermyon.com/spin) as its WebAssembly runtime, providing:
+FTL is based on the [Spin](https://www.fermyon.com/spin) framework, which embeds the [wasmtime](https://github.com/bytecodealliance/wasmtime) runtime, providing:
 - Secure sandboxing for each component
-- HTTP routing between components
+- Host-level in-memory interop between components (no network calls across components within an app)
 - Fast cold starts and execution
-- Deploy anywhere Spin runs
+- Runs on any WASI-compatible host (including your local machine)
 
 ## Architecture Overview
 
-```
-┌─────────────────┐
-│   AI Agent      │
-│ (Claude, GPT-4) │
-└────────┬────────┘
-         │ MCP Protocol
-         ▼
-┌─────────────────┐
-│  Spin Runtime   │
-│  (HTTP Router)  │
-└────────┬────────┘
-         │
-    ┌────┴────┬─────────┬─────────┐
-    ▼         ▼         ▼         ▼
-┌────────┐┌────────┐┌────────┐┌────────┐
-│Weather ││GitHub  ││Database││Custom  │
-│Tool    ││Tool    ││Tool    ││Tool    │
-│(TS)    ││(Rust)  ││(JS)    ││(Any)   │
-└────────┘└────────┘└────────┘└────────┘
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Agent["AI Agent<br/>(Claude, GPT-4, etc.)"]
+    end
+    
+    subgraph "FTL Application" 
+        subgraph "Spin Runtime"
+            Gateway["MCP Gateway<br/>(Protocol Handler)"]
+            
+            subgraph "Tool Components"
+                Weather["Weather Tool<br/>(TypeScript)"]
+                GitHub["GitHub Tool<br/>(Rust)"]
+                Database["Database Tool<br/>(JavaScript)"]
+                Custom["Custom Tool<br/>(Any Language)"]
+            end
+        end
+    end
+    
+    Agent -->|"MCP Protocol<br/>(JSON-RPC over HTTP)"| Gateway
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Weather
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| GitHub
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Database
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Custom
+    
+    classDef client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef gateway fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef tool fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class Agent client
+    class Gateway gateway
+    class Weather,GitHub,Database,Custom tool
 ```
 
-Each component:
-- Runs in its own WebAssembly sandbox
-- Has its own HTTP route (e.g., `/weather/mcp`)
-- Can be developed and tested independently
-- Can be published and shared via OCI registries
+The architecture consists of:
+
+1. **MCP Gateway**: A WebAssembly component that:
+   - Receives MCP protocol requests (JSON-RPC over HTTP)
+   - Validates and routes requests to appropriate tool components
+   - Aggregates tool metadata for discovery
+   - Handles protocol translation and error responses
+
+2. **Tool Components**: Individual WebAssembly modules that:
+   - Implement specific MCP tool functionality
+   - Run in isolated sandboxes for security
+   - Communicate via Spin's internal HTTP router (no external network)
+   - Can be written in any language that compiles to WebAssembly
+
+### Key Architectural Benefits:
+
+- **Protocol Separation**: The MCP Gateway handles all protocol complexity, allowing tools to focus on business logic
+- **Language Flexibility**: Write tools in Rust, TypeScript, JavaScript, Python, Go, or any language that targets WebAssembly
+- **Security Isolation**: Each component runs in its own WebAssembly sandbox with capability-based security
+- **Zero Network Overhead**: Components communicate via memory-mapped HTTP within the Spin runtime
+- **Independent Deployment**: Tools can be developed, tested, and versioned independently
+- **Registry Distribution**: Share tools via OCI registries (ghcr.io, Docker Hub, etc.)
 
 ## Why FTL?
 
@@ -106,8 +87,7 @@ Each component:
 
 ### For Teams
 
-- **Component Marketplace**: Share components via OCI registries
-- **Version Control**: Standard Git workflows for collaboration
+- **Component Distribution**: Share MCP components via OCI registries
 - **Independent Development**: Teams can work on components separately
 - **Unified Deployment**: Compose components into cohesive applications
 

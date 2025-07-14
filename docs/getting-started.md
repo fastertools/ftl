@@ -4,16 +4,168 @@ This guide will walk you through creating, building, and deploying your first MC
 
 ## Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install) (for the FTL CLI)
-- Language-specific requirements:
-  - **Rust**: cargo with wasm32-wasip1 target
-  - **TypeScript/JavaScript**: Node.js 20+
-- [wkg](https://github.com/bytecodealliance/wasm-pkg-tools) (for publishing)
+### System Requirements
+
+- **Operating System**: macOS, Linux, or Windows (with WSL2 recommended)
+- **Memory**: 4GB RAM minimum, 8GB recommended
+- **Disk Space**: 2GB free space for toolchain and dependencies
+
+### Required Software
+
+#### 1. Rust Toolchain
+FTL is written in Rust and requires the Rust toolchain:
+
+<details>
+<summary><b>macOS Installation</b></summary>
+
+```bash
+# Using Homebrew (recommended)
+brew install rust
+
+# Or using rustup directly
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+</details>
+
+<details>
+<summary><b>Linux Installation</b></summary>
+
+```bash
+# Install build dependencies first
+# Ubuntu/Debian:
+sudo apt update
+sudo apt install build-essential pkg-config libssl-dev
+
+# Fedora/RHEL:
+sudo dnf install gcc gcc-c++ openssl-devel
+
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+</details>
+
+<details>
+<summary><b>Windows Installation</b></summary>
+
+Option 1: **Windows Subsystem for Linux (WSL2)** - Recommended
+```powershell
+# Install WSL2
+wsl --install
+
+# Then follow Linux instructions inside WSL2
+```
+
+Option 2: **Native Windows**
+1. Install [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. Download and run [rustup-init.exe](https://rustup.rs/)
+3. Follow the installation prompts
+</details>
+
+#### 2. Node.js (for TypeScript/JavaScript tools)
+
+<details>
+<summary><b>Installation Instructions</b></summary>
+
+**macOS**:
+```bash
+# Using Homebrew
+brew install node
+
+# Or using nvm (Node Version Manager)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 20
+nvm use 20
+```
+
+**Linux**:
+```bash
+# Using NodeSource repository (Ubuntu/Debian)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Or using nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 20
+```
+
+**Windows**:
+- Download from [nodejs.org](https://nodejs.org/)
+- Or use [Chocolatey](https://chocolatey.org/): `choco install nodejs`
+</details>
+
+### Optional Tools
+
+- **[cargo-binstall](https://github.com/cargo-bins/cargo-binstall)** - Faster binary installation
+  ```bash
+  cargo install cargo-binstall
+  ```
+
+- **[wkg](https://github.com/bytecodealliance/wasm-pkg-tools)** - For publishing components
+  ```bash
+  cargo install wkg
+  ```
+
+### Verify Installation
+
+Run these commands to verify your setup:
+
+```bash
+# Check Rust
+rustc --version  # Should show 1.87.0 or higher
+cargo --version
+
+# Check Node.js (if using TypeScript)
+node --version   # Should show v20.0.0 or higher
+npm --version
+
+# Check FTL will work
+which cargo      # Should show cargo path
+```
 
 ## 1. Install the FTL CLI
 
+### Quick Install
+
 ```bash
+# Using cargo (will compile from source)
 cargo install ftl-cli
+
+# Using cargo-binstall (downloads pre-built binary if available)
+cargo binstall ftl-cli
+```
+
+### Troubleshooting Installation
+
+If installation fails:
+
+1. **Update Rust**:
+   ```bash
+   rustup update stable
+   ```
+
+2. **Clear cargo cache**:
+   ```bash
+   rm -rf ~/.cargo/registry/cache
+   cargo clean
+   ```
+
+3. **Install with locked dependencies**:
+   ```bash
+   cargo install ftl-cli --locked
+   ```
+
+4. **Check for platform-specific issues**:
+   - macOS: Ensure Xcode Command Line Tools are installed: `xcode-select --install`
+   - Linux: Install development packages (see Prerequisites)
+   - Windows: Use WSL2 or ensure Visual Studio Build Tools are installed
+
+### Verify Installation
+
+```bash
+ftl --version
+# Should output: ftl 0.0.20 or higher
 ```
 
 ## 2. Create a New Project
@@ -50,7 +202,7 @@ Edit the component implementation in `weather-tool/src/`:
 
 ```typescript
 // weather-tool/src/features.ts
-import { createTool } from 'wasmcp';
+import { createTool } from 'ftl-mcp';
 
 export const tools = [
     createTool({
@@ -77,7 +229,7 @@ export const prompts = [];
 
 ```rust
 // weather-tool/src/features.rs
-use wasmcp::*;
+use ftl-mcp::*;
 
 pub fn get_tools() -> Vec<Tool> {
     vec![

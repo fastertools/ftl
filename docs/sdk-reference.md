@@ -1,12 +1,12 @@
 # SDK Reference
 
-This document provides a reference for using the wasmcp SDKs with FTL. For complete SDK documentation, see the [wasmcp repository](https://github.com/fastertools/wasmcp).
+This document provides a reference for using the ftl-mcp SDKs with FTL. For complete SDK documentation, see the [ftl-mcp repository](https://github.com/fastertools/ftl-mcp).
 
 ## TypeScript/JavaScript SDK
 
 ### Installation
 
-The wasmcp SDK is automatically included when you create a new component with `ftl add`. The templates handle the dependency management for you.
+The ftl-mcp SDK is automatically included when you create a new component with `ftl add`. The templates handle the dependency management for you.
 
 ### Core Functions
 
@@ -15,7 +15,7 @@ The wasmcp SDK is automatically included when you create a new component with `f
 Creates an MCP handler with the specified features.
 
 ```typescript
-import { createHandler } from 'wasmcp';
+import { createHandler } from 'ftl-mcp';
 
 export const handler = createHandler({
   tools: [...],      // Array of tools
@@ -167,7 +167,7 @@ interface Prompt<TArgs = any> {
 
 ### Installation
 
-The wasmcp SDK is automatically included when you create a new Rust component with `ftl add`. The templates handle the dependency management for you.
+The ftl-mcp SDK is automatically included when you create a new Rust component with `ftl add`. The templates handle the dependency management for you.
 
 ### Core Macros
 
@@ -176,7 +176,7 @@ The wasmcp SDK is automatically included when you create a new Rust component wi
 Creates an MCP handler with the specified functions.
 
 ```rust
-use wasmcp::*;
+use ftl-mcp::*;
 
 create_handler!(
     tools: get_tools,
