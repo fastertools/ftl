@@ -155,178 +155,36 @@ ftl deploy
 
 ## Architecture
 
-FTL leverages the ftl-mcp framework and Spin platform:
+FTL leverages the ftl-mcp framework and Spin platform to create a highly optimized MCP server runtime:
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   MCP Client    │────▶│  MCP Gateway    │────▶│   Tool Component│
-│   (AI Agent)    │     │  (Router)       │     │ (WASM Module)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                               ├── /weather-tool ──▶ Weather Tool (TypeScript)
-                               ├── /calculator   ──▶ Calculator Tool (Rust)
-                               └── /database     ──▶ Database Tool (TypeScript)
-```
-
-### Project Structure
-
-```
-my-assistant/
-├── spin.toml           # Spin manifest with MCP gateway
-├── weather-tool/       # TypeScript tool
-│   ├── package.json
-│   └── src/
-│       └── index.ts
-├── calculator/         # Rust tool  
-│   ├── Cargo.toml
-│   └── src/
-│       └── lib.rs
-└── database/          # Another tool
-    ├── package.json
-    └── src/
-        └── index.ts
+```mermaid
+graph LR
+    subgraph "AI Applications"
+        Client["MCP Client<br/>(Claude, GPT-4, etc.)"]
+    end
+    
+    subgraph "FTL on Edge Network"
+        Gateway["MCP Gateway<br/>(Protocol Handler)"]
+        Weather["Weather Tool<br/>(TypeScript)"]
+        Calculator["Calculator Tool<br/>(Rust)"]
+        Database["Database Tool<br/>(TypeScript)"]
+    end
+    
+    Client -->|"MCP Protocol<br/>(JSON-RPC)"| Gateway
+    Gateway -->|"Internal Router<br/>(No Network)"| Weather
+    Gateway -->|"Internal Router<br/>(No Network)"| Calculator  
+    Gateway -->|"Internal Router<br/>(No Network)"| Database
 ```
 
-Each tool:
-- Is a standalone WebAssembly component
-- Implements a specific MCP tool
-- Can be developed and tested independently
-- Communicates via local HTTP (no network overhead)
-- Runs in a secure sandbox
-
-## Prerequisites
-
-### Required
-- **Rust 1.87+** - [Install Rust](https://rustup.rs/)
-- **Node.js 20+** (for TypeScript tools) - [Install Node.js](https://nodejs.org/)
-
-### Platform-Specific
-
-<details>
-<summary>macOS</summary>
-
-```bash
-# Using Homebrew
-brew install rust node
-
-# Or install Rust directly
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-</details>
-
-<details>
-<summary>Linux</summary>
-
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install build-essential pkg-config libssl-dev
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Install Node.js via NodeSource
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-</details>
-
-<details>
-<summary>Windows</summary>
-
-- Install [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- Install [Rust for Windows](https://rust-lang.org/tools/install)
-- Install [Node.js for Windows](https://nodejs.org/en/download/)
-- Or use [WSL2](https://docs.microsoft.com/en-us/windows/wsl/install) for Linux environment
-</details>
-
-### Auto-Installed by FTL
-- ✅ Spin runtime (prompted on first use)
-- ✅ cargo-component (for Rust tools)
-- ✅ wasm32-wasip1 target
-
-## Documentation
-
-### Getting Started
-- 📖 [Introduction](./docs/introduction.md) - Overview and concepts
-- 🚀 [Quick Start](./docs/quickstart.md) - 5-minute tutorial
-- 🛠️ [Getting Started Guide](./docs/getting-started.md) - Detailed setup
-
-### Development
-- 🔧 [Tool Development](./docs/developing-tools.md) - Building MCP tools
-- 📚 [SDK Reference](./docs/sdk-reference.md) - API documentation
-- 🏗️ [Architecture](./docs/architecture.md) - System design
-- 📡 [API Reference](./docs/api.md) - MCP protocol details
-
-### Operations
-- 🚢 [Deployment Guide](./docs/deployment.md) - Production deployment
-- 📊 [Monitoring](./docs/monitoring.md) - Observability setup
-- 🔒 [Security](./docs/security.md) - Security best practices
-- ⚡ [Performance](./docs/performance.md) - Optimization guide
-
-### Reference
-- 📋 [CLI Reference](./docs/cli-reference.md) - All commands
-- 🐛 [Troubleshooting](./docs/troubleshooting.md) - Common issues
-- 📦 [Publishing](./docs/publishing.md) - Share your tools
-
-## Development
-
-### Running CI Checks Locally
-
-This project uses [just](https://github.com/casey/just) for task automation:
-
-```bash
-# Install just
-cargo install just
-
-# Run all CI checks
-just ci
-
-# Development workflow
-just dev        # Format and lint
-just test-all   # Run all tests
-just pre-push   # Full check before pushing
-
-# See all commands
-just --list
-```
-
-## Performance
-
-FTL delivers exceptional performance through WebAssembly optimization:
-
-| Metric | FTL | Traditional Container |
-|--------|-----|----------------------|
-| Cold Start | <50ms | 500-2000ms |
-| Memory Usage | 5-10MB | 50-200MB |
-| Bundle Size | <1MB | 50MB+ |
-| Build Time | 2-5s | 30-60s |
-
-## Community & Support
-
-- 💬 [GitHub Discussions](https://github.com/fastertools/ftl-cli/discussions) - Ask questions
-- 🐛 [Issue Tracker](https://github.com/fastertools/ftl-cli/issues) - Report bugs
-- 📺 [YouTube Channel](https://youtube.com/@fastertools) - Video tutorials
-- 🐦 [Twitter/X](https://twitter.com/fastertools) - Updates and tips
+**Key Architecture Points:**
+- Each tool is a separate WebAssembly component with its own sandbox
+- The MCP Gateway handles all protocol complexity and routing
+- Tools communicate via Spin's internal router (no network latency)
+- Deploy to edge locations globally for minimal latency to AI agents
 
 ## Contributing
 
-We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Quick Contribution Guide
-
-```bash
-# Fork and clone
-git clone https://github.com/YOUR-USERNAME/ftl-cli
-cd ftl-cli
-
-# Install dependencies
-just install-deps
-
-# Run tests
-just test-all
-
-# Make your changes and test
-just dev
-```
+We welcome contributions and discussion. Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
@@ -338,9 +196,3 @@ FTL is built on top of these excellent projects:
 - [Fermyon Spin](https://github.com/fermyon/spin) - WebAssembly runtime
 - [Model Context Protocol](https://modelcontextprotocol.io) - AI tool protocol
 - [WebAssembly](https://webassembly.org) - Portable binary format
-
----
-
-<p align="center">
-  Made with ❤️ by the <a href="https://github.com/fastertools">Faster Tools</a> team
-</p>

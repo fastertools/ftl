@@ -67,14 +67,6 @@ graph LR
     PromDB --> AlertMgr
     
     AlertMgr -->|"Slack<br/>PagerDuty<br/>Email"| Notifications["Alert<br/>Notifications"]
-    
-    classDef app fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    classDef export fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef backend fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    
-    class Gateway,Tool1,Tool2,Metrics,Logs,Traces app
-    class OTLP,Prom,LogShip export
-    class PromDB,Grafana,Loki,Jaeger,AlertMgr backend
 ```
 
 ### Observability Signals

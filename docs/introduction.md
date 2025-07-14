@@ -36,14 +36,6 @@ graph TB
     Gateway -->|"Internal HTTP<br/>(spin.internal)"| GitHub
     Gateway -->|"Internal HTTP<br/>(spin.internal)"| Database
     Gateway -->|"Internal HTTP<br/>(spin.internal)"| Custom
-    
-    classDef client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef gateway fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef tool fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    
-    class Agent client
-    class Gateway gateway
-    class Weather,GitHub,Database,Custom tool
 ```
 
 The architecture consists of:

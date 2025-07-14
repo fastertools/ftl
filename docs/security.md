@@ -45,15 +45,6 @@ graph TB
     ToolB -.->|"✅ Allowed<br/>(Specific Hosts)"| Net
     ToolC -.->|"❌ Blocked"| FS
     ToolC -.->|"❌ Blocked"| Net
-    
-    classDef host fill:#ffebee,stroke:#c62828,stroke-width:2px
-    classDef runtime fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef sandbox fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    classDef tool fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    
-    class OS,FS,Net host
-    class Runtime runtime
-    class ToolA,ToolB,ToolC tool
 ```
 
 ### Security Layers
