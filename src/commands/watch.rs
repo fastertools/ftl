@@ -13,7 +13,9 @@ pub async fn execute(path: Option<PathBuf>, port: u16, clear: bool) -> Result<()
 
     // Validate project directory exists
     if !project_path.join("spin.toml").exists() {
-        anyhow::bail!("No spin.toml found. Not in a project directory? Run 'ftl init' to create a new project.");
+        anyhow::bail!(
+            "No spin.toml found. Not in a project directory? Run 'ftl init' to create a new project."
+        );
     }
 
     // Get spin path
@@ -22,20 +24,23 @@ pub async fn execute(path: Option<PathBuf>, port: u16, clear: bool) -> Result<()
     // spin watch builds and runs the app, rebuilding/restarting on file changes
     // We pass arguments through to spin up
     let listen_addr = format!("127.0.0.1:{port}");
-    let mut args = vec![
-        "watch",
-        "--listen",
-        &listen_addr,
-    ];
-    
+    let mut args = vec!["watch", "--listen", &listen_addr];
+
     if clear {
         args.push("--clear");
     }
 
-    println!("{} Starting development server with auto-rebuild...", style("→").cyan());
+    println!(
+        "{} Starting development server with auto-rebuild...",
+        style("→").cyan()
+    );
     println!();
     println!("{} Watching for file changes", style("👀").dim());
-    println!("{} Server will start at http://{}", style("🌐").blue(), listen_addr);
+    println!(
+        "{} Server will start at http://{}",
+        style("🌐").blue(),
+        listen_addr
+    );
     println!("{} Press Ctrl+C to stop", style("⏹").yellow());
     println!();
 
@@ -55,13 +60,15 @@ pub async fn execute(path: Option<PathBuf>, port: u16, clear: bool) -> Result<()
 
     // Set up Ctrl+C handler
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for Ctrl+C");
         ctrlc_pressed_clone.store(true, Ordering::SeqCst);
     });
 
     // Wait for the child process to exit
     let status = child.wait()?;
-    
+
     // Check if we should print the stopping message
     if ctrlc_pressed.load(Ordering::SeqCst) {
         println!();

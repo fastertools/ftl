@@ -19,12 +19,12 @@ pub async fn execute(path: Option<PathBuf>, release: bool) -> Result<()> {
         );
 
         let spin_path = check_and_install_spin().await?;
-        
+
         let mut args = vec!["build"];
         if release {
             args.push("--release");
         }
-        
+
         let mut child = Command::new(&spin_path)
             .args(&args)
             .current_dir(&working_path)
@@ -44,5 +44,7 @@ pub async fn execute(path: Option<PathBuf>, release: bool) -> Result<()> {
     }
 
     // Not in a Spin project directory
-    anyhow::bail!("No spin.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project.");
+    anyhow::bail!(
+        "No spin.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
+    );
 }

@@ -47,7 +47,6 @@ enum Command {
         #[arg(short, long)]
         language: Option<String>,
 
-
         /// Use a Git repository as the template source
         #[arg(long, conflicts_with = "dir", conflicts_with = "tar")]
         git: Option<String>,
@@ -100,7 +99,7 @@ enum Command {
         /// Path to project (defaults to current directory)
         #[arg(long)]
         path: Option<PathBuf>,
-        
+
         /// Clear the screen before each rebuild
         #[arg(short, long)]
         clear: bool,

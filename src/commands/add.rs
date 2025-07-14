@@ -28,7 +28,7 @@ pub async fn execute(options: AddOptions) -> Result<()> {
         dir,
         tar,
     } = options;
-    
+
     // Check if we're in a Spin project directory
     if !PathBuf::from("spin.toml").exists() {
         anyhow::bail!("No spin.toml found. Not in a Spin project directory? Run 'ftl init' first.");
@@ -53,7 +53,9 @@ pub async fn execute(options: AddOptions) -> Result<()> {
         .chars()
         .all(|c| c.is_lowercase() || c == '-' || c == '_' || c.is_numeric())
     {
-        anyhow::bail!("Tool name must be lowercase with hyphens or underscores (e.g., my-tool, my_tool)");
+        anyhow::bail!(
+            "Tool name must be lowercase with hyphens or underscores (e.g., my-tool, my_tool)"
+        );
     }
 
     // Don't allow leading or trailing hyphens/underscores, or double hyphens/underscores
@@ -64,7 +66,9 @@ pub async fn execute(options: AddOptions) -> Result<()> {
         || component_name.contains("--")
         || component_name.contains("__")
     {
-        anyhow::bail!("Tool name cannot start or end with hyphens/underscores, or contain double hyphens/underscores");
+        anyhow::bail!(
+            "Tool name cannot start or end with hyphens/underscores, or contain double hyphens/underscores"
+        );
     }
 
     // Get description interactively if not provided
@@ -77,7 +81,10 @@ pub async fn execute(options: AddOptions) -> Result<()> {
                     .interact_text()?
             } else {
                 // Non-interactive mode - use default
-                format!("MCP tool written in {}", language.as_ref().unwrap_or(&"Rust".to_string()))
+                format!(
+                    "MCP tool written in {}",
+                    language.as_ref().unwrap_or(&"Rust".to_string())
+                )
             }
         }
     };
@@ -92,7 +99,7 @@ pub async fn execute(options: AddOptions) -> Result<()> {
             } else {
                 &lang_lower
             };
-            
+
             Language::from_str(mapped_lang).ok_or_else(|| {
                 anyhow::anyhow!(
                     "Invalid language: {lang_str}. Valid options are: rust, typescript, javascript"
@@ -214,34 +221,34 @@ pub async fn execute(options: AddOptions) -> Result<()> {
 /// Update the tool_components variable in spin.toml to include the new component
 fn update_tool_components(component_name: &str) -> Result<()> {
     use toml_edit::{DocumentMut, InlineTable};
-    
+
     // Read the spin.toml file
     let spin_toml_path = PathBuf::from("spin.toml");
-    let content = std::fs::read_to_string(&spin_toml_path)
-        .context("Failed to read spin.toml")?;
-    
+    let content = std::fs::read_to_string(&spin_toml_path).context("Failed to read spin.toml")?;
+
     // Parse as TOML document (preserves formatting)
-    let mut doc = content.parse::<DocumentMut>()
+    let mut doc = content
+        .parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
-    
+
     // Navigate to variables.tool_components.default
     let variables = doc
         .get_mut("variables")
         .and_then(|v| v.as_table_mut())
         .ok_or_else(|| anyhow::anyhow!("No [variables] section found in spin.toml"))?;
-    
+
     // Ensure tool_components exists
     if !variables.contains_key("tool_components") {
         let mut inline_table = InlineTable::new();
         inline_table.insert("default", "".into());
         variables["tool_components"] = toml_edit::Item::Value(inline_table.into());
     }
-    
+
     // Get tool_components table
     let tool_components = variables
         .get_mut("tool_components")
         .ok_or_else(|| anyhow::anyhow!("Failed to get tool_components"))?;
-    
+
     // Handle both inline table and regular table formats
     match tool_components {
         toml_edit::Item::Value(val) => {
@@ -256,17 +263,17 @@ fn update_tool_components(component_name: &str) -> Result<()> {
         }
         _ => anyhow::bail!("tool_components has unexpected type"),
     }
-    
+
     // Write back to file
     let updated_content = doc.to_string();
     std::fs::write(&spin_toml_path, updated_content)
         .context("Failed to write updated spin.toml")?;
-    
+
     println!(
         "{} Updated tool_components in spin.toml",
         style("✓").green()
     );
-    
+
     Ok(())
 }
 
@@ -276,11 +283,8 @@ where
     T: toml_edit::TableLike,
 {
     // Get current value of "default"
-    let current_value = table
-        .get("default")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    
+    let current_value = table.get("default").and_then(|v| v.as_str()).unwrap_or("");
+
     // Parse existing components
     let mut component_list: Vec<String> = if current_value.is_empty() {
         vec![]
@@ -291,14 +295,14 @@ where
             .filter(|s| !s.is_empty())
             .collect()
     };
-    
+
     // Add new component if not already present
     if !component_list.contains(&component_name.to_string()) {
         component_list.push(component_name.to_string());
     }
-    
+
     // Update the value
     table.insert("default", component_list.join(",").into());
-    
+
     Ok(())
 }

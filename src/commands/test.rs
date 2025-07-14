@@ -13,25 +13,29 @@ pub async fn execute(path: Option<PathBuf>) -> Result<()> {
     if working_path.join("spin.toml").exists() {
         // In a project directory - run tests for all tools
         println!("{} Testing all tools in project", style("→").dim());
-        
+
         // Read directory entries to find tool directories
         let entries = std::fs::read_dir(&working_path)?;
         let mut any_tests_run = false;
-        
+
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 // Check if this is a tool directory (has Cargo.toml or package.json)
                 if path.join("Cargo.toml").exists() || path.join("package.json").exists() {
-                    println!("\n{} Testing {}", style("→").cyan(), path.file_name().unwrap().to_string_lossy());
+                    println!(
+                        "\n{} Testing {}",
+                        style("→").cyan(),
+                        path.file_name().unwrap().to_string_lossy()
+                    );
                     run_tool_tests(&path)?;
                     any_tests_run = true;
                 }
             }
         }
-        
+
         if !any_tests_run {
             println!("{} No tools found to test", style("ℹ").yellow());
         }
@@ -89,8 +93,11 @@ fn run_tool_tests(tool_path: &PathBuf) -> Result<()> {
             anyhow::bail!("Tests failed");
         }
     } else {
-        println!("{} No test configuration found for this tool", style("⚠").yellow());
+        println!(
+            "{} No test configuration found for this tool",
+            style("⚠").yellow()
+        );
     }
-    
+
     Ok(())
 }
