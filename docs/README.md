@@ -17,6 +17,9 @@ Welcome to the FTL documentation! This directory contains comprehensive guides f
 ### Deployment & Operations
 - **[Deployment Guide](./deployment.md)** - Deploy to various environments
 - **[Project Composition](./composition.md)** - Combine multiple components
+- **[Monitoring Guide](./monitoring.md)** - Observability and metrics
+- **[Security Guide](./security.md)** - Security best practices
+- **[Performance Guide](./performance.md)** - Optimization techniques
 
 ### Additional Resources
 - **[API Reference](./api.md)** - MCP protocol implementation details
@@ -36,8 +39,9 @@ Welcome to the FTL documentation! This directory contains comprehensive guides f
 
 ### For DevOps/Deployment
 1. Check the [Deployment Guide](./deployment.md) for platform options
-2. Learn about [monitoring and operations](./deployment.md#monitoring--logging)
-3. Review [security best practices](./deployment.md#security-best-practices)
+2. Set up [monitoring and observability](./monitoring.md)
+3. Review [security best practices](./security.md)
+4. Optimize with the [performance guide](./performance.md)
 
 ## 📖 Documentation Conventions
 
@@ -47,12 +51,12 @@ We provide examples in multiple languages:
 
 **TypeScript:**
 ```typescript
-import { createTool } from 'wasmcp';
+import { createTool } from 'ftl-mcp';
 ```
 
 **Rust:**
 ```rust
-use wasmcp::*;
+use ftl-mcp::*;
 ```
 
 **Bash:**
@@ -96,7 +100,7 @@ We welcome contributions to improve our documentation!
 
 ## 🔄 Version Compatibility
 
-This documentation is for FTL version 0.0.18 and above. For older versions, check the version tags in the repository.
+This documentation is for FTL version 0.0.20 and above. For older versions, check the version tags in the repository.
 
 ---
 

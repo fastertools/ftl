@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toolkit composition with `build-toolkit`, `serve-toolkit`, `deploy-toolkit`
 - Hot reload support in `serve` command
 - WebAssembly optimization with configurable flags
-- Integration with wasmcp SDK for MCP server implementation
+- Integration with ftl-mcp SDK for MCP server implementation
 - Runtime abstraction layer using Spin WebAssembly runtime
 - Comprehensive project templates with Handlebars
 - CI/CD pipeline with GitHub Actions

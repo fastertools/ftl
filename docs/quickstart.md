@@ -58,7 +58,8 @@ cd echo-tool
 ```
 
 The component structure:
-```
+
+<pre>
 echo-tool/
 ├── ftl.toml           # Component metadata
 ├── Makefile           # Build commands
@@ -68,14 +69,14 @@ echo-tool/
     │   ├── index.ts   # Main handler
     │   └── features.ts # Tools, resources, prompts
     └── test/          # Component tests
-```
+</pre>
 
 ### 4. Customize Your Tool
 
 Open `handler/src/features.ts` and modify the echo tool:
 
 ```typescript
-import { createTool } from 'wasmcp';
+import { createTool } from 'ftl-mcp';
 
 export const tools = [
   createTool({

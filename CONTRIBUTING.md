@@ -65,13 +65,13 @@ cargo build --release
 
 ### Project Structure
 
-```
+<pre>
 ftl-cli/
 ├── packages/
 │   └── ftl-cli/    # Main CLI implementation
-├── templates/      # Component templates (uses wasmcp)
+├── templates/      # Component templates (uses ftl-mcp)
 └── examples/       # Example tools
-```
+</pre>
 
 ## Coding Guidelines
 
@@ -89,7 +89,7 @@ ftl-cli/
 - Use `anyhow::Result` for fallible functions in the CLI
 - Provide helpful error messages with context
 - Chain errors appropriately using `.context()`
-- Component errors follow wasmcp SDK patterns
+- Component errors follow ftl-mcp SDK patterns
 
 ### Testing
 
@@ -148,10 +148,10 @@ When adding a new CLI command:
 
 ### Component SDK
 
-FTL uses the wasmcp SDK for component development:
+FTL uses the ftl-mcp SDK for component development:
 
-1. Component templates are maintained in the wasmcp repository
-2. SDK updates should be coordinated with wasmcp releases
+1. Component templates are maintained in the ftl-mcp repository
+2. SDK updates should be coordinated with ftl-mcp releases
 3. Test compatibility with all supported languages (Rust, TypeScript, JavaScript)
 4. Update documentation to reflect SDK changes
 

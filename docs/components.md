@@ -6,7 +6,7 @@ This guide covers everything you need to know about developing MCP components wi
 
 Every FTL component follows a consistent structure:
 
-```
+<pre>
 my-component/
 ├── ftl.toml            # Component metadata
 ├── Makefile            # Build automation
@@ -15,7 +15,7 @@ my-component/
 │   ├── src/            # Source files
 │   └── test/           # Test files
 └── [.wit/]             # WebAssembly Interface Types (generated)
-```
+</pre>
 
 ### ftl.toml
 
@@ -50,7 +50,7 @@ cd my-tool/handler
 
 ```typescript
 // src/features.ts
-import { createTool, createResource, createPrompt } from 'wasmcp';
+import { createTool, createResource, createPrompt } from 'ftl-mcp';
 
 // Define tools
 export const tools = [
@@ -134,7 +134,7 @@ cd my-tool/handler
 
 ```rust
 // src/lib.rs
-use wasmcp::*;
+use ftl-mcp::*;
 use serde::{Deserialize, Serialize};
 
 // Define handler
@@ -218,7 +218,7 @@ JavaScript components follow the same pattern as TypeScript but without type ann
 
 ```javascript
 // src/features.js
-import { createTool } from 'wasmcp';
+import { createTool } from 'ftl-mcp';
 
 export const tools = [
   createTool({
@@ -252,7 +252,7 @@ Add dependencies to `handler/Cargo.toml`:
 
 ```toml
 [dependencies]
-wasmcp = "0.2.0"
+ftl-mcp = "0.2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
@@ -268,7 +268,7 @@ Add dependencies to `handler/package.json`:
 ```json
 {
   "dependencies": {
-    "wasmcp": "^0.1.0",
+    "ftl-mcp": "^0.1.0",
     "axios": "^1.6.0",
     "dotenv": "^16.0.0"
   },
