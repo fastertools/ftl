@@ -13,13 +13,13 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a platform on the network edge that makes it easy to author and deploy secure [Model Context Protocol](https://modelcontextprotocol.io) servers with SOTA performance. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for authoring MCP tools in any source lanaguage and running them natively on the [most distributed](https://www.akamai.com/why-akamai/global-infrastructure) edge network.
+FTL is a platform on the network edge that makes it easy to deploy and manage secure [Model Context Protocol](https://modelcontextprotocol.io) servers with SOTA performance. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for authoring MCP tools in any source lanaguage and running them natively on the [most distributed](https://www.akamai.com/why-akamai/global-infrastructure) edge network.
 
-## Why FTL?
+## Why?
 
-When an AI agent connects to MCP tools over the network, every tool call adds latency. For agents deployed in realtime and other performance sensitive applications, that latency adds up to impact the performance of the whole system. FTL solves this problem by providing:
+When an AI agent connects to MCP tools over the network, every tool call adds latency. For agents deployed in realtime and other performance sensitive applications, that latency adds up to impact the behavior of the whole system. FTL solves this problem by providing:
 
-- **Sub-millisecond cold starts**: Backed by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) running on Akamai's globally distributed edge network. Agents deployed anywhere can instanly access their networked tools with almost no latency.
+- **Sub-millisecond cold starts on global edge compute**: Backed by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) running on Akamai's globally distributed edge network. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 - **Mix source languages within one MCP server**: Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
 - **Tiny artifacts, fast deployments**: WebAssembly binaries are self-contained and often < 1MB vs. 100MB+ containers.
 - **Secure by Default**: WebAssembly provides sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/).
@@ -178,6 +178,6 @@ Apache-2.0 - see [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 FTL is built on top of these excellent projects:
-- [Fermyon Spin](https://github.com/fermyon/spin) - WebAssembly runtime
-- [Model Context Protocol](https://modelcontextprotocol.io) - AI tool protocol
-- [WebAssembly](https://webassembly.org) - Portable binary format
+- [Fermyon Spin](https://github.com/fermyon/spin)
+- [Model Context Protocol](https://modelcontextprotocol.io)
+- [WebAssembly](https://webassembly.org)
