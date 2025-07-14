@@ -9,7 +9,7 @@ homepage = "https://github.com/fastertools/ftl-cli"
 documentation = "https://crates.io/crates/ftl-cli"
 keywords = ["wasm", "mcp", "tools", "cli", "webassembly"]
 categories = ["command-line-utilities", "development-tools", "wasm"]
-description = "CLI wrapper for Spin to build and deploy MCP servers using wasmcp templates"
+description = "CLI wrapper for Spin to build and deploy MCP tools using ftl-mcp framework"
 readme = "README.md"
 exclude = ["demo_hash", "toolkit-*"]
 
@@ -26,6 +26,7 @@ clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
+toml_edit = "0.22"
 anyhow = "1.0"
 thiserror = "1.0"
 tokio = { version = "1.35", features = ["rt", "rt-multi-thread", "macros", "time", "process", "signal", "fs"] }

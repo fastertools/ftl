@@ -26,13 +26,13 @@ pub async fn templates(
             .context("Failed to list templates")?;
 
         let output_str = String::from_utf8_lossy(&list_output.stdout);
-        let has_wasmcp_templates = output_str.contains("wasmcp-rust")
-            || output_str.contains("wasmcp-typescript")
-            || output_str.contains("wasmcp-javascript");
+        let has_ftl_templates = output_str.contains("ftl-mcp-server")
+            || output_str.contains("ftl-mcp-rust")
+            || output_str.contains("ftl-mcp-ts");
 
-        if has_wasmcp_templates {
+        if has_ftl_templates {
             println!(
-                "{} Wasmcp templates are already installed",
+                "{} ftl-mcp templates are already installed",
                 style("✓").green()
             );
             println!();
@@ -70,16 +70,16 @@ pub async fn templates(
         );
         install_cmd.args(["--tar", tar_path]);
     } else {
-        // Default: install from wasmcp repository
-        let wasmcp_repo = "https://github.com/fastertools/wasmcp";
+        // Default: install from ftl-mcp repository
+        let ftl_mcp_repo = "https://github.com/fastertools/ftl-mcp";
 
         println!(
-            "{} Installing wasmcp templates from {}",
+            "{} Installing ftl-mcp templates from {}",
             style("→").dim(),
-            style(wasmcp_repo).dim()
+            style(ftl_mcp_repo).dim()
         );
 
-        install_cmd.args(["--git", wasmcp_repo]);
+        install_cmd.args(["--git", ftl_mcp_repo]);
     }
 
     install_cmd.arg("--upgrade");
@@ -98,16 +98,16 @@ pub async fn templates(
     println!("{} Templates installed successfully!", style("✓").green());
     println!();
 
-    // List installed wasmcp templates
+    // List installed ftl-mcp templates
     let list_output = Command::new(&spin_path)
         .args(["templates", "list"])
         .output()
         .context("Failed to list templates")?;
 
     let output_str = String::from_utf8_lossy(&list_output.stdout);
-    println!("Available wasmcp templates:");
+    println!("Available ftl-mcp templates:");
     for line in output_str.lines() {
-        if line.contains("wasmcp-") {
+        if line.contains("ftl-mcp-") {
             println!("  {}", line.trim());
         }
     }
@@ -154,14 +154,14 @@ pub async fn info() -> Result<()> {
             let output_str = String::from_utf8_lossy(&output.stdout);
             let ftl_templates: Vec<&str> = output_str
                 .lines()
-                .filter(|line| line.contains("wasmcp-"))
+                .filter(|line| line.contains("ftl-mcp-"))
                 .collect();
 
             if ftl_templates.is_empty() {
-                println!("Wasmcp Templates: {} Not installed", style("✗").red());
+                println!("ftl-mcp Templates: {} Not installed", style("✗").red());
                 println!("  Run 'ftl setup templates' to install");
             } else {
-                println!("Wasmcp Templates: {} Installed", style("✓").green());
+                println!("ftl-mcp Templates: {} Installed", style("✓").green());
                 for template in ftl_templates {
                     println!("  - {}", template.trim());
                 }

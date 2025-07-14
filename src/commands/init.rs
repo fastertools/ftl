@@ -55,12 +55,31 @@ pub async fn execute(name: Option<String>, here: bool) -> Result<()> {
         }
     }
 
-    // Use spin new with http-empty template to create the project container
+    // First check if templates are installed
+    let check_template_cmd = Command::new(&spin_path)
+        .args(["templates", "list"])
+        .output()
+        .context("Failed to list templates")?;
+
+    let templates_output = String::from_utf8_lossy(&check_template_cmd.stdout);
+    let has_ftl_templates = templates_output.contains("ftl-mcp-server");
+
+    if !has_ftl_templates {
+        eprintln!();
+        eprintln!("{} ftl-mcp templates not found.", style("✗").red());
+        eprintln!();
+        eprintln!("Please install the ftl-mcp templates by running:");
+        eprintln!("  ftl setup templates");
+        eprintln!();
+        anyhow::bail!("ftl-mcp templates not installed");
+    }
+
+    // Use spin new with ftl-mcp-server template
     let mut spin_cmd = Command::new(&spin_path);
     spin_cmd.args([
         "new",
         "-t",
-        "http-empty",
+        "ftl-mcp-server",
         "-o",
         &output_dir,
         "--accept-defaults",
@@ -90,22 +109,31 @@ pub async fn execute(name: Option<String>, here: bool) -> Result<()> {
 {} MCP project initialized!
 
 {} Structure:
-  └── spin.toml        # Spin project manifest
+  └── spin.toml        # Spin configuration
+  └── README.md        # Project documentation
+
+{} MCP Gateway is pre-configured at route /mcp
 
 {} Next steps:
-  {}ftl add           # Add a component to the project
-  ftl watch           # Start development server with auto-rebuild
+  {}ftl add           # Add a tool to the project
+  ftl build           # Build all tools
+  ftl up              # Start the MCP server
 
 {} Example:
   {}ftl add weather-api --language typescript
-  {}ftl add calculator --language rust"#,
+  {}ftl add calculator --language rust
+  
+{} Connect your MCP client to:
+  http://localhost:3000/mcp"#,
         style("✓").green(),
         style("📁").blue(),
+        style("🌐").cyan(),
         style("🚀").yellow(),
         cd_instruction,
         style("💡").bright(),
         cd_instruction,
-        cd_instruction
+        cd_instruction,
+        style("🔗").magenta()
     );
 
     Ok(())

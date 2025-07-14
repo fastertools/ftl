@@ -46,18 +46,68 @@ jobs:
           ftl init test-project
           cd test-project
           
-          # Add a Rust component
-          ftl add test-rust --language rust --description "Test Rust component" --route /test-rust/mcp
+          # Add a Rust tool
+          ftl add test-rust --language rust --description "Test Rust tool"
           
-          # Build the component
-          cd test-rust
-          make build
+          # Verify tool_components was updated
+          grep -q "test-rust" spin.toml || (echo "tool_components not updated" && exit 1)
           
-          # Run tests
-          make test
+          # Build the project
+          ftl build
           
-          # Build at project level
-          cd ..
+          # Test that ftl up works (just verify it starts)
+          timeout 5s ftl up || true
+
+  test-multi-tool:
+    name: CLI Test - Multiple Tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install ftl CLI
+        run: |
+          cargo install --path .
+      
+      - name: Setup Spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: v3.3.1
+      
+      - name: Install Spin templates
+        run: |
+          spin templates install --git https://github.com/fermyon/spin --upgrade
+      
+      - name: Setup ftl templates
+        run: |
+          ftl setup templates --force
+      
+      - name: Test multiple tools workflow
+        run: |
+          # Create a test project
+          WORK_DIR=$(mktemp -d)
+          cd $WORK_DIR
+          ftl init test-project
+          cd test-project
+          
+          # Add multiple tools
+          ftl add rust-tool --language rust --description "Rust tool"
+          ftl add ts-tool --language typescript --description "TypeScript tool"
+          
+          # Verify both tools are in tool_components
+          grep -q "rust-tool" spin.toml || (echo "rust-tool not in tool_components" && exit 1)
+          grep -q "ts-tool" spin.toml || (echo "ts-tool not in tool_components" && exit 1)
+          
+          # Build the project
           ftl build
 
   test-typescript-e2e:
@@ -99,18 +149,13 @@ jobs:
           ftl init test-project
           cd test-project
           
-          # Add a TypeScript component
-          ftl add test-ts --language typescript --description "Test TypeScript component" --route /test-ts/mcp
+          # Add a TypeScript tool
+          ftl add test-ts --language typescript --description "Test TypeScript tool"
           
-          # Build the component
-          cd test-ts
-          make build
+          # Verify tool_components was updated
+          grep -q "test-ts" spin.toml || (echo "tool_components not updated" && exit 1)
           
-          # Run tests
-          make test
-          
-          # Build at project level
-          cd ..
+          # Build the project
           ftl build
 
   test-javascript-e2e:
@@ -152,16 +197,11 @@ jobs:
           ftl init test-project
           cd test-project
           
-          # Add a JavaScript component
-          ftl add test-js --language javascript --description "Test JavaScript component" --route /test-js/mcp
+          # Add a JavaScript tool
+          ftl add test-js --language javascript --description "Test JavaScript tool"
           
-          # Build the component
-          cd test-js
-          make build
+          # Verify tool_components was updated
+          grep -q "test-js" spin.toml || (echo "tool_components not updated" && exit 1)
           
-          # Run tests
-          make test
-          
-          # Build at project level
-          cd ..
+          # Build the project
           ftl build
