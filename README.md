@@ -2,7 +2,7 @@
 
 # `ftl`
 
-Build and deploy Model Context Protocol (MCP) servers on WebAssembly
+Build and deploy Model Context Protocol (MCP) tools on WebAssembly
 
 [![CI](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -13,7 +13,7 @@ Build and deploy Model Context Protocol (MCP) servers on WebAssembly
 
 </div>
 
-FTL is a command-line tool that wraps [Fermyon Spin](https://www.fermyon.com/spin) to simplify building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) servers as WebAssembly components. It uses the [wasmcp](https://github.com/fastertools/wasmcp) templates and SDKs to provide a streamlined workflow for creating, testing, and deploying MCP servers on the Fermyon Akamai platform.
+FTL is a command-line tool that wraps [Fermyon Spin](https://www.fermyon.com/spin) to simplify building and deploying [Model Context Protocol](https://modelcontextprotocol.io) (MCP) tools as WebAssembly components. It uses the [ftl-mcp](https://github.com/fastertools/ftl-mcp) framework to provide a streamlined workflow for creating, testing, and deploying MCP tools on the Fermyon platform.
 
 ## Quick Start
 
@@ -21,11 +21,14 @@ FTL is a command-line tool that wraps [Fermyon Spin](https://www.fermyon.com/spi
 # Install FTL
 cargo install ftl-cli
 
+# Set up templates
+ftl setup templates
+
 # Create a new project
 ftl init my-assistant
 cd my-assistant
 
-# Add a component
+# Add a tool
 ftl add weather-tool --language typescript
 
 # Start development server with auto-rebuild
@@ -36,25 +39,25 @@ ftl test
 
 # Build and deploy
 ftl build --release
-ftl publish
+ftl deploy
 ```
 
 ## Key Features
 
-- **Component-First Architecture**: Build MCP servers as reusable WebAssembly components
-- **Multi-Language Support**: Write components in Rust, TypeScript, or JavaScript  
-- **Registry Publishing**: Share components via OCI registries (GitHub, Docker Hub)
-- **Project Composition**: Combine multiple MCP components into a single deployable unit
-- **Automatic Dependency Management**: Tools like cargo-component installed on-demand
+- **Tool-First Architecture**: Build individual MCP tools as reusable WebAssembly components
+- **Multi-Language Support**: Write tools in Rust or TypeScript  
+- **Automatic Tool Registration**: Tools are automatically registered with the MCP gateway
+- **Local Service Chaining**: Tools communicate efficiently via HTTP without network overhead
 - **Hot Reload Development**: Auto-rebuild on file changes with `ftl watch`
 - **Edge Deployment**: Deploy anywhere Spin runs
+- **Simple Tool Management**: Just run `ftl add` and start coding
 
 ## Creating MCP Projects
 
 ### TypeScript Example
 
 ```bash
-# Create project and add TypeScript component
+# Create project and add TypeScript tool
 ftl init my-project
 cd my-project
 ftl add my-tool --language typescript
@@ -62,20 +65,38 @@ ftl add my-tool --language typescript
 
 ```typescript
 // my-tool/src/index.ts
-import { createHandler } from 'wasmcp';
-import { tools, resources, prompts } from './features.js';
+import { createTool, ToolResponse } from 'ftl-sdk'
+import { z } from 'zod'
 
-export const handler = createHandler({
-    tools,     // Your MCP tools
-    resources, // Your MCP resources  
-    prompts    // Your MCP prompts
-});
+// Define the schema using Zod
+const InputSchema = z.object({
+  message: z.string().describe('The message to process')
+})
+
+type ToolInput = z.infer<typeof InputSchema>
+
+const tool = createTool<ToolInput>({
+  metadata: {
+    name: 'my_tool',
+    title: 'My Tool',
+    description: 'A simple MCP tool',
+    inputSchema: z.toJSONSchema(InputSchema)
+  },
+  handler: async (input) => {
+    return ToolResponse.text(`Processed: ${input.message}`)
+  }
+})
+
+//@ts-ignore
+addEventListener('fetch', (event: FetchEvent) => {
+  event.respondWith(tool(event.request))
+})
 ```
 
 ### Rust Example
 
 ```bash
-# Create project and add Rust component
+# Create project and add Rust tool
 ftl init my-project
 cd my-project
 ftl add my-tool --language rust
@@ -83,68 +104,70 @@ ftl add my-tool --language rust
 
 ```rust
 // my-tool/src/lib.rs
-use wasmcp::*;
+use ftl_sdk::{tool, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
 
-create_handler!(
-    tools: get_tools,
-    resources: get_resources,
-    prompts: get_prompts
-);
+#[derive(Deserialize, JsonSchema)]
+struct MyToolInput {
+    /// The message to process
+    message: String,
+}
 
-fn get_tools() -> Vec<Tool> {
-    vec![
-        tool!("my_tool", "Tool description", schema, execute_tool)
-    ]
+/// A simple MCP tool
+#[tool]
+fn my_tool(input: MyToolInput) -> ToolResponse {
+    ToolResponse::text(format!("Processed: {}", input.message))
 }
 ```
 
-## Component Development Workflow
+## Tool Development Workflow
 
 ### 1. Development
 ```bash
-# From component directory
-ftl build           # Build the component
-ftl test            # Run component tests
-ftl watch           # Auto-rebuild on changes
-
 # From project root (with spin.toml)
-ftl build           # Build all components
-ftl up --port 3000  # Run the composed application
+ftl build           # Build all tools
+ftl test            # Run tests
+ftl watch           # Auto-rebuild on changes
+ftl up              # Run the MCP server
 ```
 
-### 2. Publishing
+### 2. Testing Your Tools
 ```bash
-# Publish to GitHub Container Registry
-ftl publish --tag v1.0.0
+# List available tools
+curl -X POST http://127.0.0.1:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 
-# Publish to Docker Hub  
-ftl publish --registry docker.io --tag latest
+# Call a tool
+curl -X POST http://127.0.0.1:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/call",
+    "params": {
+      "name": "my_tool",
+      "arguments": {"message": "Hello, World!"}
+    },
+    "id": 2
+  }'
 ```
 
-### 3. Composition
-```bash
-# Create a project composed of multiple components
-ftl init my-assistant
-cd my-assistant
-
-# Add components with custom routes
-ftl add weather-tool --language typescript --route /weather
-ftl add github-tool --language rust --route /github
-ftl add calculator --language javascript --route /calc
-
-# Each component gets its own MCP endpoint
-# /weather/mcp - Weather tool MCP endpoint
-# /github/mcp  - GitHub tool MCP endpoint  
-# /calc/mcp    - Calculator MCP endpoint
-
-# Run the composed project
-ftl watch  # Development with auto-rebuild
-ftl up     # Production mode
+### 3. MCP Client Configuration
+```json
+{
+  "mcpServers": {
+    "my-assistant": {
+      "url": "http://127.0.0.1:3000/mcp",
+      "transport": "http"
+    }
+  }
+}
 ```
 
 ### 4. Deployment
 ```bash
-# Deploy to FTL
+# Deploy to FTL/Fermyon
 ftl deploy
 
 # Or use Spin directly
@@ -153,47 +176,43 @@ spin deploy
 
 ## Architecture
 
-FTL leverages the WebAssembly component model and Spin platform:
+FTL leverages the ftl-mcp framework and Spin platform:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   MCP Client    │────▶│  Spin Runtime   │────▶│  MCP Component  │
-│   (AI Agent)    │     │  (HTTP Router)  │     │ (WASM Module)   │
+│   MCP Client    │────▶│  MCP Gateway    │────▶│   Tool Component│
+│   (AI Agent)    │     │  (Router)       │     │ (WASM Module)   │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
-                               ├── /weather/mcp ──▶ Weather Component (TypeScript)
-                               ├── /github/mcp  ──▶ GitHub Component (Rust)
-                               └── /calc/mcp    ──▶ Calculator Component (JavaScript)
+                               ├── /weather-tool ──▶ Weather Tool (TypeScript)
+                               ├── /calculator   ──▶ Calculator Tool (Rust)
+                               └── /database     ──▶ Database Tool (TypeScript)
 ```
 
 ### Project Structure
 
 ```
 my-assistant/
-├── spin.toml           # Spin manifest (project root)
-├── weather-tool/       # TypeScript component
-│   ├── ftl.toml       # Component metadata
-│   ├── Makefile       # Build automation
-│   └── handler/       # Component source
-│       ├── package.json
-│       └── src/
-├── github-tool/       # Rust component  
-│   ├── ftl.toml
-│   ├── Makefile
-│   └── handler/
-│       ├── Cargo.toml
-│       └── src/
-└── calculator/        # JavaScript component
-    ├── ftl.toml
-    ├── Makefile
-    └── handler/
+├── spin.toml           # Spin manifest with MCP gateway
+├── weather-tool/       # TypeScript tool
+│   ├── package.json
+│   └── src/
+│       └── index.ts
+├── calculator/         # Rust tool  
+│   ├── Cargo.toml
+│   └── src/
+│       └── lib.rs
+└── database/          # Another tool
+    ├── package.json
+    └── src/
+        └── index.ts
 ```
 
-Each component:
-- Is a standalone WebAssembly module
-- Implements the MCP protocol
+Each tool:
+- Is a standalone WebAssembly component
+- Implements a specific MCP tool
 - Can be developed and tested independently
-- Can be composed with other components
+- Communicates via local HTTP (no network overhead)
 - Runs in a secure sandbox
 
 ## Prerequisites
@@ -207,15 +226,14 @@ Each component:
   - cargo-binstall for faster tool installation
 - **Auto-installed**:
   - Spin runtime (prompted on first use)
-  - cargo-component (for Rust components)
+  - cargo-component (for Rust tools)
 
 ## Documentation
 
 - [Getting Started Guide](./docs/introduction.md)
 - [CLI Reference](./docs/cli-reference.md)
-- [Component Development](./docs/components.md)
-- [Publishing Components](./docs/publishing.md)
-- [Project Composition](./docs/composition.md)
+- [Tool Development](./docs/components.md)
+- [Publishing Tools](./docs/publishing.md)
 - [SDK Reference](./docs/sdk-reference.md)
 
 ## Development
