@@ -165,7 +165,6 @@ If installation fails:
 
 ```bash
 ftl --version
-# Should output: ftl 0.0.20 or higher
 ```
 
 ## 2. Create a New Project
