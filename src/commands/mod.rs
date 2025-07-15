@@ -1,7 +1,10 @@
 pub mod add;
+pub mod auth;
 pub mod build;
 pub mod deploy;
 pub mod init;
+pub mod login;
+pub mod logout;
 pub mod publish;
 pub mod registry;
 pub mod setup;

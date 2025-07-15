@@ -9,7 +9,7 @@ Fast tools for AI agents
 [![Rust](https://img.shields.io/badge/rust-1.87+-orange.svg)](https://www.rust-lang.org)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
 
-[Docs](./docs/introduction.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
+[Docs](./docs/introduction.md) | [Authentication](./docs/authentication.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
 
 </div>
 
@@ -36,6 +36,9 @@ ftl setup templates
 
 # Create a new project
 ftl init my-project
+
+# Authenticate with FTL (see docs/authentication.md for details)
+ftl login
 ```
 
 ## Creating tools

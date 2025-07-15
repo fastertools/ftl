@@ -152,6 +152,22 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+
+    /// Authenticate with FTL
+    Login {
+        /// Don't open browser automatically
+        #[arg(long)]
+        no_browser: bool,
+    },
+
+    /// Log out of FTL
+    Logout,
+
+    /// Authentication status and management
+    Auth {
+        #[command(subcommand)]
+        command: AuthCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -207,6 +223,12 @@ enum RegistryCommand {
         /// MCP tool name or URL
         component: String,
     },
+}
+
+#[derive(Subcommand)]
+enum AuthCommand {
+    /// Show authentication status
+    Status,
 }
 
 #[tokio::main]
@@ -279,5 +301,10 @@ async fn main() -> Result<()> {
             SetupCommand::Info => commands::setup::info().await,
         },
         Command::Update { force } => commands::update::execute(force).await,
+        Command::Login { no_browser } => commands::login::execute(no_browser).await,
+        Command::Logout => commands::logout::execute().await,
+        Command::Auth { command } => match command {
+            AuthCommand::Status => commands::auth::status().await,
+        },
     }
 }

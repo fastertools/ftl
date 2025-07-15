@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -51,6 +56,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -92,6 +102,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-binstall
