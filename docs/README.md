@@ -98,10 +98,6 @@ We welcome contributions to improve our documentation!
 - **Discussions**: Ask questions and share ideas
 - **Discord**: Join our community for real-time help
 
-## 🔄 Version Compatibility
-
-This documentation is for FTL version 0.0.20 and above. For older versions, check the version tags in the repository.
-
 ---
 
 Happy building with FTL! 🎉
