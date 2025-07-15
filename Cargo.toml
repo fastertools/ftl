@@ -50,6 +50,9 @@ futures-util = "0.3"
 flate2 = "1.0"
 tar = "0.4"
 zip = "2.2"
+webbrowser = "1.0"
+keyring = { version = "3.0", features = ["apple-native", "windows-native", "sync-secret-service"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [build-dependencies]
 toml = "0.8"

@@ -50,6 +50,12 @@ jobs:
           fi
         shell: bash
       
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -111,6 +117,11 @@ jobs:
     if: needs.create-release.outputs.release_created
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

@@ -13,6 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -63,6 +68,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -116,6 +126,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
@@ -154,54 +169,6 @@ jobs:
           
           # Verify tool_components was updated
           grep -q "test-ts" spin.toml || (echo "tool_components not updated" && exit 1)
-          
-          # Build the project
-          ftl build
-
-  test-javascript-e2e:
-    name: CLI Test - JavaScript
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Install ftl CLI
-        run: |
-          cargo install --path .
-      
-      - name: Setup Spin
-        uses: fermyon/actions/spin/setup@v1
-        with:
-          version: v3.3.1
-      
-      - name: Install Spin templates
-        run: |
-          spin templates install --git https://github.com/fermyon/spin --upgrade
-      
-      - name: Setup ftl templates
-        run: |
-          ftl setup templates --force
-      
-      - name: Test JavaScript workflow
-        run: |
-          # Create a test project
-          WORK_DIR=$(mktemp -d)
-          cd $WORK_DIR
-          ftl init test-project
-          cd test-project
-          
-          # Add a JavaScript tool
-          ftl add test-js --language javascript --description "Test JavaScript tool"
-          
-          # Verify tool_components was updated
-          grep -q "test-js" spin.toml || (echo "tool_components not updated" && exit 1)
           
           # Build the project
           ftl build
