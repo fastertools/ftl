@@ -13,22 +13,22 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and [edge-powered](https://www.fermyon.com/wasm-functions) hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of deployable [MCP](https://modelcontextprotocol.io)-compatible tools that are secure by default.
+FTL is an open source framework and [edge-powered](https://www.fermyon.com/wasm-functions) hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, deployable [MCP](https://modelcontextprotocol.io)-compatible tools authored in a variety of source languages.
 
 ## Why?
 
 Remote MCP servers allow AI agents deployed anywhere to access tools that extend their capabilities. But when tools are called over the network, every execution comes with latency. For agents deployed in voice, video, and other real-time and performance sensitive applications, that latency adds up to impact the behavior of the whole system.
 
-FTL is a great option for agents that want:
+FTL is a great option for agents deployed anywhere that want remotely accessible tools with:
 
 - **Sub-millisecond cold starts on global edge compute**: The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
-- **Secure by Default**: Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/). MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization). Plug in your own OIDC provider via simple configuration, or use FTL's by default.
-- **Mix source languages within one MCP server**: Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
-- **Run anywhere**: Run your FTL-based tools on your own machine, Kubernetes, Wasmtime, Fermyon, or any WASI-compatible runtime. The FTL platform aims to be the best way to manage agent tools, but you are not locked in.
-- **Distribute and compose your tools like tiny docker images**: Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
+- **Security by Default**: Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/). MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization). Plug in your own OIDC provider via simple configuration, or use FTL's by default.
+- **Multiple source languages within one MCP server**: Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
+- **Run anywhere**: Run your FTL-based tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other WASI-compatible runtimes. The FTL platform aims to be the best way to manage agent tools, but you are not locked in.
+- **Distribute and compose tools like tiny docker images**: Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 - **Standards-based implementation**: Tools are built on and compatible with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
 
-You and your agent want to extend its capabilities. You want to go from idea to execution as quickly and easily as possible. And you don't want to have to figure out performance, scalability, security, and distribution from scratch. You want one direct, end-to-end answer to the question of "How does my agent do something new?" that goes beyond being a connector hub for third party apps.
+You want one direct, end-to-end answer to the question of "How do I give my agent new computational capabilities?" that goes beyond being a connector hub for third party apps. And you don't want to have to figure out performance, scalability, security, and distribution from scratch. You want to think about tools and the agents that use them.
 
 ## Quick Start
 
