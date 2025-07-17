@@ -4,13 +4,12 @@ use console::{Emoji, style};
 use dialoguer::Confirm;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::time::Duration;
 use tokio::time::interval;
 
-const DEFAULT_CLIENT_ID: &str = "client_01JZM53FW3WYV08AFC4QWQ3BNB";
-const DEFAULT_AUTHKIT_DOMAIN: &str = "auth.ftl.tools";
-const LOGIN_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
+const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
+const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
+const LOGIN_TIMEOUT: Duration = Duration::from_secs(60 * 30); // 30 minutes
 static CHECK: Emoji<'_, '_> = Emoji("✅", "");
 static GLOBE: Emoji<'_, '_> = Emoji("🌐", "");
 
@@ -50,28 +49,12 @@ pub struct StoredCredentials {
     pub authkit_domain: String,
 }
 
-fn get_authkit_domain() -> String {
-    // First check runtime env var
-    if let Ok(domain) = env::var("FTL_AUTHKIT_DOMAIN") {
-        return domain;
-    }
-
-    // Then check compile-time env var
-    option_env!("FTL_AUTHKIT_DOMAIN")
-        .unwrap_or(DEFAULT_AUTHKIT_DOMAIN)
-        .to_string()
+fn get_authkit_domain() -> &'static str {
+    AUTHKIT_DOMAIN
 }
 
-fn get_client_id() -> String {
-    // First check runtime env var
-    if let Ok(client_id) = env::var("FTL_CLIENT_ID") {
-        return client_id;
-    }
-
-    // Then check compile-time env var
-    option_env!("FTL_CLIENT_ID")
-        .unwrap_or(DEFAULT_CLIENT_ID)
-        .to_string()
+fn get_client_id() -> &'static str {
+    CLIENT_ID
 }
 
 pub async fn execute(no_browser: bool) -> Result<()> {
