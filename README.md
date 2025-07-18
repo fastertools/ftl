@@ -22,7 +22,7 @@ FTL is an open source framework and edge hosting platform for tools that extend 
 MCP is minimal. Tools are straightforward. Writing and running them should be too. Performance and security should be a given.
 
 <details>
-<summary><strong>⤵ Flexible deployment targets / Sub-millisecond cold starts on global edge compute</strong></summary>
+<summary><strong>⤵ Sub-millisecond cold starts on global edge compute + Flexible deployment targets</strong></summary>
 
 Run FTL tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other [WASI](https://wasi.dev/)-compatible runtimes.
 
