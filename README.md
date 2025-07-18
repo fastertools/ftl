@@ -187,8 +187,8 @@ graph TB
     subgraph "FTL Application" 
         subgraph "Spin Runtime"
             subgraph "Gateway Components"
-                AuthGateway["Auth Gateway<br/>(Authentication + Authorization)"]
-                MCPGateway["MCP Gateway<br/>(Handle protocol, routing, validation)"]
+                AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
+                MCPGateway["MCP Gateway<br/>(Protocol, routing, validation)"]
             end
             
             subgraph "Tool Components"
