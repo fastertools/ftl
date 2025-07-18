@@ -19,6 +19,8 @@ FTL is an open source framework and edge hosting platform for tools accessed by 
 
 ## Why?
 
+MCP is simple. Tools are simple. Writing and running them should be too. Performance and security should be a given.
+
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute</strong></summary>
 
@@ -217,10 +219,11 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Wasm components are composed onto a worker as a single horizontally scalable unit.
 - Each tool runs as a separate WebAssembly component in its own sandbox.
 - The FTL gateway components handle protocol complexity, auth, and tool component routing.
-- Cross-component calls happen in memory with no network latency.
+- Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
+- Workers automatically scale horizontally to meet demand, can cold start < 1ms, and scale down to zero.
+- Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
 
 ## Contributing
 
