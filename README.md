@@ -188,7 +188,7 @@ graph TB
         subgraph "Spin Runtime"
             subgraph "Gateway Components"
                 AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
-                MCPGateway["MCP Gateway<br/>(Protocol, routing, validation)"]
+                MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
             end
             
             subgraph "Tool Components"
