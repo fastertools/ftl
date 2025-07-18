@@ -181,8 +181,12 @@ addEventListener('fetch', (event: FetchEvent) => {
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        Agent["MCP Client<br/>(Claude Code, Cursor, OpenAI Responses API)"]
+        ClaudeCode["Claude Code"]
+        Cursor["Cursor"]
+        OpenAI["OpenAI<br/>Responses API"]
     end
+    
+    MCP["MCP Protocol<br/>(JSON-RPC over HTTPS)"]
     
     subgraph "FTL Application" 
         subgraph "Spin Runtime"
@@ -200,7 +204,10 @@ graph TB
         end
     end
     
-    Agent -.->|"MCP Protocol<br/>(JSON-RPC over HTTPS)"| AuthGateway
+    ClaudeCode -.->| | MCP
+    Cursor -.->| | MCP
+    OpenAI -.->| | MCP
+    MCP -.->| | AuthGateway
     AuthGateway -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
     MCPGateway -.->|"In-memory call"| GitHub
