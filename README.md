@@ -22,12 +22,16 @@ FTL is an open source framework and edge hosting platform for tools that extend 
 MCP is minimal. Tools are straightforward. Writing and running them should be too. Performance and security should be a given.
 
 <details>
-<summary><strong>⤵ Sub-millisecond cold starts on global edge compute</strong></summary>
+<summary><strong>⤵ Flexible deployment targets / Sub-millisecond cold starts on global edge compute</strong></summary>
 
-FTL tools run best on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
+Run FTL tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other [WASI](https://wasi.dev/)-compatible runtimes.
+
+The FTL Platform aims to be the best way to host your tools. It runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
+
+See [ftl-mcp](https://github.com/fastertools/ftl-mcp) if you want to directly use, contribute to, or fork individual FTL components.
 </details>
 
 <details>
@@ -40,14 +44,6 @@ Tools run as individual WebAssembly components to provide sandboxed tool executi
 <summary><strong>⤵ Use multiple source languages within one MCP server</strong></summary>
 
 Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
-</details>
-
-<details>
-<summary><strong>⤵ Run anywhere</strong></summary>
-
-Run your FTL-based tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other [WASI](https://wasi.dev/)-compatible runtimes. The FTL platform aims to be the best way to manage agent tools, but you are not locked in.
-
-See [ftl-mcp](https://github.com/fastertools/ftl-mcp) if you want to directly use, contribute to, or fork individual FTL components.
 </details>
 
 <details>
