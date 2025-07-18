@@ -184,20 +184,24 @@ graph TB
         OpenAI["OpenAI<br/>Responses API"]
     end
     
-    MCP["MCP Protocol<br/>(JSON-RPC over HTTPS)"]
+    MCP["Model Context Protocol<br/>(Streamable HTTP)"]
     
-    subgraph "FTL Application" 
-        subgraph "Spin Runtime"
-            subgraph "Gateway Components"
-                AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
-                MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
-            end
-            
-            subgraph "Tool Components"
-                Weather["Weather Tool<br/>(TypeScript)"]
-                GitHub["GitHub Tool<br/>(Rust)"]
-                Database["Database Tool<br/>(JavaScript)"]
-                Custom["Custom Tool<br/>(Another Language)"]
+    subgraph "Akamai Edge Worker"
+        subgraph "Fermyon Wasm Function"
+            subgraph "Spin/Wasmtime Runtime"
+                subgraph "FTL Application"
+                    subgraph "Gateway Components"
+                        AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
+                        MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
+                    end
+                    
+                    subgraph "Tool Components"
+                        Weather["Weather Tool<br/>(TypeScript)"]
+                        GitHub["GitHub Tool<br/>(Rust)"]
+                        Database["Database Tool<br/>(JavaScript)"]
+                        Custom["Custom Tool<br/>(Another Language)"]
+                    end
+                end
             end
         end
     end
