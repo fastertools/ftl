@@ -128,11 +128,7 @@ enum Command {
     },
 
     /// Deploy the project to FTL
-    Deploy {
-        /// Environment to deploy to
-        #[arg(short, long)]
-        environment: Option<String>,
-    },
+    Deploy,
 
     /// Interact with MCP tool registries
     Registry {
@@ -282,7 +278,7 @@ async fn main() -> Result<()> {
             tag,
             path,
         } => commands::publish::execute(path, registry, tag).await,
-        Command::Deploy { environment } => commands::deploy::execute(environment).await,
+        Command::Deploy => commands::deploy::execute().await,
         Command::Registry { command } => match command {
             RegistryCommand::List { registry } => commands::registry::list(registry).await,
             RegistryCommand::Search { query, registry } => {

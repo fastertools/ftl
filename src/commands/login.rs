@@ -4,13 +4,12 @@ use console::{Emoji, style};
 use dialoguer::Confirm;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::time::Duration;
 use tokio::time::interval;
 
-const DEFAULT_CLIENT_ID: &str = "client_01JZM53FW3WYV08AFC4QWQ3BNB";
-const DEFAULT_AUTHKIT_DOMAIN: &str = "auth.ftl.tools";
-const LOGIN_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
+const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
+const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
+const LOGIN_TIMEOUT: Duration = Duration::from_secs(60 * 30); // 30 minutes
 static CHECK: Emoji<'_, '_> = Emoji("✅", "");
 static GLOBE: Emoji<'_, '_> = Emoji("🌐", "");
 
@@ -50,28 +49,12 @@ pub struct StoredCredentials {
     pub authkit_domain: String,
 }
 
-fn get_authkit_domain() -> String {
-    // First check runtime env var
-    if let Ok(domain) = env::var("FTL_AUTHKIT_DOMAIN") {
-        return domain;
-    }
-
-    // Then check compile-time env var
-    option_env!("FTL_AUTHKIT_DOMAIN")
-        .unwrap_or(DEFAULT_AUTHKIT_DOMAIN)
-        .to_string()
+fn get_authkit_domain() -> &'static str {
+    AUTHKIT_DOMAIN
 }
 
-fn get_client_id() -> String {
-    // First check runtime env var
-    if let Ok(client_id) = env::var("FTL_CLIENT_ID") {
-        return client_id;
-    }
-
-    // Then check compile-time env var
-    option_env!("FTL_CLIENT_ID")
-        .unwrap_or(DEFAULT_CLIENT_ID)
-        .to_string()
+fn get_client_id() -> &'static str {
+    CLIENT_ID
 }
 
 pub async fn execute(no_browser: bool) -> Result<()> {
@@ -85,7 +68,7 @@ pub async fn execute(no_browser: bool) -> Result<()> {
     println!();
 
     // Request device authorization
-    let auth_response = request_device_authorization(&authkit_domain).await?;
+    let auth_response = request_device_authorization(authkit_domain).await?;
 
     // Display login instructions
     println!();
@@ -111,14 +94,14 @@ pub async fn execute(no_browser: bool) -> Result<()> {
 
     // Poll for token
     let token_response = poll_for_token(
-        &authkit_domain,
+        authkit_domain,
         &auth_response.device_code,
         auth_response.interval.unwrap_or(5),
     )
     .await?;
 
     // Store credentials
-    store_credentials(&authkit_domain, &token_response)?;
+    store_credentials(authkit_domain, &token_response)?;
 
     println!();
     println!(
@@ -140,7 +123,7 @@ async fn request_device_authorization(authkit_domain: &str) -> Result<DeviceAuth
         .post(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(format!(
-            "client_id={client_id}&scope=openid%20email%20profile"
+            "client_id={client_id}&scope=openid%20email%20profile%20offline_access"
         ))
         .send()
         .await
@@ -260,6 +243,88 @@ pub fn get_stored_credentials() -> Result<StoredCredentials> {
     let json = entry.get_password()?;
     let credentials: StoredCredentials = serde_json::from_str(&json)?;
     Ok(credentials)
+}
+
+pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
+    let entry = keyring::Entry::new("ftl-cli", "default")?;
+    let json = entry.get_password()?;
+    let mut credentials: StoredCredentials = serde_json::from_str(&json)?;
+
+    // Check if token is expired or about to expire (within 30 seconds)
+    if let Some(expires_at) = credentials.expires_at {
+        let now = Utc::now();
+        let buffer = chrono::Duration::seconds(30);
+
+        if expires_at < now + buffer {
+            // Token is expired or about to expire, try to refresh
+            if let Some(refresh_token) = credentials.refresh_token.clone() {
+                match refresh_access_token(&credentials.authkit_domain, &refresh_token).await {
+                    Ok(new_tokens) => {
+                        // Update credentials with new tokens
+                        credentials.access_token = new_tokens.access_token;
+                        credentials.expires_at = new_tokens
+                            .expires_in
+                            .map(|expires_in| now + chrono::Duration::seconds(expires_in as i64));
+
+                        // Update refresh token if a new one was provided
+                        if let Some(new_refresh) = new_tokens.refresh_token {
+                            credentials.refresh_token = Some(new_refresh);
+                        }
+
+                        // Save updated credentials
+                        let updated_json = serde_json::to_string(&credentials)?;
+                        entry.set_password(&updated_json)?;
+
+                        return Ok(credentials);
+                    }
+                    Err(e) => {
+                        // Refresh failed, user needs to re-authenticate
+                        return Err(anyhow!(
+                            "Token refresh failed: {}. Please run 'ftl login' again.",
+                            e
+                        ));
+                    }
+                }
+            } else {
+                return Err(anyhow!(
+                    "Authentication token has expired and no refresh token available. Please run 'ftl login' again."
+                ));
+            }
+        }
+    }
+
+    Ok(credentials)
+}
+
+async fn refresh_access_token(authkit_domain: &str, refresh_token: &str) -> Result<TokenResponse> {
+    let client = reqwest::Client::new();
+    let url = format!("https://{authkit_domain}/oauth2/token");
+    let client_id = get_client_id();
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(format!(
+            "grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}"
+        ))
+        .send()
+        .await
+        .context("Failed to send refresh token request")?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response.text().await?;
+        return Err(anyhow!(
+            "Token refresh failed with status {}: {}",
+            status,
+            error_text
+        ));
+    }
+
+    response
+        .json::<TokenResponse>()
+        .await
+        .context("Failed to parse refresh token response")
 }
 
 pub fn clear_stored_credentials() -> Result<()> {

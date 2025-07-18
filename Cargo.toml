@@ -53,6 +53,7 @@ zip = "2.2"
 webbrowser = "1.0"
 keyring = { version = "3.0", features = ["apple-native", "windows-native", "sync-secret-service"] }
 chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
 
 [build-dependencies]
 toml = "0.8"
