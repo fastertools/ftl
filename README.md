@@ -178,10 +178,10 @@ addEventListener('fetch', (event: FetchEvent) => {
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        ClaudeCode["Claude Code"]
-        Cursor["Cursor"]
-        OpenAI["OpenAI<br/>Responses API"]
+    subgraph "MCP Clients"
+        Desktops["Cursor, Claude"]
+        Agents["LangGraph, Mastra, ADK, OpenAI Responses API"]
+        Realtime["11.ai, LiveKit, Pipecat"]
     end
     
     MCP["Model Context Protocol<br/>(Streamable HTTP)"]
@@ -190,7 +190,7 @@ graph TB
         subgraph "Fermyon Wasm Function"
             subgraph "Spin/Wasmtime Runtime"
                 subgraph "FTL Application"
-                    subgraph "Gateway Components"
+                    subgraph "FTL Gateway Components"
                         AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
                         MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
                     end
@@ -206,9 +206,9 @@ graph TB
         end
     end
     
-    ClaudeCode -.->| | MCP
-    Cursor -.->| | MCP
-    OpenAI -.->| | MCP
+    Desktops -.->| | MCP
+    Agents -.->| | MCP
+    Realtime -.->| | MCP
     MCP -.->| | AuthGateway
     AuthGateway -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
@@ -217,6 +217,7 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
+- Wasm components are composed onto a worker as a single horizontally scalable unit.
 - Each tool runs as a separate WebAssembly component in its own sandbox.
 - The FTL gateway components handle protocol complexity, auth, and tool component routing.
 - Cross-component calls happen in memory with no network latency.
