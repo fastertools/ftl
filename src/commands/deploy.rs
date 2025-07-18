@@ -13,20 +13,32 @@ use toml::Value;
 use crate::common::spin_installer::check_and_install_spin;
 use crate::commands::login::get_stored_credentials;
 
+#[derive(Debug, Serialize)]
+struct CreateRepositoryRequest {
+    #[serde(rename = "toolName")]
+    tool_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateRepositoryResponse {
+    #[serde(rename = "repositoryUri")]
+    repository_uri: String,
+    #[serde(rename = "repositoryName")]
+    #[allow(dead_code)]
+    repository_name: String,
+    #[serde(rename = "alreadyExists")]
+    already_exists: bool,
+}
+
 #[derive(Debug, Deserialize)]
 struct EcrCredentialsResponse {
-    #[serde(rename = "repositoryUri")]
-    registry_url: String,
+    #[serde(rename = "registryUri")]
+    registry_uri: String,
     #[serde(rename = "authorizationToken")]
-    token: String,
-    #[serde(rename = "proxyEndpoint")]
-    #[allow(dead_code)]
-    proxy_endpoint: Option<String>,
+    authorization_token: String,
     #[serde(rename = "expiresAt")]
     #[allow(dead_code)]
-    expires_at: Option<String>,
-    #[allow(dead_code)]
-    region: Option<String>,
+    expires_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -106,9 +118,9 @@ pub async fn execute() -> Result<()> {
     // Docker login to ECR
     docker_login(&ecr_creds).await?;
 
-    // Push components to ECR
-    println!("{} Pushing components to registry...", style("→").dim());
-    let deployed_tools = push_components_to_ecr(&components, &ecr_creds).await?;
+    // Create repositories and push components to ECR
+    println!("{} Creating repositories and pushing components...", style("→").dim());
+    let deployed_tools = create_repositories_and_push(&components, &ecr_creds, &credentials.access_token).await?;
 
     // Deploy to FTL
     println!("{} Deploying to FTL...", style("→").dim());
@@ -263,7 +275,7 @@ async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsRespons
 async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
     // ECR authorization tokens are base64 encoded "AWS:password"
     // We need to extract just the password part
-    let decoded = general_purpose::STANDARD.decode(&ecr_creds.token)
+    let decoded = general_purpose::STANDARD.decode(&ecr_creds.authorization_token)
         .context("Failed to decode ECR authorization token")?;
     let auth_string = String::from_utf8(decoded)
         .context("Invalid UTF-8 in authorization token")?;
@@ -273,12 +285,8 @@ async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
         .strip_prefix("AWS:")
         .ok_or_else(|| anyhow!("Invalid ECR token format"))?;
     
-    // Extract registry endpoint from repository URI
-    // Format: 123456789012.dkr.ecr.us-east-1.amazonaws.com/users/userId
-    let registry_endpoint = ecr_creds.registry_url
-        .split('/')
-        .next()
-        .ok_or_else(|| anyhow!("Invalid repository URI format"))?;
+    // Use the registry URI directly
+    let registry_endpoint = &ecr_creds.registry_uri;
     
     let mut cmd = Command::new("docker");
     cmd.args(&["login", "--username", "AWS", "--password-stdin", registry_endpoint]);
@@ -301,16 +309,75 @@ async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
     Ok(())
 }
 
-async fn push_components_to_ecr(
+async fn create_repository(access_token: &str, tool_name: &str) -> Result<CreateRepositoryResponse> {
+    let client = reqwest::Client::new();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
+    );
+    
+    let api_url = std::env::var("FTL_API_URL")
+        .unwrap_or_else(|_| "https://api.ftl.dev".to_string());
+    
+    let request_body = CreateRepositoryRequest {
+        tool_name: tool_name.to_string(),
+    };
+    
+    let response = client
+        .post(&format!("{}/v1/registry/repositories", api_url))
+        .headers(headers)
+        .json(&request_body)
+        .send()
+        .await
+        .context("Failed to create ECR repository")?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await?;
+        return Err(anyhow!(
+            "Failed to create ECR repository (HTTP {}): {}",
+            status.as_u16(),
+            error_text
+        ));
+    }
+    
+    response
+        .json::<CreateRepositoryResponse>()
+        .await
+        .context("Failed to parse create repository response")
+}
+
+async fn create_repositories_and_push(
     components: &[ComponentInfo],
-    ecr_creds: &EcrCredentialsResponse,
+    _ecr_creds: &EcrCredentialsResponse,
+    access_token: &str,
 ) -> Result<Vec<DeploymentTool>> {
     let mut deployed_tools = Vec::new();
     
-    // Extract user ID from registry URL (format: xxx.dkr.ecr.region.amazonaws.com/users/userId)
-    let registry_base = &ecr_creds.registry_url;
-    
     for component in components {
+        // Create repository for this component
+        println!(
+            "  {} Creating repository for {}...",
+            style("→").dim(),
+            component.name
+        );
+        
+        let repo_response = create_repository(access_token, &component.name).await?;
+        
+        if repo_response.already_exists {
+            println!(
+                "    {} Repository already exists",
+                style("✓").green()
+            );
+        } else {
+            println!(
+                "    {} Repository created",
+                style("✓").green()
+            );
+        }
+        
+        // Push component
         println!(
             "  {} Pushing {} (v{})...",
             style("→").dim(),
@@ -323,7 +390,7 @@ async fn push_components_to_ecr(
             .context("wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools")?;
         
         // Push with version tag
-        let versioned_tag = format!("{}:{}", registry_base, component.version);
+        let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
         let mut push_cmd = Command::new("wkg");
         push_cmd.args(&["oci", "push", &versioned_tag, &component.source_path]);
         
@@ -339,7 +406,7 @@ async fn push_components_to_ecr(
         }
         
         // Also push as latest
-        let latest_tag = format!("{}:latest", registry_base);
+        let latest_tag = format!("{}:latest", repo_response.repository_uri);
         let mut push_latest = Command::new("wkg");
         push_latest.args(&["oci", "push", &latest_tag, &component.source_path]);
         push_latest.output()?;
