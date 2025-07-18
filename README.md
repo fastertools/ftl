@@ -202,10 +202,10 @@ graph TB
     
     Agent -.->|"MCP Protocol<br/>(JSON-RPC over HTTPS)"| AuthGateway
     AuthGateway -.->|"Authorized requests (in-memory call)"| MCPGateway
-    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Weather
-    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| GitHub
-    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Database
-    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Custom
+    MCPGateway -.->|"In-memory call"| Weather
+    MCPGateway -.->|"In-memory call"| GitHub
+    MCPGateway -.->|"In-memory call"| Database
+    MCPGateway -.->|"In-memory call"| Custom
 ```
 
 - Each tool is a separate WebAssembly component with its own sandbox
