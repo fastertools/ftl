@@ -216,7 +216,6 @@ graph TB
 - Each tool runs as a separate WebAssembly component in its own sandbox.
 - The FTL gateway components handle protocol complexity, auth, and tool component routing.
 - Cross-component calls happen in memory with no network latency.
-- Tools are automatically deployed across the global network edge via Akamai for minimal latency.
 
 ## Contributing
 
