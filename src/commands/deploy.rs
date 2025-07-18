@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
-use crate::common::spin_installer::check_and_install_spin;
 use crate::commands::login::get_or_refresh_credentials;
+use crate::common::spin_installer::check_and_install_spin;
 
 const FTL_API_URL: &str = "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com";
 
@@ -120,7 +120,11 @@ struct ComponentInfo {
 }
 
 pub async fn execute() -> Result<()> {
-    println!("{} {} Deploying project", style("▶").cyan(), style("FTL").bold());
+    println!(
+        "{} {} Deploying project",
+        style("▶").cyan(),
+        style("FTL").bold()
+    );
     println!();
 
     // Check if we're in a Spin project directory
@@ -134,7 +138,7 @@ pub async fn execute() -> Result<()> {
         ProgressStyle::default_bar()
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}% {msg}")
             .unwrap()
-            .progress_chars("█▓▒░")
+            .progress_chars("█▓▒░"),
     );
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
@@ -167,7 +171,9 @@ pub async fn execute() -> Result<()> {
         Err(e) => {
             pb.finish_and_clear();
             if e.to_string().contains("expired") {
-                anyhow::bail!("Authentication token has expired. Please run 'ftl login' to re-authenticate.");
+                anyhow::bail!(
+                    "Authentication token has expired. Please run 'ftl login' to re-authenticate."
+                );
             } else {
                 anyhow::bail!("Not logged in to FTL. Run 'ftl login' first.");
             }
@@ -196,26 +202,32 @@ pub async fn execute() -> Result<()> {
     // Create repositories and push components to ECR
     pb.set_position(40);
     pb.set_message("Pushing components...");
-    let deployed_tools = create_repositories_and_push_with_progress(&components, &ecr_creds, &credentials.access_token, &pb).await?;
+    let deployed_tools = create_repositories_and_push_with_progress(
+        &components,
+        &ecr_creds,
+        &credentials.access_token,
+        &pb,
+    )
+    .await?;
 
     // Deploy to FTL
     pb.set_position(70);
     pb.set_message("Starting deployment...");
     let app_name = get_app_name()?;
-    let deployment = deploy_to_ftl_with_progress(
-        &credentials.access_token,
-        app_name,
-        deployed_tools,
-        pb,
-    )
-    .await?;
+    let deployment =
+        deploy_to_ftl_with_progress(&credentials.access_token, app_name, deployed_tools, pb)
+            .await?;
 
     // Display results
     println!();
     println!("{} Deployment successful!", style("✓").green().bold());
     if let Some(deployment_url) = deployment.deployment_url {
         println!();
-        println!("  {} {}", style("MCP URL:").bold(), style(deployment_url).cyan().underlined());
+        println!(
+            "  {} {}",
+            style("MCP URL:").bold(),
+            style(deployment_url).cyan().underlined()
+        );
         println!();
     }
 
@@ -223,13 +235,11 @@ pub async fn execute() -> Result<()> {
 }
 
 fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
-    let content = std::fs::read_to_string("spin.toml")
-        .context("Failed to read spin.toml")?;
-    let toml: Value = content.parse()
-        .context("Failed to parse spin.toml")?;
-    
+    let content = std::fs::read_to_string("spin.toml").context("Failed to read spin.toml")?;
+    let toml: Value = content.parse().context("Failed to parse spin.toml")?;
+
     let mut components = Vec::new();
-    
+
     // Look for components that are local files (not from registry)
     if let Some(components_table) = toml.get("component").and_then(|c| c.as_table()) {
         for (name, component) in components_table {
@@ -239,8 +249,8 @@ fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
                     // Skip if it's a system component (from registry)
                     if !source_path.contains("ghcr.io") && source_path.ends_with(".wasm") {
                         // Try to extract version from Cargo.toml or package.json
-                        let version = extract_component_version(name, &source_path)?;
-                        
+                        let version = extract_component_version(name, source_path)?;
+
                         // Extract allowed_outbound_hosts if present
                         let allowed_hosts = component
                             .get("allowed_outbound_hosts")
@@ -251,7 +261,7 @@ fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
                                     .map(|s| s.to_string())
                                     .collect()
                             });
-                        
+
                         components.push(ComponentInfo {
                             name: name.clone(),
                             source_path: source_path.to_string(),
@@ -263,7 +273,7 @@ fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
             }
         }
     }
-    
+
     Ok(components)
 }
 
@@ -277,7 +287,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
     } else {
         PathBuf::from(".")
     };
-    
+
     // Try Cargo.toml first
     let cargo_path = component_dir.join("Cargo.toml");
     if cargo_path.exists() {
@@ -291,7 +301,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
             return Ok(version.to_string());
         }
     }
-    
+
     // Try package.json
     let package_path = component_dir.join("package.json");
     if package_path.exists() {
@@ -301,7 +311,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
             return Ok(version.to_string());
         }
     }
-    
+
     // Default to 0.1.0 if no version found
     Ok("0.1.0".to_string())
 }
@@ -309,7 +319,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
 fn get_app_name() -> Result<String> {
     let content = std::fs::read_to_string("spin.toml")?;
     let toml: Value = content.parse()?;
-    
+
     toml.get("application")
         .and_then(|app| app.get("name"))
         .and_then(|name| name.as_str())
@@ -322,17 +332,16 @@ async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsRespons
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
+        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
     );
-    
-    
+
     let response = client
-        .post(&format!("{}/v1/registry/credentials", FTL_API_URL))
+        .post(format!("{FTL_API_URL}/v1/registry/credentials"))
         .headers(headers)
         .send()
         .await
         .context("Failed to get ECR credentials")?;
-    
+
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await?;
@@ -342,7 +351,7 @@ async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsRespons
             error_text
         ));
     }
-    
+
     response
         .json::<EcrCredentialsResponse>()
         .await
@@ -352,63 +361,70 @@ async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsRespons
 async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
     // ECR authorization tokens are base64 encoded "AWS:password"
     // We need to extract just the password part
-    let decoded = general_purpose::STANDARD.decode(&ecr_creds.authorization_token)
+    let decoded = general_purpose::STANDARD
+        .decode(&ecr_creds.authorization_token)
         .context("Failed to decode ECR authorization token")?;
-    let auth_string = String::from_utf8(decoded)
-        .context("Invalid UTF-8 in authorization token")?;
-    
+    let auth_string = String::from_utf8(decoded).context("Invalid UTF-8 in authorization token")?;
+
     // Extract password after "AWS:"
     let password = auth_string
         .strip_prefix("AWS:")
         .ok_or_else(|| anyhow!("Invalid ECR token format"))?;
-    
+
     // Use the registry URI directly
     let registry_endpoint = &ecr_creds.registry_uri;
-    
+
     let mut cmd = Command::new("docker");
-    cmd.args(&["login", "--username", "AWS", "--password-stdin", registry_endpoint]);
+    cmd.args([
+        "login",
+        "--username",
+        "AWS",
+        "--password-stdin",
+        registry_endpoint,
+    ]);
     cmd.stdin(std::process::Stdio::piped());
     cmd.stdout(std::process::Stdio::null());
     cmd.stderr(std::process::Stdio::null());
-    
-    let mut child = cmd.spawn()
-        .context("Failed to start docker login")?;
-    
+
+    let mut child = cmd.spawn().context("Failed to start docker login")?;
+
     // Write password to stdin
     if let Some(stdin) = child.stdin.as_mut() {
         use std::io::Write;
         stdin.write_all(password.as_bytes())?;
     }
-    
+
     let status = child.wait()?;
     if !status.success() {
         return Err(anyhow!("Docker login failed"));
     }
-    
+
     Ok(())
 }
 
-async fn create_repository(access_token: &str, tool_name: &str) -> Result<CreateRepositoryResponse> {
+async fn create_repository(
+    access_token: &str,
+    tool_name: &str,
+) -> Result<CreateRepositoryResponse> {
     let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
+        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
     );
-    
-    
+
     let request_body = CreateRepositoryRequest {
         tool_name: tool_name.to_string(),
     };
-    
+
     let response = client
-        .post(&format!("{}/v1/registry/repositories", FTL_API_URL))
+        .post(format!("{FTL_API_URL}/v1/registry/repositories"))
         .headers(headers)
         .json(&request_body)
         .send()
         .await
         .context("Failed to create ECR repository")?;
-    
+
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await?;
@@ -418,7 +434,7 @@ async fn create_repository(access_token: &str, tool_name: &str) -> Result<Create
             error_text
         ));
     }
-    
+
     response
         .json::<CreateRepositoryResponse>()
         .await
@@ -433,30 +449,35 @@ async fn create_repositories_and_push_with_progress(
 ) -> Result<Vec<DeploymentTool>> {
     let mut deployed_tools = Vec::new();
     let total_components = components.len();
-    
+
     for (idx, component) in components.iter().enumerate() {
         // Update progress
         let progress = 40 + (30 * idx / total_components) as u64;
         pb.set_position(progress);
-        pb.set_message(format!("Pushing {} v{}...", component.name, component.version));
-        
+        pb.set_message(format!(
+            "Pushing {} v{}...",
+            component.name, component.version
+        ));
+
         // Create repository for this component
         let repo_response = create_repository(access_token, &component.name).await?;
-        
+
         // Check if wkg is available
-        which::which("wkg")
-            .context("wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools")?;
-        
+        which::which("wkg").context(
+            "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
+        )?;
+
         // Push with version tag
         let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
         let mut push_cmd = Command::new("wkg");
-        push_cmd.args(&["oci", "push", &versioned_tag, &component.source_path]);
+        push_cmd.args(["oci", "push", &versioned_tag, &component.source_path]);
         push_cmd.stdout(std::process::Stdio::null());
         push_cmd.stderr(std::process::Stdio::piped());
-        
-        let output = push_cmd.output()
+
+        let output = push_cmd
+            .output()
             .context("Failed to push component with wkg")?;
-        
+
         if !output.status.success() {
             pb.finish_and_clear();
             return Err(anyhow!(
@@ -465,22 +486,22 @@ async fn create_repositories_and_push_with_progress(
                 String::from_utf8_lossy(&output.stderr)
             ));
         }
-        
+
         // Also push as latest
         let latest_tag = format!("{}:latest", repo_response.repository_uri);
         let mut push_latest = Command::new("wkg");
-        push_latest.args(&["oci", "push", &latest_tag, &component.source_path]);
+        push_latest.args(["oci", "push", &latest_tag, &component.source_path]);
         push_latest.stdout(std::process::Stdio::null());
         push_latest.stderr(std::process::Stdio::null());
         push_latest.output()?;
-        
+
         deployed_tools.push(DeploymentTool {
             name: component.name.clone(),
             tag: component.version.clone(),
             allowed_hosts: component.allowed_hosts.clone(),
         });
     }
-    
+
     Ok(deployed_tools)
 }
 
@@ -493,33 +514,33 @@ async fn poll_deployment_status_with_progress(
 ) -> Result<DeploymentDetails> {
     let max_attempts = 60; // 5 minutes with 5-second intervals
     let mut attempts = 0;
-    
+
     loop {
         if attempts >= max_attempts {
             pb.finish_and_clear();
             return Err(anyhow!("Deployment timeout after 5 minutes"));
         }
-        
+
         let response = client
             .get(status_url)
             .headers(headers.clone())
             .send()
             .await
             .context("Failed to check deployment status")?;
-        
+
         if !response.status().is_success() {
             pb.finish_and_clear();
             let error_text = response.text().await?;
             return Err(anyhow!("Failed to get deployment status: {}", error_text));
         }
-        
+
         let status_response: DeploymentStatusResponse = response
             .json()
             .await
             .context("Failed to parse deployment status")?;
-        
+
         let deployment = status_response.deployment;
-        
+
         // Update progress based on status
         let (progress, status_msg) = match deployment.status.as_str() {
             "INITIALIZING" => (75, "Initializing deployment...".to_string()),
@@ -528,16 +549,18 @@ async fn poll_deployment_status_with_progress(
             "AUTHENTICATING" => (90, "Authenticating with registries...".to_string()),
             "DEPLOYING" => (95, "Finalizing deployment...".to_string()),
             _status => {
-                let msg = deployment.status_message.as_deref()
+                let msg = deployment
+                    .status_message
+                    .as_deref()
                     .unwrap_or("Processing...")
                     .to_string();
                 (pb.position().min(95), msg)
             }
         };
-        
+
         pb.set_position(progress);
         pb.set_message(status_msg);
-        
+
         match deployment.status.as_str() {
             "COMPLETED" => {
                 pb.set_position(100);
@@ -548,7 +571,9 @@ async fn poll_deployment_status_with_progress(
             }
             "FAILED" => {
                 pb.finish_and_clear();
-                let error_msg = deployment.error_reason.as_deref()
+                let error_msg = deployment
+                    .error_reason
+                    .as_deref()
                     .or(deployment.status_message.as_deref())
                     .unwrap_or("Deployment failed")
                     .to_string();
@@ -573,47 +598,47 @@ async fn deploy_to_ftl_with_progress(
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
+        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
     );
-    
-    
+
     let request_body = DeploymentRequest {
         app_name,
         tools,
         variables: None,
     };
-    
+
     let response = client
-        .post(&format!("{}/v1/deployments", FTL_API_URL))
+        .post(format!("{FTL_API_URL}/v1/deployments"))
         .headers(headers.clone())
         .json(&request_body)
         .send()
         .await
         .context("Failed to start deployment")?;
-    
+
     if response.status() != 202 {
         pb.finish_and_clear();
         let error_text = response.text().await?;
         return Err(anyhow!("Failed to start deployment: {}", error_text));
     }
-    
+
     let start_response: StartDeploymentResponse = response
         .json()
         .await
         .context("Failed to parse deployment start response")?;
-    
+
     // Poll for deployment status
     let status_url = if start_response.status_url.starts_with("/") {
         format!("{}{}", FTL_API_URL, start_response.status_url)
     } else {
         start_response.status_url
     };
-    
+
     poll_deployment_status_with_progress(
         &client,
         headers,
         &status_url,
         &start_response.deployment_id,
         pb,
-    ).await
+    )
+    .await
 }

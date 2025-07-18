@@ -68,7 +68,7 @@ pub async fn execute(no_browser: bool) -> Result<()> {
     println!();
 
     // Request device authorization
-    let auth_response = request_device_authorization(&authkit_domain).await?;
+    let auth_response = request_device_authorization(authkit_domain).await?;
 
     // Display login instructions
     println!();
@@ -94,14 +94,14 @@ pub async fn execute(no_browser: bool) -> Result<()> {
 
     // Poll for token
     let token_response = poll_for_token(
-        &authkit_domain,
+        authkit_domain,
         &auth_response.device_code,
         auth_response.interval.unwrap_or(5),
     )
     .await?;
 
     // Store credentials
-    store_credentials(&authkit_domain, &token_response)?;
+    store_credentials(authkit_domain, &token_response)?;
 
     println!();
     println!(
@@ -249,12 +249,12 @@ pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
     let entry = keyring::Entry::new("ftl-cli", "default")?;
     let json = entry.get_password()?;
     let mut credentials: StoredCredentials = serde_json::from_str(&json)?;
-    
+
     // Check if token is expired or about to expire (within 30 seconds)
     if let Some(expires_at) = credentials.expires_at {
         let now = Utc::now();
         let buffer = chrono::Duration::seconds(30);
-        
+
         if expires_at < now + buffer {
             // Token is expired or about to expire, try to refresh
             if let Some(refresh_token) = credentials.refresh_token.clone() {
@@ -262,57 +262,65 @@ pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
                     Ok(new_tokens) => {
                         // Update credentials with new tokens
                         credentials.access_token = new_tokens.access_token;
-                        credentials.expires_at = new_tokens.expires_in
+                        credentials.expires_at = new_tokens
+                            .expires_in
                             .map(|expires_in| now + chrono::Duration::seconds(expires_in as i64));
-                        
+
                         // Update refresh token if a new one was provided
                         if let Some(new_refresh) = new_tokens.refresh_token {
                             credentials.refresh_token = Some(new_refresh);
                         }
-                        
+
                         // Save updated credentials
                         let updated_json = serde_json::to_string(&credentials)?;
                         entry.set_password(&updated_json)?;
-                        
+
                         return Ok(credentials);
                     }
                     Err(e) => {
                         // Refresh failed, user needs to re-authenticate
-                        return Err(anyhow!("Token refresh failed: {}. Please run 'ftl login' again.", e));
+                        return Err(anyhow!(
+                            "Token refresh failed: {}. Please run 'ftl login' again.",
+                            e
+                        ));
                     }
                 }
             } else {
-                return Err(anyhow!("Authentication token has expired and no refresh token available. Please run 'ftl login' again."));
+                return Err(anyhow!(
+                    "Authentication token has expired and no refresh token available. Please run 'ftl login' again."
+                ));
             }
         }
     }
-    
+
     Ok(credentials)
 }
 
 async fn refresh_access_token(authkit_domain: &str, refresh_token: &str) -> Result<TokenResponse> {
     let client = reqwest::Client::new();
-    let url = format!("https://{}/oauth2/token", authkit_domain);
+    let url = format!("https://{authkit_domain}/oauth2/token");
     let client_id = get_client_id();
-    
+
     let response = client
         .post(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(format!(
-            "grant_type=refresh_token&refresh_token={}&client_id={}",
-            refresh_token, client_id
+            "grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}"
         ))
         .send()
         .await
         .context("Failed to send refresh token request")?;
-    
+
     let status = response.status();
     if !status.is_success() {
         let error_text = response.text().await?;
-        return Err(anyhow!("Token refresh failed with status {}: {}", 
-            status, error_text));
+        return Err(anyhow!(
+            "Token refresh failed with status {}: {}",
+            status,
+            error_text
+        ));
     }
-    
+
     response
         .json::<TokenResponse>()
         .await
