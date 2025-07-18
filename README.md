@@ -46,6 +46,8 @@ Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://comp
 <summary><strong>⤵ Run anywhere</strong></summary>
 
 Run your FTL-based tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other [WASI](https://wasi.dev/)-compatible runtimes. The FTL platform aims to be the best way to manage agent tools, but you are not locked in.
+
+See [ftl-mcp](https://github.com/fastertools/ftl-mcp) if you want to directly use, contribute to, or fork individual FTL components.
 </details>
 
 <details>
