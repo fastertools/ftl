@@ -69,19 +69,7 @@ The architecture consists of:
 - **Fast Iteration**: Hot reload with `ftl watch` for rapid development
 - **Easy Testing**: Built-in test runners for each language
 - **Simple Deployment**: One command to build and deploy
-
-### For AI Applications
-
-- **Composability**: Mix and match components from different sources
-- **Performance**: WebAssembly provides near-native execution speed
-- **Security**: Components run in isolated sandboxes
-- **Portability**: Deploy anywhere - edge, cloud, or on-premise
-
-### For Teams
-
 - **Component Distribution**: Share MCP components via OCI registries
-- **Independent Development**: Teams can work on components separately
-- **Unified Deployment**: Compose components into cohesive applications
 
 ## Getting Started
 

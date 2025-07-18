@@ -1,6 +1,6 @@
 [package]
 name = "ftl-cli"
-version = "0.0.21"
+version = "0.0.22"
 authors = ["FTL Contributors"]
 edition = "2024"
 license = "Apache-2.0"

@@ -15,6 +15,8 @@ Fast tools for AI agents
 
 FTL is an open source framework and [edge-powered](https://www.fermyon.com/wasm-functions) hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance [MCP](https://modelcontextprotocol.io) tools authored in a variety of source languages.
 
+⚡️ [Quick Start](#quick-start)
+
 ## Why?
 
 Remote MCP servers allow AI agents deployed anywhere to access tools that extend their capabilities. But when tools are called over the network, every execution comes with latency. For agents deployed in voice, video, and other real-time and performance sensitive applications, that latency adds up to impact the behavior of the whole system.
@@ -71,10 +73,20 @@ cargo install ftl-cli
 ftl setup templates
 
 # Create a new project
-ftl init my-project
+ftl init my-tools
+cd my-tools
 
-# Authenticate with FTL (see docs/authentication.md for details)
+# Add new tools
+ftl add
+
+# Serve your tools and test locally with your MCP client
+ftl up --build
+
+# Authenticate with FTL
 ftl login
+
+# Deploy
+ftl deploy
 ```
 
 ## Creating tools
@@ -179,32 +191,40 @@ ftl deploy
 
 ## Architecture
 
-FTL leverages the ftl-mcp framework and Spin platform to create a highly optimized MCP server runtime:
+The ftl-cli uses the [ftl-mcp](https://github.com/fastertools/ftl-mcp) framework and Spin platform to create a highly optimized MCP server runtime:
+
+## Architecture Overview
 
 ```mermaid
-graph LR
-    subgraph "AI Applications"
-        Client["MCP Client<br/>(Claude, GPT-4, etc.)"]
+graph TB
+    subgraph "Client Layer"
+        Agent["AI Agent<br/>(Claude, GPT-4, etc.)"]
     end
     
-    subgraph "FTL on Edge Network"
-        Gateway["MCP Gateway<br/>(Protocol Handler)"]
-        Weather["Weather Tool<br/>(TypeScript)"]
-        Calculator["Calculator Tool<br/>(Rust)"]
-        Database["Database Tool<br/>(TypeScript)"]
+    subgraph "FTL Application" 
+        subgraph "Spin Runtime"
+            Gateway["MCP Gateway<br/>(Protocol Handler)"]
+            
+            subgraph "Tool Components"
+                Weather["Weather Tool<br/>(TypeScript)"]
+                GitHub["GitHub Tool<br/>(Rust)"]
+                Database["Database Tool<br/>(JavaScript)"]
+                Custom["Custom Tool<br/>(Any Language)"]
+            end
+        end
     end
     
-    Client -->|"MCP Protocol<br/>(JSON-RPC)"| Gateway
-    Gateway -->|"Internal Router<br/>(No Network)"| Weather
-    Gateway -->|"Internal Router<br/>(No Network)"| Calculator  
-    Gateway -->|"Internal Router<br/>(No Network)"| Database
+    Agent -->|"MCP Protocol<br/>(JSON-RPC over HTTP)"| Gateway
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Weather
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| GitHub
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Database
+    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Custom
 ```
 
-**Key Architecture Points:**
 - Each tool is a separate WebAssembly component with its own sandbox
-- The MCP Gateway handles all protocol complexity and routing
-- Tools communicate via Spin's internal router (no network latency)
-- Deploy to edge locations globally for minimal latency to AI agents
+- The MCP Gateway handles all protocol complexity, routing, and auth
+- The gateway routes to tools via Spin's local service chaining (no network latency)
+- Deploys are automatically distributed across the global network edge via Akamai for minimal latency
 
 ## Contributing
 
