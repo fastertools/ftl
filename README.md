@@ -28,9 +28,7 @@ The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-f
 
 - Each tool runs as a separate WebAssembly component in its own sandbox.
 - The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
-- Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
-- Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
 </details>
 
 <details>
