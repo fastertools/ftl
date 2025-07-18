@@ -215,10 +215,10 @@ graph TB
     end
     
     Agent -->|"MCP Protocol<br/>(JSON-RPC over HTTP)"| Gateway
-    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Weather
-    Gateway -->|"Internal HTTP<br/>(spin.internal)"| GitHub
-    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Database
-    Gateway -->|"Internal HTTP<br/>(spin.internal)"| Custom
+    Gateway -->|"In-memory call<br/>(spin.internal)"| Weather
+    Gateway -->|"In-memory call<br/>(spin.internal)"| GitHub
+    Gateway -->|"In-memory call<br/>(spin.internal)"| Database
+    Gateway -->|"In-memory call<br/>(spin.internal)"| Custom
 ```
 
 - Each tool is a separate WebAssembly component with its own sandbox
