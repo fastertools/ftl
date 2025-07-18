@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use toml::Value;
 
 use crate::common::spin_installer::check_and_install_spin;
-use crate::commands::login::get_stored_credentials;
+use crate::commands::login::get_or_refresh_credentials;
+
+const FTL_API_URL: &str = "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com";
 
 #[derive(Debug, Serialize)]
 struct CreateRepositoryRequest {
@@ -27,6 +29,7 @@ struct CreateRepositoryResponse {
     #[allow(dead_code)]
     repository_name: String,
     #[serde(rename = "alreadyExists")]
+    #[allow(dead_code)]
     already_exists: bool,
 }
 
@@ -59,14 +62,54 @@ struct DeploymentTool {
 }
 
 #[derive(Debug, Deserialize)]
-struct DeploymentResponse {
-    #[allow(dead_code)]
+struct StartDeploymentResponse {
+    #[serde(rename = "deploymentId")]
     deployment_id: String,
     #[allow(dead_code)]
     status: String,
-    app_url: Option<String>,
     #[allow(dead_code)]
     message: Option<String>,
+    #[serde(rename = "buildId")]
+    #[allow(dead_code)]
+    build_id: Option<String>,
+    #[serde(rename = "statusUrl")]
+    status_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeploymentStatusResponse {
+    deployment: DeploymentDetails,
+    #[serde(rename = "buildStatus")]
+    #[allow(dead_code)]
+    build_status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeploymentDetails {
+    #[serde(rename = "deploymentId")]
+    #[allow(dead_code)]
+    deployment_id: String,
+    #[serde(rename = "appName")]
+    #[allow(dead_code)]
+    app_name: String,
+    status: String,
+    #[serde(rename = "statusMessage")]
+    status_message: Option<String>,
+    #[serde(rename = "deploymentUrl")]
+    deployment_url: Option<String>,
+    #[serde(rename = "errorReason")]
+    error_reason: Option<String>,
+    #[serde(rename = "createdAt")]
+    #[allow(dead_code)]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    #[allow(dead_code)]
+    updated_at: String,
+    #[serde(rename = "completedAt")]
+    #[allow(dead_code)]
+    completed_at: Option<String>,
+    #[allow(dead_code)]
+    duration: Option<u64>,
 }
 
 struct ComponentInfo {
@@ -77,24 +120,39 @@ struct ComponentInfo {
 }
 
 pub async fn execute() -> Result<()> {
-    println!("{} Deploying project", style("→").cyan());
+    println!("{} {} Deploying project", style("▶").cyan(), style("FTL").bold());
+    println!();
 
     // Check if we're in a Spin project directory
     if !PathBuf::from("spin.toml").exists() {
         anyhow::bail!("No spin.toml found. Not in a project directory?");
     }
 
+    // Create a progress bar for the entire deployment process
+    let pb = ProgressBar::new(100);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}% {msg}")
+            .unwrap()
+            .progress_chars("█▓▒░")
+    );
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+
     // Get spin path
+    pb.set_position(5);
+    pb.set_message("Checking environment...");
     let spin_path = check_and_install_spin().await?;
 
     // Build the project first
-    println!("{} Building project...", style("→").dim());
+    pb.set_position(10);
+    pb.set_message("Building project...");
     let build_output = Command::new(&spin_path)
         .args(["build"])
         .output()
         .context("Failed to build project")?;
 
     if !build_output.status.success() {
+        pb.finish_and_clear();
         anyhow::bail!(
             "Build failed:\n{}",
             String::from_utf8_lossy(&build_output.stderr)
@@ -102,41 +160,63 @@ pub async fn execute() -> Result<()> {
     }
 
     // Get authentication credentials
-    let credentials = get_stored_credentials()
-        .context("Not logged in to FTL. Run 'ftl login' first.")?;
+    pb.set_position(20);
+    pb.set_message("Authenticating...");
+    let credentials = match get_or_refresh_credentials().await {
+        Ok(creds) => creds,
+        Err(e) => {
+            pb.finish_and_clear();
+            if e.to_string().contains("expired") {
+                anyhow::bail!("Authentication token has expired. Please run 'ftl login' to re-authenticate.");
+            } else {
+                anyhow::bail!("Not logged in to FTL. Run 'ftl login' first.");
+            }
+        }
+    };
 
     // Parse spin.toml to find user components
+    pb.set_position(25);
+    pb.set_message("Parsing project...");
     let components = parse_spin_toml()?;
     if components.is_empty() {
+        pb.finish_and_clear();
         anyhow::bail!("No user components found in spin.toml");
     }
 
     // Get ECR credentials
-    println!("{} Getting registry credentials...", style("→").dim());
+    pb.set_position(30);
+    pb.set_message("Getting registry credentials...");
     let ecr_creds = get_ecr_credentials(&credentials.access_token).await?;
 
     // Docker login to ECR
+    pb.set_position(35);
+    pb.set_message("Logging into registry...");
     docker_login(&ecr_creds).await?;
 
     // Create repositories and push components to ECR
-    println!("{} Creating repositories and pushing components...", style("→").dim());
-    let deployed_tools = create_repositories_and_push(&components, &ecr_creds, &credentials.access_token).await?;
+    pb.set_position(40);
+    pb.set_message("Pushing components...");
+    let deployed_tools = create_repositories_and_push_with_progress(&components, &ecr_creds, &credentials.access_token, &pb).await?;
 
     // Deploy to FTL
-    println!("{} Deploying to FTL...", style("→").dim());
+    pb.set_position(70);
+    pb.set_message("Starting deployment...");
     let app_name = get_app_name()?;
-    let deployment = deploy_to_ftl(
+    let deployment = deploy_to_ftl_with_progress(
         &credentials.access_token,
         app_name,
         deployed_tools,
+        pb,
     )
     .await?;
 
     // Display results
     println!();
-    println!("{} Project deployed successfully!", style("✓").green());
-    if let Some(url) = deployment.app_url {
-        println!("  URL: {}", style(url).cyan());
+    println!("{} Deployment successful!", style("✓").green().bold());
+    if let Some(deployment_url) = deployment.deployment_url {
+        println!();
+        println!("  {} {}", style("MCP URL:").bold(), style(deployment_url).cyan().underlined());
+        println!();
     }
 
     Ok(())
@@ -245,12 +325,9 @@ async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsRespons
         HeaderValue::from_str(&format!("Bearer {}", access_token))?,
     );
     
-    // TODO: Make API URL configurable
-    let api_url = std::env::var("FTL_API_URL")
-        .unwrap_or_else(|_| "https://api.ftl.dev".to_string());
     
     let response = client
-        .post(&format!("{}/v1/registry/credentials", api_url))
+        .post(&format!("{}/v1/registry/credentials", FTL_API_URL))
         .headers(headers)
         .send()
         .await
@@ -291,6 +368,8 @@ async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
     let mut cmd = Command::new("docker");
     cmd.args(&["login", "--username", "AWS", "--password-stdin", registry_endpoint]);
     cmd.stdin(std::process::Stdio::piped());
+    cmd.stdout(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::null());
     
     let mut child = cmd.spawn()
         .context("Failed to start docker login")?;
@@ -317,15 +396,13 @@ async fn create_repository(access_token: &str, tool_name: &str) -> Result<Create
         HeaderValue::from_str(&format!("Bearer {}", access_token))?,
     );
     
-    let api_url = std::env::var("FTL_API_URL")
-        .unwrap_or_else(|_| "https://api.ftl.dev".to_string());
     
     let request_body = CreateRepositoryRequest {
         tool_name: tool_name.to_string(),
     };
     
     let response = client
-        .post(&format!("{}/v1/registry/repositories", api_url))
+        .post(&format!("{}/v1/registry/repositories", FTL_API_URL))
         .headers(headers)
         .json(&request_body)
         .send()
@@ -348,42 +425,23 @@ async fn create_repository(access_token: &str, tool_name: &str) -> Result<Create
         .context("Failed to parse create repository response")
 }
 
-async fn create_repositories_and_push(
+async fn create_repositories_and_push_with_progress(
     components: &[ComponentInfo],
     _ecr_creds: &EcrCredentialsResponse,
     access_token: &str,
+    pb: &ProgressBar,
 ) -> Result<Vec<DeploymentTool>> {
     let mut deployed_tools = Vec::new();
+    let total_components = components.len();
     
-    for component in components {
+    for (idx, component) in components.iter().enumerate() {
+        // Update progress
+        let progress = 40 + (30 * idx / total_components) as u64;
+        pb.set_position(progress);
+        pb.set_message(format!("Pushing {} v{}...", component.name, component.version));
+        
         // Create repository for this component
-        println!(
-            "  {} Creating repository for {}...",
-            style("→").dim(),
-            component.name
-        );
-        
         let repo_response = create_repository(access_token, &component.name).await?;
-        
-        if repo_response.already_exists {
-            println!(
-                "    {} Repository already exists",
-                style("✓").green()
-            );
-        } else {
-            println!(
-                "    {} Repository created",
-                style("✓").green()
-            );
-        }
-        
-        // Push component
-        println!(
-            "  {} Pushing {} (v{})...",
-            style("→").dim(),
-            component.name,
-            component.version
-        );
         
         // Check if wkg is available
         which::which("wkg")
@@ -393,11 +451,14 @@ async fn create_repositories_and_push(
         let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
         let mut push_cmd = Command::new("wkg");
         push_cmd.args(&["oci", "push", &versioned_tag, &component.source_path]);
+        push_cmd.stdout(std::process::Stdio::null());
+        push_cmd.stderr(std::process::Stdio::piped());
         
         let output = push_cmd.output()
             .context("Failed to push component with wkg")?;
         
         if !output.status.success() {
+            pb.finish_and_clear();
             return Err(anyhow!(
                 "Failed to push {}: {}",
                 component.name,
@@ -409,6 +470,8 @@ async fn create_repositories_and_push(
         let latest_tag = format!("{}:latest", repo_response.repository_uri);
         let mut push_latest = Command::new("wkg");
         push_latest.args(&["oci", "push", &latest_tag, &component.source_path]);
+        push_latest.stdout(std::process::Stdio::null());
+        push_latest.stderr(std::process::Stdio::null());
         push_latest.output()?;
         
         deployed_tools.push(DeploymentTool {
@@ -421,11 +484,91 @@ async fn create_repositories_and_push(
     Ok(deployed_tools)
 }
 
-async fn deploy_to_ftl(
+async fn poll_deployment_status_with_progress(
+    client: &reqwest::Client,
+    headers: HeaderMap,
+    status_url: &str,
+    _deployment_id: &str,
+    pb: ProgressBar,
+) -> Result<DeploymentDetails> {
+    let max_attempts = 60; // 5 minutes with 5-second intervals
+    let mut attempts = 0;
+    
+    loop {
+        if attempts >= max_attempts {
+            pb.finish_and_clear();
+            return Err(anyhow!("Deployment timeout after 5 minutes"));
+        }
+        
+        let response = client
+            .get(status_url)
+            .headers(headers.clone())
+            .send()
+            .await
+            .context("Failed to check deployment status")?;
+        
+        if !response.status().is_success() {
+            pb.finish_and_clear();
+            let error_text = response.text().await?;
+            return Err(anyhow!("Failed to get deployment status: {}", error_text));
+        }
+        
+        let status_response: DeploymentStatusResponse = response
+            .json()
+            .await
+            .context("Failed to parse deployment status")?;
+        
+        let deployment = status_response.deployment;
+        
+        // Update progress based on status
+        let (progress, status_msg) = match deployment.status.as_str() {
+            "INITIALIZING" => (75, "Initializing deployment...".to_string()),
+            "BUILDING" => (80, "Building application...".to_string()),
+            "PROVISIONING" => (85, "Provisioning environment...".to_string()),
+            "AUTHENTICATING" => (90, "Authenticating with registries...".to_string()),
+            "DEPLOYING" => (95, "Finalizing deployment...".to_string()),
+            _status => {
+                let msg = deployment.status_message.as_deref()
+                    .unwrap_or("Processing...")
+                    .to_string();
+                (pb.position().min(95), msg)
+            }
+        };
+        
+        pb.set_position(progress);
+        pb.set_message(status_msg);
+        
+        match deployment.status.as_str() {
+            "COMPLETED" => {
+                pb.set_position(100);
+                pb.set_message("Deployment complete!");
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                pb.finish_and_clear();
+                return Ok(deployment);
+            }
+            "FAILED" => {
+                pb.finish_and_clear();
+                let error_msg = deployment.error_reason.as_deref()
+                    .or(deployment.status_message.as_deref())
+                    .unwrap_or("Deployment failed")
+                    .to_string();
+                return Err(anyhow!("Deployment failed: {}", error_msg));
+            }
+            _ => {
+                // Continue polling
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                attempts += 1;
+            }
+        }
+    }
+}
+
+async fn deploy_to_ftl_with_progress(
     access_token: &str,
     app_name: String,
     tools: Vec<DeploymentTool>,
-) -> Result<DeploymentResponse> {
+    pb: ProgressBar,
+) -> Result<DeploymentDetails> {
     let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -433,8 +576,6 @@ async fn deploy_to_ftl(
         HeaderValue::from_str(&format!("Bearer {}", access_token))?,
     );
     
-    let api_url = std::env::var("FTL_API_URL")
-        .unwrap_or_else(|_| "https://api.ftl.dev".to_string());
     
     let request_body = DeploymentRequest {
         app_name,
@@ -442,33 +583,37 @@ async fn deploy_to_ftl(
         variables: None,
     };
     
-    // Show progress while waiting for deployment
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-    );
-    pb.set_message("Deploying application...");
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
-    
     let response = client
-        .post(&format!("{}/v1/deployments", api_url))
-        .headers(headers)
+        .post(&format!("{}/v1/deployments", FTL_API_URL))
+        .headers(headers.clone())
         .json(&request_body)
         .send()
         .await
-        .context("Failed to deploy to FTL")?;
+        .context("Failed to start deployment")?;
     
-    pb.finish_and_clear();
-    
-    if !response.status().is_success() {
+    if response.status() != 202 {
+        pb.finish_and_clear();
         let error_text = response.text().await?;
-        return Err(anyhow!("Deployment failed: {}", error_text));
+        return Err(anyhow!("Failed to start deployment: {}", error_text));
     }
     
-    response
-        .json::<DeploymentResponse>()
+    let start_response: StartDeploymentResponse = response
+        .json()
         .await
-        .context("Failed to parse deployment response")
+        .context("Failed to parse deployment start response")?;
+    
+    // Poll for deployment status
+    let status_url = if start_response.status_url.starts_with("/") {
+        format!("{}{}", FTL_API_URL, start_response.status_url)
+    } else {
+        start_response.status_url
+    };
+    
+    poll_deployment_status_with_progress(
+        &client,
+        headers,
+        &status_url,
+        &start_response.deployment_id,
+        pb,
+    ).await
 }
