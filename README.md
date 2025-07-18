@@ -27,20 +27,20 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Each tool runs as a separate WebAssembly component in its own sandbox.
-- The FTL gateway components handle protocol complexity, auth, and tool component routing.
+- The FTL [gateway components](#architecture) handle protocol complexity, auth, and tool component routing.
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
 </details>
 
 <details>
-<summary><strong>⤵ Security by default</strong></summary>
+<summary><strong>⤵ Secure by default</strong></summary>
 
 Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/). MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization). Plug in your own OIDC provider via simple configuration, or use FTL's by default.
 </details>
 
 <details>
-<summary><strong>⤵ Multiple source languages within one MCP server</strong></summary>
+<summary><strong>⤵ Use multiple source languages within one MCP server</strong></summary>
 
 Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
 </details>
@@ -52,7 +52,7 @@ Run your FTL-based tools on your own machine, Kubernetes, Wasmtime, Fermyon, and
 </details>
 
 <details>
-<summary><strong>⤵ Distribute and compose tools like tiny docker images</strong></summary>
+<summary><strong>⤵ Distribute and compose tools like micro docker images</strong></summary>
 
 Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 </details>
