@@ -27,7 +27,7 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Each tool runs as a separate WebAssembly component in its own sandbox.
-- The FTL [gateway components](#architecture) handle protocol complexity, auth, and tool component routing.
+- The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
@@ -226,7 +226,7 @@ graph TB
 ```
 
 - Each tool runs as a separate WebAssembly component in its own sandbox.
-- The FTL gateway components handle protocol complexity, auth, and tool component routing.
+- The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
