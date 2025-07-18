@@ -188,7 +188,7 @@ graph TB
         subgraph "Spin Runtime"
             subgraph "Gateway Components"
                 AuthGateway["Auth Gateway<br/>(Authentication + Authorization)"]
-                MCPGateway["MCP Gateway<br/>(Protocol Handler)"]
+                MCPGateway["MCP Gateway<br/>(Handle protocol, routing, validation)"]
             end
             
             subgraph "Tool Components"
@@ -201,7 +201,7 @@ graph TB
     end
     
     Agent -.->|"MCP Protocol<br/>(JSON-RPC over HTTPS)"| AuthGateway
-    AuthGateway -.->|"Authorized requests"| MCPGateway
+    AuthGateway -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Weather
     MCPGateway -.->|"In-memory call<br/>(spin.internal)"| GitHub
     MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Database
