@@ -15,11 +15,9 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and [edge-powered](https://www.fermyon.com/wasm-functions) hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance [MCP](https://modelcontextprotocol.io) tools authored in a variety of source languages.
+FTL is an open source framework and edge hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance [MCP](https://modelcontextprotocol.io) tools authored in a variety of source languages.
 
 ## Why?
-
-FTL is a great option for agents deployed anywhere that want remotely accessible tools with:
 
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute</strong></summary>
