@@ -11,15 +11,13 @@ Fast tools for AI agents
 
 [Docs](./docs/introduction.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
 
+⚡️ [Quick Start](#quick-start)
+
 </div>
 
 FTL is an open source framework and [edge-powered](https://www.fermyon.com/wasm-functions) hosting platform for tools accessed by AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance [MCP](https://modelcontextprotocol.io) tools authored in a variety of source languages.
 
-⚡️ [Quick Start](#quick-start)
-
 ## Why?
-
-Remote MCP servers allow AI agents deployed anywhere to access tools that extend their capabilities. But when tools are called over the network, every execution comes with latency. For agents deployed in voice, video, and other real-time and performance sensitive applications, that latency adds up to impact the behavior of the whole system.
 
 FTL is a great option for agents deployed anywhere that want remotely accessible tools with:
 
@@ -59,50 +57,74 @@ Tools are compiled to self-contained Wasm binaries that are often < 1MB. They ca
 Tools are built on and compatible with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
 </details>
 
----
-
-You want one direct, end-to-end answer to the question of "How do I give my agent new computational capabilities?" that goes beyond being a connector hub for third party apps. And you don't want to have to figure out performance, scalability, security, and distribution from scratch. You want to think about tools and the agents that use them.
-
 ## Quick Start
 
+Install `ftl`
 ```bash
-# Install FTL
 cargo install ftl-cli
+```
 
-# Set up templates
+Set up templates
+```bash
 ftl setup templates
+```
 
-# Create a new project
+Create a new project
+```bash
 ftl init my-tools
 cd my-tools
+```
 
-# Add new tools
+Develop new tools
+```bash
 ftl add
+```
 
-# Serve your tools and test locally with your MCP client
+Serve your tools locally
+```bash
 ftl up --build
+```
 
-# Authenticate with FTL
+Try them out with your MCP client
+```json
+{
+  "mcpServers": {
+    "my-tools": {
+      "url": "http://127.0.0.1:3000/mcp",
+      "transport": "http"
+    }
+  }
+}
+```
+
+Authenticate with FTL
+```bash
 ftl login
+```
 
-# Deploy
+Deploy
+```bash
 ftl deploy
 ```
 
-## Creating tools
-
-<details>
-<summary><strong>🦀 Rust example</strong></summary>
-
-Add a Rust tool to a project
-```bash
-cd my-project
-ftl add my-tool --language rust
+Plug it in
+```json
+{
+  "mcpServers": {
+    "my-tools": {
+      "url": "https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp",
+      "transport": "https"
+    }
+  }
+}
 ```
 
-```rust
-// my-tool/src/lib.rs
+## Developing tools
 
+<details>
+<summary><strong>🦀 Rust</strong></summary>
+
+```rust
 use ftl_sdk::{tool, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
@@ -122,16 +144,9 @@ fn my_tool(input: MyToolInput) -> ToolResponse {
 </details>
 
 <details>
-<summary><strong>🟦 TypeScript example</strong></summary>
-
-Add a TypeScript tool to a project
-```bash
-ftl add my-tool --language typescript
-```
+<summary><strong>🟦 TypeScript</strong></summary>
 
 ```typescript
-// my-tool/src/index.ts
-
 import { createTool, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
@@ -161,39 +176,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 ```
 </details>
 
-### Workflow
-
-### 1. Develop
-```bash
-# From project root (with spin.toml)
-ftl build           # Build all tools
-ftl test            # Run tests
-ftl watch           # Auto-rebuild on changes
-ftl up              # Run the MCP server
-```
-
-### 2. Plug in to your local MCP Client Configuration
-```json
-{
-  "mcpServers": {
-    "my-assistant": {
-      "url": "http://127.0.0.1:3000/mcp",
-      "transport": "http"
-    }
-  }
-}
-```
-
-### 3. Deploy
-```bash
-ftl deploy
-```
-
 ## Architecture
-
-The ftl-cli uses the [ftl-mcp](https://github.com/fastertools/ftl-mcp) framework and Spin platform to create a highly optimized MCP server runtime:
-
-## Architecture Overview
 
 ```mermaid
 graph TB
