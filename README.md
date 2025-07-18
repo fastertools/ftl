@@ -181,27 +181,31 @@ addEventListener('fetch', (event: FetchEvent) => {
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        Agent["AI Agent<br/>(Claude, GPT-4, etc.)"]
+        Agent["MCP Client<br/>(Claude Code, Cursor, OpenAI Responses API)"]
     end
     
     subgraph "FTL Application" 
         subgraph "Spin Runtime"
-            Gateway["MCP Gateway<br/>(Protocol Handler)"]
+            subgraph "Gateway Components"
+                AuthGateway["Auth Gateway<br/>(Authentication + Authorization)"]
+                MCPGateway["MCP Gateway<br/>(Protocol Handler)"]
+            end
             
             subgraph "Tool Components"
                 Weather["Weather Tool<br/>(TypeScript)"]
                 GitHub["GitHub Tool<br/>(Rust)"]
                 Database["Database Tool<br/>(JavaScript)"]
-                Custom["Custom Tool<br/>(Any Language)"]
+                Custom["Custom Tool<br/>(Another Language)"]
             end
         end
     end
     
-    Agent -->|"MCP Protocol<br/>(JSON-RPC over HTTP)"| Gateway
-    Gateway -->|"In-memory call<br/>(spin.internal)"| Weather
-    Gateway -->|"In-memory call<br/>(spin.internal)"| GitHub
-    Gateway -->|"In-memory call<br/>(spin.internal)"| Database
-    Gateway -->|"In-memory call<br/>(spin.internal)"| Custom
+    Agent -.->|"MCP Protocol<br/>(JSON-RPC over HTTPS)"| AuthGateway
+    AuthGateway -.->|"Authorized requests"| MCPGateway
+    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Weather
+    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| GitHub
+    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Database
+    MCPGateway -.->|"In-memory call<br/>(spin.internal)"| Custom
 ```
 
 - Each tool is a separate WebAssembly component with its own sandbox
