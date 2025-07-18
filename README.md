@@ -24,7 +24,7 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute</strong></summary>
 
-The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
+FTL tools run natively on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
