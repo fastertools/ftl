@@ -19,7 +19,7 @@ FTL is an open source framework and edge hosting platform for tools that extend 
 
 ## Why?
 
-MCP is minimal. Tools are conceptually straightforward. Writing and running them should be too. Performance and security should be a given.
+MCP is minimal. Tools are straightforward. Writing and running them should be too. Performance and security should be a given.
 
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute</strong></summary>
