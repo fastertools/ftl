@@ -24,12 +24,14 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute + Flexible deployment targets</strong></summary>
 
-Run FTL tools on your own machine, Kubernetes, Wasmtime, Fermyon, and other [WASI](https://wasi.dev/)-compatible runtimes.
+Run FTL tools on your own machine, Kubernetes, Wasmtime, and other [WASI](https://wasi.dev/)-compatible runtimes.
 
 The FTL Platform aims to be the best way to host your tools. It runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
+
+The FTL Platform is optional. Opt in via the `ftl login` command, which enables `ftl deploy`.
 
 See [ftl-mcp](https://github.com/fastertools/ftl-mcp) if you want to directly use, contribute to, or fork individual FTL components.
 </details>
