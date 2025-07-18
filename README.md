@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and edge hosting platform for tools that extend the abilities of AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance networked [Model Context Protocol](https://modelcontextprotocol.io) tools authored in a variety of source languages.
+FTL is an open source framework and edge hosting platform for tools that extend the abilities of AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire development and hosting lifecycle of secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools authored in a variety of source languages and accessible over the network with low latency.
 
 ## Why?
 
@@ -27,8 +27,8 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 The FTL platform runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Agents deployed anywhere can instanly access their networked tools with almost no latency.
 
 - Each tool runs as a separate WebAssembly component in its own sandbox.
-- The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
+- The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
 </details>
 
 <details>
