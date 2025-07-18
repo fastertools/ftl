@@ -190,12 +190,12 @@ graph TB
         subgraph "Fermyon Wasm Function"
             subgraph "Spin/Wasmtime Runtime"
                 subgraph "FTL Application"
-                    subgraph "FTL Gateway Components"
+                    subgraph "FTL Gateway Wasm Components"
                         AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
                         MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
                     end
                     
-                    subgraph "Tool Components"
+                    subgraph "Tool Wasm Components"
                         Weather["Weather Tool<br/>(TypeScript)"]
                         GitHub["GitHub Tool<br/>(Rust)"]
                         Database["Database Tool<br/>(JavaScript)"]
