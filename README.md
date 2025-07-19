@@ -26,7 +26,7 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 
 FTL tools run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-The FTL Platform aims to be the best way to deploy and manage remote tools that are fast and distributed enough be used by agents deployed anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
+The FTL Platform aims to be the best way to deploy and manage remote tools that are fast and distributed enough to be used by agents deployed anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
 
 - FTL runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
