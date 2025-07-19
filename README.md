@@ -15,25 +15,24 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and edge hosting platform for tools that extend the abilities of AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire lifecycle of building and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools authored in a variety of source languages, accessible over the network with low latency.
+FTL is an open source framework and tool platform for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire lifecycle of building and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools distributed across the global network edge.
 
 ## Why?
 
-MCP is minimal. Tools are straightforward. Writing and running them should be too. Performance and security should be a given.
+MCP is minimal. Tools are straightforward. Writing and running them should be too.
 
 <details>
 <summary><strong>⤵ Sub-millisecond cold starts on global edge compute + Flexible deployment targets</strong></summary>
 
 FTL tools run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-The FTL Platform aims to be the best way to host and manage remote tools that are fast and distributed enough be used by agents deployed anywhere, including real-time voice and multimodal systems. FTL runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud. Latency and compute overhead for remote tool calls should not be something you have to design around.
+The FTL Platform aims to be the best way to deploy and manage remote tools that are fast and distributed enough be used by agents deployed anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
 
+- FTL runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
 
 The FTL Platform is optional. Opt in via the `ftl login` command, which enables `ftl deploy`.
-
-See [ftl-mcp](https://github.com/fastertools/ftl-mcp) if you want to directly use, contribute to, or fork individual FTL components.
 </details>
 
 <details>
@@ -242,3 +241,4 @@ FTL is built on top of these excellent projects:
 - [Spin](https://github.com/fermyon/spin)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [WebAssembly](https://webassembly.org)
+- [ftl-mcp](https://github.com/fastertools/ftl-mcp)
