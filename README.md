@@ -53,12 +53,6 @@ Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://comp
 Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 </details>
 
-<details>
-<summary><strong>⤵ Standards-based implementation</strong></summary>
-
-Tools are built on and compatible with the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
-</details>
-
 ## Quick Start
 
 Install `ftl`
