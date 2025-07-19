@@ -81,6 +81,10 @@ enum Command {
         #[arg(long)]
         build: bool,
 
+        /// Watch for file changes and rebuild automatically
+        #[arg(long)]
+        watch: bool,
+
         /// Port to serve on
         #[arg(short, long, default_value = "3000")]
         port: u16,
@@ -88,20 +92,9 @@ enum Command {
         /// Path to project (defaults to current directory)
         #[arg(long)]
         path: Option<PathBuf>,
-    },
 
-    /// Build and run the project, rebuilding on file changes
-    Watch {
-        /// Port to serve on
-        #[arg(short, long, default_value = "3000")]
-        port: u16,
-
-        /// Path to project (defaults to current directory)
-        #[arg(long)]
-        path: Option<PathBuf>,
-
-        /// Clear the screen before each rebuild
-        #[arg(short, long)]
+        /// Clear the screen before each rebuild (only with --watch)
+        #[arg(short, long, requires = "watch")]
         clear: bool,
     },
 
@@ -270,8 +263,13 @@ async fn main() -> Result<()> {
             .await
         }
         Command::Build { release, path } => commands::build::execute(path, release).await,
-        Command::Up { build, port, path } => commands::up::execute(path, port, build).await,
-        Command::Watch { port, path, clear } => commands::watch::execute(path, port, clear).await,
+        Command::Up {
+            build,
+            watch,
+            port,
+            path,
+            clear,
+        } => commands::up::execute(path, port, build, watch, clear).await,
         Command::Test { path } => commands::test::execute(path).await,
         Command::Publish {
             registry,
