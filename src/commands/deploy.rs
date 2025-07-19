@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use console::style;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
-use toml::Value;
+use tokio::sync::{Mutex, Semaphore};
+use tokio::task::JoinSet;
 
+use crate::commands::build;
 use crate::commands::login::get_or_refresh_credentials;
-use crate::common::spin_installer::check_and_install_spin;
 
 const FTL_API_URL: &str = "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com";
 
@@ -112,6 +115,7 @@ struct DeploymentDetails {
     duration: Option<u64>,
 }
 
+#[derive(Clone)]
 struct ComponentInfo {
     name: String,
     source_path: String,
@@ -132,44 +136,39 @@ pub async fn execute() -> Result<()> {
         anyhow::bail!("No spin.toml found. Not in a project directory?");
     }
 
-    // Create a progress bar for the entire deployment process
-    let pb = ProgressBar::new(100);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}% {msg}")
-            .unwrap()
-            .progress_chars("█▓▒░"),
+    // Create a simple spinner for status updates
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
     );
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
-    // Get spin path
-    pb.set_position(5);
-    pb.set_message("Checking environment...");
-    let spin_path = check_and_install_spin().await?;
+    // Build the project first using our parallel build
+    spinner.finish_and_clear();
+    println!("{} Building project...", style("→").cyan());
+    println!();
 
-    // Build the project first
-    pb.set_position(10);
-    pb.set_message("Building project...");
-    let build_output = Command::new(&spin_path)
-        .args(["build"])
-        .output()
-        .context("Failed to build project")?;
+    build::execute(None, true).await?; // Use release build for deployment
 
-    if !build_output.status.success() {
-        pb.finish_and_clear();
-        anyhow::bail!(
-            "Build failed:\n{}",
-            String::from_utf8_lossy(&build_output.stderr)
-        );
-    }
+    println!();
+
+    // Re-create spinner after build
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
+    );
+    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
     // Get authentication credentials
-    pb.set_position(20);
-    pb.set_message("Authenticating...");
+    spinner.set_message("Authenticating...");
     let credentials = match get_or_refresh_credentials().await {
         Ok(creds) => creds,
         Err(e) => {
-            pb.finish_and_clear();
+            spinner.finish_and_clear();
             if e.to_string().contains("expired") {
                 anyhow::bail!(
                     "Authentication token has expired. Please run 'ftl login' to re-authenticate."
@@ -181,42 +180,58 @@ pub async fn execute() -> Result<()> {
     };
 
     // Parse spin.toml to find user components
-    pb.set_position(25);
-    pb.set_message("Parsing project...");
+    spinner.set_message("Parsing project...");
     let components = parse_spin_toml()?;
     if components.is_empty() {
-        pb.finish_and_clear();
+        spinner.finish_and_clear();
         anyhow::bail!("No user components found in spin.toml");
     }
 
     // Get ECR credentials
-    pb.set_position(30);
-    pb.set_message("Getting registry credentials...");
+    spinner.set_message("Getting registry credentials...");
     let ecr_creds = get_ecr_credentials(&credentials.access_token).await?;
 
     // Docker login to ECR
-    pb.set_position(35);
-    pb.set_message("Logging into registry...");
+    spinner.set_message("Logging into registry...");
     docker_login(&ecr_creds).await?;
 
     // Create repositories and push components to ECR
-    pb.set_position(40);
-    pb.set_message("Pushing components...");
+    spinner.finish_and_clear();
     let deployed_tools = create_repositories_and_push_with_progress(
         &components,
         &ecr_creds,
         &credentials.access_token,
-        &pb,
     )
     .await?;
 
     // Deploy to FTL
-    pb.set_position(70);
-    pb.set_message("Starting deployment...");
+    println!();
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
+    );
+    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+    spinner.set_message("Starting deployment...");
+
+    // Refresh credentials before deployment in case the token expired during build/push
+    let fresh_credentials = match get_or_refresh_credentials().await {
+        Ok(creds) => creds,
+        Err(e) => {
+            spinner.finish_and_clear();
+            anyhow::bail!("Failed to refresh authentication token: {}", e);
+        }
+    };
+
     let app_name = get_app_name()?;
-    let deployment =
-        deploy_to_ftl_with_progress(&credentials.access_token, app_name, deployed_tools, pb)
-            .await?;
+    let deployment = deploy_to_ftl_with_progress(
+        &fresh_credentials.access_token,
+        app_name,
+        deployed_tools,
+        spinner,
+    )
+    .await?;
 
     // Display results
     println!();
@@ -236,7 +251,7 @@ pub async fn execute() -> Result<()> {
 
 fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
     let content = std::fs::read_to_string("spin.toml").context("Failed to read spin.toml")?;
-    let toml: Value = content.parse().context("Failed to parse spin.toml")?;
+    let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
 
     let mut components = Vec::new();
 
@@ -292,7 +307,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
     let cargo_path = component_dir.join("Cargo.toml");
     if cargo_path.exists() {
         let cargo_content = std::fs::read_to_string(&cargo_path)?;
-        let cargo_toml: Value = cargo_content.parse()?;
+        let cargo_toml: toml::Value = toml::from_str(&cargo_content)?;
         if let Some(version) = cargo_toml
             .get("package")
             .and_then(|p| p.get("version"))
@@ -318,7 +333,7 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
 
 fn get_app_name() -> Result<String> {
     let content = std::fs::read_to_string("spin.toml")?;
-    let toml: Value = content.parse()?;
+    let toml: toml::Value = toml::from_str(&content)?;
 
     toml.get("application")
         .and_then(|app| app.get("name"))
@@ -445,64 +460,153 @@ async fn create_repositories_and_push_with_progress(
     components: &[ComponentInfo],
     _ecr_creds: &EcrCredentialsResponse,
     access_token: &str,
-    pb: &ProgressBar,
 ) -> Result<Vec<DeploymentTool>> {
-    let mut deployed_tools = Vec::new();
-    let total_components = components.len();
+    // Check if wkg is available before starting
+    which::which("wkg").context(
+        "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
+    )?;
 
-    for (idx, component) in components.iter().enumerate() {
-        // Update progress
-        let progress = 40 + (30 * idx / total_components) as u64;
-        pb.set_position(progress);
-        pb.set_message(format!(
-            "Pushing {} v{}...",
-            component.name, component.version
-        ));
+    println!(
+        "{} Pushing {} components in parallel",
+        style("→").cyan(),
+        style(components.len()).bold()
+    );
+    println!();
 
-        // Create repository for this component
-        let repo_response = create_repository(access_token, &component.name).await?;
+    let multi_progress = MultiProgress::new();
+    let mut tasks = JoinSet::new();
+    let deployed_tools = Arc::new(Mutex::new(Vec::new()));
 
-        // Check if wkg is available
-        which::which("wkg").context(
-            "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
-        )?;
+    // Track errors across all tasks
+    let error_flag = Arc::new(Mutex::new(None::<String>));
 
-        // Push with version tag
-        let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
-        let mut push_cmd = Command::new("wkg");
-        push_cmd.args(["oci", "push", &versioned_tag, &component.source_path]);
-        push_cmd.stdout(std::process::Stdio::null());
-        push_cmd.stderr(std::process::Stdio::piped());
+    // Limit concurrent operations to avoid overwhelming the API
+    let semaphore = Arc::new(Semaphore::new(4)); // Max 4 concurrent pushes
 
-        let output = push_cmd
-            .output()
-            .context("Failed to push component with wkg")?;
+    for component in components {
+        let pb = multi_progress.add(ProgressBar::new_spinner());
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {prefix:.bold} {msg}")
+                .unwrap(),
+        );
+        pb.set_prefix(format!("[{}]", component.name));
+        pb.set_message("Creating repository...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-        if !output.status.success() {
-            pb.finish_and_clear();
-            return Err(anyhow!(
-                "Failed to push {}: {}",
-                component.name,
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
+        let component = component.clone();
+        let access_token = access_token.to_string();
+        let deployed_tools = Arc::clone(&deployed_tools);
+        let error_flag = Arc::clone(&error_flag);
+        let semaphore = Arc::clone(&semaphore);
 
-        // Also push as latest
-        let latest_tag = format!("{}:latest", repo_response.repository_uri);
-        let mut push_latest = Command::new("wkg");
-        push_latest.args(["oci", "push", &latest_tag, &component.source_path]);
-        push_latest.stdout(std::process::Stdio::null());
-        push_latest.stderr(std::process::Stdio::null());
-        push_latest.output()?;
+        tasks.spawn(async move {
+            // Acquire permit to limit concurrency
+            let _permit = semaphore.acquire().await.unwrap();
 
-        deployed_tools.push(DeploymentTool {
-            name: component.name.clone(),
-            tag: component.version.clone(),
-            allowed_hosts: component.allowed_hosts.clone(),
+            // Check if another task has already failed
+            if error_flag.lock().await.is_some() {
+                pb.finish_with_message(style("Skipped due to error").red().to_string());
+                return Ok(());
+            }
+
+            let start = Instant::now();
+
+            // Create repository
+            pb.set_message("Creating repository...");
+            let repo_response = match create_repository(&access_token, &component.name).await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    pb.finish_with_message(
+                        style(format!("✗ Failed to create repository: {e}"))
+                            .red()
+                            .to_string(),
+                    );
+                    let mut error_guard = error_flag.lock().await;
+                    if error_guard.is_none() {
+                        *error_guard =
+                            Some(format!("Component '{}' failed: {}", component.name, e));
+                    }
+                    return Err(e);
+                }
+            };
+
+            // Push with version tag
+            pb.set_message(format!("Pushing v{}...", component.version));
+            let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
+            let output = Command::new("wkg")
+                .args(["oci", "push", &versioned_tag, &component.source_path])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::piped())
+                .output()
+                .context("Failed to push component with wkg")?;
+
+            if !output.status.success() {
+                let error = format!(
+                    "Failed to push {}: {}",
+                    component.name,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                pb.finish_with_message(style(format!("✗ {error}")).red().to_string());
+                let mut error_guard = error_flag.lock().await;
+                if error_guard.is_none() {
+                    *error_guard = Some(error.clone());
+                }
+                return Err(anyhow!(error));
+            }
+
+            // Also push as latest
+            pb.set_message("Pushing latest tag...");
+            let latest_tag = format!("{}:latest", repo_response.repository_uri);
+            Command::new("wkg")
+                .args(["oci", "push", &latest_tag, &component.source_path])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .output()?;
+
+            // Add to deployed tools
+            let mut tools = deployed_tools.lock().await;
+            tools.push(DeploymentTool {
+                name: component.name.clone(),
+                tag: component.version.clone(),
+                allowed_hosts: component.allowed_hosts.clone(),
+            });
+
+            let duration = start.elapsed();
+            pb.finish_with_message(
+                style(format!(
+                    "✓ Pushed successfully in {:.1}s",
+                    duration.as_secs_f64()
+                ))
+                .green()
+                .to_string(),
+            );
+
+            Ok(())
         });
     }
 
-    Ok(deployed_tools)
+    // Wait for all tasks to complete
+    let mut first_error = None;
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result? {
+            if first_error.is_none() {
+                first_error = Some(e);
+            }
+        }
+    }
+
+    // If any component failed, return the first error
+    if let Some(e) = first_error {
+        return Err(e);
+    }
+
+    let tools = Arc::try_unwrap(deployed_tools).unwrap().into_inner();
+
+    println!();
+    println!("{} All components pushed successfully!", style("✓").green());
+
+    Ok(tools)
 }
 
 async fn poll_deployment_status_with_progress(
@@ -510,14 +614,14 @@ async fn poll_deployment_status_with_progress(
     headers: HeaderMap,
     status_url: &str,
     _deployment_id: &str,
-    pb: ProgressBar,
+    spinner: ProgressBar,
 ) -> Result<DeploymentDetails> {
     let max_attempts = 60; // 5 minutes with 5-second intervals
     let mut attempts = 0;
 
     loop {
         if attempts >= max_attempts {
-            pb.finish_and_clear();
+            spinner.finish_and_clear();
             return Err(anyhow!("Deployment timeout after 5 minutes"));
         }
 
@@ -529,7 +633,7 @@ async fn poll_deployment_status_with_progress(
             .context("Failed to check deployment status")?;
 
         if !response.status().is_success() {
-            pb.finish_and_clear();
+            spinner.finish_and_clear();
             let error_text = response.text().await?;
             return Err(anyhow!("Failed to get deployment status: {}", error_text));
         }
@@ -541,36 +645,29 @@ async fn poll_deployment_status_with_progress(
 
         let deployment = status_response.deployment;
 
-        // Update progress based on status
-        let (progress, status_msg) = match deployment.status.as_str() {
-            "INITIALIZING" => (75, "Initializing deployment...".to_string()),
-            "BUILDING" => (80, "Building application...".to_string()),
-            "PROVISIONING" => (85, "Provisioning environment...".to_string()),
-            "AUTHENTICATING" => (90, "Authenticating with registries...".to_string()),
-            "DEPLOYING" => (95, "Finalizing deployment...".to_string()),
-            _status => {
-                let msg = deployment
-                    .status_message
-                    .as_deref()
-                    .unwrap_or("Processing...")
-                    .to_string();
-                (pb.position().min(95), msg)
-            }
+        // Update spinner message based on status
+        let status_msg = match deployment.status.as_str() {
+            "INITIALIZING" => "Initializing deployment...".to_string(),
+            "BUILDING" => "Building application...".to_string(),
+            "PROVISIONING" => "Provisioning environment...".to_string(),
+            "AUTHENTICATING" => "Authenticating with registries...".to_string(),
+            "DEPLOYING" => "Finalizing deployment...".to_string(),
+            _ => deployment
+                .status_message
+                .as_deref()
+                .unwrap_or("Processing...")
+                .to_string(),
         };
 
-        pb.set_position(progress);
-        pb.set_message(status_msg);
+        spinner.set_message(status_msg);
 
         match deployment.status.as_str() {
             "COMPLETED" => {
-                pb.set_position(100);
-                pb.set_message("Deployment complete!");
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                pb.finish_and_clear();
+                spinner.finish_and_clear();
                 return Ok(deployment);
             }
             "FAILED" => {
-                pb.finish_and_clear();
+                spinner.finish_and_clear();
                 let error_msg = deployment
                     .error_reason
                     .as_deref()
@@ -592,7 +689,7 @@ async fn deploy_to_ftl_with_progress(
     access_token: &str,
     app_name: String,
     tools: Vec<DeploymentTool>,
-    pb: ProgressBar,
+    spinner: ProgressBar,
 ) -> Result<DeploymentDetails> {
     let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
@@ -616,7 +713,7 @@ async fn deploy_to_ftl_with_progress(
         .context("Failed to start deployment")?;
 
     if response.status() != 202 {
-        pb.finish_and_clear();
+        spinner.finish_and_clear();
         let error_text = response.text().await?;
         return Err(anyhow!("Failed to start deployment: {}", error_text));
     }
@@ -638,7 +735,7 @@ async fn deploy_to_ftl_with_progress(
         headers,
         &status_url,
         &start_response.deployment_id,
-        pb,
+        spinner,
     )
     .await
 }
