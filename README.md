@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and tool platform for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to provide a *just works* DX for the entire lifecycle of building and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools distributed across the global network edge.
+FTL is an open source framework and tool platform for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to expose a *just works* DX for the entire lifecycle of building and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools distributed across the global network edge.
 
 ## Why?
 
