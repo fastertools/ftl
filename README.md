@@ -4,12 +4,11 @@
 
 Fast tools for AI agents
 
-[![CI](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/fastertools/ftl-cli/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.87+-orange.svg)](https://www.rust-lang.org)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
 
-[Docs](./docs/introduction.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
+[Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Security](./SECURITY.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
 
 ⚡️ [Quick Start](#quick-start)
 
@@ -26,13 +25,17 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 
 FTL tools run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-When it's time to deploy, the FTL Platform aims to be the best surface for running and managing remote tools. It handles the hard parts and exposes MCP-compliant servers with SOTA performance that are distributed enough to be used by agents operating anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
+When it's time to deploy, the FTL Platform aims to be the best surface for running and managing high performance remote tools. It handles the plumbing and exposes MCP-compliant servers that are distributed enough to be used by agents operating anywhere, including real-time voice and multimodal systems.
+
+Latency and compute overhead for remote tool calls should not be something you have to design around. Instant, sandboxed, globally distributed high performance compute should be available to your agent as a resource. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
 
 - FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - The FTL [gateway components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
+- Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP. Ensure your users have the best possible experience when using agents that access their applications and content, regardless of physical location. 
+- High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
 
-The FTL Platform is optional. Opt in via the `ftl login` command, which enables `ftl deploy`.
+The FTL Platform is just one possible deployment target. It is currently in early alpha and free with limited capacity. Opt in via the `ftl login` command, which enables `ftl deploy`.
 </details>
 
 <details>
@@ -41,19 +44,24 @@ The FTL Platform is optional. Opt in via the `ftl login` command, which enables 
 - Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/).
 - MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own OIDC provider via simple configuration, or use FTL's by default.
-- Allowed outbound network calls are configurable by host per tool.
+- Allowed outbound network calls are configurable by host per tool. This is especially important when you include tools you didn't author in your MCP server, which you can do with OCI registry references (see below.).
 </details>
 
 <details>
-<summary><strong>⤵ Use multiple source languages within one MCP server</strong></summary>
+<summary><strong>⤵ Write tools in the best source language for the job</strong></summary>
 
-Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html). If you can implement a basic HTTP route as a Wasm component, you can run it as an MCP tool with FTL.
+* Combine tools written in different source languages within one MCP server.
+* Use Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html).
+* High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C.
 </details>
 
 <details>
 <summary><strong>⤵ Distribute and compose tools like tiny docker images</strong></summary>
 
-Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
+* Tools are compiled to self-contained Wasm binaries that are often < 1MB.
+* Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
+* Mix and match individual tools in your MCP server by registry URI.
+* Tool binary size and performance are influenced by the tool's individual source language.
 </details>
 
 ## Quick Start

@@ -1,64 +1,85 @@
-use anyhow::Result;
-use console::style;
+//! Refactored registry command with dependency injection for better testability
 
-pub async fn list(registry: Option<String>) -> Result<()> {
-    let registry_url = registry.as_deref().unwrap_or("ghcr.io");
+use std::sync::Arc;
 
-    println!(
+use crate::deps::{MessageStyle, UserInterface};
+
+/// Dependencies for the registry command
+pub struct RegistryDependencies {
+    pub ui: Arc<dyn UserInterface>,
+}
+
+/// Execute the list subcommand with injected dependencies
+pub fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) {
+    let registry_url = registry.unwrap_or("ghcr.io");
+
+    deps.ui.print(&format!(
         "{} Listing components from {}",
-        style("→").cyan(),
-        style(registry_url).bold()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(registry_url, MessageStyle::Bold)
+    ));
 
-    println!();
-    println!(
+    deps.ui.print("");
+    deps.ui.print(&format!(
         "{} Registry listing not yet implemented",
-        style("!").yellow()
-    );
-    println!();
-    println!("For now, you can browse components at:");
-    println!("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
-    println!("  - Docker Hub: https://hub.docker.com/");
-
-    Ok(())
+        styled_text("!", MessageStyle::Yellow)
+    ));
+    deps.ui.print("");
+    deps.ui.print("For now, you can browse components at:");
+    deps.ui
+        .print("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
+    deps.ui.print("  - Docker Hub: https://hub.docker.com/");
 }
 
-pub async fn search(query: String, registry: Option<String>) -> Result<()> {
-    let registry_url = registry.as_deref().unwrap_or("ghcr.io");
+/// Execute the search subcommand with injected dependencies
+pub fn search_with_deps(query: &str, registry: Option<&str>, deps: &Arc<RegistryDependencies>) {
+    let registry_url = registry.unwrap_or("ghcr.io");
 
-    println!(
+    deps.ui.print(&format!(
         "{} Searching for '{}' in {}",
-        style("→").cyan(),
-        style(&query).bold(),
-        style(registry_url).dim()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(query, MessageStyle::Bold),
+        registry_url
+    ));
 
-    println!();
-    println!(
+    deps.ui.print("");
+    deps.ui.print(&format!(
         "{} Registry search not yet implemented",
-        style("!").yellow()
-    );
-    println!();
-    println!("For now, you can search at:");
-    println!("  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages");
-
-    Ok(())
+        styled_text("!", MessageStyle::Yellow)
+    ));
+    deps.ui.print("");
+    deps.ui.print("For now, you can search at:");
+    deps.ui.print(&format!(
+        "  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages"
+    ));
 }
 
-pub async fn info(component: String) -> Result<()> {
-    println!(
+/// Execute the info subcommand with injected dependencies
+pub fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) {
+    deps.ui.print(&format!(
         "{} Getting info for component: {}",
-        style("→").cyan(),
-        style(&component).bold()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(component, MessageStyle::Bold)
+    ));
 
-    println!();
-    println!("{} Registry info not yet implemented", style("!").yellow());
-    println!();
-    println!("Component reference formats:");
-    println!("  - ghcr.io/username/component:version");
-    println!("  - docker.io/username/component:version");
-    println!("  - component-name (searches default registry)");
-
-    Ok(())
+    deps.ui.print("");
+    deps.ui.print(&format!(
+        "{} Registry info not yet implemented",
+        styled_text("!", MessageStyle::Yellow)
+    ));
+    deps.ui.print("");
+    deps.ui.print("Component reference formats:");
+    deps.ui.print("  - ghcr.io/username/component:version");
+    deps.ui.print("  - docker.io/username/component:version");
+    deps.ui
+        .print("  - component-name (searches default registry)");
 }
+
+// Helper function to format styled text (since we're not using console crate directly)
+const fn styled_text(text: &str, _style: MessageStyle) -> &str {
+    text
+}
+
+#[cfg(test)]
+#[path = "registry_tests.rs"]
+mod tests;

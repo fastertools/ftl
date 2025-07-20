@@ -1,56 +1,94 @@
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
+//! Refactored up command with dependency injection for better testability
+
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use console::style;
-use notify::{EventKind, RecursiveMode, Watcher};
-use tokio::sync::mpsc;
 
-use crate::commands::build;
-use crate::common::spin_installer::check_and_install_spin;
+use crate::deps::{
+    AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, ProcessManager, SpinInstaller,
+    UserInterface,
+};
 
-pub async fn execute(
-    path: Option<PathBuf>,
-    port: u16,
-    build: bool,
-    watch: bool,
-    clear: bool,
-) -> Result<()> {
-    let project_path = path.unwrap_or_else(|| PathBuf::from("."));
+/// File watcher trait for testability
+#[async_trait::async_trait]
+pub trait FileWatcher: Send + Sync {
+    async fn watch(&self, path: &Path, recursive: bool) -> Result<Box<dyn WatchHandle>>;
+}
+
+/// Watch handle trait
+#[async_trait::async_trait]
+pub trait WatchHandle: Send + Sync {
+    async fn wait_for_change(&mut self) -> Result<Vec<PathBuf>>;
+}
+
+/// Signal handler trait
+#[async_trait::async_trait]
+pub trait SignalHandler: Send + Sync {
+    async fn wait_for_interrupt(&self) -> Result<()>;
+}
+
+/// Up command configuration
+pub struct UpConfig {
+    pub path: Option<PathBuf>,
+    pub port: u16,
+    pub build: bool,
+    pub watch: bool,
+    pub clear: bool,
+}
+
+/// Dependencies for the up command
+pub struct UpDependencies {
+    pub file_system: Arc<dyn FileSystem>,
+    pub command_executor: Arc<dyn CommandExecutor>,
+    pub process_manager: Arc<dyn ProcessManager>,
+    pub ui: Arc<dyn UserInterface>,
+    pub spin_installer: Arc<dyn SpinInstaller>,
+    pub async_runtime: Arc<dyn AsyncRuntime>,
+    pub file_watcher: Arc<dyn FileWatcher>,
+    pub signal_handler: Arc<dyn SignalHandler>,
+}
+
+/// Execute the up command with injected dependencies
+pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
+    let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
     // Validate project directory exists
-    if !project_path.join("spin.toml").exists() {
+    if !deps.file_system.exists(&project_path.join("spin.toml")) {
         anyhow::bail!(
             "No spin.toml found. Not in a project directory? Run 'ftl init' to create a new project."
         );
     }
 
-    if watch {
-        run_with_watch(project_path, port, clear).await
+    if config.watch {
+        run_with_watch(project_path, config.port, config.clear, &deps).await
     } else {
-        run_normal(project_path, port, build).await
+        run_normal(project_path, config.port, config.build, &deps).await
     }
 }
 
-async fn run_normal(project_path: PathBuf, port: u16, build: bool) -> Result<()> {
+async fn run_normal(
+    project_path: PathBuf,
+    port: u16,
+    build: bool,
+    deps: &Arc<UpDependencies>,
+) -> Result<()> {
     // Get spin path
-    let spin_path = check_and_install_spin().await?;
+    let spin_path = deps.spin_installer.check_and_install().await?;
 
     // If build flag is set, run our parallel build first
     if build {
-        println!(
+        deps.ui.print(&format!(
             "{} Building project before starting server...",
-            style("→").cyan()
-        );
-        println!();
+            "→"
+        ));
+        deps.ui.print("");
 
-        // Use our parallel build command
-        build::execute(Some(project_path.clone()), false).await?;
-
-        println!();
+        // Run build command
+        run_build_command(&project_path, deps).await?;
+        deps.ui.print("");
     }
 
     // Build command args for spin up (without --build since we already built)
@@ -58,160 +96,92 @@ async fn run_normal(project_path: PathBuf, port: u16, build: bool) -> Result<()>
     let listen_addr = format!("127.0.0.1:{port}");
     args.extend(["--listen", &listen_addr]);
 
-    println!("{} Starting server...", style("→").cyan());
-    println!();
-    println!(
-        "{} Server will start at http://{}",
-        style("🌐").blue(),
-        listen_addr
-    );
-    println!("{} Press Ctrl+C to stop", style("⏹").yellow());
-    println!();
+    deps.ui.print(&format!("{} Starting server...", "→"));
+    deps.ui.print("");
+    deps.ui
+        .print(&format!("🌐 Server will start at http://{listen_addr}"));
+    deps.ui.print("⏹ Press Ctrl+C to stop");
+    deps.ui.print("");
 
-    // Run spin up with inherited stdio so user can see logs
-    let mut child = Command::new(&spin_path)
-        .args(&args)
-        .current_dir(&project_path)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
+    // Start the server process
+    let mut process = deps
+        .process_manager
+        .spawn(&spin_path, &args, Some(&project_path))
+        .await
         .context("Failed to start spin up")?;
 
     // Create a flag to track if Ctrl+C was pressed
     let ctrlc_pressed = Arc::new(AtomicBool::new(false));
     let ctrlc_pressed_clone = ctrlc_pressed.clone();
+    let signal_handler = deps.signal_handler.clone();
 
     // Set up Ctrl+C handler
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for Ctrl+C");
+        let _ = signal_handler.wait_for_interrupt().await;
         ctrlc_pressed_clone.store(true, Ordering::SeqCst);
     });
 
-    // Wait for the child process to exit
-    let status = child.wait()?;
+    // Wait for the process to exit
+    let exit_status = process.wait().await?;
 
     // Check if we should print the stopping message
     if ctrlc_pressed.load(Ordering::SeqCst) {
-        println!();
-        println!("{} Stopping server...", style("■").red());
-    } else if !status.success() {
-        anyhow::bail!("Spin exited with status: {}", status);
+        deps.ui.print("");
+        deps.ui
+            .print_styled("■ Stopping server...", MessageStyle::Red);
+    } else if !exit_status.success() {
+        anyhow::bail!(
+            "Spin exited with status: {}",
+            exit_status.code().unwrap_or(-1)
+        );
     }
 
     Ok(())
 }
 
-async fn run_with_watch(project_path: PathBuf, port: u16, clear: bool) -> Result<()> {
-    println!(
+async fn run_with_watch(
+    project_path: PathBuf,
+    port: u16,
+    clear: bool,
+    deps: &Arc<UpDependencies>,
+) -> Result<()> {
+    deps.ui.print(&format!(
         "{} Starting development server with auto-rebuild...",
-        style("→").cyan()
-    );
-    println!();
-    println!("{} Watching for file changes", style("👀").dim());
-    println!(
-        "{} Server will start at http://127.0.0.1:{}",
-        style("🌐").blue(),
-        port
-    );
-    println!("{} Press Ctrl+C to stop", style("⏹").yellow());
-    println!();
+        "→"
+    ));
+    deps.ui.print("");
+    deps.ui.print("👀 Watching for file changes");
+    deps.ui
+        .print(&format!("🌐 Server will start at http://127.0.0.1:{port}"));
+    deps.ui.print("⏹ Press Ctrl+C to stop");
+    deps.ui.print("");
 
     // Initial build
-    println!("{} Running initial build...", style("→").cyan());
-    build::execute(Some(project_path.clone()), false).await?;
-    println!();
+    deps.ui.print(&format!("{} Running initial build...", "→"));
+    run_build_command(&project_path, deps).await?;
+    deps.ui.print("");
 
     // Start the server
-    let spin_path = check_and_install_spin().await?;
+    let spin_path = deps.spin_installer.check_and_install().await?;
     let listen_addr = format!("127.0.0.1:{port}");
     let args = vec!["up", "--listen", &listen_addr];
 
-    let mut server_process = Command::new(&spin_path)
-        .args(&args)
-        .current_dir(&project_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
+    let mut server_process = deps
+        .process_manager
+        .spawn(&spin_path, &args, Some(&project_path))
+        .await
         .context("Failed to start spin up")?;
 
     // Set up file watcher
-    let (tx, mut rx) = mpsc::channel(100);
-
-    let mut watcher =
-        notify::recommended_watcher(move |event: Result<notify::Event, notify::Error>| {
-            if let Ok(event) = event {
-                match event.kind {
-                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                        // Filter out common non-source files and build outputs
-                        let should_rebuild = event.paths.iter().any(|p| {
-                            // Skip if path contains common build/output directories
-                            let path_str = p.to_string_lossy();
-                            if path_str.contains("/target/")
-                                || path_str.contains("\\target\\")
-                                || path_str.contains("/dist/")
-                                || path_str.contains("\\dist\\")
-                                || path_str.contains("/build/")
-                                || path_str.contains("\\build\\")
-                                || path_str.contains("/.spin/")
-                                || path_str.contains("\\.spin\\")
-                                || path_str.contains("/node_modules/")
-                                || path_str.contains("\\node_modules\\")
-                                || path_str.ends_with(".wasm")
-                                || path_str.ends_with(".wat")
-                                || path_str.ends_with("package-lock.json")
-                                || path_str.ends_with("yarn.lock")
-                                || path_str.ends_with("pnpm-lock.yaml")
-                                || path_str.ends_with("Cargo.lock")
-                            {
-                                return false;
-                            }
-
-                            // Only watch source files
-                            if let Some(ext) = p.extension() {
-                                let ext_str = ext.to_string_lossy();
-                                matches!(
-                                    ext_str.as_ref(),
-                                    "rs" | "toml"
-                                        | "js"
-                                        | "ts"
-                                        | "jsx"
-                                        | "tsx"
-                                        | "json"
-                                        | "go"
-                                        | "py"
-                                        | "c"
-                                        | "cpp"
-                                        | "h"
-                                ) && !matches!(ext_str.as_ref(), "wasm" | "wat")
-                            } else {
-                                false
-                            }
-                        });
-
-                        if should_rebuild {
-                            let _ = tx.blocking_send(());
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        })?;
-
-    // Watch the project directory
-    watcher.watch(&project_path, RecursiveMode::Recursive)?;
+    let mut watch_handle = deps.file_watcher.watch(&project_path, true).await?;
 
     // Set up Ctrl+C handler
     let ctrlc_pressed = Arc::new(AtomicBool::new(false));
     let ctrlc_pressed_clone = ctrlc_pressed.clone();
+    let signal_handler = deps.signal_handler.clone();
 
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for Ctrl+C");
+        let _ = signal_handler.wait_for_interrupt().await;
         ctrlc_pressed_clone.store(true, Ordering::SeqCst);
     });
 
@@ -219,78 +189,56 @@ async fn run_with_watch(project_path: PathBuf, port: u16, clear: bool) -> Result
     loop {
         tokio::select! {
             // File change detected
-            Some(_) = rx.recv() => {
-                // Debounce - wait a bit for multiple file changes to settle
-                tokio::time::sleep(Duration::from_millis(200)).await;
+            Ok(changed_files) = watch_handle.wait_for_change() => {
+                // Check if any of the changed files should trigger a rebuild
+                let should_rebuild = changed_files.iter().any(|p| should_watch_file(p));
 
-                // Drain any additional events that came in during the delay
-                while rx.try_recv().is_ok() {}
+                if should_rebuild {
+                    // Debounce - wait a bit for multiple file changes to settle
+                    deps.async_runtime.sleep(Duration::from_millis(200)).await;
 
-                if clear {
-                    // Clear screen
-                    print!("\x1B[2J\x1B[1;1H");
-                }
-
-                println!("{} File change detected, rebuilding...", style("🔄").yellow());
-                println!();
-
-                // Kill the current server
-                #[cfg(unix)]
-                {
-                    use nix::sys::signal::{self, Signal};
-                    use nix::unistd::Pid;
-                    let _ = signal::kill(Pid::from_raw(server_process.id() as i32), Signal::SIGTERM);
-                }
-                #[cfg(windows)]
-                {
-                    let _ = server_process.kill();
-                }
-
-                let _ = server_process.wait();
-
-                // Rebuild
-                match build::execute(Some(project_path.clone()), false).await {
-                    Ok(_) => {
-                        println!();
-                        println!("{} Restarting server...", style("→").cyan());
-
-                        // Start new server
-                        server_process = Command::new(&spin_path)
-                            .args(&args)
-                            .current_dir(&project_path)
-                            .stdin(Stdio::null())
-                            .stdout(Stdio::inherit())
-                            .stderr(Stdio::inherit())
-                            .spawn()
-                            .context("Failed to restart spin up")?;
+                    if clear {
+                        // Clear screen
+                        deps.ui.clear_screen();
                     }
-                    Err(e) => {
-                        println!();
-                        println!("{} Build failed: {}", style("✗").red(), e);
-                        println!("{} Waiting for file changes...", style("⏸").yellow());
+
+                    deps.ui.print_styled("🔄 File change detected, rebuilding...", MessageStyle::Yellow);
+                    deps.ui.print("");
+
+                    // Kill the current server
+                    server_process.terminate().await?;
+                    server_process.wait().await?;
+
+                    // Rebuild
+                    match run_build_command(&project_path, deps).await {
+                        Ok(()) => {
+                            deps.ui.print("");
+                            deps.ui.print(&format!("{} Restarting server...", "→"));
+
+                            // Start new server
+                            server_process = deps.process_manager
+                                .spawn(&spin_path, &args, Some(&project_path))
+                                .await
+                                .context("Failed to restart spin up")?;
+                        }
+                        Err(e) => {
+                            deps.ui.print("");
+                            deps.ui.print_styled(&format!("✗ Build failed: {e}"), MessageStyle::Red);
+                            deps.ui.print_styled("⏸ Waiting for file changes...", MessageStyle::Yellow);
+                        }
                     }
                 }
             }
 
-            // Ctrl+C pressed
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+            // Check for Ctrl+C periodically
+            () = deps.async_runtime.sleep(Duration::from_millis(100)) => {
                 if ctrlc_pressed.load(Ordering::SeqCst) {
-                    println!();
-                    println!("{} Stopping development server...", style("■").red());
+                    deps.ui.print("");
+                    deps.ui.print_styled("■ Stopping development server...", MessageStyle::Red);
 
                     // Kill the server
-                    #[cfg(unix)]
-                    {
-                        use nix::sys::signal::{self, Signal};
-                        use nix::unistd::Pid;
-                        let _ = signal::kill(Pid::from_raw(server_process.id() as i32), Signal::SIGTERM);
-                    }
-                    #[cfg(windows)]
-                    {
-                        let _ = server_process.kill();
-                    }
-
-                    let _ = server_process.wait();
+                    server_process.terminate().await?;
+                    server_process.wait().await?;
                     break;
                 }
             }
@@ -299,3 +247,68 @@ async fn run_with_watch(project_path: PathBuf, port: u16, clear: bool) -> Result
 
     Ok(())
 }
+
+pub fn should_watch_file(path: &Path) -> bool {
+    // Skip if path contains common build/output directories
+    let path_str = path.to_string_lossy();
+
+    // Check for excluded directories (with or without leading separator)
+    if path_str.contains("target/")
+        || path_str.contains("target\\")
+        || path_str.contains("dist/")
+        || path_str.contains("dist\\")
+        || path_str.contains("build/")
+        || path_str.contains("build\\")
+        || path_str.contains(".spin/")
+        || path_str.contains(".spin\\")
+        || path_str.contains("node_modules/")
+        || path_str.contains("node_modules\\")
+        || path_str.ends_with(".wasm")
+        || path_str.ends_with(".wat")
+        || path_str.ends_with("package-lock.json")
+        || path_str.ends_with("yarn.lock")
+        || path_str.ends_with("pnpm-lock.yaml")
+        || path_str.ends_with("Cargo.lock")
+    {
+        return false;
+    }
+
+    // Only watch source files
+    if let Some(ext) = path.extension() {
+        let ext_str = ext.to_string_lossy();
+        matches!(
+            ext_str.as_ref(),
+            "rs" | "toml" | "js" | "ts" | "jsx" | "tsx" | "json" | "go" | "py" | "c" | "cpp" | "h"
+        ) && !matches!(ext_str.as_ref(), "wasm" | "wat")
+    } else {
+        false
+    }
+}
+
+async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> Result<()> {
+    // For now, we'll use the build command directly
+    // In a real implementation, we'd refactor build command to be callable
+    use crate::commands::build::{
+        BuildConfig, BuildDependencies, execute_with_deps as build_execute,
+    };
+
+    let build_deps = Arc::new(BuildDependencies {
+        file_system: deps.file_system.clone(),
+        command_executor: deps.command_executor.clone(),
+        ui: deps.ui.clone(),
+        spin_installer: deps.spin_installer.clone(),
+    });
+
+    build_execute(
+        BuildConfig {
+            path: Some(project_path.to_path_buf()),
+            release: false,
+        },
+        build_deps,
+    )
+    .await
+}
+
+#[cfg(test)]
+#[path = "up_tests.rs"]
+mod tests;

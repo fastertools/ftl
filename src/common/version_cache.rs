@@ -1,14 +1,108 @@
-use std::fs;
+//! Refactored version cache with dependency injection for better testability
+
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::Confirm;
-use semver::Version;
 use serde::{Deserialize, Serialize};
 
-const VERSION_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
+use crate::deps::{FileSystem, MessageStyle, UserInterface};
+
+/// Helper function to check and prompt for update using default dependencies
+pub async fn check_and_prompt_for_update() -> Result<()> {
+    // Create real implementations
+    struct RealHttpClient;
+    #[async_trait::async_trait]
+    impl HttpClient for RealHttpClient {
+        async fn get(&self, url: &str, user_agent: &str) -> Result<String> {
+            let response = reqwest::Client::new()
+                .get(url)
+                .header("User-Agent", user_agent)
+                .send()
+                .await?;
+
+            response
+                .text()
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))
+        }
+    }
+
+    struct RealEnvironment;
+    impl Environment for RealEnvironment {
+        fn get_var(&self, key: &str) -> Result<String, std::env::VarError> {
+            std::env::var(key)
+        }
+
+        fn get_home_dir(&self) -> Option<PathBuf> {
+            dirs::home_dir()
+        }
+
+        fn get_cargo_pkg_version(&self) -> &'static str {
+            env!("CARGO_PKG_VERSION")
+        }
+
+        fn get_unix_timestamp(&self) -> u64 {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        }
+    }
+
+    struct RealUpdateExecutor;
+    #[async_trait::async_trait]
+    impl UpdateExecutor for RealUpdateExecutor {
+        async fn execute(&self, _sudo: bool) -> Result<()> {
+            use std::process::Command;
+
+            let output = Command::new("cargo")
+                .args(["install", "ftl-cli", "--force"])
+                .output()?;
+
+            if !output.status.success() {
+                anyhow::bail!(
+                    "Failed to update: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+
+            Ok(())
+        }
+    }
+
+    let ui = Arc::new(crate::ui::RealUserInterface);
+    let deps = Arc::new(VersionCacheDependencies {
+        file_system: Arc::new(crate::deps::RealFileSystem),
+        http_client: Arc::new(RealHttpClient),
+        environment: Arc::new(RealEnvironment),
+        ui: ui.clone(),
+        update_executor: Arc::new(RealUpdateExecutor),
+    });
+
+    let manager = VersionCacheManager::new(deps);
+    manager.check_and_prompt_for_update().await
+}
+
+/// HTTP client trait for testability
+#[async_trait::async_trait]
+pub trait HttpClient: Send + Sync {
+    async fn get(&self, url: &str, user_agent: &str) -> Result<String>;
+}
+
+/// Environment trait for testability
+pub trait Environment: Send + Sync {
+    fn get_var(&self, key: &str) -> Result<String, std::env::VarError>;
+    fn get_home_dir(&self) -> Option<PathBuf>;
+    fn get_cargo_pkg_version(&self) -> &'static str;
+    fn get_unix_timestamp(&self) -> u64;
+}
+
+/// Update executor trait
+#[async_trait::async_trait]
+pub trait UpdateExecutor: Send + Sync {
+    async fn execute(&self, sudo: bool) -> Result<()>;
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VersionCache {
@@ -22,27 +116,20 @@ pub struct VersionCache {
     pub dismissed_version: Option<String>,
 }
 
-impl Default for VersionCache {
-    fn default() -> Self {
+impl VersionCache {
+    pub const fn new(current_version: String) -> Self {
         Self {
             last_check_timestamp: 0,
-            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            current_version,
             latest_version: None,
             dismissed_version: None,
         }
     }
-}
 
-impl VersionCache {
     /// Check if we should perform a version check today
-    pub fn should_check_today(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
+    pub const fn should_check_today(&self, now_secs: u64) -> bool {
         // Check if it's been more than 24 hours since last check
-        now - self.last_check_timestamp > 24 * 60 * 60
+        now_secs - self.last_check_timestamp > 24 * 60 * 60
     }
 
     /// Check if there's a new version available that we should prompt about
@@ -57,8 +144,8 @@ impl VersionCache {
 
             // Check if latest is newer than current
             if let (Ok(current), Ok(latest_ver)) = (
-                Version::parse(&self.current_version),
-                Version::parse(latest),
+                semver::Version::parse(&self.current_version),
+                semver::Version::parse(latest),
             ) {
                 return latest_ver > current;
             }
@@ -67,12 +154,14 @@ impl VersionCache {
     }
 
     /// Update the cache with new version information
-    pub fn update_check(&mut self, latest_version: Option<String>) {
-        self.last_check_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        self.current_version = env!("CARGO_PKG_VERSION").to_string();
+    pub fn update_check(
+        &mut self,
+        now_secs: u64,
+        current_version: String,
+        latest_version: Option<String>,
+    ) {
+        self.last_check_timestamp = now_secs;
+        self.current_version = current_version;
         self.latest_version = latest_version;
     }
 
@@ -82,169 +171,198 @@ impl VersionCache {
     }
 }
 
-/// Get the path to the FTL cache directory
-pub fn get_cache_dir() -> Result<PathBuf> {
-    let cache_dir = if let Ok(xdg_cache) = std::env::var("XDG_CACHE_HOME") {
-        PathBuf::from(xdg_cache)
-    } else {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        home.join(".cache")
-    };
-
-    Ok(cache_dir.join("ftl"))
+/// Dependencies for version cache operations
+pub struct VersionCacheDependencies {
+    pub file_system: Arc<dyn FileSystem>,
+    pub http_client: Arc<dyn HttpClient>,
+    pub environment: Arc<dyn Environment>,
+    pub ui: Arc<dyn UserInterface>,
+    pub update_executor: Arc<dyn UpdateExecutor>,
 }
 
-/// Get the path to the version cache file
-pub fn get_version_cache_path() -> Result<PathBuf> {
-    Ok(get_cache_dir()?.join("version_cache.json"))
+/// Version cache manager
+pub struct VersionCacheManager {
+    deps: Arc<VersionCacheDependencies>,
 }
 
-/// Load version cache from disk
-pub fn load_version_cache() -> Result<VersionCache> {
-    let cache_path = get_version_cache_path()?;
+impl VersionCacheManager {
+    pub const fn new(deps: Arc<VersionCacheDependencies>) -> Self {
+        Self { deps }
+    }
 
-    if !cache_path.exists() {
-        // Create the cache directory if it doesn't exist
-        let cache_dir = get_cache_dir()?;
-        if !cache_dir.exists() {
-            fs::create_dir_all(&cache_dir).with_context(|| {
-                format!("Failed to create cache directory {}", cache_dir.display())
+    /// Get the path to the FTL cache directory
+    pub fn get_cache_dir(&self) -> Result<PathBuf> {
+        let cache_dir = if let Ok(xdg_cache) = self.deps.environment.get_var("XDG_CACHE_HOME") {
+            PathBuf::from(xdg_cache)
+        } else {
+            let home = self
+                .deps
+                .environment
+                .get_home_dir()
+                .context("Could not determine home directory")?;
+            home.join(".cache")
+        };
+
+        Ok(cache_dir.join("ftl"))
+    }
+
+    /// Get the path to the version cache file
+    pub fn get_version_cache_path(&self) -> Result<PathBuf> {
+        Ok(self.get_cache_dir()?.join("version_cache.json"))
+    }
+
+    /// Load version cache from disk
+    pub fn load_version_cache(&self) -> Result<VersionCache> {
+        let cache_path = self.get_version_cache_path()?;
+
+        if !self.deps.file_system.exists(&cache_path) {
+            return Ok(VersionCache::new(
+                self.deps.environment.get_cargo_pkg_version().to_string(),
+            ));
+        }
+
+        let content = self
+            .deps
+            .file_system
+            .read_to_string(&cache_path)
+            .with_context(|| {
+                format!("Failed to read version cache from {}", cache_path.display())
             })?;
+
+        let cache: VersionCache = serde_json::from_str(&content).with_context(|| {
+            format!(
+                "Failed to parse version cache from {}",
+                cache_path.display()
+            )
+        })?;
+
+        Ok(cache)
+    }
+
+    /// Save version cache to disk
+    pub fn save_version_cache(&self, cache: &VersionCache) -> Result<()> {
+        let cache_path = self.get_version_cache_path()?;
+        let content =
+            serde_json::to_string_pretty(cache).context("Failed to serialize version cache")?;
+
+        self.deps
+            .file_system
+            .write_string(&cache_path, &content)
+            .with_context(|| {
+                format!("Failed to write version cache to {}", cache_path.display())
+            })?;
+
+        Ok(())
+    }
+
+    /// Check for latest version from crates.io
+    pub async fn fetch_latest_version(&self) -> Result<String> {
+        let user_agent = format!("ftl-cli/{}", self.deps.environment.get_cargo_pkg_version());
+
+        let response = self
+            .deps
+            .http_client
+            .get("https://crates.io/api/v1/crates/ftl-cli", &user_agent)
+            .await?;
+
+        let json: serde_json::Value = serde_json::from_str(&response)?;
+
+        let latest_version = json
+            .get("crate")
+            .and_then(|c| c.get("newest_version"))
+            .and_then(|v| v.as_str())
+            .context("Could not parse latest version from crates.io response")?;
+
+        Ok(latest_version.to_string())
+    }
+
+    /// Perform version check and prompt user if needed
+    pub async fn check_and_prompt_for_update(&self) -> Result<()> {
+        let mut cache = self.load_version_cache().unwrap_or_else(|_| {
+            VersionCache::new(self.deps.environment.get_cargo_pkg_version().to_string())
+        });
+
+        let now_secs = self.deps.environment.get_unix_timestamp();
+
+        // Only check if it's been more than 24 hours
+        if !cache.should_check_today(now_secs) {
+            // Still check if we should prompt for a previously found update
+            if cache.should_prompt_for_update() {
+                self.prompt_for_update(&mut cache).await?;
+            }
+            return Ok(());
         }
-        return Ok(VersionCache::default());
-    }
 
-    let content = fs::read_to_string(&cache_path)
-        .with_context(|| format!("Failed to read version cache from {}", cache_path.display()))?;
-
-    let cache: VersionCache = serde_json::from_str(&content).with_context(|| {
-        format!(
-            "Failed to parse version cache from {}",
-            cache_path.display()
-        )
-    })?;
-
-    Ok(cache)
-}
-
-/// Save version cache to disk
-pub fn save_version_cache(cache: &VersionCache) -> Result<()> {
-    let cache_dir = get_cache_dir()?;
-
-    // Create cache directory if it doesn't exist
-    if !cache_dir.exists() {
-        fs::create_dir_all(&cache_dir)
-            .with_context(|| format!("Failed to create cache directory {}", cache_dir.display()))?;
-    }
-
-    let cache_path = get_version_cache_path()?;
-    let content =
-        serde_json::to_string_pretty(cache).context("Failed to serialize version cache")?;
-
-    fs::write(&cache_path, content)
-        .with_context(|| format!("Failed to write version cache to {}", cache_path.display()))?;
-
-    Ok(())
-}
-
-/// Check for latest version from crates.io
-pub async fn fetch_latest_version() -> Result<String> {
-    let client = reqwest::Client::builder()
-        .timeout(VERSION_CHECK_TIMEOUT)
-        .build()?;
-
-    let response = client
-        .get("https://crates.io/api/v1/crates/ftl-cli")
-        .header(
-            "User-Agent",
-            format!("ftl-cli/{}", env!("CARGO_PKG_VERSION")),
-        )
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("Failed to fetch crate information from crates.io");
-    }
-
-    let json: serde_json::Value = response.json().await?;
-
-    let latest_version = json
-        .get("crate")
-        .and_then(|c| c.get("newest_version"))
-        .and_then(|v| v.as_str())
-        .context("Could not parse latest version from crates.io response")?;
-
-    Ok(latest_version.to_string())
-}
-
-/// Perform version check and prompt user if needed
-pub async fn check_and_prompt_for_update() -> Result<()> {
-    let mut cache = load_version_cache().unwrap_or_default();
-
-    // Only check if it's been more than 24 hours
-    if !cache.should_check_today() {
-        // Still check if we should prompt for a previously found update
-        if cache.should_prompt_for_update() {
-            prompt_for_update(&mut cache).await?;
-        }
-        return Ok(());
-    }
-
-    // Perform version check
-    match fetch_latest_version().await {
-        Ok(latest_version) => {
-            cache.update_check(Some(latest_version));
-            save_version_cache(&cache)?;
+        // Perform version check
+        if let Ok(latest_version) = self.fetch_latest_version().await {
+            cache.update_check(
+                now_secs,
+                self.deps.environment.get_cargo_pkg_version().to_string(),
+                Some(latest_version),
+            );
+            self.save_version_cache(&cache)?;
 
             // Prompt if there's a new version
             if cache.should_prompt_for_update() {
-                prompt_for_update(&mut cache).await?;
+                self.prompt_for_update(&mut cache).await?;
+            }
+        } else {
+            // Silently fail version check - don't interrupt user workflow
+            cache.update_check(
+                now_secs,
+                self.deps.environment.get_cargo_pkg_version().to_string(),
+                None,
+            );
+            let _ = self.save_version_cache(&cache);
+        }
+
+        Ok(())
+    }
+
+    /// Prompt user about available update
+    async fn prompt_for_update(&self, cache: &mut VersionCache) -> Result<()> {
+        let latest = cache.latest_version.as_ref().unwrap();
+
+        self.deps.ui.print("");
+        self.deps
+            .ui
+            .print("🎉 A new version of FTL CLI is available!");
+        self.deps
+            .ui
+            .print(&format!("  Current version: {}", cache.current_version));
+        self.deps
+            .ui
+            .print_styled(&format!("  Latest version:  {latest}"), MessageStyle::Green);
+        self.deps.ui.print("");
+
+        let should_update =
+            self.deps
+                .ui
+                .prompt_select("Would you like to update now?", &["Yes", "No"], 1)?
+                == 0;
+
+        if should_update {
+            self.deps.ui.print("");
+            self.deps.update_executor.execute(false).await?;
+        } else {
+            // Ask if user wants to dismiss this version
+            let should_dismiss = self.deps.ui.prompt_select(
+                "Don't remind me about this version again?",
+                &["Yes", "No"],
+                1,
+            )? == 0;
+
+            if should_dismiss {
+                cache.dismiss_version(latest.clone());
+                self.save_version_cache(cache)?;
             }
         }
-        Err(_) => {
-            // Silently fail version check - don't interrupt user workflow
-            cache.update_check(None);
-            let _ = save_version_cache(&cache);
-        }
-    }
 
-    Ok(())
+        self.deps.ui.print("");
+        Ok(())
+    }
 }
 
-/// Prompt user about available update
-async fn prompt_for_update(cache: &mut VersionCache) -> Result<()> {
-    let latest = cache.latest_version.as_ref().unwrap();
-
-    println!();
-    println!(
-        "{} A new version of FTL CLI is available!",
-        style("🎉").cyan()
-    );
-    println!("  Current version: {}", style(&cache.current_version).dim());
-    println!("  Latest version:  {}", style(latest).green());
-    println!();
-
-    let should_update = Confirm::new()
-        .with_prompt("Would you like to update now?")
-        .default(false)
-        .interact()?;
-
-    if should_update {
-        println!();
-        crate::commands::update::execute(false).await?;
-    } else {
-        // Ask if user wants to dismiss this version
-        let should_dismiss = Confirm::new()
-            .with_prompt("Don't remind me about this version again?")
-            .default(false)
-            .interact()?;
-
-        if should_dismiss {
-            cache.dismiss_version(latest.clone());
-            save_version_cache(cache)?;
-        }
-    }
-
-    println!();
-    Ok(())
-}
+#[cfg(test)]
+#[path = "version_cache_tests.rs"]
+mod tests;

@@ -1,0 +1,1251 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FTL AWS API",
+    "version": "1.0.0",
+    "description": "API for deploying and managing applications on the Fermyon Platform",
+    "contact": {
+      "name": "API Support",
+      "email": "mashh.labs@gmail.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com",
+      "description": "Production API"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Applications",
+      "description": "Operations for managing applications"
+    },
+    {
+      "name": "Deployments",
+      "description": "Operations for creating and monitoring deployments"
+    }
+  ],
+  "externalDocs": {
+    "description": "Fermyon Platform Documentation",
+    "url": "https://developer.fermyon.com/cloud"
+  },
+  "paths": {
+    "/v1/apps": {
+      "post": {
+        "operationId": "deployApp",
+        "summary": "Deploy a new application",
+        "description": "Creates a new deployment for an application with the specified Docker image and tools configuration",
+        "tags": [
+          "Deployments"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Deployment accepted and started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listApps",
+        "summary": "List applications",
+        "description": "Retrieves a list of all applications for the authenticated user",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of applications",
+            "headers": {
+              "X-Cache": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "HIT",
+                    "MISS"
+                  ]
+                }
+              },
+              "X-Cached-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAppsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apps/{appName}": {
+      "get": {
+        "operationId": "getAppStatus",
+        "summary": "Get application status",
+        "description": "Retrieves detailed status information for a specific application",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appName",
+            "schema": {
+              "description": "Application name identifier",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Application name identifier"
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application status retrieved successfully",
+            "headers": {
+              "X-Cache": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "HIT",
+                    "MISS"
+                  ]
+                }
+              },
+              "X-Cached-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAppStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteApp",
+        "summary": "Delete an application",
+        "description": "Permanently deletes an application and all associated data",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appName",
+            "schema": {
+              "description": "Application name identifier",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Application name identifier"
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAppResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/deployments/{deploymentId}/status": {
+      "get": {
+        "operationId": "getDeploymentStatus",
+        "summary": "Get deployment status",
+        "description": "Retrieves the current status of a deployment",
+        "tags": [
+          "Deployments"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "schema": {
+              "description": "Deployment UUID",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Deployment UUID"
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deployment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/registry/repositories": {
+      "post": {
+        "operationId": "createEcrRepository",
+        "summary": "Create ECR repository",
+        "description": "Creates an ECR repository for storing container images for a specific tool",
+        "tags": [
+          "Registry"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEcrRepositoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Repository already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEcrRepositoryResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Repository created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEcrRepositoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/registry/credentials": {
+      "post": {
+        "operationId": "getEcrCredentials",
+        "summary": "Get ECR push credentials",
+        "description": "Returns temporary credentials for pushing container images to ECR",
+        "tags": [
+          "Registry"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "pattern": "^Bearer .+$"
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ECR credentials retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetEcrCredentialsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DeploymentRequest": {
+        "description": "Request body for creating a new deployment",
+        "type": "object",
+        "properties": {
+          "appName": {
+            "description": "Application name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "pattern": "^[a-zA-Z0-9-_]+$"
+          },
+          "tools": {
+            "description": "List of tools to enable for the application",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "Tool name identifier",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "tag": {
+                  "description": "Tool version tag",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "componentUri": {
+                  "description": "Full component URI",
+                  "type": "string",
+                  "format": "uri"
+                },
+                "allowedHosts": {
+                  "description": "Allowed host patterns for the tool",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "tag"
+              ]
+            }
+          },
+          "variables": {
+            "description": "Environment variables as key-value pairs",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "appName",
+          "tools"
+        ]
+      },
+      "CreateEcrRepositoryRequest": {
+        "description": "Request to create an ECR repository for a tool",
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "description": "Name of the tool/container to create a repository for",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$"
+          }
+        },
+        "required": [
+          "toolName"
+        ]
+      },
+      "DeploymentResponse": {
+        "description": "Response for successful deployment creation",
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "description": "Unique deployment identifier",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          },
+          "status": {
+            "description": "Current deployment status",
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "building",
+              "preparing",
+              "deploying",
+              "validating",
+              "deployed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "message": {
+            "description": "Human-readable status message",
+            "type": "string"
+          },
+          "statusUrl": {
+            "description": "URL to check deployment status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deploymentId",
+          "status",
+          "message",
+          "statusUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "description": "Standard error response format",
+        "type": "object",
+        "properties": {
+          "error": {
+            "description": "Human-readable error message",
+            "type": "string"
+          },
+          "code": {
+            "description": "Machine-readable error code",
+            "type": "string"
+          },
+          "details": {
+            "description": "Field-specific validation errors",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "description": "The field that caused the error",
+                  "type": "string"
+                },
+                "message": {
+                  "description": "Detailed error message for this field",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ListAppsResponse": {
+        "description": "List of applications with pagination",
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Application ID in the platform",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Full application name",
+                  "type": "string"
+                },
+                "displayName": {
+                  "description": "User-friendly display name",
+                  "type": "string"
+                },
+                "urls": {
+                  "description": "Application URLs",
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "url": {
+                  "description": "Primary application URL",
+                  "type": "string",
+                  "format": "uri"
+                },
+                "status": {
+                  "description": "Current application status",
+                  "type": "string",
+                  "enum": [
+                    "deployed",
+                    "deploying",
+                    "failed",
+                    "unknown"
+                  ]
+                },
+                "createdAt": {
+                  "description": "When the app was created",
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "lastDeployment": {
+                  "description": "Timestamp of last deployment",
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "invocations": {
+                  "description": "Number of invocations",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "displayName",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "description": "Whether more items exist",
+                "type": "boolean"
+              },
+              "cursor": {
+                "description": "Cursor for next page, null if no more items",
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "hasMore",
+              "cursor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "apps",
+          "pagination"
+        ],
+        "additionalProperties": false
+      },
+      "GetAppStatusResponse": {
+        "description": "Detailed application status information",
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Application ID in the platform",
+                "type": "string"
+              },
+              "name": {
+                "description": "Full application name",
+                "type": "string"
+              },
+              "displayName": {
+                "description": "User-friendly display name",
+                "type": "string"
+              },
+              "urls": {
+                "description": "Application URLs",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "url": {
+                "description": "Primary application URL",
+                "type": "string",
+                "format": "uri"
+              },
+              "status": {
+                "description": "Current application status",
+                "type": "string",
+                "enum": [
+                  "deployed",
+                  "deploying",
+                  "failed",
+                  "unknown"
+                ]
+              },
+              "createdAt": {
+                "description": "When the app was created",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "lastDeployment": {
+                "description": "Timestamp of last deployment",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "invocations": {
+                "description": "Number of invocations",
+                "type": "string"
+              },
+              "deploymentCount": {
+                "description": "Total number of deployments",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastDeploymentInfo": {
+                "type": "object",
+                "properties": {
+                  "deploymentId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "accepted",
+                      "building",
+                      "preparing",
+                      "deploying",
+                      "validating",
+                      "deployed",
+                      "failed",
+                      "cancelled"
+                    ]
+                  },
+                  "createdAt": {
+                    "description": "ISO 8601 timestamp",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "completedAt": {
+                    "description": "ISO 8601 timestamp",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "deploymentUrl": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "deploymentId",
+                  "status",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "displayName",
+              "url",
+              "deploymentCount"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "app"
+        ],
+        "additionalProperties": false
+      },
+      "DeleteAppResponse": {
+        "description": "Response for successful app deletion",
+        "type": "object",
+        "properties": {
+          "message": {
+            "description": "Success message",
+            "type": "string"
+          },
+          "app": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "deletedAt": {
+                "description": "ISO 8601 timestamp",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "lastDeployment": {
+                "type": "object",
+                "properties": {
+                  "deploymentId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "description": "ISO 8601 timestamp",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "deploymentUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "deploymentId",
+                  "createdAt",
+                  "deploymentUrl"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name",
+              "displayName",
+              "deletedAt"
+            ],
+            "additionalProperties": false
+          },
+          "warning": {
+            "description": "Warning about permanent deletion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "app",
+          "warning"
+        ],
+        "additionalProperties": false
+      },
+      "DeploymentStatus": {
+        "description": "Full deployment status information",
+        "type": "object",
+        "properties": {
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "deploymentId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+              },
+              "appName": {
+                "type": "string"
+              },
+              "displayName": {
+                "description": "User-friendly app name",
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "accepted",
+                  "building",
+                  "preparing",
+                  "deploying",
+                  "validating",
+                  "deployed",
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              "deploymentUrl": {
+                "description": "URL of deployed application",
+                "type": "string"
+              },
+              "imageUrl": {
+                "description": "Docker image URL",
+                "type": "string"
+              },
+              "platform": {
+                "description": "Deployment platform",
+                "type": "string",
+                "enum": ["Fermyon"]
+              },
+              "createdAt": {
+                "description": "ISO 8601 timestamp",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "updatedAt": {
+                "description": "ISO 8601 timestamp",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "completedAt": {
+                "description": "ISO 8601 timestamp",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "error": {
+                "description": "Error message if deployment failed",
+                "type": "string"
+              },
+              "retryCount": {
+                "default": 0,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "stages": {
+                "description": "Detailed stage information",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {
+                      "type": "string",
+                      "enum": [
+                        "IMAGE_BUILD",
+                        "PLATFORM_UPLOAD",
+                        "PLATFORM_DEPLOY",
+                        "VALIDATION"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "in_progress",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "startedAt": {
+                      "description": "ISO 8601 timestamp",
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "completedAt": {
+                      "description": "ISO 8601 timestamp",
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "stage",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "deploymentId",
+              "appName",
+              "displayName",
+              "status",
+              "imageUrl",
+              "platform",
+              "createdAt",
+              "updatedAt",
+              "retryCount"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "deployment"
+        ],
+        "additionalProperties": false
+      },
+      "CreateEcrRepositoryResponse": {
+        "description": "Response after ECR repository creation",
+        "type": "object",
+        "properties": {
+          "repositoryUri": {
+            "description": "Full URI of the ECR repository",
+            "type": "string"
+          },
+          "repositoryName": {
+            "description": "Name of the repository (userId/toolName)",
+            "type": "string"
+          },
+          "alreadyExists": {
+            "description": "Whether the repository already existed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repositoryUri",
+          "repositoryName",
+          "alreadyExists"
+        ],
+        "additionalProperties": false
+      },
+      "GetEcrCredentialsResponse": {
+        "description": "ECR credentials for pushing container images",
+        "type": "object",
+        "properties": {
+          "registryUri": {
+            "description": "Base ECR registry URI (without https://)",
+            "type": "string"
+          },
+          "authorizationToken": {
+            "description": "Base64-encoded authorization token",
+            "type": "string"
+          },
+          "proxyEndpoint": {
+            "description": "HTTPS endpoint for the registry",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "When the credentials expire",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "region": {
+            "description": "AWS region for the ECR registry",
+            "type": "string"
+          }
+        },
+        "required": [
+          "registryUri",
+          "authorizationToken",
+          "proxyEndpoint",
+          "expiresAt",
+          "region"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "WorkOS JWT authentication token"
+      }
+    }
+  }
+}

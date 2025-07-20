@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - 'Makefile'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
@@ -14,6 +15,7 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - 'Makefile'
       - '.github/workflows/ci.yml'
 
 env:
@@ -59,10 +61,10 @@ jobs:
         run: cargo fmt --all -- --check
       
       - name: Run clippy
-        run: cargo clippy --all -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
+  test-and-coverage:
+    name: Test & Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,8 +74,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libdbus-1-dev
       
-      - name: Install Rust
+      - name: Install Rust with llvm-tools
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
       
       - name: Install wasm32-wasip1 target
         run: rustup target add wasm32-wasip1
@@ -96,11 +100,27 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Build
-        run: cargo build --all-features
+      - name: Install cargo-llvm-cov and nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,nextest
       
-      - name: Run tests
-        run: cargo test --all-features
+      - name: Run tests with coverage
+        run: |
+          # Run tests with coverage in one command
+          cargo llvm-cov nextest --all-features --profile ci --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+          
+          # Generate coverage report and extract percentage
+          COVERAGE=$(cargo llvm-cov report --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)" | tail -1 | awk '{print $4}' | sed 's/%//')
+          echo "Coverage: ${COVERAGE}%"
+          
+          # Fail if coverage drops below 80%
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below required 80%"
+            exit 1
+          else
+            echo "::notice::Coverage ${COVERAGE}% meets the 80% requirement"
+          fi
       
       - name: Test build templates
         run: |
@@ -118,9 +138,7 @@ jobs:
           sudo apt-get install -y libdbus-1-dev
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-audit
-        run: cargo binstall cargo-audit --no-confirm --force
+        uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
         run: cargo audit

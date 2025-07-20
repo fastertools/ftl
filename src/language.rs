@@ -14,9 +14,9 @@ pub enum Language {
 impl Language {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "rust" | "rs" => Some(Language::Rust),
-            "javascript" | "js" => Some(Language::JavaScript),
-            "typescript" | "ts" => Some(Language::TypeScript),
+            "rust" | "rs" => Some(Self::Rust),
+            "javascript" | "js" => Some(Self::JavaScript),
+            "typescript" | "ts" => Some(Self::TypeScript),
             _ => None,
         }
     }
@@ -25,9 +25,13 @@ impl Language {
 impl fmt::Display for Language {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Language::Rust => write!(f, "Rust"),
-            Language::JavaScript => write!(f, "JavaScript"),
-            Language::TypeScript => write!(f, "TypeScript"),
+            Self::Rust => write!(f, "Rust"),
+            Self::JavaScript => write!(f, "JavaScript"),
+            Self::TypeScript => write!(f, "TypeScript"),
         }
     }
 }
+
+#[cfg(test)]
+#[path = "language_tests.rs"]
+mod tests;

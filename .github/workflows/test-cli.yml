@@ -7,7 +7,7 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - '.github/workflows/test-cli.yml'
+      - 'Makefile'\n      - '.github/workflows/test-cli.yml'
       - 'templates/**'
   pull_request:
     branches: [ main ]
@@ -15,7 +15,7 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - '.github/workflows/test-cli.yml'
+      - 'Makefile'\n      - '.github/workflows/test-cli.yml'
       - 'templates/**'
 
 jobs:
@@ -35,8 +35,23 @@ jobs:
         with:
           targets: wasm32-wasip1
       
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install ftl CLI
         run: |
@@ -96,6 +111,24 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
       - name: Install ftl CLI
         run: |
           cargo install --path .
@@ -150,6 +183,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install ftl CLI
         run: |

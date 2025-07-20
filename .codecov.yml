@@ -1,0 +1,30 @@
+# Codecov configuration for CI/CD coverage reporting
+# This file is used by services like codecov.io, coveralls.io, etc.
+
+coverage:
+  status:
+    project:
+      default:
+        # Fail the status if coverage drops by more than 1%
+        threshold: 1%
+        target: 80%  # We're aiming for 80%+ coverage (excluding test files)
+    patch:
+      default:
+        # New code should have at least 80% coverage
+        target: 80%
+
+ignore:
+  # Infrastructure and hard-to-test files
+  - "src/main.rs"       # CLI entry point, mostly argument parsing
+  - "src/deps.rs"       # Testing infrastructure (DI traits)
+  - "src/ui.rs"         # Interactive UI components
+  - "src/api_client.rs" # Thin wrapper around auto-generated API client
+  - "**/tests/**"       # Test files themselves
+  - "**/*_test.rs"      # Test files
+  - "**/*_tests.rs"     # Test files
+  - "**/test_*.rs"      # Test helper files
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false

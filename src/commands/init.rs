@@ -1,140 +1,171 @@
-use std::path::PathBuf;
-use std::process::Command;
+//! Refactored init command with dependency injection for better testability
 
-use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Input, theme::ColorfulTheme};
+use std::path::Path;
+use std::sync::Arc;
 
-use crate::common::spin_installer::check_and_install_spin;
+use anyhow::{Context, Result, ensure};
 
-pub async fn execute(name: Option<String>, here: bool) -> Result<()> {
-    // Get project name interactively if not provided
-    let project_name = match name {
-        Some(n) => n,
-        None => Input::<String>::with_theme(&ColorfulTheme::default())
-            .with_prompt("Project name")
-            .interact_text()?,
-    };
+use crate::deps::{CommandExecutor, FileSystem, SpinInstaller, UserInterface};
 
-    println!(
-        "{} Initializing new MCP project: {}",
-        style("→").cyan(),
-        style(&project_name).bold()
-    );
+/// Init command configuration
+pub struct InitConfig {
+    pub name: Option<String>,
+    pub here: bool,
+}
 
-    // Validate project name
-    if !project_name
-        .chars()
-        .all(|c| c.is_lowercase() || c == '-' || c.is_numeric())
-    {
-        anyhow::bail!("Project name must be lowercase with hyphens (e.g., my-project)");
+/// Dependencies for the init command
+pub struct InitDependencies {
+    pub file_system: Arc<dyn FileSystem>,
+    pub command_executor: Arc<dyn CommandExecutor>,
+    pub ui: Arc<dyn UserInterface>,
+    pub spin_installer: Arc<dyn SpinInstaller>,
+}
+
+/// Execute the init command with injected dependencies
+pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) -> Result<()> {
+    let InitConfig { mut name, here } = config;
+
+    // Install Spin if needed
+    let spin_path = deps.spin_installer.check_and_install().await?;
+    deps.ui.print(&format!("Using Spin at: {spin_path}"));
+
+    // Get project name
+    if name.is_none() && !here {
+        name = Some(deps.ui.prompt_input("Project name", Some("my-project"))?);
     }
 
-    // Don't allow leading or trailing hyphens, or double hyphens
-    if project_name.starts_with('-') || project_name.ends_with('-') || project_name.contains("--") {
-        anyhow::bail!("Project name cannot start or end with hyphens, or contain double hyphens");
+    // Validate name
+    if let Some(ref project_name) = name {
+        validate_project_name(project_name)?;
     }
 
-    // Get spin path
-    let spin_path = check_and_install_spin().await?;
-
-    // Determine output directory
-    let output_dir = if here {
+    // Check directory
+    let target_dir = if here {
         ".".to_string()
     } else {
-        project_name.clone()
+        name.as_ref().unwrap().clone()
     };
 
-    // Check if directory exists and is not empty (unless using --here)
-    if !here && PathBuf::from(&output_dir).exists() {
-        anyhow::bail!("Directory '{}' already exists", project_name);
-    } else if here {
-        let current_dir = std::env::current_dir()?;
-        if current_dir.read_dir()?.next().is_some() {
-            anyhow::bail!("Current directory is not empty");
-        }
+    if !here && deps.file_system.exists(Path::new(&target_dir)) {
+        anyhow::bail!("Directory '{}' already exists", target_dir);
     }
 
-    // First check if templates are installed
-    let check_template_cmd = Command::new(&spin_path)
-        .args(["templates", "list"])
-        .output()
-        .context("Failed to list templates")?;
-
-    let templates_output = String::from_utf8_lossy(&check_template_cmd.stdout);
-    let has_ftl_templates = templates_output.contains("ftl-mcp-server");
-
-    if !has_ftl_templates {
-        eprintln!();
-        eprintln!("{} ftl-mcp templates not found.", style("✗").red());
-        eprintln!();
-        eprintln!("Please install the ftl-mcp templates by running:");
-        eprintln!("  ftl setup templates");
-        eprintln!();
-        anyhow::bail!("ftl-mcp templates not installed");
+    if here && !is_directory_empty(&deps.file_system) {
+        anyhow::bail!("Current directory is not empty. Use --here only in an empty directory.");
     }
 
-    // Use spin new with ftl-mcp-server template
-    let mut spin_cmd = Command::new(&spin_path);
-    spin_cmd.args([
-        "new",
-        "-t",
-        "ftl-mcp-server",
-        "-o",
-        &output_dir,
-        "--accept-defaults",
-    ]);
+    // Check templates are installed
+    check_templates_installed(&deps.command_executor, &spin_path).await?;
+
+    // Create project
+    create_project(&deps.command_executor, &spin_path, &target_dir).await?;
+
+    // Success message
+    deps.ui.print("");
+    deps.ui.print("✅ MCP project initialized!");
+    deps.ui.print("");
+    deps.ui.print("Next steps:");
 
     if !here {
-        spin_cmd.arg(&project_name);
+        deps.ui.print(&format!("  cd {target_dir} &&"));
     }
 
-    let output = spin_cmd.output().context("Failed to run spin new")?;
+    deps.ui
+        .print("  ftl add           # Add a tool to the project");
+    deps.ui.print("  ftl build         # Build the project");
+    deps.ui
+        .print("  ftl up            # Start local dev server");
+    deps.ui.print("");
+    deps.ui.print("The project will be available at:");
+    deps.ui.print("  http://localhost:3000/mcp");
+    deps.ui.print("");
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Failed to create project:\n{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    Ok(())
+}
 
-    let cd_instruction = if here {
-        ""
-    } else {
-        &format!("cd {project_name} && ")
-    };
+/// Validate project name
+fn validate_project_name(name: &str) -> Result<()> {
+    ensure!(!name.is_empty(), "Project name cannot be empty");
 
-    println!(
-        r#"
-{} MCP project initialized!
+    ensure!(
+        name.chars()
+            .all(|c| c.is_lowercase() || c.is_numeric() || c == '-'),
+        "Project name must be lowercase alphanumeric with hyphens"
+    );
 
-{} Structure:
-  └── spin.toml        # Spin configuration
-  └── README.md        # Project documentation
+    ensure!(
+        !name.starts_with('-') && !name.ends_with('-'),
+        "Project name cannot start or end with hyphens"
+    );
 
-{} MCP Gateway is pre-configured at route /mcp
-
-{} Next steps:
-  {}ftl add           # Add a tool to the project
-  ftl build           # Build all tools
-  ftl up              # Start the MCP server
-
-{} Example:
-  {}ftl add weather-api --language typescript
-  {}ftl add calculator --language rust
-  
-{} Connect your MCP client to:
-  http://localhost:3000/mcp"#,
-        style("✓").green(),
-        style("📁").blue(),
-        style("🌐").cyan(),
-        style("🚀").yellow(),
-        cd_instruction,
-        style("💡").bright(),
-        cd_instruction,
-        cd_instruction,
-        style("🔗").magenta()
+    ensure!(
+        !name.contains("--"),
+        "Project name cannot contain consecutive hyphens"
     );
 
     Ok(())
 }
+
+/// Check if current directory is empty
+fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> bool {
+    let common_files = [
+        "./Cargo.toml",
+        "./package.json",
+        "./spin.toml",
+        "./.git",
+        "./src",
+        "./components",
+        "./node_modules",
+    ];
+
+    for file in &common_files {
+        if fs.exists(Path::new(file)) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Check if ftl-mcp templates are installed
+async fn check_templates_installed(
+    executor: &Arc<dyn CommandExecutor>,
+    spin_path: &str,
+) -> Result<()> {
+    let output = executor
+        .execute(spin_path, &["templates", "list"])
+        .await
+        .context("Failed to list Spin templates")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if !stdout.contains("ftl-mcp-server") {
+        anyhow::bail!("ftl-mcp templates not installed. Run 'ftl setup templates' first.");
+    }
+
+    Ok(())
+}
+
+/// Create the project using spin new
+async fn create_project(
+    executor: &Arc<dyn CommandExecutor>,
+    spin_path: &str,
+    target_dir: &str,
+) -> Result<()> {
+    let output = executor
+        .execute(
+            spin_path,
+            &["new", "-t", "ftl-mcp-server", "-a", target_dir],
+        )
+        .await?;
+
+    if !output.success {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to create project: {}", stderr);
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "init_tests.rs"]
+mod tests;

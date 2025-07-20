@@ -1,66 +1,90 @@
+//! Refactored build command with dependency injection for better testability
+
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use console::style;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use crate::common::spin_installer::check_and_install_spin;
+use crate::deps::{
+    CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, SpinInstaller,
+    UserInterface,
+};
 
-#[derive(Debug)]
-struct ComponentBuildInfo {
-    name: String,
-    build_command: Option<String>,
-    workdir: Option<String>,
+#[derive(Debug, Clone)]
+pub struct ComponentBuildInfo {
+    pub name: String,
+    pub build_command: Option<String>,
+    pub workdir: Option<String>,
 }
 
-pub async fn execute(path: Option<PathBuf>, release: bool) -> Result<()> {
-    let working_path = path.unwrap_or_else(|| PathBuf::from("."));
+/// Build command configuration
+pub struct BuildConfig {
+    pub path: Option<PathBuf>,
+    pub release: bool,
+}
+
+/// Dependencies for the build command
+pub struct BuildDependencies {
+    pub file_system: Arc<dyn FileSystem>,
+    pub command_executor: Arc<dyn CommandExecutor>,
+    pub ui: Arc<dyn UserInterface>,
+    pub spin_installer: Arc<dyn SpinInstaller>,
+}
+
+/// Execute the build command with injected dependencies
+pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>) -> Result<()> {
+    let working_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
     // Check if we're in a project directory (has spin.toml)
     let spin_toml_path = working_path.join("spin.toml");
-    if !spin_toml_path.exists() {
+    if !deps.file_system.exists(&spin_toml_path) {
         anyhow::bail!(
             "No spin.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
         );
     }
 
     // Parse spin.toml to find components with build commands
-    let components = parse_component_builds(&spin_toml_path)?;
+    let components = parse_component_builds(&deps.file_system, &spin_toml_path)?;
 
     if components.is_empty() {
-        println!(
-            "{} No components with build commands found in spin.toml",
-            style("→").cyan()
+        deps.ui.print_styled(
+            "→ No components with build commands found in spin.toml",
+            MessageStyle::Cyan,
         );
         return Ok(());
     }
 
-    println!(
-        "{} Building {} component{} in parallel",
-        style("→").cyan(),
-        style(components.len()).bold(),
-        if components.len() > 1 { "s" } else { "" }
-    );
-    println!();
+    // Check if spin is installed (only if we have components to build)
+    let _spin_path = deps.spin_installer.check_and_install().await?;
 
-    // Check if spin is installed (in case we need it for fallback)
-    let _spin_path = check_and_install_spin().await?;
+    deps.ui.print(&format!(
+        "→ Building {} component{} in parallel",
+        components.len(),
+        if components.len() > 1 { "s" } else { "" }
+    ));
+    deps.ui.print("");
 
     // Build all components in parallel
-    build_components_parallel(components, &working_path, release).await?;
+    build_components_parallel(components, &working_path, config.release, &deps).await?;
 
-    println!();
-    println!("{} All components built successfully!", style("✓").green());
+    deps.ui.print("");
+    deps.ui.print_styled(
+        "✓ All components built successfully!",
+        MessageStyle::Success,
+    );
     Ok(())
 }
 
-fn parse_component_builds(spin_toml_path: &Path) -> Result<Vec<ComponentBuildInfo>> {
-    let content = std::fs::read_to_string(spin_toml_path).context("Failed to read spin.toml")?;
+pub fn parse_component_builds(
+    fs: &Arc<dyn FileSystem>,
+    spin_toml_path: &Path,
+) -> Result<Vec<ComponentBuildInfo>> {
+    let content = fs
+        .read_to_string(spin_toml_path)
+        .context("Failed to read spin.toml")?;
     let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
 
     let mut components = Vec::new();
@@ -74,7 +98,7 @@ fn parse_component_builds(spin_toml_path: &Path) -> Result<Vec<ComponentBuildInf
                     let workdir = build_section
                         .get("workdir")
                         .and_then(|w| w.as_str())
-                        .map(|s| s.to_string());
+                        .map(std::string::ToString::to_string);
 
                     components.push(ComponentBuildInfo {
                         name: name.clone(),
@@ -93,23 +117,24 @@ async fn build_components_parallel(
     components: Vec<ComponentBuildInfo>,
     working_path: &Path,
     release: bool,
+    deps: &Arc<BuildDependencies>,
 ) -> Result<()> {
-    let multi_progress = MultiProgress::new();
+    let multi_progress = deps.ui.create_multi_progress();
     let mut tasks = JoinSet::new();
 
     // Track errors across all tasks
     let error_flag = Arc::new(Mutex::new(None::<String>));
 
     // Limit concurrent builds to avoid overwhelming the system
-    let semaphore = Arc::new(Semaphore::new(num_cpus::get()));
+    let max_concurrent = std::env::var("FTL_MAX_CONCURRENT_BUILDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(num_cpus::get);
+
+    let semaphore = Arc::new(Semaphore::new(max_concurrent));
 
     for component in components {
-        let pb = multi_progress.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {prefix:.bold} {msg}")
-                .unwrap(),
-        );
+        let pb = multi_progress.add_spinner();
         pb.set_prefix(format!("[{}]", component.name));
         pb.set_message("Starting build...");
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -117,6 +142,7 @@ async fn build_components_parallel(
         let working_path = working_path.to_path_buf();
         let error_flag = Arc::clone(&error_flag);
         let semaphore = Arc::clone(&semaphore);
+        let deps = Arc::clone(deps);
 
         tasks.spawn(async move {
             // Acquire permit to limit concurrency
@@ -124,28 +150,26 @@ async fn build_components_parallel(
 
             // Check if another task has already failed
             if error_flag.lock().await.is_some() {
-                pb.finish_with_message(style("Skipped due to error").red().to_string());
+                pb.finish_with_message("Skipped due to error".to_string());
                 return Ok(());
             }
 
             let start = Instant::now();
-            let result = build_single_component(&component, &working_path, release, &pb).await;
+            let result =
+                build_single_component(&component, &working_path, release, pb.as_ref(), &deps)
+                    .await;
 
             match result {
-                Ok(_) => {
+                Ok(()) => {
                     let duration = start.elapsed();
-                    pb.finish_with_message(
-                        style(format!(
-                            "✓ Built successfully in {:.1}s",
-                            duration.as_secs_f64()
-                        ))
-                        .green()
-                        .to_string(),
-                    );
+                    pb.finish_with_message(format!(
+                        "✓ Built successfully in {:.1}s",
+                        duration.as_secs_f64()
+                    ));
                     Ok(())
                 }
                 Err(e) => {
-                    pb.finish_with_message(style(format!("✗ Build failed: {e}")).red().to_string());
+                    pb.finish_with_message(format!("✗ Build failed: {e}"));
 
                     // Set error flag to prevent new tasks from starting
                     let mut error_guard = error_flag.lock().await;
@@ -182,7 +206,8 @@ async fn build_single_component(
     component: &ComponentBuildInfo,
     working_path: &Path,
     release: bool,
-    pb: &ProgressBar,
+    pb: &dyn ProgressIndicator,
+    deps: &Arc<BuildDependencies>,
 ) -> Result<()> {
     if let Some(build_command) = &component.build_command {
         pb.set_message("Building...");
@@ -195,47 +220,15 @@ async fn build_single_component(
         };
 
         // Replace --release flag in command if needed
-        let command = if release && !build_command.contains("--release") {
-            // For common build tools, add release flag
-            if build_command.starts_with("cargo build") {
-                build_command.replace("cargo build", "cargo build --release")
-            } else if build_command.starts_with("npm run build") {
-                // npm scripts typically handle this internally
-                build_command.clone()
-            } else {
-                // For other commands, just use as-is
-                build_command.clone()
-            }
-        } else {
-            build_command.clone()
-        };
+        let command = prepare_build_command(build_command, release);
 
         // Execute the build command using shell to handle complex commands with operators
-        let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(["/C", &command])
-                .current_dir(&build_dir)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .context(format!(
-                    "Failed to execute build command for {}",
-                    component.name
-                ))?
-        } else {
-            Command::new("sh")
-                .args(["-c", &command])
-                .current_dir(&build_dir)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .context(format!(
-                    "Failed to execute build command for {}",
-                    component.name
-                ))?
-        };
+        let (shell_cmd, shell_args) = get_shell_command(&command);
 
-        if !output.status.success() {
+        let output =
+            run_build_command(&deps.command_executor, shell_cmd, &shell_args, &build_dir).await?;
+
+        if !output.success {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!("Build failed:\n{}", stderr));
         }
@@ -243,3 +236,56 @@ async fn build_single_component(
 
     Ok(())
 }
+
+fn prepare_build_command(build_command: &str, release: bool) -> String {
+    if release && !build_command.contains("--release") {
+        // For common build tools, add release flag
+        if build_command.starts_with("cargo build") {
+            build_command.replace("cargo build", "cargo build --release")
+        } else if build_command.starts_with("npm run build") {
+            // npm scripts typically handle this internally
+            build_command.to_string()
+        } else {
+            // For other commands, just use as-is
+            build_command.to_string()
+        }
+    } else {
+        build_command.to_string()
+    }
+}
+
+fn get_shell_command(command: &str) -> (&str, Vec<&str>) {
+    if cfg!(target_os = "windows") {
+        ("cmd", vec!["/C", command])
+    } else {
+        ("sh", vec!["-c", command])
+    }
+}
+
+async fn run_build_command(
+    executor: &Arc<dyn CommandExecutor>,
+    shell_cmd: &str,
+    shell_args: &[&str],
+    build_dir: &Path,
+) -> Result<CommandOutput> {
+    // shell_args already contains ["-c", "command"], so we need to modify the command part
+    let original_command = shell_args.get(1).unwrap_or(&"");
+    let cd_and_run = format!("cd {} && {}", build_dir.display(), original_command);
+
+    // Build the new command with the cd prefix
+    let result = if shell_args.len() >= 2 {
+        // For sh -c "command", replace with sh -c "cd dir && command"
+        executor
+            .execute(shell_cmd, &[shell_args[0], &cd_and_run])
+            .await
+    } else {
+        // Fallback case - shouldn't happen in normal usage
+        executor.execute(shell_cmd, &[&cd_and_run]).await
+    };
+
+    result.context("Failed to execute build command")
+}
+
+#[cfg(test)]
+#[path = "build_tests.rs"]
+mod tests;
