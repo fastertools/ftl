@@ -1,64 +1,102 @@
+//! Refactored registry command with dependency injection for better testability
+
+use std::sync::Arc;
+
 use anyhow::Result;
-use console::style;
 
-pub async fn list(registry: Option<String>) -> Result<()> {
+use crate::deps::{UserInterface, MessageStyle};
+
+/// Dependencies for the registry command
+pub struct RegistryDependencies {
+    pub ui: Arc<dyn UserInterface>,
+}
+
+/// Execute the list subcommand with injected dependencies
+pub async fn list_with_deps(
+    registry: Option<String>,
+    deps: Arc<RegistryDependencies>,
+) -> Result<()> {
     let registry_url = registry.as_deref().unwrap_or("ghcr.io");
 
-    println!(
+    deps.ui.print(&format!(
         "{} Listing components from {}",
-        style("→").cyan(),
-        style(registry_url).bold()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(registry_url, MessageStyle::Bold)
+    ));
 
-    println!();
-    println!(
+    deps.ui.print("");
+    deps.ui.print(&format!(
         "{} Registry listing not yet implemented",
-        style("!").yellow()
-    );
-    println!();
-    println!("For now, you can browse components at:");
-    println!("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
-    println!("  - Docker Hub: https://hub.docker.com/");
+        styled_text("!", MessageStyle::Yellow)
+    ));
+    deps.ui.print("");
+    deps.ui.print("For now, you can browse components at:");
+    deps.ui.print("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
+    deps.ui.print("  - Docker Hub: https://hub.docker.com/");
 
     Ok(())
 }
 
-pub async fn search(query: String, registry: Option<String>) -> Result<()> {
+/// Execute the search subcommand with injected dependencies
+pub async fn search_with_deps(
+    query: String,
+    registry: Option<String>,
+    deps: Arc<RegistryDependencies>,
+) -> Result<()> {
     let registry_url = registry.as_deref().unwrap_or("ghcr.io");
 
-    println!(
+    deps.ui.print(&format!(
         "{} Searching for '{}' in {}",
-        style("→").cyan(),
-        style(&query).bold(),
-        style(registry_url).dim()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(&query, MessageStyle::Bold),
+        registry_url
+    ));
 
-    println!();
-    println!(
+    deps.ui.print("");
+    deps.ui.print(&format!(
         "{} Registry search not yet implemented",
-        style("!").yellow()
-    );
-    println!();
-    println!("For now, you can search at:");
-    println!("  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages");
+        styled_text("!", MessageStyle::Yellow)
+    ));
+    deps.ui.print("");
+    deps.ui.print("For now, you can search at:");
+    deps.ui.print(&format!("  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages"));
 
     Ok(())
 }
 
-pub async fn info(component: String) -> Result<()> {
-    println!(
+/// Execute the info subcommand with injected dependencies
+pub async fn info_with_deps(
+    component: String,
+    deps: Arc<RegistryDependencies>,
+) -> Result<()> {
+    deps.ui.print(&format!(
         "{} Getting info for component: {}",
-        style("→").cyan(),
-        style(&component).bold()
-    );
+        styled_text("→", MessageStyle::Cyan),
+        styled_text(&component, MessageStyle::Bold)
+    ));
 
-    println!();
-    println!("{} Registry info not yet implemented", style("!").yellow());
-    println!();
-    println!("Component reference formats:");
-    println!("  - ghcr.io/username/component:version");
-    println!("  - docker.io/username/component:version");
-    println!("  - component-name (searches default registry)");
+    deps.ui.print("");
+    deps.ui.print(&format!("{} Registry info not yet implemented", styled_text("!", MessageStyle::Yellow)));
+    deps.ui.print("");
+    deps.ui.print("Component reference formats:");
+    deps.ui.print("  - ghcr.io/username/component:version");
+    deps.ui.print("  - docker.io/username/component:version");
+    deps.ui.print("  - component-name (searches default registry)");
 
     Ok(())
+}
+
+// Helper function to format styled text (since we're not using console crate directly)
+fn styled_text(text: &str, _style: MessageStyle) -> &str {
+    text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_styled_text() {
+        assert_eq!(styled_text("test", MessageStyle::Success), "test");
+    }
 }

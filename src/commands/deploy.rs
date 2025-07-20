@@ -1,257 +1,165 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::Arc;
-use std::time::Instant;
+//! Refactored deploy command with dependency injection for testability
 
-use anyhow::{Context, Result, anyhow};
-use base64::{Engine as _, engine::general_purpose};
-use console::style;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
-use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use anyhow::{anyhow, Context, Result};
+use base64::{engine::general_purpose, Engine as _};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use crate::commands::build;
-use crate::commands::login::get_or_refresh_credentials;
+use crate::api_client::{error::ConversionError, types};
+use crate::deps::{
+    AsyncRuntime, BuildExecutor, Clock, CommandExecutor, CredentialsProvider, FileSystem,
+    FtlApiClient, MessageStyle, UserInterface,
+};
 
-const FTL_API_URL: &str = "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com";
-
-#[derive(Debug, Serialize)]
-struct CreateRepositoryRequest {
-    #[serde(rename = "toolName")]
-    tool_name: String,
+/// Component information extracted from spin.toml
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComponentInfo {
+    pub name: String,
+    pub source_path: String,
+    pub version: String,
+    pub allowed_hosts: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
-struct CreateRepositoryResponse {
-    #[serde(rename = "repositoryUri")]
-    repository_uri: String,
-    #[serde(rename = "repositoryName")]
-    #[allow(dead_code)]
-    repository_name: String,
-    #[serde(rename = "alreadyExists")]
-    #[allow(dead_code)]
-    already_exists: bool,
+/// Deploy configuration
+pub struct DeployConfig {
+    pub app_name: String,
+    pub components: Vec<ComponentInfo>,
 }
 
-#[derive(Debug, Deserialize)]
-struct EcrCredentialsResponse {
-    #[serde(rename = "registryUri")]
-    registry_uri: String,
-    #[serde(rename = "authorizationToken")]
-    authorization_token: String,
-    #[serde(rename = "expiresAt")]
-    #[allow(dead_code)]
-    expires_at: String,
+/// Dependencies for the deploy command
+pub struct DeployDependencies {
+    pub file_system: Arc<dyn FileSystem>,
+    pub command_executor: Arc<dyn CommandExecutor>,
+    pub api_client: Arc<dyn FtlApiClient>,
+    pub clock: Arc<dyn Clock>,
+    pub credentials_provider: Arc<dyn CredentialsProvider>,
+    pub ui: Arc<dyn UserInterface>,
+    pub build_executor: Arc<dyn BuildExecutor>,
+    pub async_runtime: Arc<dyn AsyncRuntime>,
 }
 
-#[derive(Debug, Serialize)]
-struct DeploymentRequest {
-    #[serde(rename = "appName")]
-    app_name: String,
-    tools: Vec<DeploymentTool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    variables: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Serialize)]
-struct DeploymentTool {
-    name: String,
-    tag: String,
-    #[serde(rename = "allowedHosts", skip_serializing_if = "Option::is_none")]
-    allowed_hosts: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StartDeploymentResponse {
-    #[serde(rename = "deploymentId")]
-    deployment_id: String,
-    #[allow(dead_code)]
-    status: String,
-    #[allow(dead_code)]
-    message: Option<String>,
-    #[serde(rename = "buildId")]
-    #[allow(dead_code)]
-    build_id: Option<String>,
-    #[serde(rename = "statusUrl")]
-    status_url: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct DeploymentStatusResponse {
-    deployment: DeploymentDetails,
-    #[serde(rename = "buildStatus")]
-    #[allow(dead_code)]
-    build_status: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DeploymentDetails {
-    #[serde(rename = "deploymentId")]
-    #[allow(dead_code)]
-    deployment_id: String,
-    #[serde(rename = "appName")]
-    #[allow(dead_code)]
-    app_name: String,
-    status: String,
-    #[serde(rename = "statusMessage")]
-    status_message: Option<String>,
-    #[serde(rename = "deploymentUrl")]
-    deployment_url: Option<String>,
-    #[serde(rename = "errorReason")]
-    error_reason: Option<String>,
-    #[serde(rename = "createdAt")]
-    #[allow(dead_code)]
-    created_at: String,
-    #[serde(rename = "updatedAt")]
-    #[allow(dead_code)]
-    updated_at: String,
-    #[serde(rename = "completedAt")]
-    #[allow(dead_code)]
-    completed_at: Option<String>,
-    #[allow(dead_code)]
-    duration: Option<u64>,
-}
-
-#[derive(Clone)]
-struct ComponentInfo {
-    name: String,
-    source_path: String,
-    version: String,
-    allowed_hosts: Option<Vec<String>>,
-}
-
-pub async fn execute() -> Result<()> {
-    println!(
+/// Execute the deploy command with injected dependencies
+pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
+    deps.ui.print(&format!(
         "{} {} Deploying project",
-        style("▶").cyan(),
-        style("FTL").bold()
-    );
-    println!();
+        "▶",
+        "FTL"
+    ));
+    deps.ui.print("");
 
     // Check if we're in a Spin project directory
-    if !PathBuf::from("spin.toml").exists() {
-        anyhow::bail!("No spin.toml found. Not in a project directory?");
+    let spin_toml_path = PathBuf::from("spin.toml");
+    if !deps.file_system.exists(&spin_toml_path) {
+        return Err(anyhow!("No spin.toml found. Not in a project directory?"));
     }
 
-    // Create a simple spinner for status updates
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+    // Create a spinner for status updates
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
-    // Build the project first using our parallel build
+    // Build the project first
     spinner.finish_and_clear();
-    println!("{} Building project...", style("→").cyan());
-    println!();
+    deps.ui.print_styled("→ Building project...", MessageStyle::Cyan);
+    deps.ui.print("");
 
-    build::execute(None, true).await?; // Use release build for deployment
+    deps.build_executor.execute(None, true).await?;
 
-    println!();
+    deps.ui.print("");
 
     // Re-create spinner after build
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
     // Get authentication credentials
     spinner.set_message("Authenticating...");
-    let credentials = match get_or_refresh_credentials().await {
+    let _credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
         Ok(creds) => creds,
         Err(e) => {
             spinner.finish_and_clear();
             if e.to_string().contains("expired") {
-                anyhow::bail!(
+                return Err(anyhow!(
                     "Authentication token has expired. Please run 'ftl login' to re-authenticate."
-                );
+                ));
             } else {
-                anyhow::bail!("Not logged in to FTL. Run 'ftl login' first.");
+                return Err(anyhow!("Not logged in to FTL. Run 'ftl login' first."));
             }
         }
     };
 
     // Parse spin.toml to find user components
     spinner.set_message("Parsing project...");
-    let components = parse_spin_toml()?;
-    if components.is_empty() {
+    let config = parse_deploy_config(&deps.file_system)?;
+    if config.components.is_empty() {
         spinner.finish_and_clear();
-        anyhow::bail!("No user components found in spin.toml");
+        return Err(anyhow!("No user components found in spin.toml"));
     }
 
     // Get ECR credentials
     spinner.set_message("Getting registry credentials...");
-    let ecr_creds = get_ecr_credentials(&credentials.access_token).await?;
+    let ecr_creds = deps.api_client.get_ecr_credentials().await
+        .map_err(|e| anyhow!("Failed to get ECR credentials: {}", e))?;
 
     // Docker login to ECR
     spinner.set_message("Logging into registry...");
-    docker_login(&ecr_creds).await?;
+    docker_login(&deps.command_executor, &ecr_creds).await?;
 
     // Create repositories and push components to ECR
     spinner.finish_and_clear();
     let deployed_tools = create_repositories_and_push_with_progress(
-        &components,
-        &ecr_creds,
-        &credentials.access_token,
+        &config.components,
+        deps.clone(),
     )
     .await?;
 
     // Deploy to FTL
-    println!();
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+    deps.ui.print("");
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
     spinner.set_message("Starting deployment...");
 
-    // Refresh credentials before deployment in case the token expired during build/push
-    let fresh_credentials = match get_or_refresh_credentials().await {
+    // Refresh credentials before deployment in case the token expired
+    let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
         Ok(creds) => creds,
         Err(e) => {
             spinner.finish_and_clear();
-            anyhow::bail!("Failed to refresh authentication token: {}", e);
+            return Err(anyhow!("Failed to refresh authentication token: {}", e));
         }
     };
 
-    let app_name = get_app_name()?;
     let deployment = deploy_to_ftl_with_progress(
-        &fresh_credentials.access_token,
-        app_name,
+        deps.clone(),
+        config.app_name,
         deployed_tools,
         spinner,
     )
     .await?;
 
     // Display results
-    println!();
-    println!("{} Deployment successful!", style("✓").green().bold());
+    deps.ui.print("");
+    deps.ui.print_styled("✓ Deployment successful!", MessageStyle::Success);
     if let Some(deployment_url) = deployment.deployment_url {
-        println!();
-        println!(
-            "  {} {}",
-            style("MCP URL:").bold(),
-            style(deployment_url).cyan().underlined()
-        );
-        println!();
+        deps.ui.print("");
+        deps.ui.print(&format!("  MCP URL: {}", deployment_url));
+        deps.ui.print("");
     }
 
     Ok(())
 }
 
-fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
-    let content = std::fs::read_to_string("spin.toml").context("Failed to read spin.toml")?;
+/// Parse deployment configuration from spin.toml
+pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployConfig> {
+    let content = file_system.read_to_string(Path::new("spin.toml"))?;
     let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
+
+    let app_name = toml
+        .get("application")
+        .and_then(|app| app.get("name"))
+        .and_then(|name| name.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow!("No application name found in spin.toml"))?;
 
     let mut components = Vec::new();
 
@@ -263,8 +171,8 @@ fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
                 if let Some(source_path) = source.as_str() {
                     // Skip if it's a system component (from registry)
                     if !source_path.contains("ghcr.io") && source_path.ends_with(".wasm") {
-                        // Try to extract version from Cargo.toml or package.json
-                        let version = extract_component_version(name, source_path)?;
+                        // Try to extract version
+                        let version = extract_component_version(file_system, name, source_path)?;
 
                         // Extract allowed_outbound_hosts if present
                         let allowed_hosts = component
@@ -289,11 +197,17 @@ fn parse_spin_toml() -> Result<Vec<ComponentInfo>> {
         }
     }
 
-    Ok(components)
+    Ok(DeployConfig {
+        app_name,
+        components,
+    })
 }
 
-fn extract_component_version(component_name: &str, source_path: &str) -> Result<String> {
-    // Try to determine the component directory from the source path
+pub fn extract_component_version(
+    file_system: &Arc<dyn FileSystem>,
+    component_name: &str,
+    source_path: &str,
+) -> Result<String> {
     let path = PathBuf::from(source_path);
     let component_dir = if path.starts_with(component_name) {
         PathBuf::from(component_name)
@@ -305,8 +219,8 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
 
     // Try Cargo.toml first
     let cargo_path = component_dir.join("Cargo.toml");
-    if cargo_path.exists() {
-        let cargo_content = std::fs::read_to_string(&cargo_path)?;
+    if file_system.exists(&cargo_path) {
+        let cargo_content = file_system.read_to_string(&cargo_path)?;
         let cargo_toml: toml::Value = toml::from_str(&cargo_content)?;
         if let Some(version) = cargo_toml
             .get("package")
@@ -319,8 +233,8 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
 
     // Try package.json
     let package_path = component_dir.join("package.json");
-    if package_path.exists() {
-        let package_content = std::fs::read_to_string(&package_path)?;
+    if file_system.exists(&package_path) {
+        let package_content = file_system.read_to_string(&package_path)?;
         let package_json: serde_json::Value = serde_json::from_str(&package_content)?;
         if let Some(version) = package_json.get("version").and_then(|v| v.as_str()) {
             return Ok(version.to_string());
@@ -331,51 +245,11 @@ fn extract_component_version(component_name: &str, source_path: &str) -> Result<
     Ok("0.1.0".to_string())
 }
 
-fn get_app_name() -> Result<String> {
-    let content = std::fs::read_to_string("spin.toml")?;
-    let toml: toml::Value = toml::from_str(&content)?;
-
-    toml.get("application")
-        .and_then(|app| app.get("name"))
-        .and_then(|name| name.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| anyhow!("No application name found in spin.toml"))
-}
-
-async fn get_ecr_credentials(access_token: &str) -> Result<EcrCredentialsResponse> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
-    );
-
-    let response = client
-        .post(format!("{FTL_API_URL}/v1/registry/credentials"))
-        .headers(headers)
-        .send()
-        .await
-        .context("Failed to get ECR credentials")?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response.text().await?;
-        return Err(anyhow!(
-            "Failed to get ECR credentials (HTTP {}): {}",
-            status.as_u16(),
-            error_text
-        ));
-    }
-
-    response
-        .json::<EcrCredentialsResponse>()
-        .await
-        .context("Failed to parse ECR credentials response")
-}
-
-async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
+async fn docker_login(
+    command_executor: &Arc<dyn CommandExecutor>,
+    ecr_creds: &types::GetEcrCredentialsResponse,
+) -> Result<()> {
     // ECR authorization tokens are base64 encoded "AWS:password"
-    // We need to extract just the password part
     let decoded = general_purpose::STANDARD
         .decode(&ecr_creds.authorization_token)
         .context("Failed to decode ECR authorization token")?;
@@ -386,116 +260,60 @@ async fn docker_login(ecr_creds: &EcrCredentialsResponse) -> Result<()> {
         .strip_prefix("AWS:")
         .ok_or_else(|| anyhow!("Invalid ECR token format"))?;
 
-    // Use the registry URI directly
-    let registry_endpoint = &ecr_creds.registry_uri;
-
-    let mut cmd = Command::new("docker");
-    cmd.args([
+    let args = vec![
         "login",
         "--username",
         "AWS",
         "--password-stdin",
-        registry_endpoint,
-    ]);
-    cmd.stdin(std::process::Stdio::piped());
-    cmd.stdout(std::process::Stdio::null());
-    cmd.stderr(std::process::Stdio::null());
+        &ecr_creds.registry_uri,
+    ];
 
-    let mut child = cmd.spawn().context("Failed to start docker login")?;
+    let output = command_executor
+        .execute_with_stdin("docker", &args, password)
+        .await
+        .context("Failed to execute docker login")?;
 
-    // Write password to stdin
-    if let Some(stdin) = child.stdin.as_mut() {
-        use std::io::Write;
-        stdin.write_all(password.as_bytes())?;
-    }
-
-    let status = child.wait()?;
-    if !status.success() {
+    if !output.success {
         return Err(anyhow!("Docker login failed"));
     }
 
     Ok(())
 }
 
-async fn create_repository(
-    access_token: &str,
-    tool_name: &str,
-) -> Result<CreateRepositoryResponse> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
-    );
-
-    let request_body = CreateRepositoryRequest {
-        tool_name: tool_name.to_string(),
-    };
-
-    let response = client
-        .post(format!("{FTL_API_URL}/v1/registry/repositories"))
-        .headers(headers)
-        .json(&request_body)
-        .send()
-        .await
-        .context("Failed to create ECR repository")?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response.text().await?;
-        return Err(anyhow!(
-            "Failed to create ECR repository (HTTP {}): {}",
-            status.as_u16(),
-            error_text
-        ));
-    }
-
-    response
-        .json::<CreateRepositoryResponse>()
-        .await
-        .context("Failed to parse create repository response")
-}
-
 async fn create_repositories_and_push_with_progress(
     components: &[ComponentInfo],
-    _ecr_creds: &EcrCredentialsResponse,
-    access_token: &str,
-) -> Result<Vec<DeploymentTool>> {
+    deps: Arc<DeployDependencies>,
+) -> Result<Vec<types::DeploymentRequestToolsItem>> {
     // Check if wkg is available before starting
-    which::which("wkg").context(
-        "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
-    )?;
+    deps.command_executor
+        .check_command_exists("wkg")
+        .await
+        .context("wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools")?;
 
-    println!(
-        "{} Pushing {} components in parallel",
-        style("→").cyan(),
-        style(components.len()).bold()
-    );
-    println!();
+    deps.ui.print(&format!(
+        "→ Pushing {} components in parallel",
+        components.len()
+    ));
+    deps.ui.print("");
 
-    let multi_progress = MultiProgress::new();
+    let multi_progress = deps.ui.create_multi_progress();
     let mut tasks = JoinSet::new();
     let deployed_tools = Arc::new(Mutex::new(Vec::new()));
 
     // Track errors across all tasks
     let error_flag = Arc::new(Mutex::new(None::<String>));
 
-    // Limit concurrent operations to avoid overwhelming the API
-    let semaphore = Arc::new(Semaphore::new(4)); // Max 4 concurrent pushes
+    // Limit concurrent operations
+    let semaphore = Arc::new(Semaphore::new(4));
 
     for component in components {
-        let pb = multi_progress.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {prefix:.bold} {msg}")
-                .unwrap(),
-        );
+        let pb = multi_progress.add_spinner();
         pb.set_prefix(format!("[{}]", component.name));
         pb.set_message("Creating repository...");
-        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        pb.enable_steady_tick(deps.clock.duration_from_millis(100));
 
         let component = component.clone();
-        let access_token = access_token.to_string();
+        let deps = deps.clone();
         let deployed_tools = Arc::clone(&deployed_tools);
         let error_flag = Arc::clone(&error_flag);
         let semaphore = Arc::clone(&semaphore);
@@ -506,48 +324,47 @@ async fn create_repositories_and_push_with_progress(
 
             // Check if another task has already failed
             if error_flag.lock().await.is_some() {
-                pb.finish_with_message(style("Skipped due to error").red().to_string());
+                pb.finish_with_message("Skipped due to error".to_string());
                 return Ok(());
             }
 
-            let start = Instant::now();
+            let start = deps.clock.now();
 
             // Create repository
             pb.set_message("Creating repository...");
-            let repo_response = match create_repository(&access_token, &component.name).await {
+            let repo_response = match deps.api_client
+                .create_ecr_repository(&types::CreateEcrRepositoryRequest {
+                    tool_name: component.name.as_str().try_into()
+                        .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
+                })
+                .await
+            {
                 Ok(resp) => resp,
                 Err(e) => {
-                    pb.finish_with_message(
-                        style(format!("✗ Failed to create repository: {e}"))
-                            .red()
-                            .to_string(),
-                    );
+                    pb.finish_with_message(format!("✗ Failed to create repository: {}", e));
                     let mut error_guard = error_flag.lock().await;
                     if error_guard.is_none() {
-                        *error_guard =
-                            Some(format!("Component '{}' failed: {}", component.name, e));
+                        *error_guard = Some(format!("Component '{}' failed: {}", component.name, e));
                     }
-                    return Err(e);
+                    return Err(anyhow!("Failed to create repository: {}", e));
                 }
             };
 
             // Push with version tag
-            pb.set_message(format!("Pushing v{}...", component.version));
+            pb.set_message(&format!("Pushing v{}...", component.version));
             let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
-            let output = Command::new("wkg")
-                .args(["oci", "push", &versioned_tag, &component.source_path])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::piped())
-                .output()
+            let output = deps.command_executor
+                .execute("wkg", &["oci", "push", &versioned_tag, &component.source_path])
+                .await
                 .context("Failed to push component with wkg")?;
 
-            if !output.status.success() {
+            if !output.success {
                 let error = format!(
                     "Failed to push {}: {}",
                     component.name,
                     String::from_utf8_lossy(&output.stderr)
                 );
-                pb.finish_with_message(style(format!("✗ {error}")).red().to_string());
+                pb.finish_with_message(format!("✗ {}", error));
                 let mut error_guard = error_flag.lock().await;
                 if error_guard.is_none() {
                     *error_guard = Some(error.clone());
@@ -558,29 +375,26 @@ async fn create_repositories_and_push_with_progress(
             // Also push as latest
             pb.set_message("Pushing latest tag...");
             let latest_tag = format!("{}:latest", repo_response.repository_uri);
-            Command::new("wkg")
-                .args(["oci", "push", &latest_tag, &component.source_path])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .output()?;
+            deps.command_executor
+                .execute("wkg", &["oci", "push", &latest_tag, &component.source_path])
+                .await?;
 
             // Add to deployed tools
             let mut tools = deployed_tools.lock().await;
-            tools.push(DeploymentTool {
-                name: component.name.clone(),
-                tag: component.version.clone(),
-                allowed_hosts: component.allowed_hosts.clone(),
+            tools.push(types::DeploymentRequestToolsItem {
+                name: component.name.as_str().try_into()
+                    .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
+                tag: component.version.as_str().try_into()
+                    .map_err(|e: ConversionError| anyhow!("Invalid tag: {}", e))?,
+                allowed_hosts: component.allowed_hosts.clone().unwrap_or_default(),
+                component_uri: None,
             });
 
             let duration = start.elapsed();
-            pb.finish_with_message(
-                style(format!(
-                    "✓ Pushed successfully in {:.1}s",
-                    duration.as_secs_f64()
-                ))
-                .green()
-                .to_string(),
-            );
+            pb.finish_with_message(format!(
+                "✓ Pushed successfully in {:.1}s",
+                duration.as_secs_f64()
+            ));
 
             Ok(())
         });
@@ -603,19 +417,17 @@ async fn create_repositories_and_push_with_progress(
 
     let tools = Arc::try_unwrap(deployed_tools).unwrap().into_inner();
 
-    println!();
-    println!("{} All components pushed successfully!", style("✓").green());
+    deps.ui.print("");
+    deps.ui.print_styled("✓ All components pushed successfully!", MessageStyle::Success);
 
     Ok(tools)
 }
 
 async fn poll_deployment_status_with_progress(
-    client: &reqwest::Client,
-    headers: HeaderMap,
-    status_url: &str,
-    _deployment_id: &str,
-    spinner: ProgressBar,
-) -> Result<DeploymentDetails> {
+    deps: Arc<DeployDependencies>,
+    deployment_id: &str,
+    spinner: Box<dyn crate::deps::ProgressIndicator>,
+) -> Result<types::DeploymentStatusDeployment> {
     let max_attempts = 60; // 5 minutes with 5-second intervals
     let mut attempts = 0;
 
@@ -625,60 +437,72 @@ async fn poll_deployment_status_with_progress(
             return Err(anyhow!("Deployment timeout after 5 minutes"));
         }
 
-        let response = client
-            .get(status_url)
-            .headers(headers.clone())
-            .send()
-            .await
-            .context("Failed to check deployment status")?;
-
-        if !response.status().is_success() {
-            spinner.finish_and_clear();
-            let error_text = response.text().await?;
-            return Err(anyhow!("Failed to get deployment status: {}", error_text));
-        }
-
-        let status_response: DeploymentStatusResponse = response
-            .json()
-            .await
-            .context("Failed to parse deployment status")?;
+        let status_response = match deps.api_client.get_deployment_status(deployment_id).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                spinner.finish_and_clear();
+                return Err(anyhow!("Failed to get deployment status: {}", e));
+            }
+        };
 
         let deployment = status_response.deployment;
 
-        // Update spinner message based on status
-        let status_msg = match deployment.status.as_str() {
-            "INITIALIZING" => "Initializing deployment...".to_string(),
-            "BUILDING" => "Building application...".to_string(),
-            "PROVISIONING" => "Provisioning environment...".to_string(),
-            "AUTHENTICATING" => "Authenticating with registries...".to_string(),
-            "DEPLOYING" => "Finalizing deployment...".to_string(),
-            _ => deployment
-                .status_message
-                .as_deref()
-                .unwrap_or("Processing...")
-                .to_string(),
+        // Update spinner message based on status and stages
+        let stages = &deployment.stages;
+        let status_msg = if !stages.is_empty() {
+            // Find the current stage (first non-completed stage)
+            let current_stage = stages
+                .iter()
+                .find(|s| !matches!(
+                    s.status,
+                    types::DeploymentStatusDeploymentStagesItemStatus::Completed
+                ))
+                .or(stages.last());
+
+            if let Some(stage) = current_stage {
+                match &stage.stage {
+                    types::DeploymentStatusDeploymentStagesItemStage::ImageBuild => {
+                        "Building container image...".to_string()
+                    }
+                    types::DeploymentStatusDeploymentStagesItemStage::PlatformUpload => {
+                        "Uploading to platform...".to_string()
+                    }
+                    types::DeploymentStatusDeploymentStagesItemStage::PlatformDeploy => {
+                        "Deploying application...".to_string()
+                    }
+                    types::DeploymentStatusDeploymentStagesItemStage::Validation => {
+                        "Validating deployment...".to_string()
+                    }
+                }
+            } else {
+                "Processing deployment...".to_string()
+            }
+        } else {
+            format!("Status: {}", deployment.status)
         };
 
-        spinner.set_message(status_msg);
+        spinner.set_message(&status_msg);
 
-        match deployment.status.as_str() {
-            "COMPLETED" => {
+        match deployment.status {
+            types::DeploymentStatusDeploymentStatus::Deployed => {
                 spinner.finish_and_clear();
                 return Ok(deployment);
             }
-            "FAILED" => {
+            types::DeploymentStatusDeploymentStatus::Failed
+            | types::DeploymentStatusDeploymentStatus::Cancelled => {
                 spinner.finish_and_clear();
                 let error_msg = deployment
-                    .error_reason
+                    .error
                     .as_deref()
-                    .or(deployment.status_message.as_deref())
                     .unwrap_or("Deployment failed")
                     .to_string();
                 return Err(anyhow!("Deployment failed: {}", error_msg));
             }
             _ => {
-                // Continue polling
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Continue polling for other statuses
+                deps.async_runtime
+                    .sleep(deps.clock.duration_from_secs(5))
+                    .await;
                 attempts += 1;
             }
         }
@@ -686,56 +510,141 @@ async fn poll_deployment_status_with_progress(
 }
 
 async fn deploy_to_ftl_with_progress(
-    access_token: &str,
+    deps: Arc<DeployDependencies>,
     app_name: String,
-    tools: Vec<DeploymentTool>,
-    spinner: ProgressBar,
-) -> Result<DeploymentDetails> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {access_token}"))?,
-    );
-
-    let request_body = DeploymentRequest {
-        app_name,
+    tools: Vec<types::DeploymentRequestToolsItem>,
+    spinner: Box<dyn crate::deps::ProgressIndicator>,
+) -> Result<types::DeploymentStatusDeployment> {
+    let request_body = types::DeploymentRequest {
+        app_name: app_name.as_str().try_into()
+            .map_err(|e: ConversionError| anyhow!("Invalid app name: {}", e))?,
         tools,
-        variables: None,
+        variables: Default::default(),
     };
 
-    let response = client
-        .post(format!("{FTL_API_URL}/v1/deployments"))
-        .headers(headers.clone())
-        .json(&request_body)
-        .send()
+    let deployment_response = deps
+        .api_client
+        .deploy_app(&request_body)
         .await
-        .context("Failed to start deployment")?;
+        .map_err(|e| {
+            spinner.finish_and_clear();
+            anyhow!("Failed to start deployment: {}", e)
+        })?;
 
-    if response.status() != 202 {
-        spinner.finish_and_clear();
-        let error_text = response.text().await?;
-        return Err(anyhow!("Failed to start deployment: {}", error_text));
-    }
-
-    let start_response: StartDeploymentResponse = response
-        .json()
-        .await
-        .context("Failed to parse deployment start response")?;
+    // Update spinner with deployment ID
+    spinner.set_message(&format!(
+        "Deployment {} in progress...",
+        &deployment_response.deployment_id
+    ));
 
     // Poll for deployment status
-    let status_url = if start_response.status_url.starts_with("/") {
-        format!("{}{}", FTL_API_URL, start_response.status_url)
-    } else {
-        start_response.status_url
-    };
-
     poll_deployment_status_with_progress(
-        &client,
-        headers,
-        &status_url,
-        &start_response.deployment_id,
+        deps,
+        &deployment_response.deployment_id.to_string(),
         spinner,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    // Mock implementations for testing
+    struct MockFileSystem {
+        files: HashMap<PathBuf, String>,
+    }
+
+    impl MockFileSystem {
+        fn new() -> Self {
+            Self {
+                files: HashMap::new(),
+            }
+        }
+
+        fn add_file(&mut self, path: impl Into<PathBuf>, content: impl Into<String>) {
+            self.files.insert(path.into(), content.into());
+        }
+    }
+
+    impl FileSystem for MockFileSystem {
+        fn exists(&self, path: &Path) -> bool {
+            self.files.contains_key(path)
+        }
+
+        fn read_to_string(&self, path: &Path) -> Result<String> {
+            self.files
+                .get(path)
+                .cloned()
+                .ok_or_else(|| anyhow!("File not found: {}", path.display()))
+        }
+        
+        fn write_string(&self, _path: &Path, _content: &str) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_parse_deploy_config() {
+        let mut fs = MockFileSystem::new();
+        fs.add_file(
+            "spin.toml",
+            r#"
+[application]
+name = "test-app"
+
+[component.api]
+source = "api/target/wasm32-wasi/release/api.wasm"
+allowed_outbound_hosts = ["https://*.amazonaws.com"]
+
+[component.worker]
+source = "worker/target/wasm32-wasi/release/worker.wasm"
+
+[component.system]
+source = { registry = "ghcr.io/example/system:latest" }
+"#,
+        );
+        // Add version files in the expected locations
+        fs.add_file(
+            "api/Cargo.toml",
+            r#"
+[package]
+name = "api"
+version = "1.2.3"
+"#,
+        );
+        fs.add_file(
+            "worker/package.json",
+            r#"{"name": "worker", "version": "2.0.0"}"#,
+        );
+
+        let fs: Arc<dyn FileSystem> = Arc::new(fs);
+        let config = parse_deploy_config(&fs).unwrap();
+
+        assert_eq!(config.app_name, "test-app");
+        assert_eq!(config.components.len(), 2);
+
+        let api = &config.components[0];
+        assert_eq!(api.name, "api");
+        assert_eq!(api.source_path, "api/target/wasm32-wasi/release/api.wasm");
+        assert_eq!(api.version, "1.2.3");
+        assert_eq!(
+            api.allowed_hosts,
+            Some(vec!["https://*.amazonaws.com".to_string()])
+        );
+
+        let worker = &config.components[1];
+        assert_eq!(worker.name, "worker");
+        assert_eq!(worker.source_path, "worker/target/wasm32-wasi/release/worker.wasm");
+        assert_eq!(worker.version, "2.0.0");
+        assert_eq!(worker.allowed_hosts, None);
+    }
+
+    #[test]
+    fn test_extract_component_version_default() {
+        let fs: Arc<dyn FileSystem> = Arc::new(MockFileSystem::new());
+        let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
+        assert_eq!(version, "0.1.0");
+    }
 }

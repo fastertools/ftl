@@ -31,3 +31,7 @@ impl fmt::Display for Language {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "language_tests.rs"]
+mod tests;

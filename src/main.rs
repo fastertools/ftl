@@ -1,12 +1,88 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
+mod api_client;
 mod commands;
 mod common;
+mod deps;
 mod language;
+mod ui;
+
+// Implementations for up command dependencies
+struct RealFileWatcher;
+
+#[async_trait::async_trait]
+impl commands::up::FileWatcher for RealFileWatcher {
+    async fn watch(&self, path: &Path, recursive: bool) -> Result<Box<dyn commands::up::WatchHandle>> {
+        use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+        use tokio::sync::mpsc;
+        
+        let (tx, rx) = mpsc::channel(100);
+        
+        let mut watcher = RecommendedWatcher::new(
+            move |res| {
+                if let Ok(event) = res {
+                    let _ = tx.try_send(event);
+                }
+            },
+            notify::Config::default(),
+        )?;
+        
+        let mode = if recursive { RecursiveMode::Recursive } else { RecursiveMode::NonRecursive };
+        watcher.watch(path, mode)?;
+        
+        Ok(Box::new(RealWatchHandle {
+            watcher: Some(watcher),
+            rx,
+        }))
+    }
+}
+
+struct RealWatchHandle {
+    watcher: Option<notify::RecommendedWatcher>,
+    rx: tokio::sync::mpsc::Receiver<notify::Event>,
+}
+
+#[async_trait::async_trait]
+impl commands::up::WatchHandle for RealWatchHandle {
+    async fn wait_for_change(&mut self) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
+        
+        while let Some(event) = self.rx.recv().await {
+            paths.extend(event.paths);
+            
+            // Drain any additional events that arrived
+            while let Ok(event) = self.rx.try_recv() {
+                paths.extend(event.paths);
+            }
+            
+            if !paths.is_empty() {
+                break;
+            }
+        }
+        
+        paths.sort();
+        paths.dedup();
+        Ok(paths)
+    }
+}
+
+struct RealSignalHandler;
+
+#[async_trait::async_trait] 
+impl commands::up::SignalHandler for RealSignalHandler {
+    async fn wait_for_interrupt(&self) -> Result<()> {
+        tokio::signal::ctrl_c().await
+            .map_err(|e| anyhow::anyhow!("Failed to listen for Ctrl+C: {}", e))
+    }
+}
+
+#[cfg(test)]
+mod test_helpers;
 
 #[derive(Parser)]
 #[command(name = "ftl")]
@@ -241,7 +317,23 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Command::Init { name, here } => commands::init::execute(name, here).await,
+        Command::Init { name, here } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::init::InitDependencies {
+                file_system: Arc::new(deps::RealFileSystem),
+                command_executor: Arc::new(deps::RealCommandExecutor),
+                ui: ui.clone(),
+                spin_installer: Arc::new(deps::RealSpinInstaller),
+            });
+            
+            // Execute with v2
+            commands::init::execute_with_deps(
+                commands::init::InitConfig { name, here },
+                deps,
+            )
+            .await
+        }
         Command::Add {
             name,
             description,
@@ -251,54 +343,524 @@ async fn main() -> Result<()> {
             dir,
             tar,
         } => {
-            commands::add::execute(commands::add::AddOptions {
-                name,
-                description,
-                language,
-                git,
-                branch,
-                dir,
-                tar,
-            })
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::add::AddDependencies {
+                file_system: Arc::new(deps::RealFileSystem) as Arc<dyn deps::FileSystem>,
+                command_executor: Arc::new(deps::RealCommandExecutor) as Arc<dyn deps::CommandExecutor>,
+                ui: ui.clone() as Arc<dyn deps::UserInterface>,
+                spin_installer: Arc::new(deps::RealSpinInstaller) as Arc<dyn deps::SpinInstaller>,
+            });
+            
+            // Execute with v2
+            commands::add::execute_with_deps(
+                commands::add::AddConfig {
+                    name,
+                    description,
+                    language,
+                    git,
+                    branch,
+                    dir,
+                    tar,
+                },
+                deps,
+            )
             .await
         }
-        Command::Build { release, path } => commands::build::execute(path, release).await,
+        Command::Build { release, path } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::build::BuildDependencies {
+                file_system: Arc::new(deps::RealFileSystem),
+                command_executor: Arc::new(deps::RealCommandExecutor),
+                ui: ui.clone(),
+                spin_installer: Arc::new(deps::RealSpinInstaller),
+                async_runtime: Arc::new(deps::RealAsyncRuntime),
+            });
+            
+            // Execute with v2
+            commands::build::execute_with_deps(
+                commands::build::BuildConfig { path, release },
+                deps,
+            )
+            .await
+        }
         Command::Up {
             build,
             watch,
             port,
             path,
             clear,
-        } => commands::up::execute(path, port, build, watch, clear).await,
-        Command::Test { path } => commands::test::execute(path).await,
+        } => {
+            // Create dependencies  
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::up::UpDependencies {
+                file_system: Arc::new(deps::RealFileSystem),
+                command_executor: Arc::new(deps::RealCommandExecutor),
+                ui: ui.clone(),
+                spin_installer: Arc::new(deps::RealSpinInstaller),
+                async_runtime: Arc::new(deps::RealAsyncRuntime),
+                process_manager: Arc::new(deps::RealProcessManager),
+                file_watcher: Arc::new(RealFileWatcher),
+                signal_handler: Arc::new(RealSignalHandler),
+            });
+            
+            // Execute with v2
+            commands::up::execute_with_deps(
+                commands::up::UpConfig {
+                    path,
+                    port,
+                    build,
+                    watch,
+                    clear,
+                },
+                deps,
+            )
+            .await
+        }
+        Command::Test { path } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementations for test-specific traits
+            struct RealDirectoryReader;
+            impl commands::test::DirectoryReader for RealDirectoryReader {
+                fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
+                    std::fs::read_dir(path)?
+                        .map(|entry| Ok(entry?.path()))
+                        .collect()
+                }
+                
+                fn is_dir(&self, path: &Path) -> Result<bool> {
+                    Ok(path.is_dir())
+                }
+            }
+            
+            struct RealFileChecker;
+            impl commands::test::FileChecker for RealFileChecker {
+                fn exists(&self, path: &Path) -> Result<bool> {
+                    Ok(path.exists())
+                }
+            }
+            
+            struct RealTestCommandExecutor;
+            impl commands::test::TestCommandExecutor for RealTestCommandExecutor {
+                fn execute(&self, command: &str, args: &[&str], working_dir: Option<&str>) -> Result<std::process::Output> {
+                    use std::process::Command;
+                    
+                    let mut cmd = Command::new(command);
+                    cmd.args(args);
+                    if let Some(dir) = working_dir {
+                        cmd.current_dir(dir);
+                    }
+                    
+                    cmd.output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))
+                }
+            }
+            
+            let deps = Arc::new(commands::test::TestDependencies {
+                ui: ui.clone(),
+                directory_reader: Arc::new(RealDirectoryReader),
+                file_checker: Arc::new(RealFileChecker),
+                command_executor: Arc::new(RealTestCommandExecutor),
+            });
+            
+            // Execute with v2
+            commands::test::execute_with_deps(path, deps).await
+        }
         Command::Publish {
             registry,
             tag,
             path,
-        } => commands::publish::execute(path, registry, tag).await,
-        Command::Deploy => commands::deploy::execute().await,
-        Command::Registry { command } => match command {
-            RegistryCommand::List { registry } => commands::registry::list(registry).await,
-            RegistryCommand::Search { query, registry } => {
-                commands::registry::search(query, registry).await
+        } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementations for publish-specific traits
+            struct RealProcessExecutor;
+            impl commands::publish::ProcessExecutor for RealProcessExecutor {
+                fn execute(&self, command: &str, args: &[&str], working_dir: Option<&Path>) -> Result<commands::publish::ProcessOutput> {
+                    use std::process::Command;
+                    
+                    let mut cmd = Command::new(command);
+                    cmd.args(args);
+                    if let Some(dir) = working_dir {
+                        cmd.current_dir(dir);
+                    }
+                    
+                    let output = cmd.output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))?;
+                    
+                    Ok(commands::publish::ProcessOutput {
+                        success: output.status.success(),
+                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                    })
+                }
             }
-            RegistryCommand::Info { component } => commands::registry::info(component).await,
-        },
-        Command::Setup { command } => match command {
-            SetupCommand::Templates {
-                force,
-                git,
-                branch,
-                dir,
-                tar,
-            } => commands::setup::templates(force, git, branch, dir, tar).await,
-            SetupCommand::Info => commands::setup::info().await,
-        },
-        Command::Update { force } => commands::update::execute(force).await,
-        Command::Login { no_browser } => commands::login::execute(no_browser).await,
-        Command::Logout => commands::logout::execute().await,
-        Command::Auth { command } => match command {
-            AuthCommand::Status => commands::auth::status().await,
-        },
+            
+            struct RealSpinInstallerForPublish;
+            #[async_trait::async_trait]
+            impl commands::publish::SpinInstaller for RealSpinInstallerForPublish {
+                async fn check_and_install_spin(&self) -> Result<PathBuf> {
+                    crate::common::spin_installer::check_and_install_spin().await
+                }
+            }
+            
+            struct RealBuildExecutorForPublish;
+            #[async_trait::async_trait]
+            impl commands::publish::BuildExecutor for RealBuildExecutorForPublish {
+                async fn execute(&self, path: Option<PathBuf>, release: bool) -> Result<()> {
+                    // Delegate to build_v2
+                    let ui = Arc::new(ui::RealUserInterface);
+                    let deps = Arc::new(commands::build::BuildDependencies {
+                        file_system: Arc::new(deps::RealFileSystem),
+                        command_executor: Arc::new(deps::RealCommandExecutor),
+                        ui: ui.clone(),
+                        spin_installer: Arc::new(deps::RealSpinInstaller),
+                        async_runtime: Arc::new(deps::RealAsyncRuntime),
+                    });
+                    commands::build::execute_with_deps(
+                        commands::build::BuildConfig { path, release },
+                        deps,
+                    ).await
+                }
+            }
+            
+            let deps = Arc::new(commands::publish::PublishDependencies {
+                ui: ui.clone(),
+                file_system: Arc::new(deps::RealFileSystem),
+                process_executor: Arc::new(RealProcessExecutor),
+                spin_installer: Arc::new(RealSpinInstallerForPublish),
+                build_executor: Arc::new(RealBuildExecutorForPublish),
+            });
+            
+            // Execute with v2
+            commands::publish::execute_with_deps(
+                commands::publish::PublishConfig {
+                    path,
+                    registry,
+                    tag,
+                },
+                deps,
+            )
+            .await
+        }
+        Command::Deploy => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::deploy::DeployDependencies {
+                file_system: Arc::new(deps::RealFileSystem),
+                command_executor: Arc::new(deps::RealCommandExecutor),
+                ui: ui.clone(),
+                credentials_provider: Arc::new(deps::RealCredentialsProvider),
+                api_client: Arc::new(deps::RealFtlApiClient::new(
+                    crate::api_client::Client::new("https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com"),
+                )),
+                clock: Arc::new(deps::RealClock),
+                async_runtime: Arc::new(deps::RealAsyncRuntime),
+                build_executor: Arc::new(deps::RealBuildExecutor),
+            });
+            
+            // Execute with v2
+            commands::deploy::execute_with_deps(deps).await
+        }
+        Command::Registry { command } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            let deps = Arc::new(commands::registry::RegistryDependencies {
+                ui: ui.clone(),
+            });
+            
+            match command {
+                RegistryCommand::List { registry } => {
+                    commands::registry::list_with_deps(registry, deps).await
+                }
+                RegistryCommand::Search { query, registry } => {
+                    commands::registry::search_with_deps(query, registry, deps).await
+                }
+                RegistryCommand::Info { component } => {
+                    commands::registry::info_with_deps(component, deps).await
+                }
+            }
+        }
+        Command::Setup { command } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementations for setup-specific traits
+            struct RealSpinInstallerForSetup;
+            impl commands::setup::SpinInstaller for RealSpinInstallerForSetup {
+                fn check_and_install(&self) -> Result<PathBuf> {
+                    // Blocking implementation since trait is sync
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(crate::common::spin_installer::check_and_install_spin())
+                    })
+                }
+                
+                fn get_spin_path(&self) -> Result<PathBuf> {
+                    // Try common locations
+                    let paths = [
+                        dirs::home_dir().map(|d| d.join(".cargo/bin/spin")),
+                        Some(PathBuf::from("/usr/local/bin/spin")),
+                        Some(PathBuf::from("/usr/bin/spin")),
+                    ];
+                    
+                    for path_opt in paths.iter().flatten() {
+                        if path_opt.exists() {
+                            return Ok(path_opt.clone());
+                        }
+                    }
+                    
+                    // Try which
+                    which::which("spin")
+                        .map_err(|_| anyhow::anyhow!("Spin not found in PATH"))
+                }
+            }
+            
+            struct RealSetupCommandExecutor;
+            impl commands::setup::SetupCommandExecutor for RealSetupCommandExecutor {
+                fn execute(&self, command: &str, args: &[&str]) -> Result<std::process::Output> {
+                    use std::process::Command;
+                    
+                    Command::new(command)
+                        .args(args)
+                        .output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))
+                }
+            }
+            
+            struct RealEnvironmentForSetup;
+            impl commands::setup::Environment for RealEnvironmentForSetup {
+                fn get_cargo_pkg_version(&self) -> &'static str {
+                    env!("CARGO_PKG_VERSION")
+                }
+            }
+            
+            let deps = Arc::new(commands::setup::SetupDependencies {
+                ui: ui.clone(),
+                spin_installer: Arc::new(RealSpinInstallerForSetup),
+                command_executor: Arc::new(RealSetupCommandExecutor),
+                environment: Arc::new(RealEnvironmentForSetup),
+            });
+            
+            match command {
+                SetupCommand::Templates {
+                    force,
+                    git,
+                    branch,
+                    dir,
+                    tar,
+                } => {
+                    commands::setup::templates_with_deps(
+                        force,
+                        git,
+                        branch,
+                        dir,
+                        tar,
+                        deps,
+                    ).await
+                }
+                SetupCommand::Info => commands::setup::info_with_deps(deps).await,
+            }
+        }
+        Command::Update { force } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementations for update-specific traits
+            struct RealHttpClientForUpdate;
+            #[async_trait::async_trait]
+            impl commands::update::HttpClient for RealHttpClientForUpdate {
+                async fn get(&self, url: &str, user_agent: &str) -> Result<String> {
+                    let response = reqwest::Client::new()
+                        .get(url)
+                        .header("User-Agent", user_agent)
+                        .send()
+                        .await?;
+                    
+                    response.text().await
+                        .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))
+                }
+            }
+            
+            struct RealCommandExecutorForUpdate;
+            impl commands::update::CommandExecutor for RealCommandExecutorForUpdate {
+                fn execute(&self, command: &str, args: &[&str]) -> Result<commands::update::CommandOutput> {
+                    use std::process::Command;
+                    
+                    let output = Command::new(command)
+                        .args(args)
+                        .output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))?;
+                    
+                    Ok(commands::update::CommandOutput {
+                        success: output.status.success(),
+                        stderr: output.stderr,
+                    })
+                }
+            }
+            
+            struct RealEnvironmentForUpdate;
+            impl commands::update::Environment for RealEnvironmentForUpdate {
+                fn get_cargo_pkg_version(&self) -> &'static str {
+                    env!("CARGO_PKG_VERSION")
+                }
+            }
+            
+            let deps = Arc::new(commands::update::UpdateDependencies {
+                ui: ui.clone(),
+                http_client: Arc::new(RealHttpClientForUpdate),
+                command_executor: Arc::new(RealCommandExecutorForUpdate),
+                environment: Arc::new(RealEnvironmentForUpdate),
+            });
+            
+            // Execute with v2
+            commands::update::execute_with_deps(force, deps).await
+        }
+        Command::Login { no_browser } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementations for login-specific traits
+            struct RealHttpClient;
+            #[async_trait::async_trait]
+            impl commands::login::HttpClient for RealHttpClient {
+                async fn post(&self, url: &str, body: &str) -> Result<commands::login::HttpResponse> {
+                    let response = reqwest::Client::new()
+                        .post(url)
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .body(body.to_string())
+                        .send()
+                        .await?;
+                    
+                    let status = response.status().as_u16();
+                    let body = response.text().await?;
+                    
+                    Ok(commands::login::HttpResponse { status, body })
+                }
+            }
+            
+            struct RealKeyringStorage;
+            impl commands::login::KeyringStorage for RealKeyringStorage {
+                fn store(&self, service: &str, username: &str, password: &str) -> Result<()> {
+                    let entry = keyring::Entry::new(service, username)?;
+                    entry.set_password(password)?;
+                    Ok(())
+                }
+                
+                fn retrieve(&self, service: &str, username: &str) -> Result<String> {
+                    let entry = keyring::Entry::new(service, username)?;
+                    entry.get_password()
+                        .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))
+                }
+                
+                fn delete(&self, service: &str, username: &str) -> Result<()> {
+                    let entry = keyring::Entry::new(service, username)?;
+                    entry.delete_credential()?;
+                    Ok(())
+                }
+            }
+            
+            struct RealBrowserLauncher;
+            impl commands::login::BrowserLauncher for RealBrowserLauncher {
+                fn open(&self, url: &str) -> Result<()> {
+                    webbrowser::open(url)
+                        .map_err(|e| anyhow::anyhow!("Failed to open browser: {}", e))
+                }
+            }
+            
+            struct RealClockForLogin;
+            impl commands::login::Clock for RealClockForLogin {
+                fn now(&self) -> chrono::DateTime<chrono::Utc> {
+                    chrono::Utc::now()
+                }
+                
+                fn instant_now(&self) -> std::time::Instant {
+                    std::time::Instant::now()
+                }
+            }
+            
+            let deps = Arc::new(commands::login::LoginDependencies {
+                ui: ui.clone(),
+                http_client: Arc::new(RealHttpClient),
+                keyring: Arc::new(RealKeyringStorage),
+                browser_launcher: Arc::new(RealBrowserLauncher),
+                async_runtime: Arc::new(deps::RealAsyncRuntime),
+                clock: Arc::new(RealClockForLogin),
+            });
+            
+            // Execute with v2
+            commands::login::execute_with_deps(
+                commands::login::LoginConfig {
+                    no_browser,
+                    authkit_domain: None,
+                    client_id: None,
+                },
+                deps,
+            )
+            .await
+        }
+        Command::Logout => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementation for logout-specific trait
+            struct RealCredentialsClearer;
+            impl commands::logout::CredentialsClearer for RealCredentialsClearer {
+                fn clear_stored_credentials(&self) -> Result<()> {
+                    use crate::commands::login::clear_stored_credentials;
+                    clear_stored_credentials()
+                }
+            }
+            
+            let deps = Arc::new(commands::logout::LogoutDependencies {
+                ui: ui.clone(),
+                credentials_clearer: Arc::new(RealCredentialsClearer),
+            });
+            
+            // Execute with v2
+            commands::logout::execute_with_deps(deps).await
+        }
+        Command::Auth { command } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+            
+            // Create real implementation for auth-specific trait
+            struct RealCredentialsProviderForAuth;
+            impl commands::auth::CredentialsProvider for RealCredentialsProviderForAuth {
+                fn get_stored_credentials(&self) -> Result<commands::auth::StoredCredentials> {
+                    use crate::commands::login::get_stored_credentials;
+                    let creds = get_stored_credentials()?
+                        .ok_or_else(|| anyhow::anyhow!("No matching entry found"))?;
+                    Ok(commands::auth::StoredCredentials {
+                        access_token: creds.access_token,
+                        refresh_token: creds.refresh_token,
+                        id_token: None, // Original doesn't have this
+                        expires_at: creds.expires_at,
+                        authkit_domain: "auth.ftl.sh".to_string(), // Default value
+                    })
+                }
+            }
+            
+            struct RealClockForAuth;
+            impl commands::auth::Clock for RealClockForAuth {
+                fn now(&self) -> chrono::DateTime<chrono::Utc> {
+                    chrono::Utc::now()
+                }
+            }
+            
+            let deps = Arc::new(commands::auth::AuthDependencies {
+                ui: ui.clone(),
+                credentials_provider: Arc::new(RealCredentialsProviderForAuth),
+                clock: Arc::new(RealClockForAuth),
+            });
+            
+            match command {
+                AuthCommand::Status => commands::auth::status_with_deps(deps).await,
+            }
+        }
     }
 }

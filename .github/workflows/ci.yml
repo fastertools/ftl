@@ -107,6 +107,57 @@ jobs:
           # Test that the embedded templates are valid
           cargo build --release
 
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      
+      - name: Install wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      
+      - name: Generate code coverage
+        run: |
+          # Run coverage with our exclusions (including test files)
+          cargo llvm-cov test --all-features --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+          
+          # Generate coverage report and extract percentage
+          COVERAGE=$(cargo llvm-cov report --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)" | tail -1 | awk '{print $4}' | sed 's/%//')
+          echo "Coverage: ${COVERAGE}%"
+          
+          # Fail if coverage drops below 80% (adjusted since we're excluding test files now)
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below required 80%"
+            exit 1
+          else
+            echo "::notice::Coverage ${COVERAGE}% meets the 80% requirement"
+          fi
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest

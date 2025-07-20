@@ -1,63 +1,121 @@
-use anyhow::{Context, Result};
+//! Refactored spin installer with dependency injection for better testability
+
 use std::path::PathBuf;
-use std::process::Command;
-use tracing::{debug, info};
+use std::sync::Arc;
 
-/// Get the path to spin if it exists in the system PATH
-pub fn get_spin_path() -> Result<PathBuf> {
-    // Check if spin is available in PATH
-    if let Ok(system_spin_path) = which::which("spin") {
-        return Ok(system_spin_path);
-    }
+use anyhow::{Context, Result};
 
-    anyhow::bail!("Spin not found")
-}
+use crate::deps::{CommandExecutor, UserInterface, MessageStyle};
 
+/// Spin installer trait (already defined in deps.rs)
+use crate::deps::SpinInstaller;
+
+/// Helper function to check and install spin using default dependencies
 pub async fn check_and_install_spin() -> Result<PathBuf> {
-    // Check if spin is available in PATH
-    if let Ok(system_spin_path) = which::which("spin") {
-        debug!("Found system Spin in PATH at: {:?}", system_spin_path);
-        ensure_akamai_plugin(&system_spin_path)?;
-        return Ok(system_spin_path);
-    }
-
-    // Spin not found - emit warning
-    eprintln!("⚠️  FTL requires Spin to run WebAssembly tools.");
-    eprintln!("Please install Spin from: https://github.com/fermyon/spin");
-    eprintln!("Or use your package manager (e.g., brew install fermyon/tap/spin)");
-
-    anyhow::bail!("Spin not found. Please install it from https://github.com/fermyon/spin")
+    let ui = Arc::new(crate::ui::RealUserInterface);
+    let deps = Arc::new(SpinInstallerDependencies {
+        command_executor: Arc::new(crate::deps::RealCommandExecutor),
+        ui: ui.clone(),
+    });
+    
+    let installer = RealSpinInstallerV2::new(deps);
+    let path = installer.check_and_install().await?;
+    Ok(PathBuf::from(path))
 }
 
-fn ensure_akamai_plugin(spin_path: &PathBuf) -> Result<()> {
-    // Check if Akamai plugin is installed
-    let output = Command::new(spin_path)
-        .args(["plugin", "list"])
-        .output()
-        .context("Failed to list Spin plugins")?;
+/// Dependencies for the spin installer
+pub struct SpinInstallerDependencies {
+    pub command_executor: Arc<dyn CommandExecutor>,
+    pub ui: Arc<dyn UserInterface>,
+}
 
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.contains("aka") {
-            debug!("Akamai plugin is already installed");
-            return Ok(());
+/// Production implementation of SpinInstaller
+pub struct RealSpinInstallerV2 {
+    deps: Arc<SpinInstallerDependencies>,
+}
+
+impl RealSpinInstallerV2 {
+    pub fn new(deps: Arc<SpinInstallerDependencies>) -> Self {
+        Self { deps }
+    }
+}
+
+#[async_trait::async_trait]
+impl SpinInstaller for RealSpinInstallerV2 {
+    async fn check_and_install(&self) -> Result<String> {
+        // Check if spin is available in PATH
+        match self.deps.command_executor.check_command_exists("spin").await {
+            Ok(_) => {
+                // Spin exists, ensure akamai plugin is installed
+                self.ensure_akamai_plugin().await?;
+                Ok("spin".to_string())
+            }
+            Err(_) => {
+                // Spin not found - emit warning
+                self.deps.ui.print_styled("⚠️  FTL requires Spin to run WebAssembly tools.", MessageStyle::Warning);
+                self.deps.ui.print("Please install Spin from: https://github.com/fermyon/spin");
+                self.deps.ui.print("Or use your package manager (e.g., brew install fermyon/tap/spin)");
+                
+                anyhow::bail!("Spin not found. Please install it from https://github.com/fermyon/spin")
+            }
         }
     }
-
-    // Install the plugin
-    info!("Installing Akamai plugin for Spin");
-    let install_output = Command::new(spin_path)
-        .args(["plugin", "install", "aka"])
-        .output()
-        .context("Failed to install Akamai plugin")?;
-
-    if !install_output.status.success() {
-        let stderr = String::from_utf8_lossy(&install_output.stderr);
-        eprintln!("⚠️  Warning: Failed to install Akamai plugin: {stderr}");
-        eprintln!("   You can install it manually with: spin plugin install aka");
-    } else {
-        debug!("Akamai plugin installed successfully");
-    }
-
-    Ok(())
 }
+
+impl RealSpinInstallerV2 {
+    async fn ensure_akamai_plugin(&self) -> Result<()> {
+        // Check if Akamai plugin is installed
+        let output = self.deps.command_executor
+            .execute("spin", &["plugin", "list"])
+            .await
+            .context("Failed to list Spin plugins")?;
+
+        if output.success {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("aka") {
+                return Ok(());
+            }
+        }
+
+        // Install the plugin
+        self.deps.ui.print("Installing Akamai plugin for Spin...");
+        let install_output = self.deps.command_executor
+            .execute("spin", &["plugin", "install", "aka"])
+            .await
+            .context("Failed to install Akamai plugin")?;
+
+        if !install_output.success {
+            let stderr = String::from_utf8_lossy(&install_output.stderr);
+            self.deps.ui.print_styled(
+                &format!("⚠️  Warning: Failed to install Akamai plugin: {}", stderr),
+                MessageStyle::Warning
+            );
+            self.deps.ui.print("   You can install it manually with: spin plugin install aka");
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spin_installer_creation() {
+        use crate::test_helpers::*;
+        use crate::ui::TestUserInterface;
+        
+        let deps = Arc::new(SpinInstallerDependencies {
+            command_executor: Arc::new(MockCommandExecutorMock::new()),
+            ui: Arc::new(TestUserInterface::new()),
+        });
+        
+        let _installer = RealSpinInstallerV2::new(deps);
+        // Just verify it can be created
+    }
+}
+
+#[cfg(test)]
+#[path = "spin_installer_tests_akamai.rs"]
+mod akamai_tests;
