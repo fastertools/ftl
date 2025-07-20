@@ -319,13 +319,16 @@ workdir = "frontend"
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 
-    // Mock: build command execution
+    // Mock: build command execution (now includes cd)
     fixture
         .command_executor
         .expect_execute()
         .withf(|cmd: &str, args: &[&str]| {
-            (cfg!(target_os = "windows") && cmd == "cmd" && args == ["/C", "npm run build"])
-                || (!cfg!(target_os = "windows") && cmd == "sh" && args == ["-c", "npm run build"])
+            if cfg!(target_os = "windows") {
+                cmd == "cmd" && args.len() == 2 && args[0] == "/C" && args[1].contains("cd") && args[1].contains("frontend") && args[1].contains("npm run build")
+            } else {
+                cmd == "sh" && args.len() == 2 && args[0] == "-c" && args[1].contains("cd") && args[1].contains("frontend") && args[1].contains("npm run build")
+            }
         })
         .times(1)
         .returning(|_: &str, _: &[&str]| {

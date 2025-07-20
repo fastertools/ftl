@@ -266,15 +266,26 @@ async fn run_build_command(
     executor: &Arc<dyn CommandExecutor>,
     shell_cmd: &str,
     shell_args: &[&str],
-    _build_dir: &Path,
+    build_dir: &Path,
 ) -> Result<CommandOutput> {
-    // Note: In a real implementation, we would need to pass the working directory
-    // to the command executor. For now, we'll just execute in the current directory.
-    // The CommandExecutor trait would need to be extended to support this.
-    executor
-        .execute(shell_cmd, shell_args)
-        .await
-        .context("Failed to execute build command")
+    // shell_args already contains ["-c", "command"], so we need to modify the command part
+    let original_command = shell_args.get(1).unwrap_or(&"");
+    let cd_and_run = format!("cd {} && {}", build_dir.display(), original_command);
+    
+    // Build the new command with the cd prefix
+    let result = if shell_args.len() >= 2 {
+        // For sh -c "command", replace with sh -c "cd dir && command"
+        executor
+            .execute(shell_cmd, &[shell_args[0], &cd_and_run])
+            .await
+    } else {
+        // Fallback case - shouldn't happen in normal usage
+        executor
+            .execute(shell_cmd, &[&cd_and_run])
+            .await
+    };
+    
+    result.context("Failed to execute build command")
 }
 
 #[cfg(test)]
