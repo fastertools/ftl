@@ -5,144 +5,588 @@
 name = "add"
 category = "basic_math"
 description = "Add two numbers together"
-registry_url = "ghcr.io/fastertools/ftl-tool-add:latest"
+image_name = "ftl-tool-add"
 tags = ["math", "arithmetic", "basic"]
 
 [[tools]]
 name = "subtract"
 category = "basic_math"
 description = "Subtract one number from another"
-registry_url = "ghcr.io/fastertools/ftl-tool-subtract:latest"
+image_name = "ftl-tool-subtract"
 tags = ["math", "arithmetic", "basic"]
 
 [[tools]]
 name = "multiply"
 category = "basic_math"
 description = "Multiply two numbers"
-registry_url = "ghcr.io/fastertools/ftl-tool-multiply:latest"
+image_name = "ftl-tool-multiply"
 tags = ["math", "arithmetic", "basic"]
 
 [[tools]]
 name = "divide"
 category = "basic_math"
 description = "Divide one number by another"
-registry_url = "ghcr.io/fastertools/ftl-tool-divide:latest"
+image_name = "ftl-tool-divide"
 tags = ["math", "arithmetic", "basic"]
 
 [[tools]]
 name = "uppercase"
 category = "text_processing"
 description = "Convert text to uppercase"
-registry_url = "ghcr.io/fastertools/ftl-tool-uppercase:latest"
+image_name = "ftl-tool-uppercase"
 tags = ["text", "string", "formatting"]
 
 [[tools]]
 name = "lowercase"
 category = "text_processing"
 description = "Convert text to lowercase"
-registry_url = "ghcr.io/fastertools/ftl-tool-lowercase:latest"
+image_name = "ftl-tool-lowercase"
 tags = ["text", "string", "formatting"]
 
 [[tools]]
 name = "trim"
 category = "text_processing"
 description = "Trim whitespace from text"
-registry_url = "ghcr.io/fastertools/ftl-tool-trim:latest"
+image_name = "ftl-tool-trim"
 tags = ["text", "string", "whitespace"]
 
 [[tools]]
 name = "base64-encode"
 category = "encoding"
 description = "Encode data to base64"
-registry_url = "ghcr.io/fastertools/ftl-tool-base64-encode:latest"
+image_name = "ftl-tool-base64-encode"
 tags = ["encoding", "base64", "conversion"]
 
 [[tools]]
 name = "base64-decode"
 category = "encoding"
 description = "Decode base64 data"
-registry_url = "ghcr.io/fastertools/ftl-tool-base64-decode:latest"
+image_name = "ftl-tool-base64-decode"
 tags = ["encoding", "base64", "conversion"]
 
 [[tools]]
 name = "url-encode"
 category = "encoding"
 description = "URL encode a string"
-registry_url = "ghcr.io/fastertools/ftl-tool-url-encode:latest"
+image_name = "ftl-tool-url-encode"
 tags = ["encoding", "url", "web"]
 
 [[tools]]
 name = "url-decode"
 category = "encoding"
 description = "URL decode a string"
-registry_url = "ghcr.io/fastertools/ftl-tool-url-decode:latest"
+image_name = "ftl-tool-url-decode"
 tags = ["encoding", "url", "web"]
 
 [[tools]]
 name = "json-format"
 category = "formatters"
 description = "Format and prettify JSON data"
-registry_url = "ghcr.io/fastertools/ftl-tool-json-format:latest"
+image_name = "ftl-tool-json-format"
 tags = ["json", "formatting", "data"]
 
 [[tools]]
 name = "json-minify"
 category = "formatters"
 description = "Minify JSON data"
-registry_url = "ghcr.io/fastertools/ftl-tool-json-minify:latest"
+image_name = "ftl-tool-json-minify"
 tags = ["json", "formatting", "compression"]
 
 [[tools]]
 name = "yaml-to-json"
 category = "formatters"
 description = "Convert YAML to JSON"
-registry_url = "ghcr.io/fastertools/ftl-tool-yaml-to-json:latest"
+image_name = "ftl-tool-yaml-to-json"
 tags = ["yaml", "json", "conversion"]
 
 [[tools]]
 name = "json-to-yaml"
 category = "formatters"
 description = "Convert JSON to YAML"
-registry_url = "ghcr.io/fastertools/ftl-tool-json-to-yaml:latest"
+image_name = "ftl-tool-json-to-yaml"
 tags = ["yaml", "json", "conversion"]
 
 [[tools]]
 name = "uuid"
 category = "utilities"
 description = "Generate a UUID"
-registry_url = "ghcr.io/fastertools/ftl-tool-uuid:latest"
+image_name = "ftl-tool-uuid"
 tags = ["uuid", "generator", "identifier"]
 
 [[tools]]
 name = "timestamp"
 category = "utilities"
 description = "Get current timestamp"
-registry_url = "ghcr.io/fastertools/ftl-tool-timestamp:latest"
+image_name = "ftl-tool-timestamp"
 tags = ["time", "date", "unix"]
 
 [[tools]]
 name = "hash-md5"
 category = "cryptography"
 description = "Generate MD5 hash"
-registry_url = "ghcr.io/fastertools/ftl-tool-hash-md5:latest"
+image_name = "ftl-tool-hash-md5"
 tags = ["hash", "md5", "cryptography"]
 
 [[tools]]
 name = "hash-sha256"
 category = "cryptography"
 description = "Generate SHA256 hash"
-registry_url = "ghcr.io/fastertools/ftl-tool-hash-sha256:latest"
+image_name = "ftl-tool-hash-sha256"
 tags = ["hash", "sha256", "cryptography"]
 
-# ... Additional tools would be added here to reach all 84 tools
-# Categories include:
-# - basic_math: arithmetic operations
-# - text_processing: string manipulation
-# - encoding: various encoding/decoding operations
-# - formatters: data format conversions
-# - utilities: general purpose tools
-# - cryptography: hashing and encryption
-# - network: HTTP requests, DNS lookups
-# - filesystem: file operations
-# - data_processing: CSV, JSON path queries
-# - validation: email, URL, regex validators
+# Network Tools
+[[tools]]
+name = "http-get"
+category = "network"
+description = "Make HTTP GET requests"
+image_name = "ftl-tool-http-get"
+tags = ["http", "network", "web", "api"]
+
+[[tools]]
+name = "http-post"
+category = "network"
+description = "Make HTTP POST requests"
+image_name = "ftl-tool-http-post"
+tags = ["http", "network", "web", "api"]
+
+[[tools]]
+name = "dns-lookup"
+category = "network"
+description = "Perform DNS lookups"
+image_name = "ftl-tool-dns-lookup"
+tags = ["dns", "network", "domain"]
+
+[[tools]]
+name = "ping"
+category = "network"
+description = "Check network connectivity"
+image_name = "ftl-tool-ping"
+tags = ["network", "connectivity", "diagnostic"]
+
+[[tools]]
+name = "whois"
+category = "network"
+description = "Query domain registration information"
+image_name = "ftl-tool-whois"
+tags = ["domain", "network", "registration"]
+
+# Filesystem Tools
+[[tools]]
+name = "file-read"
+category = "filesystem"
+description = "Read file contents"
+image_name = "ftl-tool-file-read"
+tags = ["file", "filesystem", "read"]
+
+[[tools]]
+name = "file-write"
+category = "filesystem"
+description = "Write content to files"
+image_name = "ftl-tool-file-write"
+tags = ["file", "filesystem", "write"]
+
+[[tools]]
+name = "file-exists"
+category = "filesystem"
+description = "Check if file exists"
+image_name = "ftl-tool-file-exists"
+tags = ["file", "filesystem", "check"]
+
+[[tools]]
+name = "file-delete"
+category = "filesystem"
+description = "Delete files"
+image_name = "ftl-tool-file-delete"
+tags = ["file", "filesystem", "delete"]
+
+[[tools]]
+name = "directory-list"
+category = "filesystem"
+description = "List directory contents"
+image_name = "ftl-tool-directory-list"
+tags = ["directory", "filesystem", "list"]
+
+[[tools]]
+name = "file-info"
+category = "filesystem"
+description = "Get file metadata"
+image_name = "ftl-tool-file-info"
+tags = ["file", "filesystem", "metadata"]
+
+# Data Processing Tools
+[[tools]]
+name = "csv-parse"
+category = "data_processing"
+description = "Parse CSV data"
+image_name = "ftl-tool-csv-parse"
+tags = ["csv", "data", "parsing"]
+
+[[tools]]
+name = "csv-generate"
+category = "data_processing"
+description = "Generate CSV from data"
+image_name = "ftl-tool-csv-generate"
+tags = ["csv", "data", "generation"]
+
+[[tools]]
+name = "json-path"
+category = "data_processing"
+description = "Query JSON with JSONPath"
+image_name = "ftl-tool-json-path"
+tags = ["json", "query", "jsonpath"]
+
+[[tools]]
+name = "xml-parse"
+category = "data_processing"
+description = "Parse XML data"
+image_name = "ftl-tool-xml-parse"
+tags = ["xml", "data", "parsing"]
+
+[[tools]]
+name = "xml-to-json"
+category = "data_processing"
+description = "Convert XML to JSON"
+image_name = "ftl-tool-xml-to-json"
+tags = ["xml", "json", "conversion"]
+
+[[tools]]
+name = "data-filter"
+category = "data_processing"
+description = "Filter data by criteria"
+image_name = "ftl-tool-data-filter"
+tags = ["data", "filter", "processing"]
+
+[[tools]]
+name = "data-sort"
+category = "data_processing"
+description = "Sort data by fields"
+image_name = "ftl-tool-data-sort"
+tags = ["data", "sort", "processing"]
+
+# Validation Tools
+[[tools]]
+name = "email-validate"
+category = "validation"
+description = "Validate email addresses"
+image_name = "ftl-tool-email-validate"
+tags = ["email", "validation", "verify"]
+
+[[tools]]
+name = "url-validate"
+category = "validation"
+description = "Validate URLs"
+image_name = "ftl-tool-url-validate"
+tags = ["url", "validation", "verify"]
+
+[[tools]]
+name = "regex-match"
+category = "validation"
+description = "Match text against regex patterns"
+image_name = "ftl-tool-regex-match"
+tags = ["regex", "pattern", "match"]
+
+[[tools]]
+name = "json-validate"
+category = "validation"
+description = "Validate JSON structure"
+image_name = "ftl-tool-json-validate"
+tags = ["json", "validation", "schema"]
+
+[[tools]]
+name = "phone-validate"
+category = "validation"
+description = "Validate phone numbers"
+image_name = "ftl-tool-phone-validate"
+tags = ["phone", "validation", "number"]
+
+[[tools]]
+name = "credit-card-validate"
+category = "validation"
+description = "Validate credit card numbers"
+image_name = "ftl-tool-credit-card-validate"
+tags = ["credit-card", "validation", "payment"]
+
+# Additional utility tools to reach closer to 84
+[[tools]]
+name = "random-string"
+category = "utilities"
+description = "Generate random strings"
+image_name = "ftl-tool-random-string"
+tags = ["random", "string", "generator"]
+
+[[tools]]
+name = "password-generate"
+category = "utilities"
+description = "Generate secure passwords"
+image_name = "ftl-tool-password-generate"
+tags = ["password", "security", "generator"]
+
+[[tools]]
+name = "qr-encode"
+category = "utilities"
+description = "Generate QR codes"
+image_name = "ftl-tool-qr-encode"
+tags = ["qr", "encode", "barcode"]
+
+[[tools]]
+name = "qr-decode"
+category = "utilities"
+description = "Decode QR codes"
+image_name = "ftl-tool-qr-decode"
+tags = ["qr", "decode", "barcode"]
+
+[[tools]]
+name = "color-convert"
+category = "utilities"
+description = "Convert between color formats"
+image_name = "ftl-tool-color-convert"
+tags = ["color", "conversion", "rgb", "hex"]
+
+# More cryptography tools
+[[tools]]
+name = "hash-sha512"
+category = "cryptography"
+description = "Generate SHA512 hash"
+image_name = "ftl-tool-hash-sha512"
+tags = ["hash", "sha512", "cryptography"]
+
+[[tools]]
+name = "hmac-generate"
+category = "cryptography"
+description = "Generate HMAC signatures"
+image_name = "ftl-tool-hmac-generate"
+tags = ["hmac", "signature", "cryptography"]
+
+[[tools]]
+name = "jwt-encode"
+category = "cryptography"
+description = "Encode JWT tokens"
+image_name = "ftl-tool-jwt-encode"
+tags = ["jwt", "token", "authentication"]
+
+[[tools]]
+name = "jwt-decode"
+category = "cryptography"
+description = "Decode JWT tokens"
+image_name = "ftl-tool-jwt-decode"
+tags = ["jwt", "token", "authentication"]
+
+# More text processing tools
+[[tools]]
+name = "text-replace"
+category = "text_processing"
+description = "Replace text patterns"
+image_name = "ftl-tool-text-replace"
+tags = ["text", "replace", "string"]
+
+[[tools]]
+name = "text-split"
+category = "text_processing"
+description = "Split text by delimiter"
+image_name = "ftl-tool-text-split"
+tags = ["text", "split", "string"]
+
+[[tools]]
+name = "text-join"
+category = "text_processing"
+description = "Join text with delimiter"
+image_name = "ftl-tool-text-join"
+tags = ["text", "join", "string"]
+
+[[tools]]
+name = "word-count"
+category = "text_processing"
+description = "Count words in text"
+image_name = "ftl-tool-word-count"
+tags = ["text", "count", "words"]
+
+[[tools]]
+name = "line-count"
+category = "text_processing"
+description = "Count lines in text"
+image_name = "ftl-tool-line-count"
+tags = ["text", "count", "lines"]
+
+# More formatters
+[[tools]]
+name = "toml-to-json"
+category = "formatters"
+description = "Convert TOML to JSON"
+image_name = "ftl-tool-toml-to-json"
+tags = ["toml", "json", "conversion"]
+
+[[tools]]
+name = "json-to-toml"
+category = "formatters"
+description = "Convert JSON to TOML"
+image_name = "ftl-tool-json-to-toml"
+tags = ["json", "toml", "conversion"]
+
+[[tools]]
+name = "markdown-to-html"
+category = "formatters"
+description = "Convert Markdown to HTML"
+image_name = "ftl-tool-markdown-to-html"
+tags = ["markdown", "html", "conversion"]
+
+[[tools]]
+name = "html-to-markdown"
+category = "formatters"
+description = "Convert HTML to Markdown"
+image_name = "ftl-tool-html-to-markdown"
+tags = ["html", "markdown", "conversion"]
+
+# More encoding tools
+[[tools]]
+name = "hex-encode"
+category = "encoding"
+description = "Encode data to hexadecimal"
+image_name = "ftl-tool-hex-encode"
+tags = ["hex", "encoding", "conversion"]
+
+[[tools]]
+name = "hex-decode"
+category = "encoding"
+description = "Decode hexadecimal data"
+image_name = "ftl-tool-hex-decode"
+tags = ["hex", "decoding", "conversion"]
+
+[[tools]]
+name = "html-encode"
+category = "encoding"
+description = "HTML encode special characters"
+image_name = "ftl-tool-html-encode"
+tags = ["html", "encoding", "escape"]
+
+[[tools]]
+name = "html-decode"
+category = "encoding"
+description = "HTML decode entities"
+image_name = "ftl-tool-html-decode"
+tags = ["html", "decoding", "unescape"]
+
+# More math tools
+[[tools]]
+name = "modulo"
+category = "basic_math"
+description = "Calculate modulo (remainder)"
+image_name = "ftl-tool-modulo"
+tags = ["math", "modulo", "remainder"]
+
+[[tools]]
+name = "power"
+category = "basic_math"
+description = "Calculate exponentiation"
+image_name = "ftl-tool-power"
+tags = ["math", "power", "exponent"]
+
+[[tools]]
+name = "sqrt"
+category = "basic_math"
+description = "Calculate square root"
+image_name = "ftl-tool-sqrt"
+tags = ["math", "sqrt", "root"]
+
+[[tools]]
+name = "round"
+category = "basic_math"
+description = "Round numbers"
+image_name = "ftl-tool-round"
+tags = ["math", "round", "decimal"]
+
+[[tools]]
+name = "ceil"
+category = "basic_math"
+description = "Round up to ceiling"
+image_name = "ftl-tool-ceil"
+tags = ["math", "ceil", "round"]
+
+[[tools]]
+name = "floor"
+category = "basic_math"
+description = "Round down to floor"
+image_name = "ftl-tool-floor"
+tags = ["math", "floor", "round"]
+
+# Date/Time tools
+[[tools]]
+name = "date-format"
+category = "utilities"
+description = "Format dates"
+image_name = "ftl-tool-date-format"
+tags = ["date", "time", "format"]
+
+[[tools]]
+name = "date-parse"
+category = "utilities"
+description = "Parse date strings"
+image_name = "ftl-tool-date-parse"
+tags = ["date", "time", "parse"]
+
+[[tools]]
+name = "date-diff"
+category = "utilities"
+description = "Calculate date differences"
+image_name = "ftl-tool-date-diff"
+tags = ["date", "time", "difference"]
+
+[[tools]]
+name = "timezone-convert"
+category = "utilities"
+description = "Convert between timezones"
+image_name = "ftl-tool-timezone-convert"
+tags = ["timezone", "time", "conversion"]
+
+# Image processing tools
+[[tools]]
+name = "image-resize"
+category = "data_processing"
+description = "Resize images"
+image_name = "ftl-tool-image-resize"
+tags = ["image", "resize", "processing"]
+
+[[tools]]
+name = "image-format"
+category = "data_processing"
+description = "Convert image formats"
+image_name = "ftl-tool-image-format"
+tags = ["image", "format", "conversion"]
+
+[[tools]]
+name = "image-info"
+category = "data_processing"
+description = "Get image metadata"
+image_name = "ftl-tool-image-info"
+tags = ["image", "metadata", "info"]
+
+# Compression tools
+[[tools]]
+name = "gzip-compress"
+category = "encoding"
+description = "Compress with gzip"
+image_name = "ftl-tool-gzip-compress"
+tags = ["gzip", "compress", "archive"]
+
+[[tools]]
+name = "gzip-decompress"
+category = "encoding"
+description = "Decompress gzip data"
+image_name = "ftl-tool-gzip-decompress"
+tags = ["gzip", "decompress", "archive"]
+
+# Environment tools
+[[tools]]
+name = "env-get"
+category = "utilities"
+description = "Get environment variables"
+image_name = "ftl-tool-env-get"
+tags = ["environment", "variables", "config"]
+
+[[tools]]
+name = "env-set"
+category = "utilities"
+description = "Set environment variables"
+image_name = "ftl-tool-env-set"
+tags = ["environment", "variables", "config"]
+
+# Total: ~84 tools across all categories

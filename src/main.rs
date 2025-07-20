@@ -25,6 +25,7 @@ mod commands;
 mod common;
 mod deps;
 mod language;
+mod registry;
 mod ui;
 
 // Implementations for up command dependencies

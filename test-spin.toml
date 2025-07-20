@@ -1,0 +1,21 @@
+spin_manifest_version = 2
+
+[application]
+name = "my-ftl-app"
+version = "0.1.0"
+description = "Test FTL app for tools command"
+authors = ["test@example.com"]
+
+[variables]
+tool_components = { default = "existing-tool" }
+
+[[trigger.http]]
+route = "/..."
+component = "mcp-gateway"
+
+[component.mcp-gateway]
+source = { registry = "ghcr.io/fastertools/ftl-mcp-gateway:latest" }
+variables = { tool_components = "{{ tool_components }}" }
+
+[component.existing-tool]
+source = { registry = "ghcr.io/fastertools/ftl-tool-existing:latest" }
