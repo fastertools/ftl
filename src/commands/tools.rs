@@ -2,11 +2,13 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use console::style;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use toml_edit::{DocumentMut, Item, Table};
 
-use crate::registry::{get_registry_adapter, RegistryAdapter};
+use crate::config::FtlConfig;
+use crate::registry::get_registry_adapter;
 
 // Embed the tools manifest at compile time
 const TOOLS_MANIFEST: &str = include_str!("../data/tools.toml");
@@ -23,23 +25,27 @@ pub enum ToolsCommand {
         #[arg(short, long)]
         filter: Option<String>,
 
-        /// Registry to use (ghcr, ecr)
-        #[arg(short, long, default_value = "ghcr")]
-        registry: String,
+        /// Registry to use (overrides config)
+        #[arg(short, long)]
+        registry: Option<String>,
 
         /// Show additional details
         #[arg(short, long)]
         verbose: bool,
+
+        /// List from all enabled registries
+        #[arg(short, long)]
+        all: bool,
     },
 
     /// Add pre-built tools to your project
     Add {
-        /// Tool names to add
+        /// Tool names to add (can include registry prefix like docker:tool-name)
         tools: Vec<String>,
 
-        /// Registry to use (ghcr, ecr)
-        #[arg(short, long, default_value = "ghcr")]
-        registry: String,
+        /// Registry to use (overrides config and tool prefix)
+        #[arg(short, long)]
+        registry: Option<String>,
 
         /// Skip confirmation prompt
         #[arg(short = 'y', long)]
@@ -52,7 +58,7 @@ struct ToolsManifest {
     tools: Vec<Tool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct Tool {
     name: String,
     category: String,
@@ -63,8 +69,8 @@ struct Tool {
 
 pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
     match cmd {
-        ToolsCommand::List { category, filter, registry, verbose } => {
-            list_tools(category, filter, registry, verbose).await
+        ToolsCommand::List { category, filter, registry, verbose, all } => {
+            list_tools(category, filter, registry, verbose, all).await
         }
         ToolsCommand::Add { tools, registry, yes } => {
             add_tools(tools, registry, yes).await
@@ -72,15 +78,46 @@ pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
     }
 }
 
-async fn list_tools(category: Option<String>, filter: Option<String>, registry: String, verbose: bool) -> Result<()> {
+async fn list_tools(
+    category: Option<String>, 
+    filter: Option<String>, 
+    registry: Option<String>, 
+    verbose: bool,
+    all: bool
+) -> Result<()> {
     let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
         .context("Failed to parse tools manifest")?;
     
-    // Get the registry adapter
-    let adapter = get_registry_adapter(Some(&registry))?;
+    let config = FtlConfig::load()?;
+    
+    // Determine which registries to list from
+    let registries_to_query = if all {
+        // List from all enabled registries
+        config.enabled_registries()
+            .into_iter()
+            .map(|r| (r.name.clone(), r))
+            .collect::<Vec<_>>()
+    } else if let Some(reg_name) = registry {
+        // List from specific registry
+        let reg = config.get_registry(&reg_name)
+            .or_else(|| {
+                // Fallback to old behavior for backward compatibility
+                match reg_name.as_str() {
+                    "ghcr" | "docker" | "ecr" => Some(&config.registries[0]), // Use any registry as placeholder
+                    _ => None
+                }
+            })
+            .context(format!("Registry '{}' not found", reg_name))?;
+        vec![(reg.name.clone(), reg)]
+    } else {
+        // List from default registry
+        let default_reg = config.get_registry(&config.default_registry)
+            .context(format!("Default registry '{}' not found", config.default_registry))?;
+        vec![(default_reg.name.clone(), default_reg)]
+    };
 
     // Apply filters
-    let mut tools: Vec<&Tool> = manifest.tools.iter()
+    let filtered_tools: Vec<&Tool> = manifest.tools.iter()
         .filter(|tool| {
             if let Some(cat) = &category {
                 tool.category.to_lowercase() == cat.to_lowercase()
@@ -100,71 +137,97 @@ async fn list_tools(category: Option<String>, filter: Option<String>, registry: 
         })
         .collect();
 
-    // Sort by category then name
-    tools.sort_by(|a, b| {
-        a.category.cmp(&b.category)
-            .then(a.name.cmp(&b.name))
-    });
-
-    if tools.is_empty() {
-        println!("{} No tools found matching your criteria", style("!").yellow());
+    if filtered_tools.is_empty() {
+        println!("No tools found matching your criteria");
         return Ok(());
     }
 
-    println!("{} Available FTL Tools\n", style("📦").cyan());
-
-    let mut current_category = "";
-    for tool in tools {
-        // Print category header when it changes
-        if tool.category != current_category {
-            current_category = &tool.category;
-            println!("\n{}", style(format!("[{}]", current_category)).bold().cyan());
-        }
-
-        // Print tool info
-        print!("  {} ", style(&tool.name).green().bold());
-        println!("- {}", tool.description);
-
-        if verbose {
-            let registry_url = adapter.get_registry_url(&tool.image_name);
-            println!("    Registry: {}", style(&registry_url).dim());
-            println!("    Tags: {}", tool.tags.join(", "));
+    println!("{} Available FTL Tools", style("📦").dim());
+    
+    if registries_to_query.len() > 1 {
+        println!();
+        println!("Showing tools from {} registries:", registries_to_query.len());
+        for (name, _) in &registries_to_query {
+            println!("  • {}", style(name).cyan());
         }
     }
+    println!();
 
-    println!("\n{} Use 'ftl tools add <tool>' to add tools to your project", 
-             style("→").cyan());
+    // Group tools by category
+    let mut categories: HashMap<&str, Vec<&Tool>> = HashMap::new();
+    for tool in &filtered_tools {
+        categories.entry(&tool.category).or_default().push(tool);
+    }
+
+    // Sort categories
+    let mut sorted_categories: Vec<_> = categories.into_iter().collect();
+    sorted_categories.sort_by_key(|(cat, _)| *cat);
+
+    // Display tools grouped by category
+    for (category, mut tools) in sorted_categories {
+        println!("[{}]", style(category).bold().cyan());
+        
+        // Sort tools by name within category
+        tools.sort_by_key(|t| &t.name);
+        
+        for tool in tools {
+            // Show tool for each registry if listing all
+            if all && registries_to_query.len() > 1 {
+                for (reg_name, _reg_config) in &registries_to_query {
+                    let adapter = get_registry_adapter(Some(&reg_name))?;
+                    let url = adapter.get_registry_url(&tool.image_name);
+                    
+                    println!("  {} ({}) - {}", 
+                        style(&tool.name).green(), 
+                        style(reg_name).dim(),
+                        tool.description
+                    );
+                    
+                    if verbose {
+                        println!("    Registry: {}", style(&url).dim());
+                        if !tool.tags.is_empty() {
+                            println!("    Tags: {}", tool.tags.join(", "));
+                        }
+                    }
+                }
+            } else {
+                // Single registry display
+                let (reg_name, _) = &registries_to_query[0];
+                let adapter = get_registry_adapter(Some(reg_name))?;
+                let url = adapter.get_registry_url(&tool.image_name);
+                
+                println!("  {} - {}", style(&tool.name).green(), tool.description);
+                
+                if verbose {
+                    println!("    Registry: {}", style(&url).dim());
+                    if !tool.tags.is_empty() {
+                        println!("    Tags: {}", tool.tags.join(", "));
+                    }
+                }
+            }
+        }
+        println!();
+    }
+
+    println!();
+    println!("To add a tool to your project:");
+    println!("  {} ftl tools add <tool-name>", style("$").dim());
+    
+    if all {
+        println!();
+        println!("To add from a specific registry:");
+        println!("  {} ftl tools add <registry>:<tool-name>", style("$").dim());
+    }
 
     Ok(())
 }
 
-async fn add_tools(tool_names: Vec<String>, registry: String, skip_confirm: bool) -> Result<()> {
-    // Load tools manifest
+async fn add_tools(tools: Vec<String>, registry: Option<String>, yes: bool) -> Result<()> {
     let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
         .context("Failed to parse tools manifest")?;
     
-    // Get the registry adapter
-    let adapter = get_registry_adapter(Some(&registry))?;
-
-    // Find requested tools
-    let mut tools_to_add = Vec::new();
-    let mut not_found = Vec::new();
-
-    for name in &tool_names {
-        if let Some(tool) = manifest.tools.iter().find(|t| t.name == *name) {
-            tools_to_add.push(tool);
-        } else {
-            not_found.push(name.clone());
-        }
-    }
-
-    if !not_found.is_empty() {
-        println!("{} Tools not found: {}", 
-                 style("✗").red(), 
-                 not_found.join(", "));
-        return Ok(());
-    }
-
+    let config = FtlConfig::load()?;
+    
     // Check if spin.toml exists
     if !Path::new("spin.toml").exists() {
         println!("{} No spin.toml found in current directory", style("✗").red());
@@ -172,106 +235,120 @@ async fn add_tools(tool_names: Vec<String>, registry: String, skip_confirm: bool
         return Ok(());
     }
 
-    // Show what will be added
-    println!("{} Adding the following tools:\n", style("→").cyan());
-    for tool in &tools_to_add {
-        println!("  {} {} - {}", 
-                 style("•").green(), 
-                 style(&tool.name).bold(),
-                 tool.description);
+    // Parse tools and their registries
+    let mut tools_to_add = Vec::new();
+    
+    for tool_spec in &tools {
+        let (reg_name, tool_name) = if let Some((reg, name)) = tool_spec.split_once(':') {
+            // Registry prefix provided (e.g., docker:tool-name)
+            (reg.to_string(), name.to_string())
+        } else if let Some(reg) = &registry {
+            // Registry flag provided
+            (reg.clone(), tool_spec.clone())
+        } else {
+            // Use default registry
+            (config.default_registry.clone(), tool_spec.clone())
+        };
+        
+        // Verify registry exists
+        if !config.registries.iter().any(|r| r.name == reg_name) {
+            // Fallback for backward compatibility
+            if !matches!(reg_name.as_str(), "ghcr" | "docker" | "ecr") {
+                anyhow::bail!("Registry '{}' not found", reg_name);
+            }
+        }
+        
+        // Find tool in manifest
+        let tool = manifest.tools.iter()
+            .find(|t| t.name == tool_name)
+            .context(format!("Tool '{}' not found in manifest", tool_name))?;
+        
+        tools_to_add.push((reg_name, tool.clone()));
     }
 
-    // Confirm if needed
-    if !skip_confirm {
-        println!("\n{} This will modify your spin.toml file.", style("!").yellow());
-        let confirm = dialoguer::Confirm::new()
-            .with_prompt("Continue?")
+    // Show what will be added
+    println!("{} Adding the following tools:", style("→").cyan());
+    println!();
+    for (reg, tool) in &tools_to_add {
+        println!("  {} {} ({}) - {}", 
+            style("•").green(), 
+            style(&tool.name).bold(),
+            style(reg).dim(),
+            tool.description
+        );
+    }
+
+    // Confirm unless -y flag is provided
+    if !yes {
+        use dialoguer::Confirm;
+        let proceed = Confirm::new()
+            .with_prompt("Do you want to add these tools?")
             .default(true)
             .interact()?;
-
-        if !confirm {
-            println!("{} Cancelled", style("✗").red());
+        
+        if !proceed {
+            println!("Operation cancelled");
             return Ok(());
         }
     }
 
     // Read and parse spin.toml
-    let spin_content = fs::read_to_string("spin.toml")
+    let contents = fs::read_to_string("spin.toml")
         .context("Failed to read spin.toml")?;
-    let mut doc = spin_content.parse::<DocumentMut>()
+    
+    let mut doc = contents.parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
 
-    // Add each tool as a component
-    for tool in tools_to_add {
-        add_tool_to_spin_toml(&mut doc, tool, adapter.as_ref())?;
+    // Add tools
+    for (reg_name, tool) in &tools_to_add {
+        let adapter = get_registry_adapter(Some(reg_name))?;
+        let registry_url = adapter.get_registry_url(&tool.image_name);
+        
+        add_tool_to_spin(&mut doc, &tool.name, &registry_url)?;
     }
 
-    // Write back to file
+    // Write back to spin.toml
     fs::write("spin.toml", doc.to_string())
         .context("Failed to write spin.toml")?;
 
-    println!("\n{} Successfully added tools to spin.toml", style("✓").green());
+    println!();
+    println!("{} Successfully added tools to spin.toml", style("✓").green());
     println!("{} Remember to run 'ftl build' to pull the components", style("→").cyan());
 
     Ok(())
 }
 
-fn add_tool_to_spin_toml(doc: &mut DocumentMut, tool: &Tool, adapter: &dyn RegistryAdapter) -> Result<()> {
-    // First, update the tool_components variable at the top level
-    let variables_table = doc
-        .entry("variables")
-        .or_insert(Item::Table(Table::new()))
-        .as_table_mut()
-        .context("Failed to create variables table")?;
+fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_url: &str) -> Result<()> {
+    // Create component entry
+    let mut component = Table::new();
     
-    // Get or create tool_components entry
-    let tool_components_entry = variables_table
-        .entry("tool_components")
-        .or_insert_with(|| {
-            let mut inline_table = toml_edit::InlineTable::new();
-            inline_table.insert("default", "".into());
-            toml_edit::value(inline_table)
-        });
+    let mut source = Table::new();
+    source["registry"] = toml_edit::value(registry_url);
+    component["source"] = Item::Table(source);
     
-    // Update the tool_components list
-    if let Some(tc_table) = tool_components_entry.as_inline_table_mut() {
-        if let Some(default_value) = tc_table.get_mut("default") {
-            let current = default_value.as_str().unwrap_or("");
-            let tools: Vec<&str> = if current.is_empty() {
-                vec![]
-            } else {
-                current.split(',').collect()
-            };
-            
-            if !tools.contains(&tool.name.as_str()) {
-                let new_value = if current.is_empty() {
-                    tool.name.clone()
-                } else {
-                    format!("{},{}", current, tool.name)
-                };
-                *default_value = new_value.into();
-            }
-        }
-    }
+    // Add component to document
+    doc[&format!("component.{}", tool_name)] = Item::Table(component);
     
-    // Add the component definition
-    let component_table = doc
-        .entry("component")
-        .or_insert(Item::Table(Table::new()))
-        .as_table_mut()
-        .context("Failed to create component table")?;
+    // Update tool_components variable
+    let variables = doc.get_mut("variables")
+        .and_then(|v| v.as_table_mut())
+        .context("Missing [variables] section in spin.toml")?;
     
-    // Create the tool component section [component.tool-name]
-    let mut tool_component = Table::new();
+    let tool_components = variables.get_mut("tool_components")
+        .and_then(|v| v.as_inline_table_mut())
+        .context("Missing tool_components variable")?;
     
-    // Create inline source table for registry reference
-    let mut source = toml_edit::InlineTable::new();
-    let registry_url = adapter.get_registry_url(&tool.image_name);
-    source.insert("registry", registry_url.into());
-    tool_component["source"] = toml_edit::value(source);
+    let current_value = tool_components.get("default")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     
-    // Add the component
-    component_table[&tool.name] = Item::Table(tool_component);
+    let new_value = if current_value.is_empty() {
+        tool_name.to_string()
+    } else {
+        format!("{},{}", current_value, tool_name)
+    };
+    
+    tool_components["default"] = toml_edit::Value::from(new_value);
     
     Ok(())
 }

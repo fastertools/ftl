@@ -62,6 +62,11 @@ pub struct EcrAdapter {
     region: String,
 }
 
+/// Custom registry adapter
+pub struct CustomAdapter {
+    url_pattern: String,
+}
+
 impl EcrAdapter {
     pub fn from_env() -> Result<Self> {
         let account_id = env::var("AWS_ACCOUNT_ID")
@@ -98,13 +103,60 @@ impl RegistryAdapter for EcrAdapter {
     }
 }
 
+impl RegistryAdapter for CustomAdapter {
+    fn get_registry_url(&self, image_name: &str) -> String {
+        self.url_pattern.replace("{image_name}", image_name)
+    }
+    
+    fn name(&self) -> &'static str {
+        "Custom Registry"
+    }
+}
+
 /// Get registry adapter based on registry name
 pub fn get_registry_adapter(registry: Option<&str>) -> Result<Box<dyn RegistryAdapter>> {
+    use crate::config::FtlConfig;
+    
+    // Try to load config for custom registries
+    if let Some(reg_name) = registry {
+        if let Ok(config) = FtlConfig::load() {
+            if let Some(reg_config) = config.get_registry(reg_name) {
+                use crate::config::registry::RegistryType;
+                
+                match reg_config.registry_type {
+                    RegistryType::Ghcr => {
+                        let org = reg_config.get_config_str("organization")
+                            .unwrap_or_else(|| "fastertools".to_string());
+                        return Ok(Box::new(GhcrAdapter { organization: org }));
+                    }
+                    RegistryType::Docker => {
+                        return Ok(Box::new(DockerHubAdapter));
+                    }
+                    RegistryType::Ecr => {
+                        if let (Some(account), Some(region)) = 
+                            (reg_config.get_config_str("account_id"), 
+                             reg_config.get_config_str("region")) {
+                            return Ok(Box::new(EcrAdapter::new(account, region)));
+                        } else {
+                            return Ok(Box::new(EcrAdapter::from_env()?));
+                        }
+                    }
+                    RegistryType::Custom => {
+                        if let Some(pattern) = reg_config.get_config_str("url_pattern") {
+                            return Ok(Box::new(CustomAdapter { url_pattern: pattern }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback to original behavior for backward compatibility
     match registry {
         None | Some("ghcr") => Ok(Box::new(GhcrAdapter::new())),
         Some("docker") => Ok(Box::new(DockerHubAdapter)),
         Some("ecr") => Ok(Box::new(EcrAdapter::from_env()?)),
-        Some(other) => anyhow::bail!("Unsupported registry: {}. Supported: ghcr, docker, ecr", other),
+        Some(other) => anyhow::bail!("Unsupported registry: {}. Supported: ghcr, docker, ecr, or configure custom registry with 'ftl registries add'", other),
     }
 }
 
