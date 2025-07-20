@@ -27,6 +27,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<AddDependencies> {
         Arc::new(AddDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -164,7 +165,7 @@ async fn test_add_templates_not_installed() {
                     stderr: b"Error: no such template 'ftl-mcp-rust'".to_vec(),
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -221,7 +222,7 @@ async fn test_add_success_rust() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -301,7 +302,7 @@ async fn test_add_success_typescript() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -382,7 +383,7 @@ async fn test_add_with_git_template() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -429,7 +430,7 @@ async fn test_add_interactive_prompts() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -473,7 +474,7 @@ async fn test_add_javascript_mapped_to_typescript() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 

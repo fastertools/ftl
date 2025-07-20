@@ -273,6 +273,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<UpDependencies> {
         Arc::new(UpDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -692,7 +693,7 @@ command = "cargo build --target wasm32-wasi"
     .await;
 
     // Should timeout or complete successfully
-    assert!(result.is_ok() || matches!(result, Err(_)));
+    assert!(result.is_ok() || result.is_err());
 
     // Verify processes were spawned
     assert!(process_manager.get_spawn_count() >= 1);

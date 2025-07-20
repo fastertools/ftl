@@ -19,6 +19,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<RegistryDependencies> {
         Arc::new(RegistryDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -32,8 +33,7 @@ async fn test_list_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = list_with_deps(None, deps).await;
-    assert!(result.is_ok());
+    list_with_deps(None, &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -61,8 +61,7 @@ async fn test_list_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = list_with_deps(Some("docker.io".to_string()), deps).await;
-    assert!(result.is_ok());
+    list_with_deps(Some("docker.io".to_string()), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -79,8 +78,7 @@ async fn test_search_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = search_with_deps("my-component".to_string(), None, deps).await;
-    assert!(result.is_ok());
+    search_with_deps("my-component".to_string(), None, &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -107,8 +105,7 @@ async fn test_search_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = search_with_deps("test-tool".to_string(), Some("quay.io".to_string()), deps).await;
-    assert!(result.is_ok());
+    search_with_deps("test-tool".to_string(), Some("quay.io".to_string()), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -125,8 +122,7 @@ async fn test_search_with_special_characters() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = search_with_deps("my-component@v2.0".to_string(), None, deps).await;
-    assert!(result.is_ok());
+    search_with_deps("my-component@v2.0".to_string(), None, &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -148,8 +144,7 @@ async fn test_info_simple_component() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps("my-component".to_string(), deps).await;
-    assert!(result.is_ok());
+    info_with_deps("my-component".to_string(), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -181,8 +176,7 @@ async fn test_info_full_component_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps("ghcr.io/ftl/my-tool:v1.0.0".to_string(), deps).await;
-    assert!(result.is_ok());
+    info_with_deps("ghcr.io/ftl/my-tool:v1.0.0".to_string(), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -199,8 +193,7 @@ async fn test_info_docker_hub_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps("docker.io/library/nginx:latest".to_string(), deps).await;
-    assert!(result.is_ok());
+    info_with_deps("docker.io/library/nginx:latest".to_string(), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -222,8 +215,7 @@ async fn test_list_output_completeness() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = list_with_deps(None, deps).await;
-    assert!(result.is_ok());
+    list_with_deps(None, &deps);
 
     // Verify all expected output lines are present
     let output = ui.get_output();
@@ -244,9 +236,7 @@ async fn test_list_output_completeness() {
     for (actual, expected) in output.iter().zip(expected_lines.iter()) {
         assert!(
             actual.contains(expected),
-            "Expected '{}' to contain '{}'",
-            actual,
-            expected
+            "Expected '{actual}' to contain '{expected}'"
         );
     }
 }

@@ -57,7 +57,7 @@ pub async fn check_and_prompt_for_update() -> Result<()> {
             use std::process::Command;
 
             let output = Command::new("cargo")
-                .args(&["install", "ftl-cli", "--force"])
+                .args(["install", "ftl-cli", "--force"])
                 .output()?;
 
             if !output.status.success() {
@@ -117,7 +117,7 @@ pub struct VersionCache {
 }
 
 impl VersionCache {
-    pub fn new(current_version: String) -> Self {
+    pub const fn new(current_version: String) -> Self {
         Self {
             last_check_timestamp: 0,
             current_version,
@@ -127,7 +127,7 @@ impl VersionCache {
     }
 
     /// Check if we should perform a version check today
-    pub fn should_check_today(&self, now_secs: u64) -> bool {
+    pub const fn should_check_today(&self, now_secs: u64) -> bool {
         // Check if it's been more than 24 hours since last check
         now_secs - self.last_check_timestamp > 24 * 60 * 60
     }
@@ -186,7 +186,7 @@ pub struct VersionCacheManager {
 }
 
 impl VersionCacheManager {
-    pub fn new(deps: Arc<VersionCacheDependencies>) -> Self {
+    pub const fn new(deps: Arc<VersionCacheDependencies>) -> Self {
         Self { deps }
     }
 
@@ -294,29 +294,26 @@ impl VersionCacheManager {
         }
 
         // Perform version check
-        match self.fetch_latest_version().await {
-            Ok(latest_version) => {
-                cache.update_check(
-                    now_secs,
-                    self.deps.environment.get_cargo_pkg_version().to_string(),
-                    Some(latest_version),
-                );
-                self.save_version_cache(&cache)?;
+        if let Ok(latest_version) = self.fetch_latest_version().await {
+            cache.update_check(
+                now_secs,
+                self.deps.environment.get_cargo_pkg_version().to_string(),
+                Some(latest_version),
+            );
+            self.save_version_cache(&cache)?;
 
-                // Prompt if there's a new version
-                if cache.should_prompt_for_update() {
-                    self.prompt_for_update(&mut cache).await?;
-                }
+            // Prompt if there's a new version
+            if cache.should_prompt_for_update() {
+                self.prompt_for_update(&mut cache).await?;
             }
-            Err(_) => {
-                // Silently fail version check - don't interrupt user workflow
-                cache.update_check(
-                    now_secs,
-                    self.deps.environment.get_cargo_pkg_version().to_string(),
-                    None,
-                );
-                let _ = self.save_version_cache(&cache);
-            }
+        } else {
+            // Silently fail version check - don't interrupt user workflow
+            cache.update_check(
+                now_secs,
+                self.deps.environment.get_cargo_pkg_version().to_string(),
+                None,
+            );
+            let _ = self.save_version_cache(&cache);
         }
 
         Ok(())
@@ -329,14 +326,13 @@ impl VersionCacheManager {
         self.deps.ui.print("");
         self.deps
             .ui
-            .print(&format!("🎉 A new version of FTL CLI is available!"));
+            .print("🎉 A new version of FTL CLI is available!");
         self.deps
             .ui
             .print(&format!("  Current version: {}", cache.current_version));
-        self.deps.ui.print_styled(
-            &format!("  Latest version:  {}", latest),
-            MessageStyle::Green,
-        );
+        self.deps
+            .ui
+            .print_styled(&format!("  Latest version:  {latest}"), MessageStyle::Green);
         self.deps.ui.print("");
 
         let should_update =
@@ -385,15 +381,15 @@ mod tests {
         let cache = VersionCache::new("0.1.0".to_string());
 
         // Should check if never checked before
-        assert!(cache.should_check_today(1000000));
+        assert!(cache.should_check_today(1_000_000));
 
         // Should not check if checked recently
         let mut cache = VersionCache::new("0.1.0".to_string());
-        cache.last_check_timestamp = 1000000;
-        assert!(!cache.should_check_today(1000000 + 3600)); // 1 hour later
+        cache.last_check_timestamp = 1_000_000;
+        assert!(!cache.should_check_today(1_000_000 + 3600)); // 1 hour later
 
         // Should check if more than 24 hours passed
-        assert!(cache.should_check_today(1000000 + 25 * 3600)); // 25 hours later
+        assert!(cache.should_check_today(1_000_000 + 25 * 3600)); // 25 hours later
     }
 
     #[test]

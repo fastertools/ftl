@@ -7,7 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::commands::auth::{
     AuthDependencies, Clock, CredentialsProvider, StoredCredentials, status_with_deps,
 };
-use crate::deps::{MessageStyle, UserInterface};
+use crate::deps::UserInterface;
 use crate::ui::TestUserInterface;
 
 // Mock implementation of CredentialsProvider
@@ -94,6 +94,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<AuthDependencies> {
         Arc::new(AuthDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -109,8 +110,7 @@ async fn test_auth_status_logged_in_with_valid_token() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -147,8 +147,7 @@ async fn test_auth_status_logged_in_with_expired_token() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -177,8 +176,7 @@ async fn test_auth_status_logged_in_without_expiry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -196,8 +194,7 @@ async fn test_auth_status_not_logged_in() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -218,8 +215,7 @@ async fn test_auth_status_error_checking_credentials() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -253,8 +249,7 @@ async fn test_auth_status_token_expiring_soon() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output shows 0h 45m
     let output = ui.get_output();
@@ -283,8 +278,7 @@ async fn test_auth_status_token_expiring_days_away() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = status_with_deps(deps).await;
-    assert!(result.is_ok());
+    status_with_deps(&deps);
 
     // Verify output shows total hours (7*24 + 3 = 171h)
     let output = ui.get_output();
@@ -312,8 +306,7 @@ async fn test_auth_status_various_error_messages() {
         let ui = fixture.ui.clone();
         let deps = fixture.to_deps();
 
-        let result = status_with_deps(deps).await;
-        assert!(result.is_ok(), "Should handle '{}' gracefully", error_msg);
+        status_with_deps(&deps);
 
         let output = ui.get_output();
         assert!(output.iter().any(|s| s.contains("🔐 Not logged in")));

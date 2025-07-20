@@ -33,6 +33,6 @@ fn test_language_display() {
 
 #[test]
 fn test_language_default() {
-    let default_lang: Language = Default::default();
+    let default_lang: Language = Language::default();
     assert_eq!(default_lang, Language::TypeScript);
 }

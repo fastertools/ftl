@@ -87,7 +87,7 @@ impl MockKeyringStorage {
 
 impl KeyringStorage for MockKeyringStorage {
     fn store(&self, service: &str, username: &str, password: &str) -> Result<(), anyhow::Error> {
-        let key = format!("{}-{}", service, username);
+        let key = format!("{service}-{username}");
         self.storage
             .lock()
             .unwrap()
@@ -96,7 +96,7 @@ impl KeyringStorage for MockKeyringStorage {
     }
 
     fn retrieve(&self, service: &str, username: &str) -> Result<String, anyhow::Error> {
-        let key = format!("{}-{}", service, username);
+        let key = format!("{service}-{username}");
         self.storage
             .lock()
             .unwrap()
@@ -106,7 +106,7 @@ impl KeyringStorage for MockKeyringStorage {
     }
 
     fn delete(&self, service: &str, username: &str) -> Result<(), anyhow::Error> {
-        let key = format!("{}-{}", service, username);
+        let key = format!("{service}-{username}");
         self.storage.lock().unwrap().remove(&key);
         Ok(())
     }
@@ -211,6 +211,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<LoginDependencies> {
         Arc::new(LoginDependencies {
             ui: self.ui as Arc<dyn UserInterface>,

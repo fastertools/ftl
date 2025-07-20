@@ -64,7 +64,7 @@ impl MockCommandExecutor {
     fn expect_execute(mut self, command: &str, args: &[&str], output: CommandOutput) -> Self {
         self.expected_commands.push((
             command.to_string(),
-            args.iter().map(|s| s.to_string()).collect(),
+            args.iter().map(|s| (*s).to_string()).collect(),
             output,
         ));
         self
@@ -91,7 +91,7 @@ impl CommandExecutor for MockCommandExecutor {
             ));
         }
 
-        let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
         if args_vec != *expected_args {
             return Err(anyhow::anyhow!(
                 "Expected args {:?}, got {:?}",
@@ -148,6 +148,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<UpdateDependencies> {
         Arc::new(UpdateDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -440,8 +441,7 @@ async fn test_update_output_completeness() {
     for pattern in &expected_patterns {
         assert!(
             output.iter().any(|s| s.contains(pattern)),
-            "Expected to find '{}' in output",
-            pattern
+            "Expected to find '{pattern}' in output"
         );
     }
 }

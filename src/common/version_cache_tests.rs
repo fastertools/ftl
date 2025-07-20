@@ -61,7 +61,7 @@ impl MockEnvironment {
             vars: std::collections::HashMap::new(),
             home_dir: Some(PathBuf::from("/home/user")),
             cargo_pkg_version: "0.1.0",
-            unix_timestamp: 1000000,
+            unix_timestamp: 1_000_000,
         }
     }
 
@@ -129,6 +129,152 @@ impl UpdateExecutor for MockUpdateExecutor {
 
 // Clock trait is no longer used in version_cache, removed MockClock
 
+// Test-specific UI implementations
+struct TestUIWithUpdateChoice {
+    inner: TestUserInterface,
+    prompt_count: Arc<Mutex<usize>>,
+}
+
+impl UserInterface for TestUIWithUpdateChoice {
+    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+        self.inner.create_spinner()
+    }
+
+    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+        self.inner.create_multi_progress()
+    }
+
+    fn print(&self, message: &str) {
+        self.inner.print(message);
+    }
+
+    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+        self.inner.print_styled(message, style);
+    }
+
+    fn is_interactive(&self) -> bool {
+        self.inner.is_interactive()
+    }
+
+    fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String, anyhow::Error> {
+        self.inner.prompt_input(prompt, default)
+    }
+
+    fn prompt_select(
+        &self,
+        prompt: &str,
+        _items: &[&str],
+        _default: usize,
+    ) -> Result<usize, anyhow::Error> {
+        let mut count = self.prompt_count.lock().unwrap();
+        *count += 1;
+        if prompt.contains("Would you like to update now?") {
+            Ok(0) // Select "Yes"
+        } else {
+            Ok(1) // Select "No" for other prompts
+        }
+    }
+
+    fn clear_screen(&self) {
+        self.inner.clear_screen();
+    }
+}
+
+struct TestUIWithDismissChoice {
+    inner: TestUserInterface,
+    prompt_count: Arc<Mutex<usize>>,
+}
+
+impl UserInterface for TestUIWithDismissChoice {
+    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+        self.inner.create_spinner()
+    }
+
+    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+        self.inner.create_multi_progress()
+    }
+
+    fn print(&self, message: &str) {
+        self.inner.print(message);
+    }
+
+    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+        self.inner.print_styled(message, style);
+    }
+
+    fn is_interactive(&self) -> bool {
+        self.inner.is_interactive()
+    }
+
+    fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String, anyhow::Error> {
+        self.inner.prompt_input(prompt, default)
+    }
+
+    fn prompt_select(
+        &self,
+        prompt: &str,
+        _items: &[&str],
+        _default: usize,
+    ) -> Result<usize, anyhow::Error> {
+        let mut count = self.prompt_count.lock().unwrap();
+        *count += 1;
+        if prompt.contains("Would you like to update now?") {
+            Ok(1) // Select "No"
+        } else if prompt.contains("Don't remind me about this version again?") {
+            Ok(0) // Select "Yes" to dismiss
+        } else {
+            Ok(1)
+        }
+    }
+
+    fn clear_screen(&self) {
+        self.inner.clear_screen();
+    }
+}
+
+struct TestUIUpdateFails {
+    inner: TestUserInterface,
+}
+
+impl UserInterface for TestUIUpdateFails {
+    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+        self.inner.create_spinner()
+    }
+
+    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+        self.inner.create_multi_progress()
+    }
+
+    fn print(&self, message: &str) {
+        self.inner.print(message);
+    }
+
+    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+        self.inner.print_styled(message, style);
+    }
+
+    fn is_interactive(&self) -> bool {
+        self.inner.is_interactive()
+    }
+
+    fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String, anyhow::Error> {
+        self.inner.prompt_input(prompt, default)
+    }
+
+    fn prompt_select(
+        &self,
+        _prompt: &str,
+        _items: &[&str],
+        _default: usize,
+    ) -> Result<usize, anyhow::Error> {
+        Ok(0) // Always select first option ("Yes" to update)
+    }
+
+    fn clear_screen(&self) {
+        self.inner.clear_screen();
+    }
+}
+
 struct TestFixture {
     file_system: MockFileSystemMock,
     http_client: Arc<MockHttpClient>,
@@ -148,6 +294,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<VersionCacheDependencies> {
         Arc::new(VersionCacheDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -236,7 +383,7 @@ fn test_load_version_cache_exists() {
     let manager = VersionCacheManager::new(deps);
 
     let cache = manager.load_version_cache().unwrap();
-    assert_eq!(cache.last_check_timestamp, 999999);
+    assert_eq!(cache.last_check_timestamp, 999_999);
     assert_eq!(cache.current_version, "0.1.0");
     assert_eq!(cache.latest_version, Some("0.2.0".to_string()));
 }
@@ -328,7 +475,7 @@ async fn test_check_and_prompt_no_check_needed() {
     });
 
     // Set timestamp to only 1 hour after last check
-    fixture.environment = Arc::new(MockEnvironment::new().with_timestamp(999000 + 3600));
+    fixture.environment = Arc::new(MockEnvironment::new().with_timestamp(999_000 + 3600));
 
     let deps = fixture.to_deps();
     let manager = VersionCacheManager::new(deps);
@@ -360,7 +507,7 @@ async fn test_check_and_prompt_with_update_available() {
 
     // Timestamp is already set to 1000000 in new()
 
-    let ui = fixture.ui.clone();
+    let _ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let manager = VersionCacheManager::new(deps);
 
@@ -395,7 +542,7 @@ async fn test_check_and_prompt_with_dismissed_version() {
         .times(1)
         .returning(|_, _| Ok(()));
 
-    let ui = fixture.ui.clone();
+    let _ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let manager = VersionCacheManager::new(deps);
 
@@ -454,61 +601,6 @@ async fn test_check_and_prompt_user_chooses_update() {
         .returning(|_, _| Ok(()));
 
     // Create a custom TestUserInterface that returns "Yes" for update prompt
-    struct TestUIWithUpdateChoice {
-        inner: TestUserInterface,
-        prompt_count: Arc<Mutex<usize>>,
-    }
-
-    impl UserInterface for TestUIWithUpdateChoice {
-        fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
-            self.inner.create_spinner()
-        }
-
-        fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
-            self.inner.create_multi_progress()
-        }
-
-        fn print(&self, message: &str) {
-            self.inner.print(message);
-        }
-
-        fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
-            self.inner.print_styled(message, style);
-        }
-
-        fn is_interactive(&self) -> bool {
-            self.inner.is_interactive()
-        }
-
-        fn prompt_input(
-            &self,
-            prompt: &str,
-            default: Option<&str>,
-        ) -> Result<String, anyhow::Error> {
-            self.inner.prompt_input(prompt, default)
-        }
-
-        fn prompt_select(
-            &self,
-            prompt: &str,
-            _items: &[&str],
-            _default: usize,
-        ) -> Result<usize, anyhow::Error> {
-            let mut count = self.prompt_count.lock().unwrap();
-            *count += 1;
-
-            if prompt.contains("Would you like to update now?") {
-                Ok(0) // Select "Yes"
-            } else {
-                Ok(1) // Select "No" for other prompts
-            }
-        }
-
-        fn clear_screen(&self) {
-            self.inner.clear_screen();
-        }
-    }
-
     let test_ui = Arc::new(TestUIWithUpdateChoice {
         inner: TestUserInterface::new(),
         prompt_count: Arc::new(Mutex::new(0)),
@@ -551,63 +643,6 @@ async fn test_check_and_prompt_user_dismisses_version() {
         .returning(|_, _| Ok(()));
 
     // Create a custom TestUserInterface for this test
-    struct TestUIWithDismissChoice {
-        inner: TestUserInterface,
-        prompt_count: Arc<Mutex<usize>>,
-    }
-
-    impl UserInterface for TestUIWithDismissChoice {
-        fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
-            self.inner.create_spinner()
-        }
-
-        fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
-            self.inner.create_multi_progress()
-        }
-
-        fn print(&self, message: &str) {
-            self.inner.print(message);
-        }
-
-        fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
-            self.inner.print_styled(message, style);
-        }
-
-        fn is_interactive(&self) -> bool {
-            self.inner.is_interactive()
-        }
-
-        fn prompt_input(
-            &self,
-            prompt: &str,
-            default: Option<&str>,
-        ) -> Result<String, anyhow::Error> {
-            self.inner.prompt_input(prompt, default)
-        }
-
-        fn prompt_select(
-            &self,
-            prompt: &str,
-            _items: &[&str],
-            _default: usize,
-        ) -> Result<usize, anyhow::Error> {
-            let mut count = self.prompt_count.lock().unwrap();
-            *count += 1;
-
-            if prompt.contains("Would you like to update now?") {
-                Ok(1) // Select "No"
-            } else if prompt.contains("Don't remind me about this version again?") {
-                Ok(0) // Select "Yes" to dismiss
-            } else {
-                Ok(1)
-            }
-        }
-
-        fn clear_screen(&self) {
-            self.inner.clear_screen();
-        }
-    }
-
     let test_ui = Arc::new(TestUIWithDismissChoice {
         inner: TestUserInterface::new(),
         prompt_count: Arc::new(Mutex::new(0)),
@@ -649,53 +684,6 @@ async fn test_update_executor_failure() {
         .returning(|_, _| Ok(()));
 
     // Create UI that chooses to update
-    struct TestUIUpdateFails {
-        inner: TestUserInterface,
-    }
-
-    impl UserInterface for TestUIUpdateFails {
-        fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
-            self.inner.create_spinner()
-        }
-
-        fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
-            self.inner.create_multi_progress()
-        }
-
-        fn print(&self, message: &str) {
-            self.inner.print(message);
-        }
-
-        fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
-            self.inner.print_styled(message, style);
-        }
-
-        fn is_interactive(&self) -> bool {
-            self.inner.is_interactive()
-        }
-
-        fn prompt_input(
-            &self,
-            prompt: &str,
-            default: Option<&str>,
-        ) -> Result<String, anyhow::Error> {
-            self.inner.prompt_input(prompt, default)
-        }
-
-        fn prompt_select(
-            &self,
-            _prompt: &str,
-            _items: &[&str],
-            _default: usize,
-        ) -> Result<usize, anyhow::Error> {
-            Ok(0) // Always select first option ("Yes" to update)
-        }
-
-        fn clear_screen(&self) {
-            self.inner.clear_screen();
-        }
-    }
-
     let test_ui = Arc::new(TestUIUpdateFails {
         inner: TestUserInterface::new(),
     });
@@ -716,9 +704,9 @@ async fn test_update_executor_failure() {
 fn test_version_cache_update_check() {
     let mut cache = VersionCache::new("0.1.0".to_string());
 
-    cache.update_check(2000000, "0.1.1".to_string(), Some("0.2.0".to_string()));
+    cache.update_check(2_000_000, "0.1.1".to_string(), Some("0.2.0".to_string()));
 
-    assert_eq!(cache.last_check_timestamp, 2000000);
+    assert_eq!(cache.last_check_timestamp, 2_000_000);
     assert_eq!(cache.current_version, "0.1.1");
     assert_eq!(cache.latest_version, Some("0.2.0".to_string()));
 }

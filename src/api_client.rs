@@ -4,10 +4,20 @@ use anyhow::Result;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 // Include the generated client code
-include!(concat!(env!("OUT_DIR"), "/ftl_backend_client.rs"));
+#[allow(clippy::use_self)]
+#[allow(clippy::pedantic)]
+#[allow(clippy::nursery)]
+#[allow(unused_imports)]
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/ftl_backend_client.rs"));
+}
 
-// Re-export the generated types module for easier access
-pub use types::*;
+// Re-export from the generated module
+pub use generated::*;
+
+// Re-export the generated types module and its submodules for easier access
+pub use generated::types;
+pub use generated::types::error;
 
 /// Configuration for the FTL API client
 pub struct ApiConfig {
@@ -27,12 +37,13 @@ impl Default for ApiConfig {
 }
 
 /// Create a configured FTL API client
+#[allow(dead_code)]
 pub fn create_client(config: ApiConfig) -> Result<Client> {
     let mut headers = HeaderMap::new();
 
     // Add authorization header if token is provided
     if let Some(token) = config.auth_token {
-        let auth_value = HeaderValue::from_str(&format!("Bearer {}", token))?;
+        let auth_value = HeaderValue::from_str(&format!("Bearer {token}"))?;
         headers.insert(AUTHORIZATION, auth_value);
     }
 
@@ -45,6 +56,7 @@ pub fn create_client(config: ApiConfig) -> Result<Client> {
 }
 
 /// Helper function to create client from environment variables
+#[allow(dead_code)]
 pub fn create_client_from_env() -> Result<Client> {
     let base_url = std::env::var("FTL_API_URL")
         .unwrap_or_else(|_| "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string());

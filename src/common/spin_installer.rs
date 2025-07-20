@@ -29,13 +29,13 @@ pub struct SpinInstallerDependencies {
     pub ui: Arc<dyn UserInterface>,
 }
 
-/// Production implementation of SpinInstaller
+/// Production implementation of `SpinInstaller`
 pub struct RealSpinInstallerV2 {
     deps: Arc<SpinInstallerDependencies>,
 }
 
 impl RealSpinInstallerV2 {
-    pub fn new(deps: Arc<SpinInstallerDependencies>) -> Self {
+    pub const fn new(deps: Arc<SpinInstallerDependencies>) -> Self {
         Self { deps }
     }
 }
@@ -44,34 +44,29 @@ impl RealSpinInstallerV2 {
 impl SpinInstaller for RealSpinInstallerV2 {
     async fn check_and_install(&self) -> Result<String> {
         // Check if spin is available in PATH
-        match self
+        if let Ok(()) = self
             .deps
             .command_executor
             .check_command_exists("spin")
             .await
         {
-            Ok(_) => {
-                // Spin exists, ensure akamai plugin is installed
-                self.ensure_akamai_plugin().await?;
-                Ok("spin".to_string())
-            }
-            Err(_) => {
-                // Spin not found - emit warning
-                self.deps.ui.print_styled(
-                    "⚠️  FTL requires Spin to run WebAssembly tools.",
-                    MessageStyle::Warning,
-                );
-                self.deps
-                    .ui
-                    .print("Please install Spin from: https://github.com/fermyon/spin");
-                self.deps
-                    .ui
-                    .print("Or use your package manager (e.g., brew install fermyon/tap/spin)");
+            // Spin exists, ensure akamai plugin is installed
+            self.ensure_akamai_plugin().await?;
+            Ok("spin".to_string())
+        } else {
+            // Spin not found - emit warning
+            self.deps.ui.print_styled(
+                "⚠️  FTL requires Spin to run WebAssembly tools.",
+                MessageStyle::Warning,
+            );
+            self.deps
+                .ui
+                .print("Please install Spin from: https://github.com/fermyon/spin");
+            self.deps
+                .ui
+                .print("Or use your package manager (e.g., brew install fermyon/tap/spin)");
 
-                anyhow::bail!(
-                    "Spin not found. Please install it from https://github.com/fermyon/spin"
-                )
-            }
+            anyhow::bail!("Spin not found. Please install it from https://github.com/fermyon/spin")
         }
     }
 }
@@ -105,7 +100,7 @@ impl RealSpinInstallerV2 {
         if !install_output.success {
             let stderr = String::from_utf8_lossy(&install_output.stderr);
             self.deps.ui.print_styled(
-                &format!("⚠️  Warning: Failed to install Akamai plugin: {}", stderr),
+                &format!("⚠️  Warning: Failed to install Akamai plugin: {stderr}"),
                 MessageStyle::Warning,
             );
             self.deps

@@ -1,4 +1,4 @@
-//! Comprehensive unit tests for deploy_v2 module
+//! Comprehensive unit tests for `deploy_v2` module
 
 use crate::api_client::types;
 use crate::commands::deploy::*;

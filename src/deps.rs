@@ -146,7 +146,6 @@ pub trait MultiProgressManager: Send + Sync {
 /// Message styling options
 #[derive(Debug, Clone, Copy)]
 pub enum MessageStyle {
-    Normal,
     Bold,
     Cyan,
     Green,
@@ -262,7 +261,7 @@ pub struct RealFtlApiClient {
 }
 
 impl RealFtlApiClient {
-    pub fn new(client: ApiClient) -> Self {
+    pub const fn new(client: ApiClient) -> Self {
         Self { client }
     }
 }
@@ -274,7 +273,7 @@ impl FtlApiClient for RealFtlApiClient {
             .get_ecr_credentials()
             .send()
             .await
-            .map(|resp| resp.into_inner())
+            .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to get ECR credentials: {}", e))
     }
 
@@ -287,7 +286,7 @@ impl FtlApiClient for RealFtlApiClient {
             .body(request)
             .send()
             .await
-            .map(|resp| resp.into_inner())
+            .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to create ECR repository: {}", e))
     }
 
@@ -297,7 +296,7 @@ impl FtlApiClient for RealFtlApiClient {
             .deployment_id(deployment_id)
             .send()
             .await
-            .map(|resp| resp.into_inner())
+            .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to get deployment status: {}", e))
     }
 
@@ -310,7 +309,7 @@ impl FtlApiClient for RealFtlApiClient {
             .body(request)
             .send()
             .await
-            .map(|resp| resp.into_inner())
+            .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to deploy app: {}", e))
     }
 }
@@ -355,12 +354,11 @@ impl BuildExecutor for RealBuildExecutor {
             command_executor: Arc::new(RealCommandExecutor),
             ui: ui.clone(),
             spin_installer: Arc::new(RealSpinInstaller),
-            async_runtime: Arc::new(RealAsyncRuntime),
         });
 
         crate::commands::build::execute_with_deps(
             crate::commands::build::BuildConfig {
-                path: path.map(|p| p.to_path_buf()),
+                path: path.map(std::path::Path::to_path_buf),
                 release,
             },
             deps,
@@ -410,9 +408,6 @@ pub trait ProcessHandle: Send + Sync {
 
     /// Terminate the process
     async fn terminate(&mut self) -> Result<()>;
-
-    /// Get the process ID
-    fn id(&self) -> u32;
 }
 
 /// Exit status
@@ -421,7 +416,7 @@ pub struct ExitStatus {
 }
 
 impl ExitStatus {
-    pub fn new(code: Option<i32>) -> Self {
+    pub const fn new(code: Option<i32>) -> Self {
         Self { code }
     }
 
@@ -429,18 +424,9 @@ impl ExitStatus {
         self.code == Some(0)
     }
 
-    pub fn code(&self) -> Option<i32> {
+    pub const fn code(&self) -> Option<i32> {
         self.code
     }
-}
-
-/// Async spawn trait
-#[async_trait]
-pub trait AsyncSpawner: Send + Sync {
-    /// Spawn an async task
-    async fn spawn<F>(&self, future: F) -> Result<()>
-    where
-        F: std::future::Future<Output = ()> + Send + 'static;
 }
 
 /// Real process manager implementation
@@ -499,9 +485,5 @@ impl ProcessHandle for RealProcessHandle {
                 .map_err(|e| anyhow::anyhow!("Failed to terminate process: {}", e))?;
         }
         Ok(())
-    }
-
-    fn id(&self) -> u32 {
-        self.child.as_ref().map(|c| c.id()).unwrap_or(0)
     }
 }

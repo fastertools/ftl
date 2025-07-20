@@ -7,7 +7,7 @@ use crate::commands::publish::{
     BuildExecutor, ProcessExecutor, ProcessOutput, PublishConfig, PublishDependencies,
     SpinInstaller, execute_with_deps,
 };
-use crate::deps::{FileSystem, MessageStyle, UserInterface};
+use crate::deps::{FileSystem, UserInterface};
 use crate::test_helpers::*;
 use crate::ui::TestUserInterface;
 
@@ -70,7 +70,7 @@ impl MockProcessExecutor {
     ) -> Self {
         self.expected_commands.push((
             command.to_string(),
-            args.iter().map(|s| s.to_string()).collect(),
+            args.iter().map(|s| (*s).to_string()).collect(),
             working_dir,
             output,
         ));
@@ -103,7 +103,7 @@ impl ProcessExecutor for MockProcessExecutor {
             ));
         }
 
-        let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
         if args_vec != *expected_args {
             return Err(anyhow::anyhow!(
                 "Expected args {:?}, got {:?}",
@@ -112,7 +112,7 @@ impl ProcessExecutor for MockProcessExecutor {
             ));
         }
 
-        if working_dir.map(|p| p.to_path_buf()) != *expected_dir {
+        if working_dir.map(std::path::Path::to_path_buf) != *expected_dir {
             return Err(anyhow::anyhow!(
                 "Expected working dir {:?}, got {:?}",
                 expected_dir,
@@ -180,6 +180,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<PublishDependencies> {
         Arc::new(PublishDependencies {
             ui: self.ui as Arc<dyn UserInterface>,

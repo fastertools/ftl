@@ -1,5 +1,6 @@
 //! Refactored deploy command with dependency injection for testability
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -42,6 +43,7 @@ pub struct DeployDependencies {
 }
 
 /// Execute the deploy command with injected dependencies
+#[allow(clippy::too_many_lines)]
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     deps.ui
         .print(&format!("{} {} Deploying project", "▶", "FTL"));
@@ -81,9 +83,8 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
                 return Err(anyhow!(
                     "Authentication token has expired. Please run 'ftl login' to re-authenticate."
                 ));
-            } else {
-                return Err(anyhow!("Not logged in to FTL. Run 'ftl login' first."));
             }
+            return Err(anyhow!("Not logged in to FTL. Run 'ftl login' first."));
         }
     };
 
@@ -136,7 +137,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
         .print_styled("✓ Deployment successful!", MessageStyle::Success);
     if let Some(deployment_url) = deployment.deployment_url {
         deps.ui.print("");
-        deps.ui.print(&format!("  MCP URL: {}", deployment_url));
+        deps.ui.print(&format!("  MCP URL: {deployment_url}"));
         deps.ui.print("");
     }
 
@@ -152,7 +153,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
         .get("application")
         .and_then(|app| app.get("name"))
         .and_then(|name| name.as_str())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| anyhow!("No application name found in spin.toml"))?;
 
     let mut components = Vec::new();
@@ -164,7 +165,9 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                 // Check if source is a local file (string) vs registry (table)
                 if let Some(source_path) = source.as_str() {
                     // Skip if it's a system component (from registry)
-                    if !source_path.contains("ghcr.io") && source_path.ends_with(".wasm") {
+                    if !source_path.contains("ghcr.io")
+                        && source_path.to_lowercase().ends_with(".wasm")
+                    {
                         // Try to extract version
                         let version = extract_component_version(file_system, name, source_path)?;
 
@@ -175,7 +178,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                             .map(|arr| {
                                 arr.iter()
                                     .filter_map(|v| v.as_str())
-                                    .map(|s| s.to_string())
+                                    .map(std::string::ToString::to_string)
                                     .collect()
                             });
 
@@ -274,6 +277,7 @@ async fn docker_login(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 async fn create_repositories_and_push_with_progress(
     components: &[ComponentInfo],
     deps: Arc<DeployDependencies>,
@@ -341,7 +345,7 @@ async fn create_repositories_and_push_with_progress(
             {
                 Ok(resp) => resp,
                 Err(e) => {
-                    pb.finish_with_message(format!("✗ Failed to create repository: {}", e));
+                    pb.finish_with_message(format!("✗ Failed to create repository: {e}"));
                     let mut error_guard = error_flag.lock().await;
                     if error_guard.is_none() {
                         *error_guard =
@@ -369,7 +373,7 @@ async fn create_repositories_and_push_with_progress(
                     component.name,
                     String::from_utf8_lossy(&output.stderr)
                 );
-                pb.finish_with_message(format!("✗ {}", error));
+                pb.finish_with_message(format!("✗ {error}"));
                 let mut error_guard = error_flag.lock().await;
                 if error_guard.is_none() {
                     *error_guard = Some(error.clone());
@@ -437,6 +441,7 @@ async fn create_repositories_and_push_with_progress(
     Ok(tools)
 }
 
+#[allow(clippy::too_many_lines)]
 async fn poll_deployment_status_with_progress(
     deps: Arc<DeployDependencies>,
     deployment_id: &str,
@@ -463,7 +468,9 @@ async fn poll_deployment_status_with_progress(
 
         // Update spinner message based on status and stages
         let stages = &deployment.stages;
-        let status_msg = if !stages.is_empty() {
+        let status_msg = if stages.is_empty() {
+            format!("Status: {}", deployment.status)
+        } else {
             // Find the current stage (first non-completed stage)
             let current_stage = stages
                 .iter()
@@ -493,8 +500,6 @@ async fn poll_deployment_status_with_progress(
             } else {
                 "Processing deployment...".to_string()
             }
-        } else {
-            format!("Status: {}", deployment.status)
         };
 
         spinner.set_message(&status_msg);
@@ -537,7 +542,7 @@ async fn deploy_to_ftl_with_progress(
             .try_into()
             .map_err(|e: ConversionError| anyhow!("Invalid app name: {}", e))?,
         tools,
-        variables: Default::default(),
+        variables: HashMap::default(),
     };
 
     let deployment_response = deps

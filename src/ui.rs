@@ -30,12 +30,11 @@ impl UserInterface for RealUserInterface {
     }
 
     fn print(&self, message: &str) {
-        println!("{}", message);
+        println!("{message}");
     }
 
     fn print_styled(&self, message: &str, msg_style: MessageStyle) {
         let styled = match msg_style {
-            MessageStyle::Normal => message.to_string(),
             MessageStyle::Bold => style(message).bold().to_string(),
             MessageStyle::Cyan => style(message).cyan().to_string(),
             MessageStyle::Green => style(message).green().to_string(),
@@ -45,7 +44,7 @@ impl UserInterface for RealUserInterface {
             MessageStyle::Error => style(message).red().bold().to_string(),
             MessageStyle::Success => style(message).green().bold().to_string(),
         };
-        println!("{}", styled);
+        println!("{styled}");
     }
 
     fn is_interactive(&self) -> bool {
@@ -134,6 +133,7 @@ pub struct TestUserInterface {
 }
 
 impl TestUserInterface {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             output: Arc::new(Mutex::new(Vec::new())),
@@ -141,10 +141,12 @@ impl TestUserInterface {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_output(&self) -> Vec<String> {
         self.output.lock().unwrap().clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_styled_output(&self) -> Vec<(String, MessageStyle)> {
         self.styled_output.lock().unwrap().clone()
     }

@@ -99,7 +99,7 @@ async fn run_normal(
     deps.ui.print(&format!("{} Starting server...", "→"));
     deps.ui.print("");
     deps.ui
-        .print(&format!("🌐 Server will start at http://{}", listen_addr));
+        .print(&format!("🌐 Server will start at http://{listen_addr}"));
     deps.ui.print("⏹ Press Ctrl+C to stop");
     deps.ui.print("");
 
@@ -151,10 +151,8 @@ async fn run_with_watch(
     ));
     deps.ui.print("");
     deps.ui.print("👀 Watching for file changes");
-    deps.ui.print(&format!(
-        "🌐 Server will start at http://127.0.0.1:{}",
-        port
-    ));
+    deps.ui
+        .print(&format!("🌐 Server will start at http://127.0.0.1:{port}"));
     deps.ui.print("⏹ Press Ctrl+C to stop");
     deps.ui.print("");
 
@@ -213,7 +211,7 @@ async fn run_with_watch(
 
                     // Rebuild
                     match run_build_command(&project_path, deps).await {
-                        Ok(_) => {
+                        Ok(()) => {
                             deps.ui.print("");
                             deps.ui.print(&format!("{} Restarting server...", "→"));
 
@@ -225,7 +223,7 @@ async fn run_with_watch(
                         }
                         Err(e) => {
                             deps.ui.print("");
-                            deps.ui.print_styled(&format!("✗ Build failed: {}", e), MessageStyle::Red);
+                            deps.ui.print_styled(&format!("✗ Build failed: {e}"), MessageStyle::Red);
                             deps.ui.print_styled("⏸ Waiting for file changes...", MessageStyle::Yellow);
                         }
                     }
@@ -233,7 +231,7 @@ async fn run_with_watch(
             }
 
             // Check for Ctrl+C periodically
-            _ = deps.async_runtime.sleep(Duration::from_millis(100)) => {
+            () = deps.async_runtime.sleep(Duration::from_millis(100)) => {
                 if ctrlc_pressed.load(Ordering::SeqCst) {
                     deps.ui.print("");
                     deps.ui.print_styled("■ Stopping development server...", MessageStyle::Red);
@@ -299,7 +297,6 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
         command_executor: deps.command_executor.clone(),
         ui: deps.ui.clone(),
         spin_installer: deps.spin_installer.clone(),
-        async_runtime: deps.async_runtime.clone(),
     });
 
     build_execute(

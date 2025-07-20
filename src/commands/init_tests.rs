@@ -27,6 +27,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<InitDependencies> {
         Arc::new(InitDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -229,7 +230,7 @@ async fn test_init_spin_new_fails() {
         .expect_execute()
         .times(2) // templates list + spin new
         .returning(|path, args| {
-            println!("Mock execute called with path: {}, args: {:?}", path, args);
+            println!("Mock execute called with path: {path}, args: {args:?}");
             if args == ["templates", "list"] {
                 Ok(CommandOutput {
                     success: true,
@@ -244,7 +245,7 @@ async fn test_init_spin_new_fails() {
                     stderr: b"Failed to create project: some error".to_vec(),
                 })
             } else {
-                panic!("Unexpected command: {} {:?}", path, args);
+                panic!("Unexpected command: {path} {args:?}");
             }
         });
 
@@ -262,8 +263,7 @@ async fn test_init_spin_new_fails() {
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("Failed to create project"),
-        "Expected 'Failed to create project', got: {}",
-        err_msg
+        "Expected 'Failed to create project', got: {err_msg}"
     );
 }
 
@@ -290,7 +290,7 @@ async fn test_init_success() {
         .expect_execute()
         .times(2) // templates list + spin new
         .returning(|path, args| {
-            println!("Mock execute called with path: {}, args: {:?}", path, args);
+            println!("Mock execute called with path: {path}, args: {args:?}");
             if args == ["templates", "list"] {
                 Ok(CommandOutput {
                     success: true,
@@ -304,7 +304,7 @@ async fn test_init_success() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {} {:?}", path, args);
+                panic!("Unexpected command: {path} {args:?}");
             }
         });
 
@@ -320,7 +320,7 @@ async fn test_init_success() {
     .await;
 
     if let Err(e) = &result {
-        eprintln!("Init error: {}", e);
+        eprintln!("Init error: {e}");
     }
     assert!(result.is_ok());
 
@@ -361,7 +361,7 @@ async fn test_init_here_success() {
         .expect_execute()
         .times(2) // templates list + spin new
         .returning(|path, args| {
-            println!("Mock execute called with path: {}, args: {:?}", path, args);
+            println!("Mock execute called with path: {path}, args: {args:?}");
             if args == ["templates", "list"] {
                 Ok(CommandOutput {
                     success: true,
@@ -375,7 +375,7 @@ async fn test_init_here_success() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {} {:?}", path, args);
+                panic!("Unexpected command: {path} {args:?}");
             }
         });
 
@@ -391,7 +391,7 @@ async fn test_init_here_success() {
     .await;
 
     if let Err(e) = &result {
-        eprintln!("Init error: {}", e);
+        eprintln!("Init error: {e}");
     }
     assert!(result.is_ok());
 
@@ -447,7 +447,7 @@ async fn test_init_interactive_name() {
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {:?}", args);
+                panic!("Unexpected command: {args:?}");
             }
         });
 
@@ -463,7 +463,7 @@ async fn test_init_interactive_name() {
     .await;
 
     if let Err(e) = &result {
-        eprintln!("Init error: {}", e);
+        eprintln!("Init error: {e}");
     }
     assert!(result.is_ok());
 
@@ -500,7 +500,7 @@ fn setup_templates_installed(fixture: &mut TestFixture) {
         .expect_execute()
         .times(1)
         .returning(|path, args| {
-            println!("Mock execute called with path: {}, args: {:?}", path, args);
+            println!("Mock execute called with path: {path}, args: {args:?}");
             if args == ["templates", "list"] {
                 Ok(CommandOutput {
                     success: true,

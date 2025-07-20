@@ -2,8 +2,6 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
-
 use crate::deps::{MessageStyle, UserInterface};
 
 /// Dependencies for the registry command
@@ -12,11 +10,8 @@ pub struct RegistryDependencies {
 }
 
 /// Execute the list subcommand with injected dependencies
-pub async fn list_with_deps(
-    registry: Option<String>,
-    deps: Arc<RegistryDependencies>,
-) -> Result<()> {
-    let registry_url = registry.as_deref().unwrap_or("ghcr.io");
+pub fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) {
+    let registry_url = registry.unwrap_or("ghcr.io");
 
     deps.ui.print(&format!(
         "{} Listing components from {}",
@@ -34,22 +29,16 @@ pub async fn list_with_deps(
     deps.ui
         .print("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
     deps.ui.print("  - Docker Hub: https://hub.docker.com/");
-
-    Ok(())
 }
 
 /// Execute the search subcommand with injected dependencies
-pub async fn search_with_deps(
-    query: String,
-    registry: Option<String>,
-    deps: Arc<RegistryDependencies>,
-) -> Result<()> {
-    let registry_url = registry.as_deref().unwrap_or("ghcr.io");
+pub fn search_with_deps(query: &str, registry: Option<&str>, deps: &Arc<RegistryDependencies>) {
+    let registry_url = registry.unwrap_or("ghcr.io");
 
     deps.ui.print(&format!(
         "{} Searching for '{}' in {}",
         styled_text("→", MessageStyle::Cyan),
-        styled_text(&query, MessageStyle::Bold),
+        styled_text(query, MessageStyle::Bold),
         registry_url
     ));
 
@@ -63,16 +52,14 @@ pub async fn search_with_deps(
     deps.ui.print(&format!(
         "  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages"
     ));
-
-    Ok(())
 }
 
 /// Execute the info subcommand with injected dependencies
-pub async fn info_with_deps(component: String, deps: Arc<RegistryDependencies>) -> Result<()> {
+pub fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) {
     deps.ui.print(&format!(
         "{} Getting info for component: {}",
         styled_text("→", MessageStyle::Cyan),
-        styled_text(&component, MessageStyle::Bold)
+        styled_text(component, MessageStyle::Bold)
     ));
 
     deps.ui.print("");
@@ -86,12 +73,10 @@ pub async fn info_with_deps(component: String, deps: Arc<RegistryDependencies>) 
     deps.ui.print("  - docker.io/username/component:version");
     deps.ui
         .print("  - component-name (searches default registry)");
-
-    Ok(())
 }
 
 // Helper function to format styled text (since we're not using console crate directly)
-fn styled_text(text: &str, _style: MessageStyle) -> &str {
+const fn styled_text(text: &str, _style: MessageStyle) -> &str {
     text
 }
 

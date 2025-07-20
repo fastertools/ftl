@@ -40,6 +40,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<SpinInstallerDependencies> {
         Arc::new(SpinInstallerDependencies {
             command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,
@@ -59,7 +60,7 @@ async fn test_check_and_install_spin_found_with_plugin() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "list"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "list"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -88,7 +89,7 @@ async fn test_check_and_install_spin_found_without_plugin() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "list"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "list"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -102,7 +103,7 @@ async fn test_check_and_install_spin_found_without_plugin() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "install", "aka"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "install", "aka"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -169,7 +170,7 @@ async fn test_check_and_install_plugin_list_fails() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "list"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "list"])
         .times(1)
         .returning(|_, _| Err(anyhow::anyhow!("Failed to execute command")));
 
@@ -197,7 +198,7 @@ async fn test_check_and_install_plugin_install_fails() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "list"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "list"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -211,7 +212,7 @@ async fn test_check_and_install_plugin_install_fails() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "install", "aka"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "install", "aka"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -251,7 +252,7 @@ async fn test_check_and_install_plugin_list_command_fails() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "list"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "list"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
@@ -265,7 +266,7 @@ async fn test_check_and_install_plugin_list_command_fails() {
     fixture
         .command_executor
         .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == &["plugin", "install", "aka"])
+        .withf(|cmd: &str, args: &[&str]| cmd == "spin" && args == ["plugin", "install", "aka"])
         .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {

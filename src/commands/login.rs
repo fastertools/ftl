@@ -40,6 +40,7 @@ pub struct TokenError {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct StoredCredentials {
     pub access_token: String,
     pub refresh_token: Option<String>,
@@ -60,7 +61,7 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.status >= 200 && self.status < 300
     }
 }
@@ -69,6 +70,7 @@ impl HttpResponse {
 pub trait KeyringStorage: Send + Sync {
     fn store(&self, service: &str, username: &str, password: &str) -> Result<()>;
     fn retrieve(&self, service: &str, username: &str) -> Result<String>;
+    #[allow(dead_code)]
     fn delete(&self, service: &str, username: &str) -> Result<()>;
 }
 
@@ -106,7 +108,7 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
     let client_id = config.client_id.as_deref().unwrap_or(CLIENT_ID);
 
     deps.ui
-        .print(&format!("→ Logging in to FTL ({})", authkit_domain));
+        .print(&format!("→ Logging in to FTL ({authkit_domain})"));
     deps.ui.print("");
 
     // Request device authorization
@@ -127,15 +129,15 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
     deps.ui.print("");
 
     // Optionally open browser
-    if !config.no_browser && deps.ui.is_interactive() {
-        if deps
+    if !config.no_browser
+        && deps.ui.is_interactive()
+        && deps
             .ui
             .prompt_select("Open browser automatically?", &["Yes", "No"], 0)?
             == 0
-        {
-            deps.browser_launcher
-                .open(&auth_response.verification_uri_complete)?;
-        }
+    {
+        deps.browser_launcher
+            .open(&auth_response.verification_uri_complete)?;
     }
 
     // Poll for token
@@ -181,6 +183,7 @@ async fn request_device_authorization(
     serde_json::from_str(&response.body).context("Failed to parse device authorization response")
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn poll_for_token(
     http_client: &Arc<dyn HttpClient>,
     ui: &Arc<dyn UserInterface>,
@@ -211,8 +214,7 @@ async fn poll_for_token(
             .await;
 
         let body = format!(
-            "grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code={}&client_id={}",
-            device_code, client_id
+            "grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code={device_code}&client_id={client_id}"
         );
 
         let response = http_client
@@ -228,7 +230,7 @@ async fn poll_for_token(
         // Handle error responses
         if let Ok(error) = serde_json::from_str::<TokenError>(&response.body) {
             match error.error.as_str() {
-                "authorization_pending" => continue,
+                "authorization_pending" => {}
                 "slow_down" => {
                     // Increase interval
                     interval_secs = poll_interval_secs + 5;
@@ -260,9 +262,11 @@ fn store_credentials(
     authkit_domain: &str,
     token_response: &TokenResponse,
 ) -> Result<()> {
-    let expires_at = token_response
-        .expires_in
-        .map(|expires_in| clock.now() + chrono::Duration::seconds(expires_in as i64));
+    let expires_at = token_response.expires_in.and_then(|expires_in| {
+        i64::try_from(expires_in)
+            .ok()
+            .map(|secs| clock.now() + chrono::Duration::seconds(secs))
+    });
 
     let credentials = StoredCredentials {
         access_token: token_response.access_token.clone(),
@@ -278,14 +282,6 @@ fn store_credentials(
     Ok(())
 }
 
-pub fn get_stored_credentials_with_deps(
-    keyring: &Arc<dyn KeyringStorage>,
-) -> Result<StoredCredentials> {
-    let json = keyring.retrieve("ftl-cli", "default")?;
-    let credentials: StoredCredentials = serde_json::from_str(&json)?;
-    Ok(credentials)
-}
-
 /// Helper function to get stored credentials using default keyring
 pub fn get_stored_credentials() -> Result<Option<StoredCredentials>> {
     let entry = keyring::Entry::new("ftl-cli", "default")?;
@@ -299,60 +295,63 @@ pub fn get_stored_credentials() -> Result<Option<StoredCredentials>> {
     }
 }
 
+// Real implementations for default behavior
+struct RealKeyringStorage;
+
+impl KeyringStorage for RealKeyringStorage {
+    fn store(&self, service: &str, username: &str, password: &str) -> Result<()> {
+        let entry = keyring::Entry::new(service, username)?;
+        entry.set_password(password)?;
+        Ok(())
+    }
+
+    fn retrieve(&self, service: &str, username: &str) -> Result<String> {
+        let entry = keyring::Entry::new(service, username)?;
+        entry
+            .get_password()
+            .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))
+    }
+
+    fn delete(&self, service: &str, username: &str) -> Result<()> {
+        let entry = keyring::Entry::new(service, username)?;
+        entry.delete_credential()?;
+        Ok(())
+    }
+}
+
+struct RealHttpClient;
+
+#[async_trait::async_trait]
+impl HttpClient for RealHttpClient {
+    async fn post(&self, url: &str, body: &str) -> Result<HttpResponse> {
+        let response = reqwest::Client::new()
+            .post(url)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body.to_string())
+            .send()
+            .await?;
+
+        let status = response.status().as_u16();
+        let body = response.text().await?;
+
+        Ok(HttpResponse { status, body })
+    }
+}
+
+struct RealClock;
+
+impl Clock for RealClock {
+    fn now(&self) -> DateTime<Utc> {
+        Utc::now()
+    }
+
+    fn instant_now(&self) -> std::time::Instant {
+        std::time::Instant::now()
+    }
+}
+
 /// Helper function to get or refresh credentials using default implementations
 pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
-    // Create real implementations
-    struct RealKeyringStorage;
-    impl KeyringStorage for RealKeyringStorage {
-        fn store(&self, service: &str, username: &str, password: &str) -> Result<()> {
-            let entry = keyring::Entry::new(service, username)?;
-            entry.set_password(password)?;
-            Ok(())
-        }
-
-        fn retrieve(&self, service: &str, username: &str) -> Result<String> {
-            let entry = keyring::Entry::new(service, username)?;
-            entry
-                .get_password()
-                .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))
-        }
-
-        fn delete(&self, service: &str, username: &str) -> Result<()> {
-            let entry = keyring::Entry::new(service, username)?;
-            entry.delete_credential()?;
-            Ok(())
-        }
-    }
-
-    struct RealHttpClient;
-    #[async_trait::async_trait]
-    impl HttpClient for RealHttpClient {
-        async fn post(&self, url: &str, body: &str) -> Result<HttpResponse> {
-            let response = reqwest::Client::new()
-                .post(url)
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(body.to_string())
-                .send()
-                .await?;
-
-            let status = response.status().as_u16();
-            let body = response.text().await?;
-
-            Ok(HttpResponse { status, body })
-        }
-    }
-
-    struct RealClock;
-    impl Clock for RealClock {
-        fn now(&self) -> DateTime<Utc> {
-            Utc::now()
-        }
-
-        fn instant_now(&self) -> std::time::Instant {
-            std::time::Instant::now()
-        }
-    }
-
     let keyring: Arc<dyn KeyringStorage> = Arc::new(RealKeyringStorage);
     let http_client: Arc<dyn HttpClient> = Arc::new(RealHttpClient);
     let clock: Arc<dyn Clock> = Arc::new(RealClock);
@@ -382,9 +381,11 @@ pub async fn get_or_refresh_credentials_with_deps(
                     Ok(new_tokens) => {
                         // Update credentials with new tokens
                         credentials.access_token = new_tokens.access_token;
-                        credentials.expires_at = new_tokens
-                            .expires_in
-                            .map(|expires_in| now + chrono::Duration::seconds(expires_in as i64));
+                        credentials.expires_at = new_tokens.expires_in.and_then(|expires_in| {
+                            i64::try_from(expires_in)
+                                .ok()
+                                .map(|secs| now + chrono::Duration::seconds(secs))
+                        });
 
                         // Update refresh token if a new one was provided
                         if let Some(new_refresh) = new_tokens.refresh_token {
@@ -404,11 +405,10 @@ pub async fn get_or_refresh_credentials_with_deps(
                         ));
                     }
                 }
-            } else {
-                return Err(anyhow!(
-                    "Authentication token has expired and no refresh token available. Please run 'ftl login' again."
-                ));
             }
+            return Err(anyhow!(
+                "Authentication token has expired and no refresh token available. Please run 'ftl login' again."
+            ));
         }
     }
 
@@ -440,11 +440,6 @@ async fn refresh_access_token(
     }
 
     serde_json::from_str(&response.body).context("Failed to parse refresh token response")
-}
-
-pub fn clear_stored_credentials_with_deps(keyring: &Arc<dyn KeyringStorage>) -> Result<()> {
-    keyring.delete("ftl-cli", "default")?;
-    Ok(())
 }
 
 /// Helper function to clear stored credentials using default keyring

@@ -33,7 +33,7 @@ pub struct TestDependencies {
 }
 
 /// Execute the test command with injected dependencies
-pub async fn execute_with_deps(path: Option<PathBuf>, deps: Arc<TestDependencies>) -> Result<()> {
+pub fn execute_with_deps(path: Option<PathBuf>, deps: &Arc<TestDependencies>) -> Result<()> {
     let working_path = path.unwrap_or_else(|| PathBuf::from("."));
 
     deps.ui.print_styled("→ Running tests", MessageStyle::Cyan);
@@ -60,9 +60,9 @@ pub async fn execute_with_deps(path: Option<PathBuf>, deps: Arc<TestDependencies
 
                     deps.ui.print("");
                     deps.ui
-                        .print_styled(&format!("→ Testing {}", tool_name), MessageStyle::Cyan);
+                        .print_styled(&format!("→ Testing {tool_name}"), MessageStyle::Cyan);
 
-                    run_tool_tests(&entry, &deps)?;
+                    run_tool_tests(&entry, deps)?;
                     any_tests_run = true;
                 }
             }
@@ -74,7 +74,7 @@ pub async fn execute_with_deps(path: Option<PathBuf>, deps: Arc<TestDependencies
         }
     } else {
         // Try to run tests in current directory as a single tool
-        run_tool_tests(&working_path, &deps)?;
+        run_tool_tests(&working_path, deps)?;
     }
 
     deps.ui.print("");

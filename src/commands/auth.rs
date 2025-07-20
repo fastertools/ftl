@@ -9,6 +9,7 @@ use crate::deps::{MessageStyle, UserInterface};
 
 /// Stored credentials structure
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StoredCredentials {
     pub access_token: String,
     pub refresh_token: Option<String>,
@@ -35,7 +36,7 @@ pub struct AuthDependencies {
 }
 
 /// Execute the auth status command with injected dependencies
-pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
+pub fn status_with_deps(deps: &Arc<AuthDependencies>) {
     deps.ui
         .print_styled("→ Authentication Status", MessageStyle::Cyan);
     deps.ui.print("");
@@ -82,8 +83,6 @@ pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
                     styled_text("Available", MessageStyle::Success)
                 ));
             }
-
-            Ok(())
         }
         Err(e) => {
             if e.to_string().contains("No matching entry found") {
@@ -101,13 +100,12 @@ pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
                     styled_text("ftl login", MessageStyle::Cyan)
                 ));
             }
-            Ok(())
         }
     }
 }
 
 // Helper function to format styled text (since we're not using console crate directly)
-fn styled_text(text: &str, _style: MessageStyle) -> &str {
+const fn styled_text(text: &str, _style: MessageStyle) -> &str {
     text
 }
 

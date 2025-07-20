@@ -1,6 +1,6 @@
 //! Refactored setup command with dependency injection for better testability
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Output;
 use std::sync::Arc;
 
@@ -33,13 +33,13 @@ pub struct SetupDependencies {
 }
 
 /// Execute the templates subcommand with injected dependencies
-pub async fn templates_with_deps(
+pub fn templates_with_deps(
     force: bool,
-    git: Option<String>,
-    branch: Option<String>,
-    dir: Option<PathBuf>,
-    tar: Option<String>,
-    deps: Arc<SetupDependencies>,
+    git: Option<&str>,
+    branch: Option<&str>,
+    dir: Option<&PathBuf>,
+    tar: Option<&str>,
+    deps: &Arc<SetupDependencies>,
 ) -> Result<()> {
     deps.ui
         .print_styled("→ Managing FTL templates", MessageStyle::Cyan);
@@ -75,11 +75,11 @@ pub async fn templates_with_deps(
     let mut args = vec!["templates", "install"];
     let source_info: String;
 
-    if let Some(git_url) = &git {
-        source_info = format!("→ Installing templates from Git: {}", git_url);
+    if let Some(git_url) = git {
+        source_info = format!("→ Installing templates from Git: {git_url}");
         args.push("--git");
         args.push(git_url);
-        if let Some(branch_name) = &branch {
+        if let Some(branch_name) = branch {
             args.push("--branch");
             args.push(branch_name);
         }
@@ -91,14 +91,14 @@ pub async fn templates_with_deps(
         let dir_str = dir_path.to_str().unwrap();
         args.push("--dir");
         args.push(dir_str);
-    } else if let Some(tar_path) = &tar {
-        source_info = format!("→ Installing templates from tarball: {}", tar_path);
+    } else if let Some(tar_path) = tar {
+        source_info = format!("→ Installing templates from tarball: {tar_path}");
         args.push("--tar");
         args.push(tar_path);
     } else {
         // Default: install from ftl-mcp repository
         let ftl_mcp_repo = "https://github.com/fastertools/ftl-mcp";
-        source_info = format!("→ Installing ftl-mcp templates from {}", ftl_mcp_repo);
+        source_info = format!("→ Installing ftl-mcp templates from {ftl_mcp_repo}");
         args.push("--git");
         args.push(ftl_mcp_repo);
     }
@@ -140,7 +140,7 @@ pub async fn templates_with_deps(
 }
 
 /// Execute the info subcommand with injected dependencies
-pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
+pub fn info_with_deps(deps: &Arc<SetupDependencies>) {
     deps.ui
         .print_styled("→ FTL Configuration", MessageStyle::Cyan);
     deps.ui.print("");
@@ -153,30 +153,27 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
     deps.ui.print("");
 
     // Check spin installation
-    match deps.spin_installer.get_spin_path() {
-        Ok(spin_path) => {
-            deps.ui.print(&format!(
-                "Spin: {} {}",
-                styled_text("✓", MessageStyle::Success),
-                spin_path.display()
-            ));
+    if let Ok(spin_path) = deps.spin_installer.get_spin_path() {
+        deps.ui.print(&format!(
+            "Spin: {} {}",
+            styled_text("✓", MessageStyle::Success),
+            spin_path.display()
+        ));
 
-            // Get spin version
-            if let Ok(output) = deps
-                .command_executor
-                .execute(spin_path.to_str().unwrap_or("spin"), &["--version"])
-            {
-                let version = String::from_utf8_lossy(&output.stdout);
-                deps.ui.print(&format!("  Version: {}", version.trim()));
-            }
+        // Get spin version
+        if let Ok(output) = deps
+            .command_executor
+            .execute(spin_path.to_str().unwrap_or("spin"), &["--version"])
+        {
+            let version = String::from_utf8_lossy(&output.stdout);
+            deps.ui.print(&format!("  Version: {}", version.trim()));
         }
-        Err(_) => {
-            deps.ui.print(&format!(
-                "Spin: {} Not installed",
-                styled_text("✗", MessageStyle::Error)
-            ));
-            deps.ui.print("  Run 'ftl setup templates' to install");
-        }
+    } else {
+        deps.ui.print(&format!(
+            "Spin: {} Not installed",
+            styled_text("✗", MessageStyle::Error)
+        ));
+        deps.ui.print("  Run 'ftl setup templates' to install");
     }
     deps.ui.print("");
 
@@ -256,12 +253,10 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
                 .print("  Install from: https://github.com/bytecodealliance/wasm-pkg-tools");
         }
     }
-
-    Ok(())
 }
 
 // Helper function to format styled text (since we're not using console crate directly)
-fn styled_text(text: &str, _style: MessageStyle) -> &str {
+const fn styled_text(text: &str, _style: MessageStyle) -> &str {
     text
 }
 

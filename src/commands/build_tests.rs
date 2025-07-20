@@ -29,6 +29,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<BuildDependencies> {
         Arc::new(BuildDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -411,7 +412,7 @@ workdir = "frontend"
                     stderr: vec![],
                 })
             } else {
-                panic!("Unexpected command: {} {:?}", cmd, args);
+                panic!("Unexpected command: {cmd} {args:?}");
             }
         });
 

@@ -1,3 +1,9 @@
+//! Build script for generating API client code from `OpenAPI` specification
+//!
+//! This build script uses the `progenitor` crate to automatically generate
+//! a strongly-typed Rust client from the FTL backend `OpenAPI` specification.
+//! The generated client provides type-safe access to all FTL API endpoints.
+
 use std::env;
 use std::fs;
 use std::path::Path;

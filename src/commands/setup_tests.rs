@@ -62,7 +62,7 @@ impl MockSetupCommandExecutor {
     fn expect_execute(mut self, command: &str, args: &[&str], output: Output) -> Self {
         self.expected_commands.push((
             command.to_string(),
-            args.iter().map(|s| s.to_string()).collect(),
+            args.iter().map(|s| (*s).to_string()).collect(),
             output,
         ));
         self
@@ -105,7 +105,7 @@ impl SetupCommandExecutor for MockSetupCommandExecutor {
             ));
         }
 
-        let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
         if args_vec != *expected_args {
             return Err(anyhow::anyhow!(
                 "Expected args {:?}, got {:?}",
@@ -154,6 +154,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<SetupDependencies> {
         Arc::new(SetupDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -179,7 +180,7 @@ async fn test_templates_already_installed() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(false, None, None, None, None, deps).await;
+    let result = templates_with_deps(false, None, None, None, None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -231,7 +232,7 @@ async fn test_templates_install_default() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(false, None, None, None, None, deps).await;
+    let result = templates_with_deps(false, None, None, None, None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -285,9 +286,9 @@ async fn test_templates_install_from_git() {
         None,
         None,
         None,
-        deps,
+        &deps,
     )
-    .await;
+    ;
     assert!(result.is_ok());
 
     // Verify output
@@ -338,9 +339,9 @@ async fn test_templates_install_from_git_with_branch() {
         Some("dev".to_string()),
         None,
         None,
-        deps,
+        &deps,
     )
-    .await;
+    ;
     assert!(result.is_ok());
 }
 
@@ -382,9 +383,9 @@ async fn test_templates_install_from_dir() {
         None,
         Some(PathBuf::from("/path/to/templates")),
         None,
-        deps,
+        &deps,
     )
-    .await;
+    ;
     assert!(result.is_ok());
 
     // Verify output
@@ -434,9 +435,9 @@ async fn test_templates_install_from_tar() {
         None,
         None,
         Some("templates.tar.gz".to_string()),
-        deps,
+        &deps,
     )
-    .await;
+    ;
     assert!(result.is_ok());
 
     // Verify output
@@ -475,7 +476,7 @@ async fn test_templates_force_reinstall() {
 
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(true, None, None, None, None, deps).await;
+    let result = templates_with_deps(true, None, None, None, None, &deps);
     assert!(result.is_ok());
 }
 
@@ -505,7 +506,7 @@ async fn test_templates_install_failure() {
 
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(false, None, None, None, None, deps).await;
+    let result = templates_with_deps(false, None, None, None, None, &deps);
     assert!(result.is_err());
     assert!(
         result
@@ -548,8 +549,7 @@ async fn test_info_all_installed() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps(deps).await;
-    assert!(result.is_ok());
+    info_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -589,8 +589,7 @@ async fn test_info_spin_not_installed() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps(deps).await;
-    assert!(result.is_ok());
+    info_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();
@@ -633,8 +632,7 @@ async fn test_info_no_templates() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = info_with_deps(deps).await;
-    assert!(result.is_ok());
+    info_with_deps(&deps);
 
     // Verify output
     let output = ui.get_output();

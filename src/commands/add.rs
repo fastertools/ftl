@@ -41,7 +41,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         None => deps.ui.prompt_input("Tool name", None)?,
     };
 
-    deps.ui.print(&format!("→ Adding tool: {}", component_name));
+    deps.ui.print(&format!("→ Adding tool: {component_name}"));
 
     // Validate component name
     validate_component_name(&component_name)?;
@@ -63,11 +63,11 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     };
 
     // Determine language
-    let selected_language = determine_language(&config.language, &deps.ui)?;
+    let selected_language = determine_language(config.language.as_ref(), &deps.ui)?;
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
-    deps.ui.print(&format!("Using Spin at: {}", spin_path));
+    deps.ui.print(&format!("Using Spin at: {spin_path}"));
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
@@ -104,7 +104,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     args.push("--accept-defaults");
     args.push("--value");
-    let desc_value = format!("tool-description={}", description);
+    let desc_value = format!("tool-description={description}");
     args.push(&desc_value);
     args.push(&component_name);
 
@@ -131,9 +131,8 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
             deps.ui.print("  ftl setup templates");
             deps.ui.print("");
             anyhow::bail!("ftl-mcp templates not installed");
-        } else {
-            anyhow::bail!("Failed to add tool:\n{}", stderr);
         }
+        anyhow::bail!("Failed to add tool:\n{}", stderr);
     }
 
     // Update spin.toml to add the component to tool_components variable
@@ -173,34 +172,31 @@ fn validate_component_name(name: &str) -> Result<()> {
 }
 
 /// Determine the language to use
-fn determine_language(language: &Option<String>, ui: &Arc<dyn UserInterface>) -> Result<Language> {
-    match language {
-        Some(lang_str) => {
-            let lang_lower = lang_str.to_lowercase();
-            // Map javascript to typescript
-            let mapped_lang = if lang_lower == "javascript" || lang_lower == "js" {
-                "typescript"
-            } else {
-                &lang_lower
-            };
+fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) -> Result<Language> {
+    if let Some(lang_str) = language {
+        let lang_lower = lang_str.to_lowercase();
+        // Map javascript to typescript
+        let mapped_lang = if lang_lower == "javascript" || lang_lower == "js" {
+            "typescript"
+        } else {
+            &lang_lower
+        };
 
-            Language::from_str(mapped_lang).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Invalid language: {}. Valid options are: rust, typescript, javascript",
-                    lang_str
-                )
-            })
-        }
-        None => {
-            // Interactive language selection
-            let languages = vec!["rust", "typescript"];
-            let selection = ui.prompt_select("Select programming language", &languages, 0)?;
-            Ok(Language::from_str(languages[selection]).unwrap())
-        }
+        Language::from_str(mapped_lang).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Invalid language: {}. Valid options are: rust, typescript, javascript",
+                lang_str
+            )
+        })
+    } else {
+        // Interactive language selection
+        let languages = vec!["rust", "typescript"];
+        let selection = ui.prompt_select("Select programming language", &languages, 0)?;
+        Ok(Language::from_str(languages[selection]).unwrap())
     }
 }
 
-/// Update the tool_components variable in spin.toml to include the new component
+/// Update the `tool_components` variable in spin.toml to include the new component
 fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Result<()> {
     use toml_edit::{DocumentMut, InlineTable};
 
@@ -236,13 +232,13 @@ fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Res
     match tool_components {
         toml_edit::Item::Value(val) => {
             if let Some(table) = val.as_inline_table_mut() {
-                update_component_list_in_table(table, component_name)?;
+                update_component_list_in_table(table, component_name);
             } else {
                 anyhow::bail!("tool_components is not a table");
             }
         }
         toml_edit::Item::Table(table) => {
-            update_component_list_in_table(table, component_name)?;
+            update_component_list_in_table(table, component_name);
         }
         _ => anyhow::bail!("tool_components has unexpected type"),
     }
@@ -256,7 +252,7 @@ fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Res
 }
 
 /// Helper function to update component list in either table type
-fn update_component_list_in_table<T>(table: &mut T, component_name: &str) -> Result<()>
+fn update_component_list_in_table<T>(table: &mut T, component_name: &str)
 where
     T: toml_edit::TableLike,
 {
@@ -281,43 +277,34 @@ where
 
     // Update the value
     table.insert("default", component_list.join(",").into());
-
-    Ok(())
 }
 
 /// Print success message
 fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, language: Language) {
     let route = format!("/{}", component_name.replace('_', "-"));
     let main_file = match language {
-        Language::Rust => format!("{}/src/lib.rs", component_name),
-        Language::JavaScript | Language::TypeScript => format!("{}/src/index.ts", component_name),
+        Language::Rust => format!("{component_name}/src/lib.rs"),
+        Language::JavaScript | Language::TypeScript => format!("{component_name}/src/index.ts"),
     };
 
     ui.print("");
     ui.print_styled(
-        &format!("✓ {} tool added successfully!", language),
+        &format!("✓ {language} tool added successfully!"),
         MessageStyle::Success,
     );
     ui.print("");
     ui.print("📁 Tool location:");
     ui.print(&format!(
-        "  └── {}/         # Tool source code",
-        component_name
+        "  └── {component_name}/         # Tool source code"
     ));
     ui.print("");
-    ui.print(&format!(
-        "💡 Edit {} to implement your tool logic",
-        main_file
-    ));
+    ui.print(&format!("💡 Edit {main_file} to implement your tool logic"));
     ui.print("");
     ui.print("🔨 Build and run:");
     ui.print("  ftl build       # Build all tools");
     ui.print("  ftl up          # Start the MCP server");
     ui.print("");
-    ui.print(&format!(
-        "🚀 Your tool will be available at route: {}",
-        route
-    ));
+    ui.print(&format!("🚀 Your tool will be available at route: {route}"));
     ui.print("");
 }
 

@@ -9,8 +9,8 @@ use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
 use crate::deps::{
-    AsyncRuntime, CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator,
-    SpinInstaller, UserInterface,
+    CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, SpinInstaller,
+    UserInterface,
 };
 
 #[derive(Debug, Clone)]
@@ -32,7 +32,6 @@ pub struct BuildDependencies {
     pub command_executor: Arc<dyn CommandExecutor>,
     pub ui: Arc<dyn UserInterface>,
     pub spin_installer: Arc<dyn SpinInstaller>,
-    pub async_runtime: Arc<dyn AsyncRuntime>,
 }
 
 /// Execute the build command with injected dependencies
@@ -99,7 +98,7 @@ pub fn parse_component_builds(
                     let workdir = build_section
                         .get("workdir")
                         .and_then(|w| w.as_str())
-                        .map(|s| s.to_string());
+                        .map(std::string::ToString::to_string);
 
                     components.push(ComponentBuildInfo {
                         name: name.clone(),
@@ -161,7 +160,7 @@ async fn build_components_parallel(
                     .await;
 
             match result {
-                Ok(_) => {
+                Ok(()) => {
                     let duration = start.elapsed();
                     pb.finish_with_message(format!(
                         "✓ Built successfully in {:.1}s",

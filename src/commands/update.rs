@@ -44,7 +44,7 @@ pub async fn execute_with_deps(force: bool, deps: Arc<UpdateDependencies>) -> Re
 
     let current_version = deps.environment.get_cargo_pkg_version();
     deps.ui
-        .print(&format!("Current version: {}", current_version));
+        .print(&format!("Current version: {current_version}"));
 
     if !force {
         // Check if we're already on the latest version
@@ -118,7 +118,7 @@ async fn get_latest_version(deps: &Arc<UpdateDependencies>) -> Result<String> {
 }
 
 // Helper function to format styled text (since we're not using console crate directly)
-fn styled_text(text: &str, _style: MessageStyle) -> &str {
+const fn styled_text(text: &str, _style: MessageStyle) -> &str {
     text
 }
 

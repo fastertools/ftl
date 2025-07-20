@@ -52,6 +52,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<LogoutDependencies> {
         Arc::new(LogoutDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -66,7 +67,7 @@ async fn test_logout_success() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(&deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -84,7 +85,7 @@ async fn test_logout_not_logged_in() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(&deps);
     assert!(result.is_ok()); // Should not fail even if not logged in
 
     // Verify output
@@ -100,7 +101,7 @@ async fn test_logout_keyring_error() {
 
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(&deps);
     assert!(result.is_err());
     assert!(
         result
@@ -127,11 +128,10 @@ async fn test_logout_with_different_keyring_errors() {
         let ui = fixture.ui.clone();
         let deps = fixture.to_deps();
 
-        let result = execute_with_deps(deps).await;
+        let result = execute_with_deps(&deps);
         assert!(
             result.is_ok(),
-            "Should handle '{}' as not logged in",
-            error_msg
+            "Should handle '{error_msg}' as not logged in"
         );
 
         let output = ui.get_output();
@@ -147,7 +147,7 @@ async fn test_logout_unexpected_error() {
 
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(&deps);
     assert!(result.is_err());
     assert!(
         !result

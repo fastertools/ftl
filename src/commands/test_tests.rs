@@ -87,8 +87,8 @@ impl MockTestCommandExecutor {
     ) -> Self {
         self.expected_commands.push((
             command.to_string(),
-            args.iter().map(|s| s.to_string()).collect(),
-            cwd.map(|s| s.to_string()),
+            args.iter().map(|s| (*s).to_string()).collect(),
+            cwd.map(std::string::ToString::to_string),
             output,
         ));
         self
@@ -136,7 +136,7 @@ impl TestCommandExecutor for MockTestCommandExecutor {
             ));
         }
 
-        let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
         if args_vec != *expected_args {
             return Err(anyhow::anyhow!(
                 "Expected args {:?}, got {:?}",
@@ -174,6 +174,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<TestDependencies> {
         Arc::new(TestDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -200,7 +201,7 @@ async fn test_single_rust_tool() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -226,7 +227,7 @@ async fn test_single_npm_tool() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -251,7 +252,7 @@ async fn test_single_makefile_tool() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -294,7 +295,7 @@ async fn test_project_directory_multiple_tools() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -320,7 +321,7 @@ async fn test_project_directory_no_tools() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -336,7 +337,7 @@ async fn test_no_test_configuration() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -363,7 +364,7 @@ async fn test_cargo_test_failure() {
 
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Tests failed"));
 }
@@ -385,7 +386,7 @@ async fn test_custom_path() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(Some(PathBuf::from("custom/path")), deps).await;
+    let result = execute_with_deps(Some(PathBuf::from("custom/path")), &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -427,7 +428,7 @@ async fn test_mixed_success_and_failure() {
 
     let deps = fixture.to_deps();
 
-    let result = execute_with_deps(None, deps).await;
+    let result = execute_with_deps(None, &deps);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Tests failed"));
 }

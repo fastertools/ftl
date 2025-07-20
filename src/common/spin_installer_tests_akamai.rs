@@ -1,4 +1,4 @@
-//! Additional tests for ensure_akamai_plugin functionality
+//! Additional tests for `ensure_akamai_plugin` functionality
 
 use crate::common::spin_installer::*;
 use crate::deps::*;
@@ -20,6 +20,7 @@ impl TestFixture {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<SpinInstallerDependencies> {
         Arc::new(SpinInstallerDependencies {
             command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,

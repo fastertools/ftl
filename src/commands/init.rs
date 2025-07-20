@@ -27,7 +27,7 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
 
     // Install Spin if needed
     let spin_path = deps.spin_installer.check_and_install().await?;
-    deps.ui.print(&format!("Using Spin at: {}", spin_path));
+    deps.ui.print(&format!("Using Spin at: {spin_path}"));
 
     // Get project name
     if name.is_none() && !here {
@@ -50,7 +50,7 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
         anyhow::bail!("Directory '{}' already exists", target_dir);
     }
 
-    if here && !is_directory_empty(&deps.file_system)? {
+    if here && !is_directory_empty(&deps.file_system) {
         anyhow::bail!("Current directory is not empty. Use --here only in an empty directory.");
     }
 
@@ -67,7 +67,7 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
     deps.ui.print("Next steps:");
 
     if !here {
-        deps.ui.print(&format!("  cd {} &&", target_dir));
+        deps.ui.print(&format!("  cd {target_dir} &&"));
     }
 
     deps.ui
@@ -107,7 +107,7 @@ fn validate_project_name(name: &str) -> Result<()> {
 }
 
 /// Check if current directory is empty
-fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> Result<bool> {
+fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> bool {
     let common_files = [
         "./Cargo.toml",
         "./package.json",
@@ -120,11 +120,11 @@ fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> Result<bool> {
 
     for file in &common_files {
         if fs.exists(Path::new(file)) {
-            return Ok(false);
+            return false;
         }
     }
 
-    Ok(true)
+    true
 }
 
 /// Check if ftl-mcp templates are installed
@@ -164,29 +164,4 @@ async fn create_project(
     }
 
     Ok(())
-}
-
-/// Helper to list directory entries
-fn list_directory_entries(fs: &Arc<dyn FileSystem>, dir: &Path) -> Result<Vec<String>> {
-    let mut entries = Vec::new();
-
-    // This is a simplified implementation since we can't actually list directories
-    // with our current FileSystem trait. In a real implementation, we'd need to
-    // extend the trait or use a different approach.
-    for entry in [
-        "Cargo.toml",
-        "package.json",
-        "spin.toml",
-        ".git",
-        "src",
-        "components",
-        "node_modules",
-    ] {
-        let path = dir.join(entry);
-        if fs.exists(&path) {
-            entries.push(entry.to_string());
-        }
-    }
-
-    Ok(entries)
 }
