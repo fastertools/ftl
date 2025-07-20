@@ -325,9 +325,19 @@ workdir = "frontend"
         .expect_execute()
         .withf(|cmd: &str, args: &[&str]| {
             if cfg!(target_os = "windows") {
-                cmd == "cmd" && args.len() == 2 && args[0] == "/C" && args[1].contains("cd") && args[1].contains("frontend") && args[1].contains("npm run build")
+                cmd == "cmd"
+                    && args.len() == 2
+                    && args[0] == "/C"
+                    && args[1].contains("cd")
+                    && args[1].contains("frontend")
+                    && args[1].contains("npm run build")
             } else {
-                cmd == "sh" && args.len() == 2 && args[0] == "-c" && args[1].contains("cd") && args[1].contains("frontend") && args[1].contains("npm run build")
+                cmd == "sh"
+                    && args.len() == 2
+                    && args[0] == "-c"
+                    && args[1].contains("cd")
+                    && args[1].contains("frontend")
+                    && args[1].contains("npm run build")
             }
         })
         .times(1)

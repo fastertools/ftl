@@ -271,7 +271,7 @@ async fn run_build_command(
     // shell_args already contains ["-c", "command"], so we need to modify the command part
     let original_command = shell_args.get(1).unwrap_or(&"");
     let cd_and_run = format!("cd {} && {}", build_dir.display(), original_command);
-    
+
     // Build the new command with the cd prefix
     let result = if shell_args.len() >= 2 {
         // For sh -c "command", replace with sh -c "cd dir && command"
@@ -280,11 +280,9 @@ async fn run_build_command(
             .await
     } else {
         // Fallback case - shouldn't happen in normal usage
-        executor
-            .execute(shell_cmd, &[&cd_and_run])
-            .await
+        executor.execute(shell_cmd, &[&cd_and_run]).await
     };
-    
+
     result.context("Failed to execute build command")
 }
 
