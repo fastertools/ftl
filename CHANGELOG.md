@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- New `ftl tools` subcommand for managing pre-built FTL tool components
+  - `ftl tools list`: Browse 82+ pre-built tools with category filtering and search
+  - `ftl tools add`: Add tools to your project's spin.toml configuration
+  - Support for multiple registries (GHCR and ECR) via `--registry` flag
+  - Embedded tools manifest with categories: basic_math, text_processing, encoding, formatters, utilities, cryptography, network, filesystem, data_processing, validation
 - Support for Spin template options in `ftl init` and `ftl setup templates` commands
   - `--git`: Use a Git repository as the template source
   - `--branch`: Specify Git branch (requires `--git`)
