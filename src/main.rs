@@ -554,6 +554,12 @@ enum Command {
         #[command(subcommand)]
         command: AuthCommand,
     },
+
+    /// Manage pre-built MCP tools
+    Tools {
+        #[command(subcommand)]
+        command: commands::tools::ToolsCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -905,5 +911,6 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Command::Tools { command } => commands::tools::handle_command(command).await,
     }
 }
