@@ -7,14 +7,16 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'Makefile'\n      - '.github/workflows/ci.yml'
+      - 'Makefile'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'Makefile'\n      - '.github/workflows/ci.yml'
+      - 'Makefile'
+      - '.github/workflows/ci.yml'
 
 env:
   RUST_BACKTRACE: 1
