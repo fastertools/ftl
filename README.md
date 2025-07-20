@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source framework and tool platform for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to expose a *just works* DX for the entire lifecycle of building and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools distributed across the global network edge.
+FTL is an open source framework and tool platform for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to expose a *just works* DX for the entire lifecycle of authoring and running secure, high performance [Model Context Protocol](https://modelcontextprotocol.io) tools distributed across the global network edge.
 
 ## Why?
 
@@ -26,19 +26,22 @@ MCP is minimal. Tools are straightforward. Writing and running them should be to
 
 FTL tools run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-The FTL Platform aims to be the best way to deploy and manage remote tools that are fast and distributed enough to be used by agents deployed anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
+When it's time to deploy, the FTL Platform aims to be the best surface for running and managing remote tools. It handles the hard parts and exposes MCP-compliant servers with SOTA performance that are distributed enough to be used by agents operating anywhere, including real-time voice and multimodal systems. Latency and compute overhead for remote tool calls should not be something you have to design around.
 
-- FTL runs on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
+- FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
-- The FTL [gateway components](#architecture) handle protocol complexity, auth, tool argument validation, and tool component routing.
+- The FTL [gateway components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
 
 The FTL Platform is optional. Opt in via the `ftl login` command, which enables `ftl deploy`.
 </details>
 
 <details>
-<summary><strong>⤵ Secure by default</strong></summary>
+<summary><strong>⤵ Secure by design</strong></summary>
 
-Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/). MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization). Plug in your own OIDC provider via simple configuration, or use FTL's by default.
+- Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/).
+- MCP endpoints are secured by [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
+- Plug in your own OIDC provider via simple configuration, or use FTL's by default.
+- Allowed outbound network calls are configurable by host per tool.
 </details>
 
 <details>
@@ -48,7 +51,7 @@ Write your MCP tools in Rust, TypeScript, Python, Go, C, and [more](https://comp
 </details>
 
 <details>
-<summary><strong>⤵ Distribute and compose tools like micro docker images</strong></summary>
+<summary><strong>⤵ Distribute and compose tools like tiny docker images</strong></summary>
 
 Tools are compiled to self-contained Wasm binaries that are often < 1MB. They can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 </details>
@@ -220,6 +223,7 @@ graph TB
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
+- The FTL Wasm components and language SDKs are managed in [ftl-mcp](https://github.com/fastertools/ftl-mcp).
 
 ## Contributing
 
@@ -235,4 +239,3 @@ FTL is built on top of these excellent projects:
 - [Spin](https://github.com/fermyon/spin)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [WebAssembly](https://webassembly.org)
-- [ftl-mcp](https://github.com/fastertools/ftl-mcp)
