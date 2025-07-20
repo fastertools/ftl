@@ -1,18 +1,19 @@
-.PHONY: ci fmt-check lint test coverage fix-fmt fix-clippy fix dev pre-push build-release default
+.PHONY: ci fmt-check lint test coverage coverage-html fmt fix-clippy fix dev pre-push build-release default
 
 # Default to showing help
 default:
 	@echo "Available targets:"
-	@echo "  ci           - Run all CI checks"
-	@echo "  fmt-check    - Check formatting"
-	@echo "  lint         - Run clippy"
-	@echo "  test         - Run tests"
-	@echo "  coverage     - Run tests with coverage"
-	@echo "  fix-fmt      - Fix formatting"
-	@echo "  fix-clippy   - Fix clippy warnings"
-	@echo "  fix          - Fix everything"
-	@echo "  dev          - Quick dev check"
-	@echo "  pre-push     - Pre-push checks"
+	@echo "  ci            - Run all CI checks"
+	@echo "  fmt-check     - Check formatting"
+	@echo "  lint          - Run clippy"
+	@echo "  test          - Run tests"
+	@echo "  coverage      - Run tests with coverage"
+	@echo "  coverage-html - Generate HTML coverage report"
+	@echo "  fmt       	   - Fix formatting"
+	@echo "  fix-clippy    - Fix clippy warnings"
+	@echo "  fix           - Fix everything"
+	@echo "  dev           - Quick dev check"
+	@echo "  pre-push      - Pre-push checks"
 	@echo "  build-release - Build release"
 
 # Run all CI checks
@@ -37,10 +38,15 @@ test:
 
 # Run tests with coverage
 coverage:
-	cargo llvm-cov nextest
+	cargo llvm-cov nextest --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+
+# Generate HTML coverage report
+coverage-html:
+	cargo llvm-cov nextest --html --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+	@echo "Coverage report generated at target/llvm-cov/html/index.html"
 
 # Fix formatting
-fix-fmt:
+fmt:
 	cargo fmt --all
 
 # Fix clippy warnings
@@ -49,12 +55,12 @@ fix-clippy:
 
 # Fix everything
 fix:
-	@$(MAKE) fix-fmt
+	@$(MAKE) fmt
 	@$(MAKE) fix-clippy
 
 # Quick dev check
 dev:
-	@$(MAKE) fix-fmt
+	@$(MAKE) fmt
 	@$(MAKE) lint
 
 # Pre-push checks

@@ -7,14 +7,14 @@ on:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - '.github/workflows/ci.yml'
+      - 'Makefile'\n      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - '.github/workflows/ci.yml'
+      - 'Makefile'\n      - '.github/workflows/ci.yml'
 
 env:
   RUST_BACKTRACE: 1
@@ -59,7 +59,7 @@ jobs:
         run: cargo fmt --all -- --check
       
       - name: Run clippy
-        run: cargo clippy --all -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Test
@@ -96,11 +96,17 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      
+      - name: Install cargo-nextest
+        run: cargo binstall cargo-nextest --no-confirm --force
+      
       - name: Build
         run: cargo build --all-features
       
       - name: Run tests
-        run: cargo test --all-features
+        run: cargo nextest run --all-features --profile ci
       
       - name: Test build templates
         run: |
@@ -138,13 +144,18 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      
+      - name: Install cargo-llvm-cov and cargo-nextest
+        run: |
+          cargo binstall cargo-llvm-cov --no-confirm --force
+          cargo binstall cargo-nextest --no-confirm --force
       
       - name: Generate code coverage
         run: |
           # Run coverage with our exclusions (including test files)
-          cargo llvm-cov test --all-features --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+          cargo llvm-cov nextest --all-features --profile ci --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
           
           # Generate coverage report and extract percentage
           COVERAGE=$(cargo llvm-cov report --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)" | tail -1 | awk '{print $4}' | sed 's/%//')
