@@ -113,23 +113,8 @@ impl RealSpinInstallerV2 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_spin_installer_creation() {
-        use crate::test_helpers::*;
-        use crate::ui::TestUserInterface;
-
-        let deps = Arc::new(SpinInstallerDependencies {
-            command_executor: Arc::new(MockCommandExecutorMock::new()),
-            ui: Arc::new(TestUserInterface::new()),
-        });
-
-        let _installer = RealSpinInstallerV2::new(deps);
-        // Just verify it can be created
-    }
-}
+#[path = "spin_installer_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "spin_installer_tests_akamai.rs"]

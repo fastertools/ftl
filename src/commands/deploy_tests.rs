@@ -4,10 +4,91 @@ use crate::api_client::types;
 use crate::commands::deploy::*;
 use crate::deps::*;
 use crate::test_helpers::*;
+use crate::ui::TestUserInterface;
+use anyhow::{Result, anyhow};
 use mockall::predicate::*;
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+struct TestFixture {
+    file_system: MockFileSystemMock,
+    command_executor: MockCommandExecutorMock,
+    api_client: MockFtlApiClientMock,
+    clock: MockClockMock,
+    credentials_provider: MockCredentialsProviderMock,
+    ui: Arc<TestUserInterface>,
+    build_executor: Arc<MockBuildExecutor>,
+    async_runtime: MockAsyncRuntimeMock,
+}
+
+impl TestFixture {
+    fn new() -> Self {
+        Self {
+            file_system: MockFileSystemMock::new(),
+            command_executor: MockCommandExecutorMock::new(),
+            api_client: MockFtlApiClientMock::new(),
+            clock: MockClockMock::new(),
+            credentials_provider: MockCredentialsProviderMock::new(),
+            ui: Arc::new(TestUserInterface::new()),
+            build_executor: Arc::new(MockBuildExecutor::new()),
+            async_runtime: MockAsyncRuntimeMock::new(),
+        }
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    fn to_deps(self) -> Arc<DeployDependencies> {
+        Arc::new(DeployDependencies {
+            file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
+            command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,
+            api_client: Arc::new(self.api_client) as Arc<dyn FtlApiClient>,
+            clock: Arc::new(self.clock) as Arc<dyn Clock>,
+            credentials_provider: Arc::new(self.credentials_provider)
+                as Arc<dyn CredentialsProvider>,
+            ui: self.ui as Arc<dyn UserInterface>,
+            build_executor: self.build_executor as Arc<dyn BuildExecutor>,
+            async_runtime: Arc::new(self.async_runtime) as Arc<dyn AsyncRuntime>,
+        })
+    }
+}
+
+// Mock implementation of BuildExecutor
+struct MockBuildExecutor {
+    should_fail: bool,
+    error_message: Option<String>,
+}
+
+impl MockBuildExecutor {
+    fn new() -> Self {
+        Self {
+            should_fail: false,
+            error_message: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn with_failure(mut self, message: &str) -> Self {
+        self.should_fail = true;
+        self.error_message = Some(message.to_string());
+        self
+    }
+}
+
+#[async_trait::async_trait]
+impl BuildExecutor for MockBuildExecutor {
+    async fn execute(&self, _path: Option<&Path>, _release: bool) -> Result<()> {
+        if self.should_fail {
+            Err(anyhow::anyhow!(
+                self.error_message
+                    .clone()
+                    .unwrap_or_else(|| "Build failed".to_string())
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 #[tokio::test]
 async fn test_deploy_no_spin_toml() {
@@ -51,12 +132,7 @@ async fn test_deploy_authentication_expired() {
         .expect_duration_from_millis()
         .returning(Duration::from_millis);
 
-    // Mock: build executor succeeds
-    fixture
-        .build_executor
-        .expect_execute()
-        .times(1)
-        .returning(|_, _| Ok(()));
+    // Build executor succeeds (it's not a mock, just a test implementation)
 
     // Mock: credentials expired
     fixture
@@ -109,19 +185,14 @@ name = "test-app"
         .expect_duration_from_millis()
         .returning(Duration::from_millis);
 
-    // Mock: build executor succeeds
-    fixture
-        .build_executor
-        .expect_execute()
-        .times(1)
-        .returning(|_, _| Ok(()));
+    // Build executor succeeds (it's not a mock, just a test implementation)
 
     // Mock: credentials succeed
     fixture
         .credentials_provider
         .expect_get_or_refresh_credentials()
         .times(1)
-        .returning(|| Ok(test_credentials()));
+        .returning(|| Ok(crate::test_helpers::test_credentials()));
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps).await;
@@ -142,11 +213,18 @@ async fn test_deploy_docker_login_failure() {
     // Setup basic mocks
     setup_basic_mocks(&mut fixture);
 
+    // Mock: get ECR credentials
+    fixture
+        .api_client
+        .expect_get_ecr_credentials()
+        .times(1)
+        .returning(|| Ok(crate::test_helpers::test_ecr_credentials()));
+
     // Mock: docker login fails
     fixture
         .command_executor
         .expect_execute_with_stdin()
-        .withf(|cmd: &str, args: &[&str], _: &str| cmd == "docker" && args.contains(&"login"))
+        .withf(|cmd: &str, args: &[&str], _stdin: &str| cmd == "docker" && args.contains(&"login"))
         .times(1)
         .returning(|_, _, _| {
             Ok(CommandOutput {
@@ -301,7 +379,11 @@ async fn test_deployment_timeout() {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+        .returning(|_| {
+            Ok(crate::test_helpers::test_deployment_response(
+                "test-deployment-id",
+            ))
+        });
 
     // Mock: status always returns "deploying" (60 times = timeout)
     fixture
@@ -309,7 +391,7 @@ async fn test_deployment_timeout() {
         .expect_get_deployment_status()
         .times(60)
         .returning(|_| {
-            Ok(test_deployment_status(
+            Ok(crate::test_helpers::test_deployment_status(
                 "test-deployment-id",
                 types::DeploymentStatusDeploymentStatus::Deploying,
             ))
@@ -347,7 +429,11 @@ async fn test_deployment_failed_status() {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+        .returning(|_| {
+            Ok(crate::test_helpers::test_deployment_response(
+                "test-deployment-id",
+            ))
+        });
 
     // Mock: status returns failed
     fixture
@@ -355,7 +441,7 @@ async fn test_deployment_failed_status() {
         .expect_get_deployment_status()
         .times(1)
         .returning(|_| {
-            let status = test_deployment_status(
+            let status = crate::test_helpers::test_deployment_status(
                 "test-deployment-id",
                 types::DeploymentStatusDeploymentStatus::Failed,
             );
@@ -404,7 +490,12 @@ allowed_outbound_hosts = ["https://*.amazonaws.com"]
         });
 
     // Mock: component version files don't exist (use default)
-    fixture.file_system.expect_exists().returning(|_| false);
+    // Be more specific about which paths we're mocking
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .returning(|_| false);
 
     // Mock: clock for progress bars
     fixture
@@ -419,32 +510,30 @@ allowed_outbound_hosts = ["https://*.amazonaws.com"]
 
     fixture.clock.expect_now().returning(Instant::now);
 
-    // Mock: build executor succeeds
-    fixture
-        .build_executor
-        .expect_execute()
-        .times(1)
-        .returning(|_, _| Ok(()));
+    // Build executor succeeds (it's not a mock, just a test implementation)
 
-    // Mock: credentials succeed
+    // Mock: credentials succeed (called multiple times in deploy flow)
     fixture
         .credentials_provider
         .expect_get_or_refresh_credentials()
-        .returning(|| Ok(test_credentials()));
+        .returning(|| Ok(crate::test_helpers::test_credentials()));
 
-    // Mock: API client returns ECR credentials
+    // ECR credentials mock is set up separately in tests that need it
+}
+
+fn setup_docker_login_success(fixture: &mut TestFixture) {
+    // Mock: get ECR credentials
     fixture
         .api_client
         .expect_get_ecr_credentials()
         .times(1)
-        .returning(|| Ok(test_ecr_credentials()));
-}
+        .returning(|| Ok(crate::test_helpers::test_ecr_credentials()));
 
-fn setup_docker_login_success(fixture: &mut TestFixture) {
+    // Mock: docker login succeeds
     fixture
         .command_executor
         .expect_execute_with_stdin()
-        .withf(|cmd: &str, args: &[&str], _: &str| cmd == "docker" && args.contains(&"login"))
+        .withf(|cmd: &str, args: &[&str], _stdin: &str| cmd == "docker" && args.contains(&"login"))
         .times(1)
         .returning(|_, _, _| {
             Ok(CommandOutput {
@@ -477,7 +566,7 @@ fn setup_successful_push(fixture: &mut TestFixture) {
         .returning(|_req| {
             // Extract tool name from request
             let tool_name = "api"; // For simplicity in test
-            Ok(test_repository_response(tool_name))
+            Ok(crate::test_helpers::test_repository_response(tool_name))
         });
 
     // Mock: wkg push succeeds (both version and latest tags)
@@ -501,7 +590,11 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+        .returning(|_| {
+            Ok(crate::test_helpers::test_deployment_response(
+                "test-deployment-id",
+            ))
+        });
 
     // Mock: deployment status checks - first returns deploying, then deployed
     let mut call_count = 0;
@@ -512,12 +605,12 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .returning(move |_| {
             call_count += 1;
             if call_count == 1 {
-                Ok(test_deployment_status(
+                Ok(crate::test_helpers::test_deployment_status(
                     "test-deployment-id",
                     types::DeploymentStatusDeploymentStatus::Deploying,
                 ))
             } else {
-                Ok(test_deployment_status(
+                Ok(crate::test_helpers::test_deployment_status(
                     "test-deployment-id",
                     types::DeploymentStatusDeploymentStatus::Deployed,
                 ))
@@ -530,4 +623,104 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .expect_sleep()
         .times(1)
         .returning(|_| ());
+}
+
+// Mock implementations for testing
+struct MockFileSystem {
+    files: HashMap<PathBuf, String>,
+}
+
+impl MockFileSystem {
+    fn new() -> Self {
+        Self {
+            files: HashMap::new(),
+        }
+    }
+
+    fn add_file(&mut self, path: impl Into<PathBuf>, content: impl Into<String>) {
+        self.files.insert(path.into(), content.into());
+    }
+}
+
+impl FileSystem for MockFileSystem {
+    fn exists(&self, path: &Path) -> bool {
+        self.files.contains_key(path)
+    }
+
+    fn read_to_string(&self, path: &Path) -> Result<String> {
+        self.files
+            .get(path)
+            .cloned()
+            .ok_or_else(|| anyhow!("File not found: {}", path.display()))
+    }
+
+    fn write_string(&self, _path: &Path, _content: &str) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn test_parse_deploy_config() {
+    let mut fs = MockFileSystem::new();
+    fs.add_file(
+        "spin.toml",
+        r#"
+[application]
+name = "test-app"
+
+[component.api]
+source = "api/target/wasm32-wasi/release/api.wasm"
+allowed_outbound_hosts = ["https://*.amazonaws.com"]
+
+[component.worker]
+source = "worker/target/wasm32-wasi/release/worker.wasm"
+
+[component.system]
+source = { registry = "ghcr.io/example/system:latest" }
+"#,
+    );
+    // Add version files in the expected locations
+    fs.add_file(
+        "api/Cargo.toml",
+        r#"
+[package]
+name = "api"
+version = "1.2.3"
+"#,
+    );
+    fs.add_file(
+        "worker/package.json",
+        r#"{"name": "worker", "version": "2.0.0"}"#,
+    );
+
+    let fs: Arc<dyn FileSystem> = Arc::new(fs);
+    let config = parse_deploy_config(&fs).unwrap();
+
+    assert_eq!(config.app_name, "test-app");
+    assert_eq!(config.components.len(), 2);
+
+    let api = &config.components[0];
+    assert_eq!(api.name, "api");
+    assert_eq!(api.source_path, "api/target/wasm32-wasi/release/api.wasm");
+    assert_eq!(api.version, "1.2.3");
+    assert_eq!(
+        api.allowed_hosts,
+        Some(vec!["https://*.amazonaws.com".to_string()])
+    );
+
+    let worker = &config.components[1];
+    assert_eq!(worker.name, "worker");
+    assert_eq!(
+        worker.source_path,
+        "worker/target/wasm32-wasi/release/worker.wasm"
+    );
+    assert_eq!(worker.version, "2.0.0");
+    assert_eq!(worker.allowed_hosts, None);
+}
+
+#[test]
+fn test_extract_component_version_default() {
+    let fs: Arc<dyn FileSystem> = Arc::new(MockFileSystem::new());
+    let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
+    assert_eq!(version, "0.1.0");
 }

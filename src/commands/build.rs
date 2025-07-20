@@ -278,54 +278,5 @@ async fn run_build_command(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_prepare_build_command() {
-        // Test cargo build
-        assert_eq!(
-            prepare_build_command("cargo build", true),
-            "cargo build --release"
-        );
-        assert_eq!(
-            prepare_build_command("cargo build --target wasm32-wasi", true),
-            "cargo build --release --target wasm32-wasi"
-        );
-        assert_eq!(
-            prepare_build_command("cargo build --release", true),
-            "cargo build --release"
-        );
-
-        // Test npm
-        assert_eq!(
-            prepare_build_command("npm run build", true),
-            "npm run build"
-        );
-
-        // Test other commands
-        assert_eq!(prepare_build_command("make", true), "make");
-
-        // Test non-release mode
-        assert_eq!(prepare_build_command("cargo build", false), "cargo build");
-    }
-
-    #[test]
-    fn test_get_shell_command() {
-        let command = "cargo build --release";
-
-        #[cfg(target_os = "windows")]
-        {
-            let (cmd, args) = get_shell_command(command);
-            assert_eq!(cmd, "cmd");
-            assert_eq!(args, vec!["/C", command]);
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let (cmd, args) = get_shell_command(command);
-            assert_eq!(cmd, "sh");
-            assert_eq!(args, vec!["-c", command]);
-        }
-    }
-}
+#[path = "build_tests.rs"]
+mod tests;

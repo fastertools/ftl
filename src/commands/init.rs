@@ -165,3 +165,7 @@ async fn create_project(
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "init_tests.rs"]
+mod tests;

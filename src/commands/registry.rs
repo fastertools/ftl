@@ -81,11 +81,5 @@ const fn styled_text(text: &str, _style: MessageStyle) -> &str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_styled_text() {
-        assert_eq!(styled_text("test", MessageStyle::Success), "test");
-    }
-}
+#[path = "registry_tests.rs"]
+mod tests;

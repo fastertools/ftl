@@ -14,6 +14,7 @@ use base64::Engine;
 
 // Type alias for command matcher function
 type CommandMatcher = Box<dyn Fn(&str, &[&str]) -> bool + Send + Sync>;
+type CommandWithStdinMatcher = Box<dyn Fn(&str, &[&str], &str) -> bool + Send + Sync>;
 
 // Mock implementations using mockall
 mock! {
@@ -81,11 +82,14 @@ use std::sync::{Arc, Mutex};
 
 type CommandCheckFn = dyn Fn(&str) -> Result<()> + Send + Sync;
 type CommandExecFn = dyn Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync;
+type CommandExecWithStdinFn = dyn Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync;
 
 pub struct MockCommandExecutorMock {
     check_command_exists_fn: Arc<Mutex<Option<Box<CommandCheckFn>>>>,
     execute_fns: Arc<Mutex<Vec<Box<CommandExecFn>>>>,
     execute_call_count: Arc<Mutex<usize>>,
+    execute_with_stdin_fns: Arc<Mutex<Vec<Box<CommandExecWithStdinFn>>>>,
+    execute_with_stdin_call_count: Arc<Mutex<usize>>,
 }
 
 impl MockCommandExecutorMock {
@@ -94,6 +98,8 @@ impl MockCommandExecutorMock {
             check_command_exists_fn: Arc::new(Mutex::new(None)),
             execute_fns: Arc::new(Mutex::new(Vec::new())),
             execute_call_count: Arc::new(Mutex::new(0)),
+            execute_with_stdin_fns: Arc::new(Mutex::new(Vec::new())),
+            execute_with_stdin_call_count: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -103,6 +109,13 @@ impl MockCommandExecutorMock {
 
     pub fn expect_execute(&mut self) -> ExecuteExpectation {
         ExecuteExpectation {
+            mock: self,
+            matcher: None,
+        }
+    }
+
+    pub fn expect_execute_with_stdin(&mut self) -> ExecuteWithStdinExpectation {
+        ExecuteWithStdinExpectation {
             mock: self,
             matcher: None,
         }
@@ -158,6 +171,37 @@ impl<'a> ExecuteExpectation<'a> {
     }
 }
 
+pub struct ExecuteWithStdinExpectation<'a> {
+    mock: &'a mut MockCommandExecutorMock,
+    matcher: Option<CommandWithStdinMatcher>,
+}
+
+impl<'a> ExecuteWithStdinExpectation<'a> {
+    pub fn withf<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&str, &[&str], &str) -> bool + Send + Sync + 'static,
+    {
+        self.matcher = Some(Box::new(f));
+        self
+    }
+
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
+    where
+        F: Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync + 'static,
+    {
+        self.mock
+            .execute_with_stdin_fns
+            .lock()
+            .unwrap()
+            .push(Box::new(f));
+        self.mock
+    }
+}
+
 #[async_trait]
 impl CommandExecutor for MockCommandExecutorMock {
     async fn check_command_exists(&self, command: &str) -> Result<()> {
@@ -187,15 +231,24 @@ impl CommandExecutor for MockCommandExecutorMock {
 
     async fn execute_with_stdin(
         &self,
-        _command: &str,
-        _args: &[&str],
-        _stdin: &str,
+        command: &str,
+        args: &[&str],
+        stdin: &str,
     ) -> Result<CommandOutput> {
-        Ok(CommandOutput {
-            success: true,
-            stdout: vec![],
-            stderr: vec![],
-        })
+        let mut count = self.execute_with_stdin_call_count.lock().unwrap();
+        let index = *count;
+        *count += 1;
+
+        let fns = self.execute_with_stdin_fns.lock().unwrap();
+        if index < fns.len() {
+            fns[index](command, args, stdin)
+        } else {
+            Ok(CommandOutput {
+                success: true,
+                stdout: vec![],
+                stderr: vec![],
+            })
+        }
     }
 }
 

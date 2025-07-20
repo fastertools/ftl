@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::commands::logout::*;
-use crate::deps::*;
+use crate::deps::UserInterface;
 use crate::ui::TestUserInterface;
 
 // Mock implementation of CredentialsClearer

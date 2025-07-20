@@ -364,56 +364,5 @@ impl VersionCacheManager {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version_cache_new() {
-        let cache = VersionCache::new("0.1.0".to_string());
-        assert_eq!(cache.current_version, "0.1.0");
-        assert_eq!(cache.last_check_timestamp, 0);
-        assert!(cache.latest_version.is_none());
-        assert!(cache.dismissed_version.is_none());
-    }
-
-    #[test]
-    fn test_should_check_today() {
-        let cache = VersionCache::new("0.1.0".to_string());
-
-        // Should check if never checked before
-        assert!(cache.should_check_today(1_000_000));
-
-        // Should not check if checked recently
-        let mut cache = VersionCache::new("0.1.0".to_string());
-        cache.last_check_timestamp = 1_000_000;
-        assert!(!cache.should_check_today(1_000_000 + 3600)); // 1 hour later
-
-        // Should check if more than 24 hours passed
-        assert!(cache.should_check_today(1_000_000 + 25 * 3600)); // 25 hours later
-    }
-
-    #[test]
-    fn test_should_prompt_for_update() {
-        let mut cache = VersionCache::new("0.1.0".to_string());
-
-        // No update available
-        assert!(!cache.should_prompt_for_update());
-
-        // Newer version available
-        cache.latest_version = Some("0.2.0".to_string());
-        assert!(cache.should_prompt_for_update());
-
-        // Same version
-        cache.latest_version = Some("0.1.0".to_string());
-        assert!(!cache.should_prompt_for_update());
-
-        // Older version (shouldn't happen but test anyway)
-        cache.latest_version = Some("0.0.9".to_string());
-        assert!(!cache.should_prompt_for_update());
-
-        // Dismissed version
-        cache.latest_version = Some("0.2.0".to_string());
-        cache.dismissed_version = Some("0.2.0".to_string());
-        assert!(!cache.should_prompt_for_update());
-    }
-}
+#[path = "version_cache_tests.rs"]
+mod tests;

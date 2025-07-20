@@ -310,37 +310,5 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_should_watch_file() {
-        use std::path::PathBuf;
-
-        // Should watch source files
-        assert!(should_watch_file(&PathBuf::from("src/main.rs")));
-        assert!(should_watch_file(&PathBuf::from("lib.rs")));
-        assert!(should_watch_file(&PathBuf::from("src/index.ts")));
-        assert!(should_watch_file(&PathBuf::from("app.js")));
-        assert!(should_watch_file(&PathBuf::from("Cargo.toml")));
-        assert!(should_watch_file(&PathBuf::from("package.json")));
-
-        // Should not watch build outputs
-        assert!(!should_watch_file(&PathBuf::from("target/debug/app")));
-        assert!(!should_watch_file(&PathBuf::from("dist/bundle.js")));
-        assert!(!should_watch_file(&PathBuf::from("build/output.wasm")));
-        assert!(!should_watch_file(&PathBuf::from(".spin/config")));
-        assert!(!should_watch_file(&PathBuf::from(
-            "node_modules/package/index.js"
-        )));
-
-        // Should not watch lock files
-        assert!(!should_watch_file(&PathBuf::from("Cargo.lock")));
-        assert!(!should_watch_file(&PathBuf::from("package-lock.json")));
-        assert!(!should_watch_file(&PathBuf::from("yarn.lock")));
-
-        // Should not watch wasm files
-        assert!(!should_watch_file(&PathBuf::from("module.wasm")));
-        assert!(!should_watch_file(&PathBuf::from("module.wat")));
-    }
-}
+#[path = "up_tests.rs"]
+mod tests;

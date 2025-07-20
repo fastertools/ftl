@@ -68,6 +68,7 @@ impl MockClock {
         Self { now: Utc::now() }
     }
 
+    #[allow(dead_code)]
     fn with_time(now: DateTime<Utc>) -> Self {
         Self { now }
     }

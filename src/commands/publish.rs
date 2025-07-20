@@ -114,16 +114,5 @@ pub async fn execute_with_deps(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_publish_config_defaults() {
-        let config = PublishConfig {
-            path: None,
-            registry: None,
-            tag: None,
-        };
-        assert!(config.path.is_none());
-    }
-}
+#[path = "publish_tests.rs"]
+mod tests;

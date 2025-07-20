@@ -282,13 +282,12 @@ async fn test_templates_install_from_git() {
 
     let result = templates_with_deps(
         false,
-        Some("https://github.com/user/repo".to_string()),
+        Some("https://github.com/user/repo"),
         None,
         None,
         None,
         &deps,
-    )
-    ;
+    );
     assert!(result.is_ok());
 
     // Verify output
@@ -335,13 +334,12 @@ async fn test_templates_install_from_git_with_branch() {
 
     let result = templates_with_deps(
         false,
-        Some("https://github.com/user/repo".to_string()),
-        Some("dev".to_string()),
+        Some("https://github.com/user/repo"),
+        Some("dev"),
         None,
         None,
         &deps,
-    )
-    ;
+    );
     assert!(result.is_ok());
 }
 
@@ -377,15 +375,8 @@ async fn test_templates_install_from_dir() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(
-        false,
-        None,
-        None,
-        Some(PathBuf::from("/path/to/templates")),
-        None,
-        &deps,
-    )
-    ;
+    let path = PathBuf::from("/path/to/templates");
+    let result = templates_with_deps(false, None, None, Some(&path), None, &deps);
     assert!(result.is_ok());
 
     // Verify output
@@ -429,15 +420,7 @@ async fn test_templates_install_from_tar() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    let result = templates_with_deps(
-        false,
-        None,
-        None,
-        None,
-        Some("templates.tar.gz".to_string()),
-        &deps,
-    )
-    ;
+    let result = templates_with_deps(false, None, None, None, Some("templates.tar.gz"), &deps);
     assert!(result.is_ok());
 
     // Verify output

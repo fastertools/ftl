@@ -225,19 +225,34 @@ async fn test_init_spin_new_fails() {
         .times(1)
         .returning(|_| false);
 
-    // Setup all command executor expectations in one returning function
-    fixture.command_executor
+    // Mock: templates list
+    fixture
+        .command_executor
         .expect_execute()
-        .times(2) // templates list + spin new
+        .times(1)
         .returning(|path, args| {
             println!("Mock execute called with path: {path}, args: {args:?}");
             if args == ["templates", "list"] {
+                println!("Returning success for templates list");
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
                     stderr: vec![],
                 })
-            } else if args.len() >= 2 && args[0] == "new" && args.contains(&"my-project") {
+            } else {
+                panic!("Unexpected command for first call: {path} {args:?}");
+            }
+        });
+
+    // Mock: spin new fails
+    fixture
+        .command_executor
+        .expect_execute()
+        .times(1)
+        .returning(|path, args| {
+            println!("Mock execute called with path: {path}, args: {args:?}");
+            if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
+                println!("Returning failure for spin new");
                 // Simulate failure for spin new
                 Ok(CommandOutput {
                     success: false,
@@ -245,7 +260,7 @@ async fn test_init_spin_new_fails() {
                     stderr: b"Failed to create project: some error".to_vec(),
                 })
             } else {
-                panic!("Unexpected command: {path} {args:?}");
+                panic!("Unexpected command for second call: {path} {args:?}");
             }
         });
 
@@ -259,6 +274,7 @@ async fn test_init_spin_new_fails() {
     )
     .await;
 
+    println!("Test result: {result:?}");
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -297,7 +313,7 @@ async fn test_init_success() {
                     stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
                     stderr: vec![],
                 })
-            } else if args.len() >= 2 && args[0] == "new" && args.contains(&"my-project") {
+            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"Project created successfully".to_vec(),
@@ -368,7 +384,7 @@ async fn test_init_here_success() {
                     stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
                     stderr: vec![],
                 })
-            } else if args.len() >= 2 && args[0] == "new" && args.contains(&".") {
+            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "."] {
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"Project created successfully".to_vec(),
@@ -440,7 +456,7 @@ async fn test_init_interactive_name() {
                     stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
                     stderr: vec![],
                 })
-            } else if args[0] == "new" && args.contains(&"my-project") {
+            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"Project created successfully".to_vec(),
@@ -494,6 +510,7 @@ fn setup_basic_init_mocks(fixture: &mut TestFixture) {
         .returning(|_| false);
 }
 
+#[allow(dead_code)]
 fn setup_templates_installed(fixture: &mut TestFixture) {
     fixture
         .command_executor

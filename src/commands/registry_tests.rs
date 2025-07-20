@@ -61,7 +61,7 @@ async fn test_list_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(Some("docker.io".to_string()), &deps);
+    list_with_deps(Some("docker.io"), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -78,7 +78,7 @@ async fn test_search_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component".to_string(), None, &deps);
+    search_with_deps("my-component", None, &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -105,7 +105,7 @@ async fn test_search_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("test-tool".to_string(), Some("quay.io".to_string()), &deps);
+    search_with_deps("test-tool", Some("quay.io"), &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -122,7 +122,7 @@ async fn test_search_with_special_characters() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component@v2.0".to_string(), None, &deps);
+    search_with_deps("my-component@v2.0", None, &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -144,7 +144,7 @@ async fn test_info_simple_component() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("my-component".to_string(), &deps);
+    info_with_deps("my-component", &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -176,7 +176,7 @@ async fn test_info_full_component_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("ghcr.io/ftl/my-tool:v1.0.0".to_string(), &deps);
+    info_with_deps("ghcr.io/ftl/my-tool:v1.0.0", &deps);
 
     // Verify output
     let output = ui.get_output();
@@ -193,7 +193,7 @@ async fn test_info_docker_hub_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("docker.io/library/nginx:latest".to_string(), &deps);
+    info_with_deps("docker.io/library/nginx:latest", &deps);
 
     // Verify output
     let output = ui.get_output();

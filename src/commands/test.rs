@@ -134,12 +134,5 @@ fn run_tool_tests(tool_path: &Path, deps: &Arc<TestDependencies>) -> Result<()> 
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_execute_with_deps_signature() {
-        // Just verify the function signature compiles
-        let _ = execute_with_deps;
-    }
-}
+#[path = "test_tests.rs"]
+mod tests;

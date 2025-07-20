@@ -112,6 +112,7 @@ impl MockTestCommandExecutor {
 }
 
 impl TestCommandExecutor for MockTestCommandExecutor {
+    #[allow(clippy::similar_names)]
     fn execute(
         &self,
         command: &str,
@@ -126,7 +127,8 @@ impl TestCommandExecutor for MockTestCommandExecutor {
             return Err(anyhow::anyhow!("Unexpected command execution"));
         }
 
-        let (expected_cmd, expected_args, expected_cwd, output) = &self.expected_commands[index];
+        let (expected_cmd, expected_args, expected_cwd, expected_output) =
+            &self.expected_commands[index];
 
         if command != expected_cmd {
             return Err(anyhow::anyhow!(
@@ -153,7 +155,7 @@ impl TestCommandExecutor for MockTestCommandExecutor {
             ));
         }
 
-        Ok(output.clone())
+        Ok(expected_output.clone())
     }
 }
 

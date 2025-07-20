@@ -9,9 +9,12 @@ use crate::commands::up::{self, *};
 use crate::deps::*;
 use crate::ui::TestUserInterface;
 
+// Type alias for spawn responses
+type SpawnResponse = Result<Box<dyn ProcessHandle>, anyhow::Error>;
+
 // Mock implementations
 struct MockProcessManager {
-    spawn_responses: Arc<Mutex<Vec<Result<Box<dyn ProcessHandle>, anyhow::Error>>>>,
+    spawn_responses: Arc<Mutex<Vec<SpawnResponse>>>,
     spawn_count: Arc<AtomicU32>,
 }
 
@@ -23,7 +26,7 @@ impl MockProcessManager {
         }
     }
 
-    fn add_spawn_response(&self, response: Result<Box<dyn ProcessHandle>, anyhow::Error>) {
+    fn add_spawn_response(&self, response: SpawnResponse) {
         self.spawn_responses.lock().unwrap().push(response);
     }
 
@@ -51,7 +54,6 @@ impl ProcessManager for MockProcessManager {
 }
 
 struct MockProcessHandle {
-    id: u32,
     exit_code: i32,
     terminated: Arc<AtomicBool>,
     wait_count: Arc<AtomicU32>,
@@ -59,9 +61,8 @@ struct MockProcessHandle {
 }
 
 impl MockProcessHandle {
-    fn new(id: u32, exit_code: i32) -> Self {
+    fn new(_id: u32, exit_code: i32) -> Self {
         Self {
-            id,
             exit_code,
             terminated: Arc::new(AtomicBool::new(false)),
             wait_count: Arc::new(AtomicU32::new(0)),
@@ -74,10 +75,12 @@ impl MockProcessHandle {
         self
     }
 
+    #[allow(dead_code)]
     fn was_terminated(&self) -> bool {
         self.terminated.load(Ordering::SeqCst)
     }
 
+    #[allow(dead_code)]
     fn get_wait_count(&self) -> u32 {
         self.wait_count.load(Ordering::SeqCst)
     }
@@ -103,10 +106,6 @@ impl ProcessHandle for MockProcessHandle {
         self.terminated.store(true, Ordering::SeqCst);
         Ok(())
     }
-
-    fn id(&self) -> u32 {
-        self.id
-    }
 }
 
 struct MockFileWatcher {
@@ -122,6 +121,7 @@ impl MockFileWatcher {
         }
     }
 
+    #[allow(dead_code)]
     fn with_failure() -> Self {
         Self {
             watch_count: Arc::new(AtomicU32::new(0)),
@@ -129,6 +129,7 @@ impl MockFileWatcher {
         }
     }
 
+    #[allow(dead_code)]
     fn get_watch_count(&self) -> u32 {
         self.watch_count.load(Ordering::SeqCst)
     }
@@ -234,6 +235,7 @@ impl MockAsyncRuntime {
         }
     }
 
+    #[allow(dead_code)]
     fn get_sleep_count(&self) -> u32 {
         self.sleep_count.load(Ordering::SeqCst)
     }
@@ -709,15 +711,31 @@ command = "cargo build --target wasm32-wasi"
 
 #[test]
 fn test_should_watch_file() {
-    // Test the file watching filter
-    assert!(up::should_watch_file(&PathBuf::from("src/main.rs")));
-    assert!(up::should_watch_file(&PathBuf::from("Cargo.toml")));
-    assert!(up::should_watch_file(&PathBuf::from("src/index.ts")));
+    use std::path::PathBuf;
 
+    // Should watch source files
+    assert!(up::should_watch_file(&PathBuf::from("src/main.rs")));
+    assert!(up::should_watch_file(&PathBuf::from("lib.rs")));
+    assert!(up::should_watch_file(&PathBuf::from("src/index.ts")));
+    assert!(up::should_watch_file(&PathBuf::from("app.js")));
+    assert!(up::should_watch_file(&PathBuf::from("Cargo.toml")));
+    assert!(up::should_watch_file(&PathBuf::from("package.json")));
+
+    // Should not watch build outputs
     assert!(!up::should_watch_file(&PathBuf::from("target/debug/app")));
+    assert!(!up::should_watch_file(&PathBuf::from("dist/bundle.js")));
+    assert!(!up::should_watch_file(&PathBuf::from("build/output.wasm")));
+    assert!(!up::should_watch_file(&PathBuf::from(".spin/config")));
     assert!(!up::should_watch_file(&PathBuf::from(
-        "node_modules/pkg/index.js"
+        "node_modules/package/index.js"
     )));
+
+    // Should not watch lock files
     assert!(!up::should_watch_file(&PathBuf::from("Cargo.lock")));
-    assert!(!up::should_watch_file(&PathBuf::from("app.wasm")));
+    assert!(!up::should_watch_file(&PathBuf::from("package-lock.json")));
+    assert!(!up::should_watch_file(&PathBuf::from("yarn.lock")));
+
+    // Should not watch wasm files
+    assert!(!up::should_watch_file(&PathBuf::from("module.wasm")));
+    assert!(!up::should_watch_file(&PathBuf::from("module.wat")));
 }

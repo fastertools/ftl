@@ -15,7 +15,6 @@ struct TestFixture {
     command_executor: MockCommandExecutorMock,
     ui: Arc<TestUserInterface>,
     spin_installer: MockSpinInstallerMock,
-    async_runtime: MockAsyncRuntimeMock,
 }
 
 impl TestFixture {
@@ -25,7 +24,6 @@ impl TestFixture {
             command_executor: MockCommandExecutorMock::new(),
             ui: Arc::new(TestUserInterface::new()),
             spin_installer: MockSpinInstallerMock::new(),
-            async_runtime: MockAsyncRuntimeMock::new(),
         }
     }
 
@@ -36,7 +34,6 @@ impl TestFixture {
             command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,
             ui: self.ui as Arc<dyn UserInterface>,
             spin_installer: Arc::new(self.spin_installer) as Arc<dyn SpinInstaller>,
-            async_runtime: Arc::new(self.async_runtime) as Arc<dyn AsyncRuntime>,
         })
     }
 }
@@ -663,4 +660,52 @@ source = "static.wasm"
         Some("npm run build".to_string())
     );
     assert_eq!(components[1].workdir, Some("frontend".to_string()));
+}
+
+#[test]
+fn test_prepare_build_command() {
+    // Test cargo build
+    assert_eq!(
+        prepare_build_command("cargo build", true),
+        "cargo build --release"
+    );
+    assert_eq!(
+        prepare_build_command("cargo build --target wasm32-wasi", true),
+        "cargo build --release --target wasm32-wasi"
+    );
+    assert_eq!(
+        prepare_build_command("cargo build --release", true),
+        "cargo build --release"
+    );
+
+    // Test npm
+    assert_eq!(
+        prepare_build_command("npm run build", true),
+        "npm run build"
+    );
+
+    // Test other commands
+    assert_eq!(prepare_build_command("make", true), "make");
+
+    // Test non-release mode
+    assert_eq!(prepare_build_command("cargo build", false), "cargo build");
+}
+
+#[test]
+fn test_get_shell_command() {
+    let command = "cargo build --release";
+
+    #[cfg(target_os = "windows")]
+    {
+        let (cmd, args) = get_shell_command(command);
+        assert_eq!(cmd, "cmd");
+        assert_eq!(args, vec!["/C", command]);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let (cmd, args) = get_shell_command(command);
+        assert_eq!(cmd, "sh");
+        assert_eq!(args, vec!["-c", command]);
+    }
 }

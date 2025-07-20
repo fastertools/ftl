@@ -450,51 +450,5 @@ pub fn clear_stored_credentials() -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_http_response_is_success() {
-        let response = HttpResponse {
-            status: 200,
-            body: "ok".to_string(),
-        };
-        assert!(response.is_success());
-
-        let response = HttpResponse {
-            status: 201,
-            body: "created".to_string(),
-        };
-        assert!(response.is_success());
-
-        let response = HttpResponse {
-            status: 400,
-            body: "bad request".to_string(),
-        };
-        assert!(!response.is_success());
-
-        let response = HttpResponse {
-            status: 500,
-            body: "server error".to_string(),
-        };
-        assert!(!response.is_success());
-    }
-
-    #[test]
-    fn test_stored_credentials_serialization() {
-        let creds = StoredCredentials {
-            access_token: "test_token".to_string(),
-            refresh_token: Some("refresh_token".to_string()),
-            id_token: None,
-            expires_at: Some(Utc::now()),
-            authkit_domain: "test.domain".to_string(),
-        };
-
-        let json = serde_json::to_string(&creds).unwrap();
-        let deserialized: StoredCredentials = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(creds.access_token, deserialized.access_token);
-        assert_eq!(creds.refresh_token, deserialized.refresh_token);
-        assert_eq!(creds.authkit_domain, deserialized.authkit_domain);
-    }
-}
+#[path = "login_tests.rs"]
+mod tests;
