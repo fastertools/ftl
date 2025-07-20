@@ -23,6 +23,7 @@ use tracing_subscriber::EnvFilter;
 mod api_client;
 mod commands;
 mod common;
+mod config;
 mod deps;
 mod language;
 mod registry;
