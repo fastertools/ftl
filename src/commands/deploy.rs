@@ -3,8 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
-use base64::{engine::general_purpose, Engine as _};
+use anyhow::{Context, Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
@@ -43,11 +43,8 @@ pub struct DeployDependencies {
 
 /// Execute the deploy command with injected dependencies
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
-    deps.ui.print(&format!(
-        "{} {} Deploying project",
-        "▶",
-        "FTL"
-    ));
+    deps.ui
+        .print(&format!("{} {} Deploying project", "▶", "FTL"));
     deps.ui.print("");
 
     // Check if we're in a Spin project directory
@@ -62,7 +59,8 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
 
     // Build the project first
     spinner.finish_and_clear();
-    deps.ui.print_styled("→ Building project...", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ Building project...", MessageStyle::Cyan);
     deps.ui.print("");
 
     deps.build_executor.execute(None, true).await?;
@@ -99,7 +97,10 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
 
     // Get ECR credentials
     spinner.set_message("Getting registry credentials...");
-    let ecr_creds = deps.api_client.get_ecr_credentials().await
+    let ecr_creds = deps
+        .api_client
+        .get_ecr_credentials()
+        .await
         .map_err(|e| anyhow!("Failed to get ECR credentials: {}", e))?;
 
     // Docker login to ECR
@@ -108,11 +109,8 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
 
     // Create repositories and push components to ECR
     spinner.finish_and_clear();
-    let deployed_tools = create_repositories_and_push_with_progress(
-        &config.components,
-        deps.clone(),
-    )
-    .await?;
+    let deployed_tools =
+        create_repositories_and_push_with_progress(&config.components, deps.clone()).await?;
 
     // Deploy to FTL
     deps.ui.print("");
@@ -129,17 +127,13 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
         }
     };
 
-    let deployment = deploy_to_ftl_with_progress(
-        deps.clone(),
-        config.app_name,
-        deployed_tools,
-        spinner,
-    )
-    .await?;
+    let deployment =
+        deploy_to_ftl_with_progress(deps.clone(), config.app_name, deployed_tools, spinner).await?;
 
     // Display results
     deps.ui.print("");
-    deps.ui.print_styled("✓ Deployment successful!", MessageStyle::Success);
+    deps.ui
+        .print_styled("✓ Deployment successful!", MessageStyle::Success);
     if let Some(deployment_url) = deployment.deployment_url {
         deps.ui.print("");
         deps.ui.print(&format!("  MCP URL: {}", deployment_url));
@@ -288,7 +282,9 @@ async fn create_repositories_and_push_with_progress(
     deps.command_executor
         .check_command_exists("wkg")
         .await
-        .context("wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools")?;
+        .context(
+            "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
+        )?;
 
     deps.ui.print(&format!(
         "→ Pushing {} components in parallel",
@@ -332,9 +328,13 @@ async fn create_repositories_and_push_with_progress(
 
             // Create repository
             pb.set_message("Creating repository...");
-            let repo_response = match deps.api_client
+            let repo_response = match deps
+                .api_client
                 .create_ecr_repository(&types::CreateEcrRepositoryRequest {
-                    tool_name: component.name.as_str().try_into()
+                    tool_name: component
+                        .name
+                        .as_str()
+                        .try_into()
                         .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
                 })
                 .await
@@ -344,7 +344,8 @@ async fn create_repositories_and_push_with_progress(
                     pb.finish_with_message(format!("✗ Failed to create repository: {}", e));
                     let mut error_guard = error_flag.lock().await;
                     if error_guard.is_none() {
-                        *error_guard = Some(format!("Component '{}' failed: {}", component.name, e));
+                        *error_guard =
+                            Some(format!("Component '{}' failed: {}", component.name, e));
                     }
                     return Err(anyhow!("Failed to create repository: {}", e));
                 }
@@ -353,8 +354,12 @@ async fn create_repositories_and_push_with_progress(
             // Push with version tag
             pb.set_message(&format!("Pushing v{}...", component.version));
             let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
-            let output = deps.command_executor
-                .execute("wkg", &["oci", "push", &versioned_tag, &component.source_path])
+            let output = deps
+                .command_executor
+                .execute(
+                    "wkg",
+                    &["oci", "push", &versioned_tag, &component.source_path],
+                )
                 .await
                 .context("Failed to push component with wkg")?;
 
@@ -382,9 +387,15 @@ async fn create_repositories_and_push_with_progress(
             // Add to deployed tools
             let mut tools = deployed_tools.lock().await;
             tools.push(types::DeploymentRequestToolsItem {
-                name: component.name.as_str().try_into()
+                name: component
+                    .name
+                    .as_str()
+                    .try_into()
                     .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
-                tag: component.version.as_str().try_into()
+                tag: component
+                    .version
+                    .as_str()
+                    .try_into()
                     .map_err(|e: ConversionError| anyhow!("Invalid tag: {}", e))?,
                 allowed_hosts: component.allowed_hosts.clone().unwrap_or_default(),
                 component_uri: None,
@@ -418,7 +429,10 @@ async fn create_repositories_and_push_with_progress(
     let tools = Arc::try_unwrap(deployed_tools).unwrap().into_inner();
 
     deps.ui.print("");
-    deps.ui.print_styled("✓ All components pushed successfully!", MessageStyle::Success);
+    deps.ui.print_styled(
+        "✓ All components pushed successfully!",
+        MessageStyle::Success,
+    );
 
     Ok(tools)
 }
@@ -453,10 +467,12 @@ async fn poll_deployment_status_with_progress(
             // Find the current stage (first non-completed stage)
             let current_stage = stages
                 .iter()
-                .find(|s| !matches!(
-                    s.status,
-                    types::DeploymentStatusDeploymentStagesItemStatus::Completed
-                ))
+                .find(|s| {
+                    !matches!(
+                        s.status,
+                        types::DeploymentStatusDeploymentStagesItemStatus::Completed
+                    )
+                })
                 .or(stages.last());
 
             if let Some(stage) = current_stage {
@@ -516,7 +532,9 @@ async fn deploy_to_ftl_with_progress(
     spinner: Box<dyn crate::deps::ProgressIndicator>,
 ) -> Result<types::DeploymentStatusDeployment> {
     let request_body = types::DeploymentRequest {
-        app_name: app_name.as_str().try_into()
+        app_name: app_name
+            .as_str()
+            .try_into()
             .map_err(|e: ConversionError| anyhow!("Invalid app name: {}", e))?,
         tools,
         variables: Default::default(),
@@ -579,7 +597,7 @@ mod tests {
                 .cloned()
                 .ok_or_else(|| anyhow!("File not found: {}", path.display()))
         }
-        
+
         fn write_string(&self, _path: &Path, _content: &str) -> Result<()> {
             Ok(())
         }
@@ -636,7 +654,10 @@ version = "1.2.3"
 
         let worker = &config.components[1];
         assert_eq!(worker.name, "worker");
-        assert_eq!(worker.source_path, "worker/target/wasm32-wasi/release/worker.wasm");
+        assert_eq!(
+            worker.source_path,
+            "worker/target/wasm32-wasi/release/worker.wasm"
+        );
         assert_eq!(worker.version, "2.0.0");
         assert_eq!(worker.allowed_hosts, None);
     }

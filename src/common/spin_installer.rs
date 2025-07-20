@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::deps::{CommandExecutor, UserInterface, MessageStyle};
+use crate::deps::{CommandExecutor, MessageStyle, UserInterface};
 
 /// Spin installer trait (already defined in deps.rs)
 use crate::deps::SpinInstaller;
@@ -17,7 +17,7 @@ pub async fn check_and_install_spin() -> Result<PathBuf> {
         command_executor: Arc::new(crate::deps::RealCommandExecutor),
         ui: ui.clone(),
     });
-    
+
     let installer = RealSpinInstallerV2::new(deps);
     let path = installer.check_and_install().await?;
     Ok(PathBuf::from(path))
@@ -44,7 +44,12 @@ impl RealSpinInstallerV2 {
 impl SpinInstaller for RealSpinInstallerV2 {
     async fn check_and_install(&self) -> Result<String> {
         // Check if spin is available in PATH
-        match self.deps.command_executor.check_command_exists("spin").await {
+        match self
+            .deps
+            .command_executor
+            .check_command_exists("spin")
+            .await
+        {
             Ok(_) => {
                 // Spin exists, ensure akamai plugin is installed
                 self.ensure_akamai_plugin().await?;
@@ -52,11 +57,20 @@ impl SpinInstaller for RealSpinInstallerV2 {
             }
             Err(_) => {
                 // Spin not found - emit warning
-                self.deps.ui.print_styled("⚠️  FTL requires Spin to run WebAssembly tools.", MessageStyle::Warning);
-                self.deps.ui.print("Please install Spin from: https://github.com/fermyon/spin");
-                self.deps.ui.print("Or use your package manager (e.g., brew install fermyon/tap/spin)");
-                
-                anyhow::bail!("Spin not found. Please install it from https://github.com/fermyon/spin")
+                self.deps.ui.print_styled(
+                    "⚠️  FTL requires Spin to run WebAssembly tools.",
+                    MessageStyle::Warning,
+                );
+                self.deps
+                    .ui
+                    .print("Please install Spin from: https://github.com/fermyon/spin");
+                self.deps
+                    .ui
+                    .print("Or use your package manager (e.g., brew install fermyon/tap/spin)");
+
+                anyhow::bail!(
+                    "Spin not found. Please install it from https://github.com/fermyon/spin"
+                )
             }
         }
     }
@@ -65,7 +79,9 @@ impl SpinInstaller for RealSpinInstallerV2 {
 impl RealSpinInstallerV2 {
     async fn ensure_akamai_plugin(&self) -> Result<()> {
         // Check if Akamai plugin is installed
-        let output = self.deps.command_executor
+        let output = self
+            .deps
+            .command_executor
             .execute("spin", &["plugin", "list"])
             .await
             .context("Failed to list Spin plugins")?;
@@ -79,7 +95,9 @@ impl RealSpinInstallerV2 {
 
         // Install the plugin
         self.deps.ui.print("Installing Akamai plugin for Spin...");
-        let install_output = self.deps.command_executor
+        let install_output = self
+            .deps
+            .command_executor
             .execute("spin", &["plugin", "install", "aka"])
             .await
             .context("Failed to install Akamai plugin")?;
@@ -88,9 +106,11 @@ impl RealSpinInstallerV2 {
             let stderr = String::from_utf8_lossy(&install_output.stderr);
             self.deps.ui.print_styled(
                 &format!("⚠️  Warning: Failed to install Akamai plugin: {}", stderr),
-                MessageStyle::Warning
+                MessageStyle::Warning,
             );
-            self.deps.ui.print("   You can install it manually with: spin plugin install aka");
+            self.deps
+                .ui
+                .print("   You can install it manually with: spin plugin install aka");
         }
 
         Ok(())
@@ -105,12 +125,12 @@ mod tests {
     fn test_spin_installer_creation() {
         use crate::test_helpers::*;
         use crate::ui::TestUserInterface;
-        
+
         let deps = Arc::new(SpinInstallerDependencies {
             command_executor: Arc::new(MockCommandExecutorMock::new()),
             ui: Arc::new(TestUserInterface::new()),
         });
-        
+
         let _installer = RealSpinInstallerV2::new(deps);
         // Just verify it can be created
     }

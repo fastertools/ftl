@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use semver::Version;
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// HTTP client trait for version checking
 #[async_trait::async_trait]
@@ -38,14 +38,13 @@ pub struct UpdateDependencies {
 }
 
 /// Execute the update command with injected dependencies
-pub async fn execute_with_deps(
-    force: bool,
-    deps: Arc<UpdateDependencies>,
-) -> Result<()> {
-    deps.ui.print_styled("→ Updating FTL CLI", MessageStyle::Cyan);
+pub async fn execute_with_deps(force: bool, deps: Arc<UpdateDependencies>) -> Result<()> {
+    deps.ui
+        .print_styled("→ Updating FTL CLI", MessageStyle::Cyan);
 
     let current_version = deps.environment.get_cargo_pkg_version();
-    deps.ui.print(&format!("Current version: {}", current_version));
+    deps.ui
+        .print(&format!("Current version: {}", current_version));
 
     if !force {
         // Check if we're already on the latest version
@@ -80,19 +79,22 @@ pub async fn execute_with_deps(
     deps.ui.print("→ Installing latest version...");
 
     // Use cargo install to update to latest version
-    let install_output = deps.command_executor.execute(
-        "cargo",
-        &["install", "ftl-cli", "--force"],
-    )?;
+    let install_output = deps
+        .command_executor
+        .execute("cargo", &["install", "ftl-cli", "--force"])?;
 
     if !install_output.success {
         let stderr = String::from_utf8_lossy(&install_output.stderr);
         anyhow::bail!("Failed to update FTL CLI:\n{}", stderr);
     }
 
-    deps.ui.print(&format!("{} FTL CLI updated successfully!", styled_text("✓", MessageStyle::Success)));
+    deps.ui.print(&format!(
+        "{} FTL CLI updated successfully!",
+        styled_text("✓", MessageStyle::Success)
+    ));
     deps.ui.print("");
-    deps.ui.print("Run 'ftl --version' to verify the new version");
+    deps.ui
+        .print("Run 'ftl --version' to verify the new version");
 
     Ok(())
 }
@@ -100,11 +102,11 @@ pub async fn execute_with_deps(
 async fn get_latest_version(deps: &Arc<UpdateDependencies>) -> Result<String> {
     let url = "https://crates.io/api/v1/crates/ftl-cli";
     let user_agent = format!("ftl-cli/{}", deps.environment.get_cargo_pkg_version());
-    
+
     let response = deps.http_client.get(url, &user_agent).await?;
 
-    let json: serde_json::Value = serde_json::from_str(&response)
-        .context("Failed to parse crates.io response")?;
+    let json: serde_json::Value =
+        serde_json::from_str(&response).context("Failed to parse crates.io response")?;
 
     let latest_version = json
         .get("crate")

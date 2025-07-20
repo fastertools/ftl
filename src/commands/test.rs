@@ -1,12 +1,12 @@
 //! Refactored test command with dependency injection for better testability
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::process::Output;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// Directory operations trait
 pub trait DirectoryReader: Send + Sync {
@@ -33,10 +33,7 @@ pub struct TestDependencies {
 }
 
 /// Execute the test command with injected dependencies
-pub async fn execute_with_deps(
-    path: Option<PathBuf>,
-    deps: Arc<TestDependencies>,
-) -> Result<()> {
+pub async fn execute_with_deps(path: Option<PathBuf>, deps: Arc<TestDependencies>) -> Result<()> {
     let working_path = path.unwrap_or_else(|| PathBuf::from("."));
 
     deps.ui.print_styled("→ Running tests", MessageStyle::Cyan);
@@ -53,19 +50,18 @@ pub async fn execute_with_deps(
         for entry in entries {
             if deps.directory_reader.is_dir(&entry)? {
                 // Check if this is a tool directory (has Cargo.toml or package.json)
-                if deps.file_checker.exists(&entry.join("Cargo.toml"))? 
-                    || deps.file_checker.exists(&entry.join("package.json"))? {
-                    
-                    let tool_name = entry.file_name()
+                if deps.file_checker.exists(&entry.join("Cargo.toml"))?
+                    || deps.file_checker.exists(&entry.join("package.json"))?
+                {
+                    let tool_name = entry
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
-                    
+
                     deps.ui.print("");
-                    deps.ui.print_styled(
-                        &format!("→ Testing {}", tool_name),
-                        MessageStyle::Cyan
-                    );
-                    
+                    deps.ui
+                        .print_styled(&format!("→ Testing {}", tool_name), MessageStyle::Cyan);
+
                     run_tool_tests(&entry, &deps)?;
                     any_tests_run = true;
                 }
@@ -73,7 +69,8 @@ pub async fn execute_with_deps(
         }
 
         if !any_tests_run {
-            deps.ui.print_styled("ℹ No tools found to test", MessageStyle::Yellow);
+            deps.ui
+                .print_styled("ℹ No tools found to test", MessageStyle::Yellow);
         }
     } else {
         // Try to run tests in current directory as a single tool
@@ -81,7 +78,8 @@ pub async fn execute_with_deps(
     }
 
     deps.ui.print("");
-    deps.ui.print_styled("✓ All tests passed!", MessageStyle::Success);
+    deps.ui
+        .print_styled("✓ All tests passed!", MessageStyle::Success);
 
     Ok(())
 }
@@ -89,11 +87,10 @@ pub async fn execute_with_deps(
 fn run_tool_tests(tool_path: &Path, deps: &Arc<TestDependencies>) -> Result<()> {
     // Check if Makefile exists and has test target
     if deps.file_checker.exists(&tool_path.join("Makefile"))? {
-        let output = deps.command_executor.execute(
-            "make",
-            &["test"],
-            tool_path.to_str(),
-        ).context("Failed to run make test")?;
+        let output = deps
+            .command_executor
+            .execute("make", &["test"], tool_path.to_str())
+            .context("Failed to run make test")?;
 
         if !output.status.success() {
             deps.ui.print(&String::from_utf8_lossy(&output.stdout));
@@ -104,11 +101,10 @@ fn run_tool_tests(tool_path: &Path, deps: &Arc<TestDependencies>) -> Result<()> 
         deps.ui.print(&String::from_utf8_lossy(&output.stdout));
     } else if deps.file_checker.exists(&tool_path.join("Cargo.toml"))? {
         // Rust tool
-        let output = deps.command_executor.execute(
-            "cargo",
-            &["test"],
-            tool_path.to_str(),
-        ).context("Failed to run cargo test")?;
+        let output = deps
+            .command_executor
+            .execute("cargo", &["test"], tool_path.to_str())
+            .context("Failed to run cargo test")?;
 
         deps.ui.print(&String::from_utf8_lossy(&output.stdout));
         if !output.status.success() {
@@ -117,11 +113,10 @@ fn run_tool_tests(tool_path: &Path, deps: &Arc<TestDependencies>) -> Result<()> 
         }
     } else if deps.file_checker.exists(&tool_path.join("package.json"))? {
         // JavaScript/TypeScript tool
-        let output = deps.command_executor.execute(
-            "npm",
-            &["test"],
-            tool_path.to_str(),
-        ).context("Failed to run npm test")?;
+        let output = deps
+            .command_executor
+            .execute("npm", &["test"], tool_path.to_str())
+            .context("Failed to run npm test")?;
 
         deps.ui.print(&String::from_utf8_lossy(&output.stdout));
         if !output.status.success() {
@@ -131,7 +126,7 @@ fn run_tool_tests(tool_path: &Path, deps: &Arc<TestDependencies>) -> Result<()> 
     } else {
         deps.ui.print_styled(
             "⚠ No test configuration found for this tool",
-            MessageStyle::Yellow
+            MessageStyle::Yellow,
         );
     }
 

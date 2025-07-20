@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::deps::{
-    AsyncRuntime, MessageStyle, UserInterface
-};
+use crate::deps::{AsyncRuntime, MessageStyle, UserInterface};
 
 pub const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
 pub const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
@@ -103,36 +101,40 @@ pub struct LoginDependencies {
 }
 
 /// Execute the login command with injected dependencies
-pub async fn execute_with_deps(
-    config: LoginConfig,
-    deps: Arc<LoginDependencies>,
-) -> Result<()> {
+pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>) -> Result<()> {
     let authkit_domain = config.authkit_domain.as_deref().unwrap_or(AUTHKIT_DOMAIN);
     let client_id = config.client_id.as_deref().unwrap_or(CLIENT_ID);
 
-    deps.ui.print(&format!("→ Logging in to FTL ({})", authkit_domain));
+    deps.ui
+        .print(&format!("→ Logging in to FTL ({})", authkit_domain));
     deps.ui.print("");
 
     // Request device authorization
-    let auth_response = request_device_authorization(
-        &deps.http_client,
-        authkit_domain,
-        client_id,
-    ).await?;
+    let auth_response =
+        request_device_authorization(&deps.http_client, authkit_domain, client_id).await?;
 
     // Display login instructions
     deps.ui.print("");
     deps.ui.print("🌐 To complete login, visit:");
-    deps.ui.print(&format!("   {}", auth_response.verification_uri));
+    deps.ui
+        .print(&format!("   {}", auth_response.verification_uri));
     deps.ui.print("");
     deps.ui.print("And enter this code:");
-    deps.ui.print_styled(&format!("   {}", auth_response.user_code), MessageStyle::Success);
+    deps.ui.print_styled(
+        &format!("   {}", auth_response.user_code),
+        MessageStyle::Success,
+    );
     deps.ui.print("");
 
     // Optionally open browser
     if !config.no_browser && deps.ui.is_interactive() {
-        if deps.ui.prompt_select("Open browser automatically?", &["Yes", "No"], 0)? == 0 {
-            deps.browser_launcher.open(&auth_response.verification_uri_complete)?;
+        if deps
+            .ui
+            .prompt_select("Open browser automatically?", &["Yes", "No"], 0)?
+            == 0
+        {
+            deps.browser_launcher
+                .open(&auth_response.verification_uri_complete)?;
         }
     }
 
@@ -146,18 +148,15 @@ pub async fn execute_with_deps(
         client_id,
         &auth_response.device_code,
         auth_response.interval.unwrap_or(5),
-    ).await?;
+    )
+    .await?;
 
     // Store credentials
-    store_credentials(
-        &deps.keyring,
-        &deps.clock,
-        authkit_domain,
-        &token_response,
-    )?;
+    store_credentials(&deps.keyring, &deps.clock, authkit_domain, &token_response)?;
 
     deps.ui.print("");
-    deps.ui.print_styled("✅ Success! Successfully logged in!", MessageStyle::Success);
+    deps.ui
+        .print_styled("✅ Success! Successfully logged in!", MessageStyle::Success);
 
     Ok(())
 }
@@ -168,19 +167,18 @@ async fn request_device_authorization(
     client_id: &str,
 ) -> Result<DeviceAuthResponse> {
     let url = format!("https://{authkit_domain}/oauth2/device_authorization");
-    let body = format!(
-        "client_id={client_id}&scope=openid%20email%20profile%20offline_access"
-    );
+    let body = format!("client_id={client_id}&scope=openid%20email%20profile%20offline_access");
 
-    let response = http_client.post(&url, &body).await
+    let response = http_client
+        .post(&url, &body)
+        .await
         .context("Failed to request device authorization")?;
 
     if !response.is_success() {
         return Err(anyhow!("Device authorization failed: {}", response.body));
     }
 
-    serde_json::from_str(&response.body)
-        .context("Failed to parse device authorization response")
+    serde_json::from_str(&response.body).context("Failed to parse device authorization response")
 }
 
 async fn poll_for_token(
@@ -194,7 +192,7 @@ async fn poll_for_token(
     poll_interval_secs: u64,
 ) -> Result<TokenResponse> {
     let url = format!("https://{authkit_domain}/oauth2/token");
-    
+
     let pb = ui.create_spinner();
     pb.set_message("Waiting for authorization...");
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -208,20 +206,23 @@ async fn poll_for_token(
             return Err(anyhow!("Login timeout - please try again"));
         }
 
-        async_runtime.sleep(Duration::from_secs(interval_secs)).await;
+        async_runtime
+            .sleep(Duration::from_secs(interval_secs))
+            .await;
 
         let body = format!(
             "grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code={}&client_id={}",
             device_code, client_id
         );
 
-        let response = http_client.post(&url, &body).await
+        let response = http_client
+            .post(&url, &body)
+            .await
             .context("Failed to poll for token")?;
 
         if response.is_success() {
             pb.finish_and_clear();
-            return serde_json::from_str(&response.body)
-                .context("Failed to parse token response");
+            return serde_json::from_str(&response.body).context("Failed to parse token response");
         }
 
         // Handle error responses
@@ -308,20 +309,21 @@ pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
             entry.set_password(password)?;
             Ok(())
         }
-        
+
         fn retrieve(&self, service: &str, username: &str) -> Result<String> {
             let entry = keyring::Entry::new(service, username)?;
-            entry.get_password()
+            entry
+                .get_password()
                 .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))
         }
-        
+
         fn delete(&self, service: &str, username: &str) -> Result<()> {
             let entry = keyring::Entry::new(service, username)?;
             entry.delete_credential()?;
             Ok(())
         }
     }
-    
+
     struct RealHttpClient;
     #[async_trait::async_trait]
     impl HttpClient for RealHttpClient {
@@ -332,29 +334,29 @@ pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
                 .body(body.to_string())
                 .send()
                 .await?;
-            
+
             let status = response.status().as_u16();
             let body = response.text().await?;
-            
+
             Ok(HttpResponse { status, body })
         }
     }
-    
+
     struct RealClock;
     impl Clock for RealClock {
         fn now(&self) -> DateTime<Utc> {
             Utc::now()
         }
-        
+
         fn instant_now(&self) -> std::time::Instant {
             std::time::Instant::now()
         }
     }
-    
+
     let keyring: Arc<dyn KeyringStorage> = Arc::new(RealKeyringStorage);
     let http_client: Arc<dyn HttpClient> = Arc::new(RealHttpClient);
     let clock: Arc<dyn Clock> = Arc::new(RealClock);
-    
+
     get_or_refresh_credentials_with_deps(&keyring, &http_client, &clock).await
 }
 
@@ -374,11 +376,9 @@ pub async fn get_or_refresh_credentials_with_deps(
         if expires_at < now + buffer {
             // Token is expired or about to expire, try to refresh
             if let Some(refresh_token) = credentials.refresh_token.clone() {
-                match refresh_access_token(
-                    http_client,
-                    &credentials.authkit_domain,
-                    &refresh_token,
-                ).await {
+                match refresh_access_token(http_client, &credentials.authkit_domain, &refresh_token)
+                    .await
+                {
                     Ok(new_tokens) => {
                         // Update credentials with new tokens
                         credentials.access_token = new_tokens.access_token;
@@ -422,12 +422,13 @@ async fn refresh_access_token(
 ) -> Result<TokenResponse> {
     let url = format!("https://{authkit_domain}/oauth2/token");
     let client_id = CLIENT_ID; // Use default for refresh
-    
-    let body = format!(
-        "grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}"
-    );
 
-    let response = http_client.post(&url, &body).await
+    let body =
+        format!("grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}");
+
+    let response = http_client
+        .post(&url, &body)
+        .await
         .context("Failed to send refresh token request")?;
 
     if !response.is_success() {
@@ -438,13 +439,10 @@ async fn refresh_access_token(
         ));
     }
 
-    serde_json::from_str(&response.body)
-        .context("Failed to parse refresh token response")
+    serde_json::from_str(&response.body).context("Failed to parse refresh token response")
 }
 
-pub fn clear_stored_credentials_with_deps(
-    keyring: &Arc<dyn KeyringStorage>,
-) -> Result<()> {
+pub fn clear_stored_credentials_with_deps(keyring: &Arc<dyn KeyringStorage>) -> Result<()> {
     keyring.delete("ftl-cli", "default")?;
     Ok(())
 }
@@ -462,16 +460,28 @@ mod tests {
 
     #[test]
     fn test_http_response_is_success() {
-        let response = HttpResponse { status: 200, body: "ok".to_string() };
+        let response = HttpResponse {
+            status: 200,
+            body: "ok".to_string(),
+        };
         assert!(response.is_success());
-        
-        let response = HttpResponse { status: 201, body: "created".to_string() };
+
+        let response = HttpResponse {
+            status: 201,
+            body: "created".to_string(),
+        };
         assert!(response.is_success());
-        
-        let response = HttpResponse { status: 400, body: "bad request".to_string() };
+
+        let response = HttpResponse {
+            status: 400,
+            body: "bad request".to_string(),
+        };
         assert!(!response.is_success());
-        
-        let response = HttpResponse { status: 500, body: "server error".to_string() };
+
+        let response = HttpResponse {
+            status: 500,
+            body: "server error".to_string(),
+        };
         assert!(!response.is_success());
     }
 
@@ -484,10 +494,10 @@ mod tests {
             expires_at: Some(Utc::now()),
             authkit_domain: "test.domain".to_string(),
         };
-        
+
         let json = serde_json::to_string(&creds).unwrap();
         let deserialized: StoredCredentials = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(creds.access_token, deserialized.access_token);
         assert_eq!(creds.refresh_token, deserialized.refresh_token);
         assert_eq!(creds.authkit_domain, deserialized.authkit_domain);

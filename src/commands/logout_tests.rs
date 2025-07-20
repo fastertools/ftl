@@ -19,7 +19,7 @@ impl MockCredentialsClearer {
             error_message: None,
         }
     }
-    
+
     fn with_failure(mut self, message: &str) -> Self {
         self.should_fail = true;
         self.error_message = Some(message.to_string());
@@ -30,9 +30,9 @@ impl MockCredentialsClearer {
 impl CredentialsClearer for MockCredentialsClearer {
     fn clear_stored_credentials(&self) -> Result<(), anyhow::Error> {
         if self.should_fail {
-            Err(anyhow::anyhow!(
-                self.error_message.clone().unwrap_or_else(|| "Failed to clear credentials".to_string())
-            ))
+            Err(anyhow::anyhow!(self.error_message.clone().unwrap_or_else(
+                || "Failed to clear credentials".to_string()
+            )))
         } else {
             Ok(())
         }
@@ -51,7 +51,7 @@ impl TestFixture {
             credentials_clearer: Arc::new(MockCredentialsClearer::new()),
         }
     }
-    
+
     fn to_deps(self) -> Arc<LogoutDependencies> {
         Arc::new(LogoutDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -65,10 +65,10 @@ async fn test_logout_success() {
     let fixture = TestFixture::new();
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(deps).await;
     assert!(result.is_ok());
-    
+
     // Verify output
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Logging out of FTL")));
@@ -78,16 +78,15 @@ async fn test_logout_success() {
 #[tokio::test]
 async fn test_logout_not_logged_in() {
     let mut fixture = TestFixture::new();
-    fixture.credentials_clearer = Arc::new(
-        MockCredentialsClearer::new().with_failure("No matching entry found in keyring")
-    );
-    
+    fixture.credentials_clearer =
+        Arc::new(MockCredentialsClearer::new().with_failure("No matching entry found in keyring"));
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(deps).await;
     assert!(result.is_ok()); // Should not fail even if not logged in
-    
+
     // Verify output
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Not currently logged in")));
@@ -96,15 +95,19 @@ async fn test_logout_not_logged_in() {
 #[tokio::test]
 async fn test_logout_keyring_error() {
     let mut fixture = TestFixture::new();
-    fixture.credentials_clearer = Arc::new(
-        MockCredentialsClearer::new().with_failure("Failed to access keyring")
-    );
-    
+    fixture.credentials_clearer =
+        Arc::new(MockCredentialsClearer::new().with_failure("Failed to access keyring"));
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(deps).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Failed to access keyring"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to access keyring")
+    );
 }
 
 #[tokio::test]
@@ -115,19 +118,22 @@ async fn test_logout_with_different_keyring_errors() {
         "No matching entry found in keyring",
         "Entry not found: No matching entry found",
     ];
-    
+
     for error_msg in not_found_errors {
         let mut fixture = TestFixture::new();
-        fixture.credentials_clearer = Arc::new(
-            MockCredentialsClearer::new().with_failure(error_msg)
-        );
-        
+        fixture.credentials_clearer =
+            Arc::new(MockCredentialsClearer::new().with_failure(error_msg));
+
         let ui = fixture.ui.clone();
         let deps = fixture.to_deps();
-        
+
         let result = execute_with_deps(deps).await;
-        assert!(result.is_ok(), "Should handle '{}' as not logged in", error_msg);
-        
+        assert!(
+            result.is_ok(),
+            "Should handle '{}' as not logged in",
+            error_msg
+        );
+
         let output = ui.get_output();
         assert!(output.iter().any(|s| s.contains("Not currently logged in")));
     }
@@ -136,13 +142,17 @@ async fn test_logout_with_different_keyring_errors() {
 #[tokio::test]
 async fn test_logout_unexpected_error() {
     let mut fixture = TestFixture::new();
-    fixture.credentials_clearer = Arc::new(
-        MockCredentialsClearer::new().with_failure("Unexpected database error")
-    );
-    
+    fixture.credentials_clearer =
+        Arc::new(MockCredentialsClearer::new().with_failure("Unexpected database error"));
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(deps).await;
     assert!(result.is_err());
-    assert!(!result.unwrap_err().to_string().contains("No matching entry found"));
+    assert!(
+        !result
+            .unwrap_err()
+            .to_string()
+            .contains("No matching entry found")
+    );
 }

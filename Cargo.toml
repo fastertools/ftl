@@ -113,14 +113,14 @@ missing_docs = "warn"
 
 [lints.clippy]
 # Deny categories
-correctness = "deny"
-suspicious = "deny"
-perf = "deny"
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
 
 # Warn categories  
-complexity = "warn"
-style = "warn"
-pedantic = "warn"
+complexity = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
 
 # Specific lints to enable
 missing_safety_doc = "warn"

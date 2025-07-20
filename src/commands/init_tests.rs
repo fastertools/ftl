@@ -40,68 +40,84 @@ impl TestFixture {
 #[tokio::test]
 async fn test_init_invalid_name_uppercase() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin installer - still needs to be called
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         InitConfig {
             name: Some("TestProject".to_string()),
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("must be lowercase"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must be lowercase")
+    );
 }
 
 #[tokio::test]
 async fn test_init_invalid_name_leading_hyphen() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin installer - still needs to be called
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         InitConfig {
             name: Some("-project".to_string()),
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("cannot start or end with hyphens"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("cannot start or end with hyphens")
+    );
 }
 
 #[tokio::test]
 async fn test_init_directory_already_exists() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: directory exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("my-project")))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         InitConfig {
@@ -109,8 +125,9 @@ async fn test_init_directory_already_exists() {
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("already exists"));
 }
@@ -118,13 +135,14 @@ async fn test_init_directory_already_exists() {
 #[tokio::test]
 async fn test_init_here_not_empty() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: current directory has files - check all common files
     // The is_directory_empty function checks up to 7 files but stops early if it finds one
     fixture.file_system
@@ -134,7 +152,7 @@ async fn test_init_here_not_empty() {
             // Only spin.toml exists
             path == Path::new("./spin.toml")
         });
-    
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         InitConfig {
@@ -142,8 +160,9 @@ async fn test_init_here_not_empty() {
             here: true,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not empty"));
 }
@@ -151,20 +170,23 @@ async fn test_init_here_not_empty() {
 #[tokio::test]
 async fn test_init_templates_not_installed() {
     let mut fixture = TestFixture::new();
-    
+
     setup_basic_init_mocks(&mut fixture);
-    
+
     // Mock: templates list doesn't contain ftl-mcp-server
-    fixture.command_executor
+    fixture
+        .command_executor
         .expect_execute()
         .withf(|_: &str, args: &[&str]| args == ["templates", "list"])
         .times(1)
-        .returning(|_, _| Ok(CommandOutput {
-            success: true,
-            stdout: b"some-other-template\nanother-template".to_vec(),
-            stderr: vec![],
-        }));
-    
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"some-other-template\nanother-template".to_vec(),
+                stderr: vec![],
+            })
+        });
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         InitConfig {
@@ -172,28 +194,36 @@ async fn test_init_templates_not_installed() {
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("ftl-mcp templates not installed"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("ftl-mcp templates not installed")
+    );
 }
 
 #[tokio::test]
 async fn test_init_spin_new_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Setup basic mocks
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
-    fixture.file_system
+
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("my-project")))
         .times(1)
         .returning(|_| false);
-    
+
     // Setup all command executor expectations in one returning function
     fixture.command_executor
         .expect_execute()
@@ -217,7 +247,7 @@ async fn test_init_spin_new_fails() {
                 panic!("Unexpected command: {} {:?}", path, args);
             }
         });
-    
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         InitConfig {
@@ -225,29 +255,36 @@ async fn test_init_spin_new_fails() {
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("Failed to create project"), "Expected 'Failed to create project', got: {}", err_msg);
+    assert!(
+        err_msg.contains("Failed to create project"),
+        "Expected 'Failed to create project', got: {}",
+        err_msg
+    );
 }
 
 #[tokio::test]
 async fn test_init_success() {
     let mut fixture = TestFixture::new();
-    
+
     // Setup basic mocks
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
-    fixture.file_system
+
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("my-project")))
         .times(1)
         .returning(|_| false);
-    
+
     // Setup all command executor expectations in one returning function
     fixture.command_executor
         .expect_execute()
@@ -270,7 +307,7 @@ async fn test_init_success() {
                 panic!("Unexpected command: {} {:?}", path, args);
             }
         });
-    
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -279,36 +316,46 @@ async fn test_init_success() {
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     if let Err(e) = &result {
         eprintln!("Init error: {}", e);
     }
     assert!(result.is_ok());
-    
+
     // Verify output
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("MCP project initialized!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("MCP project initialized!"))
+    );
     assert!(output.iter().any(|s| s.contains("cd my-project &&")));
-    assert!(output.iter().any(|s| s.contains("http://localhost:3000/mcp")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("http://localhost:3000/mcp"))
+    );
 }
 
 #[tokio::test]
 async fn test_init_here_success() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: current directory is empty - no files exist
     fixture.file_system
         .expect_exists()
         .times(7) // 7 common files we check
         .returning(|_| false);
-    
+
     // Setup all command executor expectations in one returning function
     fixture.command_executor
         .expect_execute()
@@ -331,7 +378,7 @@ async fn test_init_here_success() {
                 panic!("Unexpected command: {} {:?}", path, args);
             }
         });
-    
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -340,37 +387,48 @@ async fn test_init_here_success() {
             here: true,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     if let Err(e) = &result {
         eprintln!("Init error: {}", e);
     }
     assert!(result.is_ok());
-    
+
     // Verify output doesn't contain cd instruction
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("MCP project initialized!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("MCP project initialized!"))
+    );
     assert!(!output.iter().any(|s| s.contains("cd my-project")));
-    assert!(output.iter().any(|s| s == "  ftl add           # Add a tool to the project"));
+    assert!(
+        output
+            .iter()
+            .any(|s| s == "  ftl add           # Add a tool to the project")
+    );
 }
 
 #[tokio::test]
 async fn test_init_interactive_name() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: directory doesn't exist - expects "my-project" since that's the default provided to prompt_input
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("my-project")))
         .times(1)
         .returning(|_| false);
-    
+
     // Mock: command executor for both templates check and spin new
     fixture.command_executor
         .expect_execute()
@@ -392,7 +450,7 @@ async fn test_init_interactive_name() {
                 panic!("Unexpected command: {:?}", args);
             }
         });
-    
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -401,28 +459,35 @@ async fn test_init_interactive_name() {
             here: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     if let Err(e) = &result {
         eprintln!("Init error: {}", e);
     }
     assert!(result.is_ok());
-    
+
     // Verify output - it will use "my-project" as the default from TestUserInterface
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("MCP project initialized!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("MCP project initialized!"))
+    );
 }
 
 // Helper functions
 fn setup_basic_init_mocks(fixture: &mut TestFixture) {
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: directory doesn't exist
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("my-project")))
         .times(1)
@@ -430,7 +495,8 @@ fn setup_basic_init_mocks(fixture: &mut TestFixture) {
 }
 
 fn setup_templates_installed(fixture: &mut TestFixture) {
-    fixture.command_executor
+    fixture
+        .command_executor
         .expect_execute()
         .times(1)
         .returning(|path, args| {

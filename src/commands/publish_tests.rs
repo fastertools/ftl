@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::commands::publish::{
-    BuildExecutor, ProcessExecutor, ProcessOutput, PublishConfig, PublishDependencies, 
-    SpinInstaller, execute_with_deps
+    BuildExecutor, ProcessExecutor, ProcessOutput, PublishConfig, PublishDependencies,
+    SpinInstaller, execute_with_deps,
 };
-use crate::deps::{UserInterface, MessageStyle, FileSystem};
-use crate::ui::TestUserInterface;
+use crate::deps::{FileSystem, MessageStyle, UserInterface};
 use crate::test_helpers::*;
+use crate::ui::TestUserInterface;
 
 // Mock implementation of BuildExecutor
 struct MockBuildExecutor {
@@ -24,7 +24,7 @@ impl MockBuildExecutor {
             error_message: None,
         }
     }
-    
+
     fn with_failure(mut self, message: &str) -> Self {
         self.should_fail = true;
         self.error_message = Some(message.to_string());
@@ -37,7 +37,9 @@ impl BuildExecutor for MockBuildExecutor {
     async fn execute(&self, _path: Option<PathBuf>, _release: bool) -> Result<(), anyhow::Error> {
         if self.should_fail {
             Err(anyhow::anyhow!(
-                self.error_message.clone().unwrap_or_else(|| "Build failed".to_string())
+                self.error_message
+                    .clone()
+                    .unwrap_or_else(|| "Build failed".to_string())
             ))
         } else {
             Ok(())
@@ -58,8 +60,14 @@ impl MockProcessExecutor {
             call_count: std::sync::Mutex::new(0),
         }
     }
-    
-    fn expect_execute(mut self, command: &str, args: &[&str], working_dir: Option<PathBuf>, output: ProcessOutput) -> Self {
+
+    fn expect_execute(
+        mut self,
+        command: &str,
+        args: &[&str],
+        working_dir: Option<PathBuf>,
+        output: ProcessOutput,
+    ) -> Self {
         self.expected_commands.push((
             command.to_string(),
             args.iter().map(|s| s.to_string()).collect(),
@@ -71,30 +79,47 @@ impl MockProcessExecutor {
 }
 
 impl ProcessExecutor for MockProcessExecutor {
-    fn execute(&self, command: &str, args: &[&str], working_dir: Option<&Path>) -> Result<ProcessOutput, anyhow::Error> {
+    fn execute(
+        &self,
+        command: &str,
+        args: &[&str],
+        working_dir: Option<&Path>,
+    ) -> Result<ProcessOutput, anyhow::Error> {
         let mut count = self.call_count.lock().unwrap();
         let index = *count;
         *count += 1;
-        
+
         if index >= self.expected_commands.len() {
             return Err(anyhow::anyhow!("Unexpected command execution"));
         }
-        
+
         let (expected_cmd, expected_args, expected_dir, output) = &self.expected_commands[index];
-        
+
         if command != expected_cmd {
-            return Err(anyhow::anyhow!("Expected command '{}', got '{}'", expected_cmd, command));
+            return Err(anyhow::anyhow!(
+                "Expected command '{}', got '{}'",
+                expected_cmd,
+                command
+            ));
         }
-        
+
         let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         if args_vec != *expected_args {
-            return Err(anyhow::anyhow!("Expected args {:?}, got {:?}", expected_args, args_vec));
+            return Err(anyhow::anyhow!(
+                "Expected args {:?}, got {:?}",
+                expected_args,
+                args_vec
+            ));
         }
-        
+
         if working_dir.map(|p| p.to_path_buf()) != *expected_dir {
-            return Err(anyhow::anyhow!("Expected working dir {:?}, got {:?}", expected_dir, working_dir));
+            return Err(anyhow::anyhow!(
+                "Expected working dir {:?}, got {:?}",
+                expected_dir,
+                working_dir
+            ));
         }
-        
+
         Ok(ProcessOutput {
             success: output.success,
             stdout: output.stdout.clone(),
@@ -116,7 +141,7 @@ impl MockSpinInstaller {
             spin_path: PathBuf::from("/usr/local/bin/spin"),
         }
     }
-    
+
     fn with_failure() -> Self {
         Self {
             should_fail: true,
@@ -154,7 +179,7 @@ impl TestFixture {
             build_executor: Arc::new(MockBuildExecutor::new()),
         }
     }
-    
+
     fn to_deps(self) -> Arc<PublishDependencies> {
         Arc::new(PublishDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
@@ -169,108 +194,120 @@ impl TestFixture {
 #[tokio::test]
 async fn test_publish_success() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .withf(|path: &Path| path == Path::new("./spin.toml"))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push succeeds
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push"],
-            Some(PathBuf::from(".")),
-            ProcessOutput {
-                success: true,
-                stdout: "Published to registry successfully!".to_string(),
-                stderr: String::new(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: "Published to registry successfully!".to_string(),
+            stderr: String::new(),
+        },
+    ));
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_ok());
-    
+
     // Verify output
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Publishing project")));
     assert!(output.iter().any(|s| s.contains("Building project")));
     assert!(output.iter().any(|s| s.contains("Publishing to registry")));
-    assert!(output.iter().any(|s| s.contains("Project published successfully")));
-    assert!(output.iter().any(|s| s.contains("Published to registry successfully!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Project published successfully"))
+    );
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Published to registry successfully!"))
+    );
 }
 
 #[tokio::test]
 async fn test_publish_no_spin_toml() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml doesn't exist
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .withf(|path: &Path| path == Path::new("./spin.toml"))
         .times(1)
         .returning(|_| false);
-    
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("No spin.toml found"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("No spin.toml found")
+    );
 }
 
 #[tokio::test]
 async fn test_publish_with_custom_path() {
     let mut fixture = TestFixture::new();
-    
+
     let custom_path = PathBuf::from("/my/project");
-    
+
     // Mock: spin.toml exists at custom path
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .withf(|path: &Path| path == Path::new("/my/project/spin.toml"))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push with custom path
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push"],
-            Some(custom_path.clone()),
-            ProcessOutput {
-                success: true,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push"],
+        Some(custom_path.clone()),
+        ProcessOutput {
+            success: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: Some(PathBuf::from("/my/project")),
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_ok());
 }
@@ -278,35 +315,34 @@ async fn test_publish_with_custom_path() {
 #[tokio::test]
 async fn test_publish_with_registry() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push with custom registry
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push", "--registry", "https://my.registry.com"],
-            Some(PathBuf::from(".")),
-            ProcessOutput {
-                success: true,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push", "--registry", "https://my.registry.com"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: Some("https://my.registry.com".to_string()),
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_ok());
 }
@@ -314,35 +350,34 @@ async fn test_publish_with_registry() {
 #[tokio::test]
 async fn test_publish_with_tag() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push with tag
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push", "--tag", "v1.0.0"],
-            Some(PathBuf::from(".")),
-            ProcessOutput {
-                success: true,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push", "--tag", "v1.0.0"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: Some("v1.0.0".to_string()),
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_ok());
 }
@@ -350,35 +385,41 @@ async fn test_publish_with_tag() {
 #[tokio::test]
 async fn test_publish_with_registry_and_tag() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push with both registry and tag
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push", "--registry", "https://my.registry.com", "--tag", "v2.0.0"],
-            Some(PathBuf::from(".")),
-            ProcessOutput {
-                success: true,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &[
+            "registry",
+            "push",
+            "--registry",
+            "https://my.registry.com",
+            "--tag",
+            "v2.0.0",
+        ],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: Some("https://my.registry.com".to_string()),
         tag: Some("v2.0.0".to_string()),
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_ok());
 }
@@ -386,89 +427,99 @@ async fn test_publish_with_registry_and_tag() {
 #[tokio::test]
 async fn test_publish_spin_install_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin installer fails
     fixture.spin_installer = Arc::new(MockSpinInstaller::with_failure());
-    
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Failed to install spin"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to install spin")
+    );
 }
 
 #[tokio::test]
 async fn test_publish_build_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: build fails
-    fixture.build_executor = Arc::new(
-        MockBuildExecutor::new().with_failure("Build error: missing dependencies")
-    );
-    
+    fixture.build_executor =
+        Arc::new(MockBuildExecutor::new().with_failure("Build error: missing dependencies"));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Build error: missing dependencies"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Build error: missing dependencies")
+    );
 }
 
 #[tokio::test]
 async fn test_publish_registry_push_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin registry push fails
-    fixture.process_executor = Arc::new(
-        MockProcessExecutor::new().expect_execute(
-            "/usr/local/bin/spin",
-            &["registry", "push"],
-            Some(PathBuf::from(".")),
-            ProcessOutput {
-                success: false,
-                stdout: "Error: Authentication failed".to_string(),
-                stderr: "Please login first".to_string(),
-            },
-        )
-    );
-    
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: false,
+            stdout: "Error: Authentication failed".to_string(),
+            stderr: "Please login first".to_string(),
+        },
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let config = PublishConfig {
         path: None,
         registry: None,
         tag: None,
     };
-    
+
     let result = execute_with_deps(config, deps).await;
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();

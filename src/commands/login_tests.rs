@@ -1,8 +1,8 @@
 //! Unit tests for the login command
 
+use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use chrono::{DateTime, Utc};
 
 use crate::commands::login::{self, *};
 use crate::deps::{AsyncRuntime, UserInterface};
@@ -23,7 +23,10 @@ impl MockHttpClient {
     }
 
     fn add_response(&self, url_contains: &str, response: HttpResponse) {
-        self.responses.lock().unwrap().push((url_contains.to_string(), response));
+        self.responses
+            .lock()
+            .unwrap()
+            .push((url_contains.to_string(), response));
     }
 }
 
@@ -31,20 +34,21 @@ impl MockHttpClient {
 impl HttpClient for MockHttpClient {
     async fn post(&self, url: &str, _body: &str) -> Result<HttpResponse, anyhow::Error> {
         let responses = self.responses.lock().unwrap();
-        
+
         // Special handling for oauth2/token endpoint
         if url.contains("oauth2/token") {
             let mut count = self.token_call_count.lock().unwrap();
             let current_count = *count;
             *count += 1;
             drop(count);
-            
+
             // Find all token responses
-            let token_responses: Vec<_> = responses.iter()
+            let token_responses: Vec<_> = responses
+                .iter()
                 .filter(|(pattern, _)| pattern == "oauth2/token")
                 .map(|(_, resp)| resp)
                 .collect();
-            
+
             if !token_responses.is_empty() {
                 let index = current_count.min(token_responses.len() - 1);
                 let response = token_responses.get(index).unwrap();
@@ -54,7 +58,7 @@ impl HttpClient for MockHttpClient {
                 });
             }
         }
-        
+
         // For other endpoints, return the first matching response
         for (pattern, response) in responses.iter() {
             if url.contains(pattern) {
@@ -64,7 +68,7 @@ impl HttpClient for MockHttpClient {
                 });
             }
         }
-        
+
         Err(anyhow::anyhow!("No mock response for URL: {}", url))
     }
 }
@@ -84,13 +88,18 @@ impl MockKeyringStorage {
 impl KeyringStorage for MockKeyringStorage {
     fn store(&self, service: &str, username: &str, password: &str) -> Result<(), anyhow::Error> {
         let key = format!("{}-{}", service, username);
-        self.storage.lock().unwrap().insert(key, password.to_string());
+        self.storage
+            .lock()
+            .unwrap()
+            .insert(key, password.to_string());
         Ok(())
     }
 
     fn retrieve(&self, service: &str, username: &str) -> Result<String, anyhow::Error> {
         let key = format!("{}-{}", service, username);
-        self.storage.lock().unwrap()
+        self.storage
+            .lock()
+            .unwrap()
             .get(&key)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("No password found"))
@@ -217,7 +226,7 @@ impl TestFixture {
 #[tokio::test]
 async fn test_login_success_with_browser() {
     let fixture = TestFixture::new();
-    
+
     // Mock device authorization response
     let auth_response = DeviceAuthResponse {
         device_code: "test_device_code".to_string(),
@@ -227,7 +236,7 @@ async fn test_login_success_with_browser() {
         expires_in: 600,
         interval: Some(5),
     };
-    
+
     fixture.http_client.add_response(
         "device_authorization",
         HttpResponse {
@@ -235,7 +244,7 @@ async fn test_login_success_with_browser() {
             body: serde_json::to_string(&auth_response).unwrap(),
         },
     );
-    
+
     // Mock token response (immediate success)
     let token_response = TokenResponse {
         access_token: "test_access_token".to_string(),
@@ -244,7 +253,7 @@ async fn test_login_success_with_browser() {
         refresh_token: Some("test_refresh_token".to_string()),
         id_token: Some("test_id_token".to_string()),
     };
-    
+
     fixture.http_client.add_response(
         "oauth2/token",
         HttpResponse {
@@ -252,12 +261,12 @@ async fn test_login_success_with_browser() {
             body: serde_json::to_string(&token_response).unwrap(),
         },
     );
-    
+
     let browser = fixture.browser_launcher.clone();
     let keyring = fixture.keyring.clone();
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: false,
@@ -265,20 +274,21 @@ async fn test_login_success_with_browser() {
             client_id: Some("test_client".to_string()),
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
-    
+
     // Verify browser was NOT opened (TestUserInterface is non-interactive)
     let opened_urls = browser.get_opened_urls();
     assert_eq!(opened_urls.len(), 0);
-    
+
     // Verify credentials were stored
     let stored = keyring.retrieve("ftl-cli", "default").unwrap();
     let creds: StoredCredentials = serde_json::from_str(&stored).unwrap();
     assert_eq!(creds.access_token, "test_access_token");
     assert_eq!(creds.refresh_token, Some("test_refresh_token".to_string()));
-    
+
     // Verify UI output
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Logging in to FTL")));
@@ -289,7 +299,7 @@ async fn test_login_success_with_browser() {
 #[tokio::test]
 async fn test_login_no_browser() {
     let fixture = TestFixture::new();
-    
+
     // Mock responses
     let auth_response = DeviceAuthResponse {
         device_code: "test_device_code".to_string(),
@@ -299,7 +309,7 @@ async fn test_login_no_browser() {
         expires_in: 600,
         interval: Some(5),
     };
-    
+
     fixture.http_client.add_response(
         "device_authorization",
         HttpResponse {
@@ -307,7 +317,7 @@ async fn test_login_no_browser() {
             body: serde_json::to_string(&auth_response).unwrap(),
         },
     );
-    
+
     fixture.http_client.add_response(
         "oauth2/token",
         HttpResponse {
@@ -318,13 +328,14 @@ async fn test_login_no_browser() {
                 expires_in: Some(3600),
                 refresh_token: None,
                 id_token: None,
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     let browser = fixture.browser_launcher.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: true,
@@ -332,10 +343,11 @@ async fn test_login_no_browser() {
             client_id: None,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
-    
+
     // Verify browser was NOT opened
     let opened_urls = browser.get_opened_urls();
     assert_eq!(opened_urls.len(), 0);
@@ -344,7 +356,7 @@ async fn test_login_no_browser() {
 #[tokio::test]
 async fn test_login_authorization_pending() {
     let fixture = TestFixture::new();
-    
+
     // Mock device authorization
     fixture.http_client.add_response(
         "device_authorization",
@@ -354,13 +366,15 @@ async fn test_login_authorization_pending() {
                 device_code: "test_device_code".to_string(),
                 user_code: "TEST-CODE".to_string(),
                 verification_uri: "https://auth.example.com/verify".to_string(),
-                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE".to_string(),
+                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE"
+                    .to_string(),
                 expires_in: 600,
                 interval: Some(1), // Fast polling for test
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     // First poll: authorization pending
     fixture.http_client.add_response(
         "oauth2/token",
@@ -369,10 +383,10 @@ async fn test_login_authorization_pending() {
             body: r#"{"error":"authorization_pending"}"#.to_string(),
         },
     );
-    
+
     // Second poll: success
     fixture.http_client.add_response(
-        "oauth2/token", 
+        "oauth2/token",
         HttpResponse {
             status: 200,
             body: serde_json::to_string(&TokenResponse {
@@ -381,13 +395,14 @@ async fn test_login_authorization_pending() {
                 expires_in: Some(3600),
                 refresh_token: None,
                 id_token: None,
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     let async_runtime = fixture.async_runtime.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: true,
@@ -395,10 +410,11 @@ async fn test_login_authorization_pending() {
             client_id: None,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
-    
+
     // Verify we slept at least once (for authorization_pending)
     assert!(async_runtime.get_sleep_count() >= 2);
 }
@@ -406,7 +422,7 @@ async fn test_login_authorization_pending() {
 #[tokio::test]
 async fn test_login_device_auth_failure() {
     let fixture = TestFixture::new();
-    
+
     // Mock failed device authorization
     fixture.http_client.add_response(
         "device_authorization",
@@ -415,9 +431,9 @@ async fn test_login_device_auth_failure() {
             body: "Invalid client".to_string(),
         },
     );
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: true,
@@ -425,16 +441,22 @@ async fn test_login_device_auth_failure() {
             client_id: None,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Device authorization failed"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Device authorization failed")
+    );
 }
 
 #[tokio::test]
 async fn test_login_access_denied() {
     let fixture = TestFixture::new();
-    
+
     // Mock device authorization
     fixture.http_client.add_response(
         "device_authorization",
@@ -444,24 +466,27 @@ async fn test_login_access_denied() {
                 device_code: "test_device_code".to_string(),
                 user_code: "TEST-CODE".to_string(),
                 verification_uri: "https://auth.example.com/verify".to_string(),
-                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE".to_string(),
+                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE"
+                    .to_string(),
                 expires_in: 600,
                 interval: Some(1),
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     // Mock access denied
     fixture.http_client.add_response(
         "oauth2/token",
         HttpResponse {
             status: 400,
-            body: r#"{"error":"access_denied","error_description":"User denied access"}"#.to_string(),
+            body: r#"{"error":"access_denied","error_description":"User denied access"}"#
+                .to_string(),
         },
     );
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: true,
@@ -469,16 +494,22 @@ async fn test_login_access_denied() {
             client_id: None,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Access denied by user"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Access denied by user")
+    );
 }
 
 #[tokio::test]
 async fn test_login_expired_token() {
     let fixture = TestFixture::new();
-    
+
     // Mock device authorization
     fixture.http_client.add_response(
         "device_authorization",
@@ -488,13 +519,15 @@ async fn test_login_expired_token() {
                 device_code: "test_device_code".to_string(),
                 user_code: "TEST-CODE".to_string(),
                 verification_uri: "https://auth.example.com/verify".to_string(),
-                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE".to_string(),
+                verification_uri_complete: "https://auth.example.com/verify?code=TEST-CODE"
+                    .to_string(),
                 expires_in: 600,
                 interval: Some(1),
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     // Mock expired token
     fixture.http_client.add_response(
         "oauth2/token",
@@ -503,9 +536,9 @@ async fn test_login_expired_token() {
             body: r#"{"error":"expired_token"}"#.to_string(),
         },
     );
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         LoginConfig {
             no_browser: true,
@@ -513,16 +546,22 @@ async fn test_login_expired_token() {
             client_id: None,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Device code expired"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Device code expired")
+    );
 }
 
 #[tokio::test]
 async fn test_get_stored_credentials() {
     let keyring = Arc::new(MockKeyringStorage::new());
-    
+
     let creds = StoredCredentials {
         access_token: "test_token".to_string(),
         refresh_token: Some("refresh_token".to_string()),
@@ -530,14 +569,16 @@ async fn test_get_stored_credentials() {
         expires_at: Some(Utc::now() + chrono::Duration::hours(1)),
         authkit_domain: "auth.example.com".to_string(),
     };
-    
+
     // Store credentials
     let json = serde_json::to_string(&creds).unwrap();
     keyring.store("ftl-cli", "default", &json).unwrap();
-    
+
     // Retrieve credentials
-    let retrieved = get_stored_credentials_with_deps(&(keyring.clone() as Arc<dyn login::KeyringStorage>)).unwrap();
-    
+    let retrieved =
+        get_stored_credentials_with_deps(&(keyring.clone() as Arc<dyn login::KeyringStorage>))
+            .unwrap();
+
     assert_eq!(retrieved.access_token, "test_token");
     assert_eq!(retrieved.refresh_token, Some("refresh_token".to_string()));
     assert_eq!(retrieved.authkit_domain, "auth.example.com");
@@ -548,7 +589,7 @@ async fn test_refresh_credentials_success() {
     let keyring = Arc::new(MockKeyringStorage::new());
     let http_client = Arc::new(MockHttpClient::new());
     let clock = Arc::new(MockClock::new());
-    
+
     // Store expired credentials
     let expired_creds = StoredCredentials {
         access_token: "old_token".to_string(),
@@ -557,10 +598,10 @@ async fn test_refresh_credentials_success() {
         expires_at: Some(clock.now() - chrono::Duration::hours(1)), // Expired
         authkit_domain: "auth.example.com".to_string(),
     };
-    
+
     let json = serde_json::to_string(&expired_creds).unwrap();
     keyring.store("ftl-cli", "default", &json).unwrap();
-    
+
     // Mock refresh response
     http_client.add_response(
         "oauth2/token",
@@ -572,21 +613,27 @@ async fn test_refresh_credentials_success() {
                 expires_in: Some(3600),
                 refresh_token: Some("new_refresh_token".to_string()),
                 id_token: None,
-            }).unwrap(),
+            })
+            .unwrap(),
         },
     );
-    
+
     // Refresh credentials
     let refreshed = get_or_refresh_credentials_with_deps(
         &(keyring.clone() as Arc<dyn login::KeyringStorage>),
         &(http_client.clone() as Arc<dyn login::HttpClient>),
-        &(clock.clone() as Arc<dyn login::Clock>)
-    ).await.unwrap();
-    
+        &(clock.clone() as Arc<dyn login::Clock>),
+    )
+    .await
+    .unwrap();
+
     assert_eq!(refreshed.access_token, "new_token");
-    assert_eq!(refreshed.refresh_token, Some("new_refresh_token".to_string()));
+    assert_eq!(
+        refreshed.refresh_token,
+        Some("new_refresh_token".to_string())
+    );
     assert!(refreshed.expires_at.is_some());
-    
+
     // Verify stored credentials were updated
     let stored = keyring.retrieve("ftl-cli", "default").unwrap();
     let stored_creds: StoredCredentials = serde_json::from_str(&stored).unwrap();
@@ -598,7 +645,7 @@ async fn test_refresh_credentials_no_refresh_token() {
     let keyring = Arc::new(MockKeyringStorage::new());
     let http_client = Arc::new(MockHttpClient::new());
     let clock = Arc::new(MockClock::new());
-    
+
     // Store expired credentials without refresh token
     let expired_creds = StoredCredentials {
         access_token: "old_token".to_string(),
@@ -607,31 +654,38 @@ async fn test_refresh_credentials_no_refresh_token() {
         expires_at: Some(clock.now() - chrono::Duration::hours(1)), // Expired
         authkit_domain: "auth.example.com".to_string(),
     };
-    
+
     let json = serde_json::to_string(&expired_creds).unwrap();
     keyring.store("ftl-cli", "default", &json).unwrap();
-    
+
     // Try to refresh
     let result = get_or_refresh_credentials_with_deps(
         &(keyring.clone() as Arc<dyn login::KeyringStorage>),
         &(http_client.clone() as Arc<dyn login::HttpClient>),
-        &(clock.clone() as Arc<dyn login::Clock>)
-    ).await;
-    
+        &(clock.clone() as Arc<dyn login::Clock>),
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("no refresh token available"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("no refresh token available")
+    );
 }
 
 #[tokio::test]
 async fn test_clear_credentials() {
     let keyring = Arc::new(MockKeyringStorage::new());
-    
+
     // Store some credentials
     keyring.store("ftl-cli", "default", "test_data").unwrap();
-    
+
     // Clear credentials
-    clear_stored_credentials_with_deps(&(keyring.clone() as Arc<dyn login::KeyringStorage>)).unwrap();
-    
+    clear_stored_credentials_with_deps(&(keyring.clone() as Arc<dyn login::KeyringStorage>))
+        .unwrap();
+
     // Try to retrieve - should fail
     let result = keyring.retrieve("ftl-cli", "default");
     assert!(result.is_err());

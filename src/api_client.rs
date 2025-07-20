@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 // Include the generated client code
 include!(concat!(env!("OUT_DIR"), "/ftl_backend_client.rs"));
@@ -29,18 +29,18 @@ impl Default for ApiConfig {
 /// Create a configured FTL API client
 pub fn create_client(config: ApiConfig) -> Result<Client> {
     let mut headers = HeaderMap::new();
-    
+
     // Add authorization header if token is provided
     if let Some(token) = config.auth_token {
         let auth_value = HeaderValue::from_str(&format!("Bearer {}", token))?;
         headers.insert(AUTHORIZATION, auth_value);
     }
-    
+
     let http_client = reqwest::ClientBuilder::new()
         .default_headers(headers)
         .timeout(config.timeout)
         .build()?;
-    
+
     Ok(Client::new_with_client(&config.base_url, http_client))
 }
 
@@ -48,9 +48,9 @@ pub fn create_client(config: ApiConfig) -> Result<Client> {
 pub fn create_client_from_env() -> Result<Client> {
     let base_url = std::env::var("FTL_API_URL")
         .unwrap_or_else(|_| "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string());
-    
+
     let auth_token = std::env::var("FTL_AUTH_TOKEN").ok();
-    
+
     create_client(ApiConfig {
         base_url,
         auth_token,

@@ -8,8 +8,8 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 
 use crate::deps::{
-    AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, 
-    ProcessManager, SpinInstaller, UserInterface
+    AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, ProcessManager, SpinInstaller,
+    UserInterface,
 };
 
 /// File watcher trait for testability
@@ -52,10 +52,7 @@ pub struct UpDependencies {
 }
 
 /// Execute the up command with injected dependencies
-pub async fn execute_with_deps(
-    config: UpConfig,
-    deps: Arc<UpDependencies>,
-) -> Result<()> {
+pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
     let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
     // Validate project directory exists
@@ -73,10 +70,10 @@ pub async fn execute_with_deps(
 }
 
 async fn run_normal(
-    project_path: PathBuf, 
-    port: u16, 
+    project_path: PathBuf,
+    port: u16,
     build: bool,
-    deps: &Arc<UpDependencies>
+    deps: &Arc<UpDependencies>,
 ) -> Result<()> {
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
@@ -101,15 +98,14 @@ async fn run_normal(
 
     deps.ui.print(&format!("{} Starting server...", "→"));
     deps.ui.print("");
-    deps.ui.print(&format!(
-        "🌐 Server will start at http://{}",
-        listen_addr
-    ));
+    deps.ui
+        .print(&format!("🌐 Server will start at http://{}", listen_addr));
     deps.ui.print("⏹ Press Ctrl+C to stop");
     deps.ui.print("");
 
     // Start the server process
-    let mut process = deps.process_manager
+    let mut process = deps
+        .process_manager
         .spawn(&spin_path, &args, Some(&project_path))
         .await
         .context("Failed to start spin up")?;
@@ -131,19 +127,23 @@ async fn run_normal(
     // Check if we should print the stopping message
     if ctrlc_pressed.load(Ordering::SeqCst) {
         deps.ui.print("");
-        deps.ui.print_styled("■ Stopping server...", MessageStyle::Red);
+        deps.ui
+            .print_styled("■ Stopping server...", MessageStyle::Red);
     } else if !exit_status.success() {
-        anyhow::bail!("Spin exited with status: {}", exit_status.code().unwrap_or(-1));
+        anyhow::bail!(
+            "Spin exited with status: {}",
+            exit_status.code().unwrap_or(-1)
+        );
     }
 
     Ok(())
 }
 
 async fn run_with_watch(
-    project_path: PathBuf, 
-    port: u16, 
+    project_path: PathBuf,
+    port: u16,
     clear: bool,
-    deps: &Arc<UpDependencies>
+    deps: &Arc<UpDependencies>,
 ) -> Result<()> {
     deps.ui.print(&format!(
         "{} Starting development server with auto-rebuild...",
@@ -168,7 +168,8 @@ async fn run_with_watch(
     let listen_addr = format!("127.0.0.1:{port}");
     let args = vec!["up", "--listen", &listen_addr];
 
-    let mut server_process = deps.process_manager
+    let mut server_process = deps
+        .process_manager
         .spawn(&spin_path, &args, Some(&project_path))
         .await
         .context("Failed to start spin up")?;
@@ -252,13 +253,18 @@ async fn run_with_watch(
 pub fn should_watch_file(path: &Path) -> bool {
     // Skip if path contains common build/output directories
     let path_str = path.to_string_lossy();
-    
+
     // Check for excluded directories (with or without leading separator)
-    if path_str.contains("target/") || path_str.contains("target\\")
-        || path_str.contains("dist/") || path_str.contains("dist\\")
-        || path_str.contains("build/") || path_str.contains("build\\")
-        || path_str.contains(".spin/") || path_str.contains(".spin\\")
-        || path_str.contains("node_modules/") || path_str.contains("node_modules\\")
+    if path_str.contains("target/")
+        || path_str.contains("target\\")
+        || path_str.contains("dist/")
+        || path_str.contains("dist\\")
+        || path_str.contains("build/")
+        || path_str.contains("build\\")
+        || path_str.contains(".spin/")
+        || path_str.contains(".spin\\")
+        || path_str.contains("node_modules/")
+        || path_str.contains("node_modules\\")
         || path_str.ends_with(".wasm")
         || path_str.ends_with(".wat")
         || path_str.ends_with("package-lock.json")
@@ -284,8 +290,10 @@ pub fn should_watch_file(path: &Path) -> bool {
 async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> Result<()> {
     // For now, we'll use the build command directly
     // In a real implementation, we'd refactor build command to be callable
-    use crate::commands::build::{execute_with_deps as build_execute, BuildConfig, BuildDependencies};
-    
+    use crate::commands::build::{
+        BuildConfig, BuildDependencies, execute_with_deps as build_execute,
+    };
+
     let build_deps = Arc::new(BuildDependencies {
         file_system: deps.file_system.clone(),
         command_executor: deps.command_executor.clone(),
@@ -293,14 +301,15 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
         spin_installer: deps.spin_installer.clone(),
         async_runtime: deps.async_runtime.clone(),
     });
-    
+
     build_execute(
         BuildConfig {
             path: Some(project_path.to_path_buf()),
             release: false,
         },
         build_deps,
-    ).await
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -310,7 +319,7 @@ mod tests {
     #[test]
     fn test_should_watch_file() {
         use std::path::PathBuf;
-        
+
         // Should watch source files
         assert!(should_watch_file(&PathBuf::from("src/main.rs")));
         assert!(should_watch_file(&PathBuf::from("lib.rs")));
@@ -318,19 +327,21 @@ mod tests {
         assert!(should_watch_file(&PathBuf::from("app.js")));
         assert!(should_watch_file(&PathBuf::from("Cargo.toml")));
         assert!(should_watch_file(&PathBuf::from("package.json")));
-        
+
         // Should not watch build outputs
         assert!(!should_watch_file(&PathBuf::from("target/debug/app")));
         assert!(!should_watch_file(&PathBuf::from("dist/bundle.js")));
         assert!(!should_watch_file(&PathBuf::from("build/output.wasm")));
         assert!(!should_watch_file(&PathBuf::from(".spin/config")));
-        assert!(!should_watch_file(&PathBuf::from("node_modules/package/index.js")));
-        
+        assert!(!should_watch_file(&PathBuf::from(
+            "node_modules/package/index.js"
+        )));
+
         // Should not watch lock files
         assert!(!should_watch_file(&PathBuf::from("Cargo.lock")));
         assert!(!should_watch_file(&PathBuf::from("package-lock.json")));
         assert!(!should_watch_file(&PathBuf::from("yarn.lock")));
-        
+
         // Should not watch wasm files
         assert!(!should_watch_file(&PathBuf::from("module.wasm")));
         assert!(!should_watch_file(&PathBuf::from("module.wat")));

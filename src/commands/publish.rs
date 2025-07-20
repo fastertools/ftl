@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::deps::{UserInterface, MessageStyle, FileSystem};
+use crate::deps::{FileSystem, MessageStyle, UserInterface};
 
 /// Build executor trait
 #[async_trait::async_trait]
@@ -21,7 +21,12 @@ pub trait SpinInstaller: Send + Sync {
 
 /// Process executor trait for running commands with working directory
 pub trait ProcessExecutor: Send + Sync {
-    fn execute(&self, command: &str, args: &[&str], working_dir: Option<&Path>) -> Result<ProcessOutput>;
+    fn execute(
+        &self,
+        command: &str,
+        args: &[&str],
+        working_dir: Option<&Path>,
+    ) -> Result<ProcessOutput>;
 }
 
 /// Process execution output
@@ -54,7 +59,8 @@ pub async fn execute_with_deps(
 ) -> Result<()> {
     let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
-    deps.ui.print_styled("→ Publishing project", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ Publishing project", MessageStyle::Cyan);
 
     // Validate we're in a Spin project directory
     let spin_toml_path = project_path.join("spin.toml");
@@ -69,7 +75,9 @@ pub async fn execute_with_deps(
 
     // Build the project first
     deps.ui.print("→ Building project...");
-    deps.build_executor.execute(Some(project_path.clone()), true).await?;
+    deps.build_executor
+        .execute(Some(project_path.clone()), true)
+        .await?;
 
     // Prepare registry push arguments
     let mut args = vec!["registry", "push"];
@@ -86,17 +94,16 @@ pub async fn execute_with_deps(
 
     deps.ui.print("→ Publishing to registry...");
 
-    let output = deps.process_executor.execute(
-        &spin_path.to_string_lossy(),
-        &args,
-        Some(&project_path),
-    )?;
+    let output =
+        deps.process_executor
+            .execute(&spin_path.to_string_lossy(), &args, Some(&project_path))?;
 
     if !output.success {
         anyhow::bail!("Publishing failed:\n{}\n{}", output.stdout, output.stderr);
     }
 
-    deps.ui.print_styled("✓ Project published successfully!", MessageStyle::Success);
+    deps.ui
+        .print_styled("✓ Project published successfully!", MessageStyle::Success);
 
     // Print any useful output from spin
     if !output.stdout.trim().is_empty() {

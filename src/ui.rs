@@ -6,8 +6,8 @@ use std::time::Duration;
 use console::style;
 use indicatif::{MultiProgress as IndicatifMultiProgress, ProgressBar, ProgressStyle};
 
-use anyhow::Result;
 use crate::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
+use anyhow::Result;
 
 /// Production UI implementation using indicatif
 pub struct RealUserInterface;
@@ -22,17 +22,17 @@ impl UserInterface for RealUserInterface {
         );
         Box::new(RealProgressIndicator { pb })
     }
-    
+
     fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
         Box::new(RealMultiProgressManager {
             mp: IndicatifMultiProgress::new(),
         })
     }
-    
+
     fn print(&self, message: &str) {
         println!("{}", message);
     }
-    
+
     fn print_styled(&self, message: &str, msg_style: MessageStyle) {
         let styled = match msg_style {
             MessageStyle::Normal => message.to_string(),
@@ -47,29 +47,29 @@ impl UserInterface for RealUserInterface {
         };
         println!("{}", styled);
     }
-    
+
     fn is_interactive(&self) -> bool {
         atty::is(atty::Stream::Stdin)
     }
-    
+
     fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String> {
         use dialoguer::{Input, theme::ColorfulTheme};
-        
+
         let theme = ColorfulTheme::default();
-        let mut input = Input::<String>::with_theme(&theme)
-            .with_prompt(prompt);
-        
+        let mut input = Input::<String>::with_theme(&theme).with_prompt(prompt);
+
         if let Some(default_val) = default {
             input = input.default(default_val.to_string());
         }
-        
-        input.interact_text()
+
+        input
+            .interact_text()
             .map_err(|e| anyhow::anyhow!("Failed to get input: {}", e))
     }
-    
+
     fn prompt_select(&self, prompt: &str, items: &[&str], default: usize) -> Result<usize> {
         use dialoguer::{Select, theme::ColorfulTheme};
-        
+
         Select::with_theme(&ColorfulTheme::default())
             .with_prompt(prompt)
             .items(items)
@@ -77,7 +77,7 @@ impl UserInterface for RealUserInterface {
             .interact()
             .map_err(|e| anyhow::anyhow!("Failed to get selection: {}", e))
     }
-    
+
     fn clear_screen(&self) {
         print!("\x1B[2J\x1B[1;1H");
     }
@@ -91,19 +91,19 @@ impl ProgressIndicator for RealProgressIndicator {
     fn set_message(&self, message: &str) {
         self.pb.set_message(message.to_string());
     }
-    
+
     fn finish_and_clear(&self) {
         self.pb.finish_and_clear();
     }
-    
+
     fn enable_steady_tick(&self, duration: Duration) {
         self.pb.enable_steady_tick(duration);
     }
-    
+
     fn finish_with_message(&self, message: String) {
         self.pb.finish_with_message(message);
     }
-    
+
     fn set_prefix(&self, prefix: String) {
         self.pb.set_prefix(prefix);
     }
@@ -140,11 +140,11 @@ impl TestUserInterface {
             styled_output: Arc::new(Mutex::new(Vec::new())),
         }
     }
-    
+
     pub fn get_output(&self) -> Vec<String> {
         self.output.lock().unwrap().clone()
     }
-    
+
     pub fn get_styled_output(&self) -> Vec<(String, MessageStyle)> {
         self.styled_output.lock().unwrap().clone()
     }
@@ -156,15 +156,15 @@ impl UserInterface for TestUserInterface {
             messages: Arc::new(Mutex::new(Vec::new())),
         })
     }
-    
+
     fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
         Box::new(TestMultiProgressManager)
     }
-    
+
     fn print(&self, message: &str) {
         self.output.lock().unwrap().push(message.to_string());
     }
-    
+
     fn print_styled(&self, message: &str, style: MessageStyle) {
         // Add to both styled output and regular output for easier testing
         self.styled_output
@@ -173,21 +173,21 @@ impl UserInterface for TestUserInterface {
             .push((message.to_string(), style));
         self.output.lock().unwrap().push(message.to_string());
     }
-    
+
     fn is_interactive(&self) -> bool {
         false // Test UI is non-interactive
     }
-    
+
     fn prompt_input(&self, _prompt: &str, default: Option<&str>) -> Result<String> {
         // In test mode, return the default or a test value
         Ok(default.unwrap_or("test-value").to_string())
     }
-    
+
     fn prompt_select(&self, _prompt: &str, _items: &[&str], default: usize) -> Result<usize> {
         // In test mode, return the default selection
         Ok(default)
     }
-    
+
     fn clear_screen(&self) {
         // No-op in test mode
     }
@@ -201,15 +201,15 @@ impl ProgressIndicator for TestProgressIndicator {
     fn set_message(&self, message: &str) {
         self.messages.lock().unwrap().push(message.to_string());
     }
-    
+
     fn finish_and_clear(&self) {}
-    
+
     fn enable_steady_tick(&self, _duration: Duration) {}
-    
+
     fn finish_with_message(&self, message: String) {
         self.messages.lock().unwrap().push(message);
     }
-    
+
     fn set_prefix(&self, _prefix: String) {}
 }
 

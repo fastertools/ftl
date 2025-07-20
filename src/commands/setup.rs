@@ -1,12 +1,12 @@
 //! Refactored setup command with dependency injection for better testability
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::process::Output;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// Spin installer trait
 pub trait SpinInstaller: Send + Sync {
@@ -41,7 +41,8 @@ pub async fn templates_with_deps(
     tar: Option<String>,
     deps: Arc<SetupDependencies>,
 ) -> Result<()> {
-    deps.ui.print_styled("→ Managing FTL templates", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ Managing FTL templates", MessageStyle::Cyan);
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install()?;
@@ -49,10 +50,10 @@ pub async fn templates_with_deps(
 
     // Check if templates are already installed
     if !force {
-        let list_output = deps.command_executor.execute(
-            spin_str,
-            &["templates", "list"],
-        ).context("Failed to list templates")?;
+        let list_output = deps
+            .command_executor
+            .execute(spin_str, &["templates", "list"])
+            .context("Failed to list templates")?;
 
         let output_str = String::from_utf8_lossy(&list_output.stdout);
         let has_ftl_templates = output_str.contains("ftl-mcp-server")
@@ -62,7 +63,7 @@ pub async fn templates_with_deps(
         if has_ftl_templates {
             deps.ui.print_styled(
                 "✓ ftl-mcp templates are already installed",
-                MessageStyle::Success
+                MessageStyle::Success,
             );
             deps.ui.print("");
             deps.ui.print("Use --force to reinstall/update them");
@@ -83,7 +84,10 @@ pub async fn templates_with_deps(
             args.push(branch_name);
         }
     } else if let Some(dir_path) = &dir {
-        source_info = format!("→ Installing templates from directory: {}", dir_path.display());
+        source_info = format!(
+            "→ Installing templates from directory: {}",
+            dir_path.display()
+        );
         let dir_str = dir_path.to_str().unwrap();
         args.push("--dir");
         args.push(dir_str);
@@ -102,10 +106,10 @@ pub async fn templates_with_deps(
     deps.ui.print(&source_info);
     args.push("--upgrade");
 
-    let install_output = deps.command_executor.execute(
-        spin_str,
-        &args,
-    ).context("Failed to install templates")?;
+    let install_output = deps
+        .command_executor
+        .execute(spin_str, &args)
+        .context("Failed to install templates")?;
 
     if !install_output.status.success() {
         anyhow::bail!(
@@ -114,14 +118,15 @@ pub async fn templates_with_deps(
         );
     }
 
-    deps.ui.print_styled("✓ Templates installed successfully!", MessageStyle::Success);
+    deps.ui
+        .print_styled("✓ Templates installed successfully!", MessageStyle::Success);
     deps.ui.print("");
 
     // List installed ftl-mcp templates
-    let list_output = deps.command_executor.execute(
-        spin_str,
-        &["templates", "list"],
-    ).context("Failed to list templates")?;
+    let list_output = deps
+        .command_executor
+        .execute(spin_str, &["templates", "list"])
+        .context("Failed to list templates")?;
 
     let output_str = String::from_utf8_lossy(&list_output.stdout);
     deps.ui.print("Available ftl-mcp templates:");
@@ -136,7 +141,8 @@ pub async fn templates_with_deps(
 
 /// Execute the info subcommand with injected dependencies
 pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
-    deps.ui.print_styled("→ FTL Configuration", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ FTL Configuration", MessageStyle::Cyan);
     deps.ui.print("");
 
     // Show version
@@ -156,10 +162,10 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
             ));
 
             // Get spin version
-            if let Ok(output) = deps.command_executor.execute(
-                spin_path.to_str().unwrap_or("spin"),
-                &["--version"],
-            ) {
+            if let Ok(output) = deps
+                .command_executor
+                .execute(spin_path.to_str().unwrap_or("spin"), &["--version"])
+            {
                 let version = String::from_utf8_lossy(&output.stdout);
                 deps.ui.print(&format!("  Version: {}", version.trim()));
             }
@@ -176,10 +182,10 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
 
     // Check templates
     if let Ok(spin_path) = deps.spin_installer.get_spin_path() {
-        if let Ok(output) = deps.command_executor.execute(
-            spin_path.to_str().unwrap_or("spin"),
-            &["templates", "list"],
-        ) {
+        if let Ok(output) = deps
+            .command_executor
+            .execute(spin_path.to_str().unwrap_or("spin"), &["templates", "list"])
+        {
             let output_str = String::from_utf8_lossy(&output.stdout);
             let ftl_templates: Vec<&str> = output_str
                 .lines()
@@ -206,7 +212,10 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
     deps.ui.print("");
 
     // Check for cargo-component
-    match deps.command_executor.execute("cargo", &["component", "--version"]) {
+    match deps
+        .command_executor
+        .execute("cargo", &["component", "--version"])
+    {
         Ok(output) if output.status.success() => {
             let version = String::from_utf8_lossy(&output.stdout);
             deps.ui.print(&format!(
@@ -221,7 +230,8 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
                 styled_text("✗", MessageStyle::Error)
             ));
             deps.ui.print("  Required for building Rust components");
-            deps.ui.print("  Will be installed automatically when building Rust components");
+            deps.ui
+                .print("  Will be installed automatically when building Rust components");
         }
     }
     deps.ui.print("");
@@ -242,7 +252,8 @@ pub async fn info_with_deps(deps: Arc<SetupDependencies>) -> Result<()> {
                 styled_text("✗", MessageStyle::Error)
             ));
             deps.ui.print("  Required for 'ftl publish'");
-            deps.ui.print("  Install from: https://github.com/bytecodealliance/wasm-pkg-tools");
+            deps.ui
+                .print("  Install from: https://github.com/bytecodealliance/wasm-pkg-tools");
         }
     }
 

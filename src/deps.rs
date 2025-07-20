@@ -10,17 +10,17 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::api_client::{types, Client as ApiClient};
+use crate::api_client::{Client as ApiClient, types};
 use crate::commands::login::StoredCredentials as Credentials;
 
 /// File system operations
 pub trait FileSystem: Send + Sync {
     /// Check if a path exists
     fn exists(&self, path: &Path) -> bool;
-    
+
     /// Read a file to string
     fn read_to_string(&self, path: &Path) -> Result<String>;
-    
+
     /// Write string to file
     fn write_string(&self, path: &Path, content: &str) -> Result<()>;
 }
@@ -30,10 +30,10 @@ pub trait FileSystem: Send + Sync {
 pub trait CommandExecutor: Send + Sync {
     /// Check if a command exists in PATH
     async fn check_command_exists(&self, command: &str) -> Result<()>;
-    
+
     /// Execute a command with arguments
     async fn execute(&self, command: &str, args: &[&str]) -> Result<CommandOutput>;
-    
+
     /// Execute a command with stdin input
     async fn execute_with_stdin(
         &self,
@@ -56,19 +56,16 @@ pub struct CommandOutput {
 pub trait FtlApiClient: Send + Sync {
     /// Get ECR credentials
     async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse>;
-    
+
     /// Create ECR repository
     async fn create_ecr_repository(
         &self,
         request: &types::CreateEcrRepositoryRequest,
     ) -> Result<types::CreateEcrRepositoryResponse>;
-    
+
     /// Get deployment status
-    async fn get_deployment_status(
-        &self,
-        deployment_id: &str,
-    ) -> Result<types::DeploymentStatus>;
-    
+    async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus>;
+
     /// Deploy application
     async fn deploy_app(
         &self,
@@ -80,10 +77,10 @@ pub trait FtlApiClient: Send + Sync {
 pub trait Clock: Send + Sync {
     /// Get current instant
     fn now(&self) -> Instant;
-    
+
     /// Create duration from milliseconds
     fn duration_from_millis(&self, millis: u64) -> Duration;
-    
+
     /// Create duration from seconds
     fn duration_from_secs(&self, secs: u64) -> Duration;
 }
@@ -99,25 +96,25 @@ pub trait CredentialsProvider: Send + Sync {
 pub trait UserInterface: Send + Sync {
     /// Create a spinner progress indicator
     fn create_spinner(&self) -> Box<dyn ProgressIndicator>;
-    
+
     /// Create a multi-progress manager
     fn create_multi_progress(&self) -> Box<dyn MultiProgressManager>;
-    
+
     /// Print a message
     fn print(&self, message: &str);
-    
+
     /// Print a styled message
     fn print_styled(&self, message: &str, style: MessageStyle);
-    
+
     /// Check if running in interactive mode
     fn is_interactive(&self) -> bool;
-    
+
     /// Prompt for text input
     fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String>;
-    
+
     /// Prompt for selection
     fn prompt_select(&self, prompt: &str, items: &[&str], default: usize) -> Result<usize>;
-    
+
     /// Clear the screen
     fn clear_screen(&self);
 }
@@ -126,16 +123,16 @@ pub trait UserInterface: Send + Sync {
 pub trait ProgressIndicator: Send + Sync {
     /// Set the message
     fn set_message(&self, message: &str);
-    
+
     /// Finish and clear the progress
     fn finish_and_clear(&self);
-    
+
     /// Enable steady tick
     fn enable_steady_tick(&self, duration: Duration);
-    
+
     /// Finish with a message
     fn finish_with_message(&self, message: String);
-    
+
     /// Set prefix
     fn set_prefix(&self, prefix: String);
 }
@@ -190,12 +187,12 @@ impl FileSystem for RealFileSystem {
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }
-    
+
     fn read_to_string(&self, path: &Path) -> Result<String> {
         std::fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("Failed to read file {}: {}", path.display(), e))
     }
-    
+
     fn write_string(&self, path: &Path, content: &str) -> Result<()> {
         std::fs::write(path, content)
             .map_err(|e| anyhow::anyhow!("Failed to write file {}: {}", path.display(), e))
@@ -212,31 +209,31 @@ impl CommandExecutor for RealCommandExecutor {
             .map(|_| ())
             .map_err(|_| anyhow::anyhow!("{} not found in PATH", command))
     }
-    
+
     async fn execute(&self, command: &str, args: &[&str]) -> Result<CommandOutput> {
         use std::process::Command;
-        
+
         let output = Command::new(command)
             .args(args)
             .output()
             .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))?;
-        
+
         Ok(CommandOutput {
             success: output.status.success(),
             stdout: output.stdout,
             stderr: output.stderr,
         })
     }
-    
+
     async fn execute_with_stdin(
         &self,
         command: &str,
         args: &[&str],
         stdin: &str,
     ) -> Result<CommandOutput> {
-        use std::process::{Command, Stdio};
         use std::io::Write;
-        
+        use std::process::{Command, Stdio};
+
         let mut child = Command::new(command)
             .args(args)
             .stdin(Stdio::piped())
@@ -244,13 +241,13 @@ impl CommandExecutor for RealCommandExecutor {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn {}: {}", command, e))?;
-        
+
         if let Some(mut stdin_handle) = child.stdin.take() {
             stdin_handle.write_all(stdin.as_bytes())?;
         }
-        
+
         let output = child.wait_with_output()?;
-        
+
         Ok(CommandOutput {
             success: output.status.success(),
             stdout: output.stdout,
@@ -280,7 +277,7 @@ impl FtlApiClient for RealFtlApiClient {
             .map(|resp| resp.into_inner())
             .map_err(|e| anyhow::anyhow!("Failed to get ECR credentials: {}", e))
     }
-    
+
     async fn create_ecr_repository(
         &self,
         request: &types::CreateEcrRepositoryRequest,
@@ -293,11 +290,8 @@ impl FtlApiClient for RealFtlApiClient {
             .map(|resp| resp.into_inner())
             .map_err(|e| anyhow::anyhow!("Failed to create ECR repository: {}", e))
     }
-    
-    async fn get_deployment_status(
-        &self,
-        deployment_id: &str,
-    ) -> Result<types::DeploymentStatus> {
+
+    async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus> {
         self.client
             .get_deployment_status()
             .deployment_id(deployment_id)
@@ -306,7 +300,7 @@ impl FtlApiClient for RealFtlApiClient {
             .map(|resp| resp.into_inner())
             .map_err(|e| anyhow::anyhow!("Failed to get deployment status: {}", e))
     }
-    
+
     async fn deploy_app(
         &self,
         request: &types::DeploymentRequest,
@@ -328,11 +322,11 @@ impl Clock for RealClock {
     fn now(&self) -> Instant {
         Instant::now()
     }
-    
+
     fn duration_from_millis(&self, millis: u64) -> Duration {
         Duration::from_millis(millis)
     }
-    
+
     fn duration_from_secs(&self, secs: u64) -> Duration {
         Duration::from_secs(secs)
     }
@@ -363,14 +357,15 @@ impl BuildExecutor for RealBuildExecutor {
             spin_installer: Arc::new(RealSpinInstaller),
             async_runtime: Arc::new(RealAsyncRuntime),
         });
-        
+
         crate::commands::build::execute_with_deps(
             crate::commands::build::BuildConfig {
                 path: path.map(|p| p.to_path_buf()),
                 release,
             },
             deps,
-        ).await
+        )
+        .await
     }
 }
 
@@ -399,7 +394,12 @@ impl SpinInstaller for RealSpinInstaller {
 #[async_trait]
 pub trait ProcessManager: Send + Sync {
     /// Spawn a new process
-    async fn spawn(&self, command: &str, args: &[&str], working_dir: Option<&Path>) -> Result<Box<dyn ProcessHandle>>;
+    async fn spawn(
+        &self,
+        command: &str,
+        args: &[&str],
+        working_dir: Option<&Path>,
+    ) -> Result<Box<dyn ProcessHandle>>;
 }
 
 /// Process handle trait
@@ -407,10 +407,10 @@ pub trait ProcessManager: Send + Sync {
 pub trait ProcessHandle: Send + Sync {
     /// Wait for the process to exit
     async fn wait(&mut self) -> Result<ExitStatus>;
-    
+
     /// Terminate the process
     async fn terminate(&mut self) -> Result<()>;
-    
+
     /// Get the process ID
     fn id(&self) -> u32;
 }
@@ -424,11 +424,11 @@ impl ExitStatus {
     pub fn new(code: Option<i32>) -> Self {
         Self { code }
     }
-    
+
     pub fn success(&self) -> bool {
         self.code == Some(0)
     }
-    
+
     pub fn code(&self) -> Option<i32> {
         self.code
     }
@@ -448,25 +448,29 @@ pub struct RealProcessManager;
 
 #[async_trait]
 impl ProcessManager for RealProcessManager {
-    async fn spawn(&self, command: &str, args: &[&str], working_dir: Option<&Path>) -> Result<Box<dyn ProcessHandle>> {
+    async fn spawn(
+        &self,
+        command: &str,
+        args: &[&str],
+        working_dir: Option<&Path>,
+    ) -> Result<Box<dyn ProcessHandle>> {
         use std::process::{Command, Stdio};
-        
+
         let mut cmd = Command::new(command);
         cmd.args(args)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
-            
+
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }
-        
-        let child = cmd.spawn()
+
+        let child = cmd
+            .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn process: {}", e))?;
-            
-        Ok(Box::new(RealProcessHandle {
-            child: Some(child),
-        }))
+
+        Ok(Box::new(RealProcessHandle { child: Some(child) }))
     }
 }
 
@@ -479,22 +483,24 @@ pub struct RealProcessHandle {
 impl ProcessHandle for RealProcessHandle {
     async fn wait(&mut self) -> Result<ExitStatus> {
         if let Some(mut child) = self.child.take() {
-            let status = child.wait()
+            let status = child
+                .wait()
                 .map_err(|e| anyhow::anyhow!("Failed to wait for process: {}", e))?;
             Ok(ExitStatus::new(status.code()))
         } else {
             anyhow::bail!("Process already consumed")
         }
     }
-    
+
     async fn terminate(&mut self) -> Result<()> {
         if let Some(mut child) = self.child.take() {
-            child.kill()
+            child
+                .kill()
                 .map_err(|e| anyhow::anyhow!("Failed to terminate process: {}", e))?;
         }
         Ok(())
     }
-    
+
     fn id(&self) -> u32 {
         self.child.as_ref().map(|c| c.id()).unwrap_or(0)
     }

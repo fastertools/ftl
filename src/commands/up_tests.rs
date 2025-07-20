@@ -1,8 +1,8 @@
 //! Unit tests for the up command
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::commands::up::{self, *};
@@ -22,11 +22,11 @@ impl MockProcessManager {
             spawn_count: Arc::new(AtomicU32::new(0)),
         }
     }
-    
+
     fn add_spawn_response(&self, response: Result<Box<dyn ProcessHandle>, anyhow::Error>) {
         self.spawn_responses.lock().unwrap().push(response);
     }
-    
+
     fn get_spawn_count(&self) -> u32 {
         self.spawn_count.load(Ordering::SeqCst)
     }
@@ -34,7 +34,12 @@ impl MockProcessManager {
 
 #[async_trait::async_trait]
 impl ProcessManager for MockProcessManager {
-    async fn spawn(&self, _command: &str, _args: &[&str], _working_dir: Option<&Path>) -> Result<Box<dyn ProcessHandle>, anyhow::Error> {
+    async fn spawn(
+        &self,
+        _command: &str,
+        _args: &[&str],
+        _working_dir: Option<&Path>,
+    ) -> Result<Box<dyn ProcessHandle>, anyhow::Error> {
         self.spawn_count.fetch_add(1, Ordering::SeqCst);
         let mut responses = self.spawn_responses.lock().unwrap();
         if let Some(response) = responses.pop() {
@@ -63,16 +68,16 @@ impl MockProcessHandle {
             wait_duration: None,
         }
     }
-    
+
     fn with_wait_duration(mut self, duration: Duration) -> Self {
         self.wait_duration = Some(duration);
         self
     }
-    
+
     fn was_terminated(&self) -> bool {
         self.terminated.load(Ordering::SeqCst)
     }
-    
+
     fn get_wait_count(&self) -> u32 {
         self.wait_count.load(Ordering::SeqCst)
     }
@@ -82,7 +87,7 @@ impl MockProcessHandle {
 impl ProcessHandle for MockProcessHandle {
     async fn wait(&mut self) -> Result<ExitStatus, anyhow::Error> {
         self.wait_count.fetch_add(1, Ordering::SeqCst);
-        
+
         // Wait for the specified duration or until terminated
         if let Some(duration) = self.wait_duration {
             let start = std::time::Instant::now();
@@ -90,15 +95,15 @@ impl ProcessHandle for MockProcessHandle {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         }
-        
+
         Ok(ExitStatus::new(Some(self.exit_code)))
     }
-    
+
     async fn terminate(&mut self) -> Result<(), anyhow::Error> {
         self.terminated.store(true, Ordering::SeqCst);
         Ok(())
     }
-    
+
     fn id(&self) -> u32 {
         self.id
     }
@@ -116,14 +121,14 @@ impl MockFileWatcher {
             should_fail: false,
         }
     }
-    
+
     fn with_failure() -> Self {
         Self {
             watch_count: Arc::new(AtomicU32::new(0)),
             should_fail: true,
         }
     }
-    
+
     fn get_watch_count(&self) -> u32 {
         self.watch_count.load(Ordering::SeqCst)
     }
@@ -131,7 +136,11 @@ impl MockFileWatcher {
 
 #[async_trait::async_trait]
 impl FileWatcher for MockFileWatcher {
-    async fn watch(&self, _path: &Path, _recursive: bool) -> Result<Box<dyn WatchHandle>, anyhow::Error> {
+    async fn watch(
+        &self,
+        _path: &Path,
+        _recursive: bool,
+    ) -> Result<Box<dyn WatchHandle>, anyhow::Error> {
         self.watch_count.fetch_add(1, Ordering::SeqCst);
         if self.should_fail {
             Err(anyhow::anyhow!("Failed to create file watcher"))
@@ -153,7 +162,7 @@ impl MockWatchHandle {
             files_to_return: Arc::new(Mutex::new(Vec::new())),
         }
     }
-    
+
     fn add_change(&self, files: Vec<PathBuf>) {
         self.files_to_return.lock().unwrap().push(files);
     }
@@ -163,15 +172,15 @@ impl MockWatchHandle {
 impl WatchHandle for MockWatchHandle {
     async fn wait_for_change(&mut self) -> Result<Vec<PathBuf>, anyhow::Error> {
         self.change_count.fetch_add(1, Ordering::SeqCst);
-        
+
         // Simulate waiting for file changes
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         let changed_files = {
             let mut files = self.files_to_return.lock().unwrap();
             files.pop()
         };
-        
+
         if let Some(files) = changed_files {
             Ok(files)
         } else {
@@ -192,7 +201,7 @@ impl MockSignalHandler {
             interrupt_after: None,
         }
     }
-    
+
     fn with_interrupt_after(duration: Duration) -> Self {
         Self {
             interrupt_after: Some(duration),
@@ -224,7 +233,7 @@ impl MockAsyncRuntime {
             sleep_count: Arc::new(AtomicU32::new(0)),
         }
     }
-    
+
     fn get_sleep_count(&self) -> u32 {
         self.sleep_count.load(Ordering::SeqCst)
     }
@@ -263,7 +272,7 @@ impl TestFixture {
             signal_handler: Arc::new(MockSignalHandler::new()),
         }
     }
-    
+
     fn to_deps(self) -> Arc<UpDependencies> {
         Arc::new(UpDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
@@ -285,14 +294,15 @@ use mockall::predicate::*;
 #[tokio::test]
 async fn test_up_no_spin_toml() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml doesn't exist
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("./spin.toml")))
         .times(1)
         .returning(|_| false);
-    
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         UpConfig {
@@ -303,41 +313,51 @@ async fn test_up_no_spin_toml() {
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("No spin.toml found"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("No spin.toml found")
+    );
 }
 
 #[tokio::test]
 async fn test_up_normal_mode_no_build() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("./spin.toml")))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: process spawn and wait - process should wait for 200ms
     fixture.process_manager.add_spawn_response(Ok(Box::new(
-        MockProcessHandle::new(1234, 0).with_wait_duration(Duration::from_millis(200))
+        MockProcessHandle::new(1234, 0).with_wait_duration(Duration::from_millis(200)),
     )));
-    
+
     // Mock: signal handler with interrupt after 100ms
-    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(Duration::from_millis(100)));
-    
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(100),
+    ));
+
     let ui = fixture.ui.clone();
     let process_manager = fixture.process_manager.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         UpConfig {
             path: None,
@@ -347,18 +367,23 @@ async fn test_up_normal_mode_no_build() {
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
-    
+
     // Verify process was spawned
     assert_eq!(process_manager.get_spawn_count(), 1);
-    
+
     // Verify output
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Starting server")));
-    assert!(output.iter().any(|s| s.contains("Server will start at http://127.0.0.1:3000")));
-    
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Server will start at http://127.0.0.1:3000"))
+    );
+
     // The stopping message should be in the output
     assert!(output.iter().any(|s| s.contains("Stopping server")));
 }
@@ -366,21 +391,22 @@ async fn test_up_normal_mode_no_build() {
 #[tokio::test]
 async fn test_up_with_build() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists (checked twice - once for up, once for build)
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(2)
-        .returning(|path| {
-            path == Path::new("./spin.toml")
-        });
-    
+        .returning(|path| path == Path::new("./spin.toml"));
+
     // Mock: read spin.toml for build
-    fixture.file_system
+    fixture
+        .file_system
         .expect_read_to_string()
         .with(eq(Path::new("./spin.toml")))
         .times(1)
-        .returning(|_| Ok(r#"
+        .returning(|_| {
+            Ok(r#"
 spin_manifest_version = "1"
 name = "test-app"
 
@@ -388,33 +414,43 @@ name = "test-app"
 source = "target/wasm32-wasi/release/backend.wasm"
 [component.backend.build]
 command = "cargo build --target wasm32-wasi"
-"#.to_string()));
-    
+"#
+            .to_string())
+        });
+
     // Mock: spin installer (called twice - once for build, once for up)
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(2)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: build command execution
-    fixture.command_executor
+    fixture
+        .command_executor
         .expect_execute()
         .times(1)
-        .returning(|_, _| Ok(CommandOutput {
-            success: true,
-            stdout: b"Build successful".to_vec(),
-            stderr: vec![],
-        }));
-    
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Build successful".to_vec(),
+                stderr: vec![],
+            })
+        });
+
     // Mock: process spawn
-    fixture.process_manager.add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
-    
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
+
     // Mock: signal handler with interrupt
-    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(Duration::from_millis(100)));
-    
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(100),
+    ));
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         UpConfig {
             path: None,
@@ -424,41 +460,50 @@ command = "cargo build --target wasm32-wasi"
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
-    
+
     // Verify output includes build step
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("Building project before starting server")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Building project before starting server"))
+    );
     assert!(output.iter().any(|s| s.contains("Building 1 component")));
 }
 
 #[tokio::test]
 async fn test_up_process_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("./spin.toml")))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: process spawn with exit code 1
-    fixture.process_manager.add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 1))));
-    
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 1))));
+
     // Don't send interrupt signal
     fixture.signal_handler = Arc::new(MockSignalHandler::new());
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         UpConfig {
             path: None,
@@ -468,37 +513,49 @@ async fn test_up_process_fails() {
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Spin exited with status: 1"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Spin exited with status: 1")
+    );
 }
 
 #[tokio::test]
 async fn test_up_with_custom_path() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists at custom path
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .with(eq(Path::new("/my/project/spin.toml")))
         .times(1)
         .returning(|_| true);
-    
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: process spawn
-    fixture.process_manager.add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
-    
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
+
     // Mock: signal handler
-    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(Duration::from_millis(100)));
-    
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(100),
+    ));
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         UpConfig {
             path: Some(PathBuf::from("/my/project")),
@@ -508,30 +565,33 @@ async fn test_up_with_custom_path() {
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_up_watch_mode_initial_build_fails() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists (checked twice)
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .times(2)
         .returning(|path| path == Path::new("./spin.toml"));
-    
+
     // Mock: read spin.toml for build - return invalid toml
-    fixture.file_system
+    fixture
+        .file_system
         .expect_read_to_string()
         .with(eq(Path::new("./spin.toml")))
         .times(1)
         .returning(|_| Ok("invalid toml content".to_string()));
-    
+
     let deps = fixture.to_deps();
-    
+
     let result = execute_with_deps(
         UpConfig {
             path: None,
@@ -541,25 +601,31 @@ async fn test_up_watch_mode_initial_build_fails() {
             clear: false,
         },
         deps,
-    ).await;
-    
+    )
+    .await;
+
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Failed to parse spin.toml"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse spin.toml")
+    );
 }
 
-#[tokio::test] 
+#[tokio::test]
 async fn test_up_watch_mode_file_change() {
     let mut fixture = TestFixture::new();
-    
+
     // Mock: spin.toml exists (multiple checks)
-    fixture.file_system
+    fixture
+        .file_system
         .expect_exists()
         .returning(|path| path == Path::new("./spin.toml"));
-    
+
     // Mock: read spin.toml for builds
-    fixture.file_system
-        .expect_read_to_string()
-        .returning(|_| Ok(r#"
+    fixture.file_system.expect_read_to_string().returning(|_| {
+        Ok(r#"
 spin_manifest_version = "1"
 name = "test-app"
 
@@ -567,39 +633,48 @@ name = "test-app"
 source = "target/wasm32-wasi/release/backend.wasm"
 [component.backend.build]
 command = "cargo build --target wasm32-wasi"
-"#.to_string()));
-    
+"#
+        .to_string())
+    });
+
     // Mock: spin installer
-    fixture.spin_installer
+    fixture
+        .spin_installer
         .expect_check_and_install()
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
-    
+
     // Mock: build command execution
-    fixture.command_executor
-        .expect_execute()
-        .returning(|_, _| Ok(CommandOutput {
+    fixture.command_executor.expect_execute().returning(|_, _| {
+        Ok(CommandOutput {
             success: true,
             stdout: b"Build successful".to_vec(),
             stderr: vec![],
-        }));
-    
+        })
+    });
+
     // Mock: process spawns
-    fixture.process_manager.add_spawn_response(Ok(Box::new(MockProcessHandle::new(5678, 0))));
-    fixture.process_manager.add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
-    
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(5678, 0))));
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
+
     // Mock: file watcher that returns a change after 200ms
     let watch_handle = Arc::new(MockWatchHandle::new());
     watch_handle.add_change(vec![PathBuf::from("src/main.rs")]);
-    
+
     fixture.file_watcher = Arc::new(MockFileWatcher::new());
-    
+
     // Mock: signal handler with interrupt after 500ms
-    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(Duration::from_millis(500)));
-    
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(500),
+    ));
+
     let ui = fixture.ui.clone();
     let process_manager = fixture.process_manager.clone();
     let deps = fixture.to_deps();
-    
+
     // Run in a task with timeout to prevent hanging
     let result = tokio::time::timeout(
         Duration::from_secs(2),
@@ -612,18 +687,23 @@ command = "cargo build --target wasm32-wasi"
                 clear: false,
             },
             deps,
-        )
-    ).await;
-    
+        ),
+    )
+    .await;
+
     // Should timeout or complete successfully
     assert!(result.is_ok() || matches!(result, Err(_)));
-    
+
     // Verify processes were spawned
     assert!(process_manager.get_spawn_count() >= 1);
-    
+
     // Verify output shows watch mode
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("Starting development server with auto-rebuild")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Starting development server with auto-rebuild"))
+    );
 }
 
 #[test]
@@ -632,9 +712,11 @@ fn test_should_watch_file() {
     assert!(up::should_watch_file(&PathBuf::from("src/main.rs")));
     assert!(up::should_watch_file(&PathBuf::from("Cargo.toml")));
     assert!(up::should_watch_file(&PathBuf::from("src/index.ts")));
-    
+
     assert!(!up::should_watch_file(&PathBuf::from("target/debug/app")));
-    assert!(!up::should_watch_file(&PathBuf::from("node_modules/pkg/index.js")));
+    assert!(!up::should_watch_file(&PathBuf::from(
+        "node_modules/pkg/index.js"
+    )));
     assert!(!up::should_watch_file(&PathBuf::from("Cargo.lock")));
     assert!(!up::should_watch_file(&PathBuf::from("app.wasm")));
 }

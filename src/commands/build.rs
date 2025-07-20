@@ -9,8 +9,8 @@ use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
 use crate::deps::{
-    AsyncRuntime, CommandExecutor, CommandOutput, FileSystem, MessageStyle, 
-    ProgressIndicator, SpinInstaller, UserInterface
+    AsyncRuntime, CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator,
+    SpinInstaller, UserInterface,
 };
 
 #[derive(Debug, Clone)]
@@ -36,10 +36,7 @@ pub struct BuildDependencies {
 }
 
 /// Execute the build command with injected dependencies
-pub async fn execute_with_deps(
-    config: BuildConfig,
-    deps: Arc<BuildDependencies>,
-) -> Result<()> {
+pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>) -> Result<()> {
     let working_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
     // Check if we're in a project directory (has spin.toml)
@@ -54,7 +51,10 @@ pub async fn execute_with_deps(
     let components = parse_component_builds(&deps.file_system, &spin_toml_path)?;
 
     if components.is_empty() {
-        deps.ui.print_styled("→ No components with build commands found in spin.toml", MessageStyle::Cyan);
+        deps.ui.print_styled(
+            "→ No components with build commands found in spin.toml",
+            MessageStyle::Cyan,
+        );
         return Ok(());
     }
 
@@ -72,18 +72,21 @@ pub async fn execute_with_deps(
     build_components_parallel(components, &working_path, config.release, &deps).await?;
 
     deps.ui.print("");
-    deps.ui.print_styled("✓ All components built successfully!", MessageStyle::Success);
+    deps.ui.print_styled(
+        "✓ All components built successfully!",
+        MessageStyle::Success,
+    );
     Ok(())
 }
 
 pub fn parse_component_builds(
-    fs: &Arc<dyn FileSystem>, 
-    spin_toml_path: &Path
+    fs: &Arc<dyn FileSystem>,
+    spin_toml_path: &Path,
 ) -> Result<Vec<ComponentBuildInfo>> {
-    let content = fs.read_to_string(spin_toml_path)
+    let content = fs
+        .read_to_string(spin_toml_path)
         .context("Failed to read spin.toml")?;
-    let toml: toml::Value = toml::from_str(&content)
-        .context("Failed to parse spin.toml")?;
+    let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
 
     let mut components = Vec::new();
 
@@ -128,7 +131,7 @@ async fn build_components_parallel(
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or_else(num_cpus::get);
-    
+
     let semaphore = Arc::new(Semaphore::new(max_concurrent));
 
     for component in components {
@@ -153,7 +156,9 @@ async fn build_components_parallel(
             }
 
             let start = Instant::now();
-            let result = build_single_component(&component, &working_path, release, pb.as_ref(), &deps).await;
+            let result =
+                build_single_component(&component, &working_path, release, pb.as_ref(), &deps)
+                    .await;
 
             match result {
                 Ok(_) => {
@@ -220,13 +225,9 @@ async fn build_single_component(
 
         // Execute the build command using shell to handle complex commands with operators
         let (shell_cmd, shell_args) = get_shell_command(&command);
-        
-        let output = run_build_command(
-            &deps.command_executor,
-            shell_cmd,
-            &shell_args,
-            &build_dir,
-        ).await?;
+
+        let output =
+            run_build_command(&deps.command_executor, shell_cmd, &shell_args, &build_dir).await?;
 
         if !output.success {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -271,7 +272,9 @@ async fn run_build_command(
     // Note: In a real implementation, we would need to pass the working directory
     // to the command executor. For now, we'll just execute in the current directory.
     // The CommandExecutor trait would need to be extended to support this.
-    executor.execute(shell_cmd, shell_args).await
+    executor
+        .execute(shell_cmd, shell_args)
+        .await
         .context("Failed to execute build command")
 }
 
@@ -294,37 +297,31 @@ mod tests {
             prepare_build_command("cargo build --release", true),
             "cargo build --release"
         );
-        
+
         // Test npm
         assert_eq!(
             prepare_build_command("npm run build", true),
             "npm run build"
         );
-        
+
         // Test other commands
-        assert_eq!(
-            prepare_build_command("make", true),
-            "make"
-        );
-        
+        assert_eq!(prepare_build_command("make", true), "make");
+
         // Test non-release mode
-        assert_eq!(
-            prepare_build_command("cargo build", false),
-            "cargo build"
-        );
+        assert_eq!(prepare_build_command("cargo build", false), "cargo build");
     }
 
     #[test]
     fn test_get_shell_command() {
         let command = "cargo build --release";
-        
+
         #[cfg(target_os = "windows")]
         {
             let (cmd, args) = get_shell_command(command);
             assert_eq!(cmd, "cmd");
             assert_eq!(args, vec!["/C", command]);
         }
-        
+
         #[cfg(not(target_os = "windows"))]
         {
             let (cmd, args) = get_shell_command(command);

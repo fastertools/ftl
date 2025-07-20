@@ -8,17 +8,17 @@ fn test_language_from_str() {
     assert_eq!(Language::from_str("rust"), Some(Language::Rust));
     assert_eq!(Language::from_str("javascript"), Some(Language::JavaScript));
     assert_eq!(Language::from_str("typescript"), Some(Language::TypeScript));
-    
+
     // Test aliases
     assert_eq!(Language::from_str("rs"), Some(Language::Rust));
     assert_eq!(Language::from_str("js"), Some(Language::JavaScript));
     assert_eq!(Language::from_str("ts"), Some(Language::TypeScript));
-    
+
     // Test case insensitive
     assert_eq!(Language::from_str("RUST"), Some(Language::Rust));
     assert_eq!(Language::from_str("JavaScript"), Some(Language::JavaScript));
     assert_eq!(Language::from_str("TypeScript"), Some(Language::TypeScript));
-    
+
     // Test unknown
     assert_eq!(Language::from_str("python"), None);
     assert_eq!(Language::from_str(""), None);

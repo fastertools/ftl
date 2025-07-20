@@ -18,7 +18,7 @@ mod add_tests;
 mod auth_tests;
 #[cfg(test)]
 mod build_tests;
-#[cfg(test)]  
+#[cfg(test)]
 mod deploy_tests;
 #[cfg(test)]
 mod init_tests;

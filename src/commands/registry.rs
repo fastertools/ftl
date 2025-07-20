@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// Dependencies for the registry command
 pub struct RegistryDependencies {
@@ -31,7 +31,8 @@ pub async fn list_with_deps(
     ));
     deps.ui.print("");
     deps.ui.print("For now, you can browse components at:");
-    deps.ui.print("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
+    deps.ui
+        .print("  - GitHub Container Registry: https://github.com/orgs/YOUR_ORG/packages");
     deps.ui.print("  - Docker Hub: https://hub.docker.com/");
 
     Ok(())
@@ -59,16 +60,15 @@ pub async fn search_with_deps(
     ));
     deps.ui.print("");
     deps.ui.print("For now, you can search at:");
-    deps.ui.print(&format!("  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages"));
+    deps.ui.print(&format!(
+        "  - GitHub: https://github.com/search?q=mcp+{query}&type=registrypackages"
+    ));
 
     Ok(())
 }
 
 /// Execute the info subcommand with injected dependencies
-pub async fn info_with_deps(
-    component: String,
-    deps: Arc<RegistryDependencies>,
-) -> Result<()> {
+pub async fn info_with_deps(component: String, deps: Arc<RegistryDependencies>) -> Result<()> {
     deps.ui.print(&format!(
         "{} Getting info for component: {}",
         styled_text("→", MessageStyle::Cyan),
@@ -76,12 +76,16 @@ pub async fn info_with_deps(
     ));
 
     deps.ui.print("");
-    deps.ui.print(&format!("{} Registry info not yet implemented", styled_text("!", MessageStyle::Yellow)));
+    deps.ui.print(&format!(
+        "{} Registry info not yet implemented",
+        styled_text("!", MessageStyle::Yellow)
+    ));
     deps.ui.print("");
     deps.ui.print("Component reference formats:");
     deps.ui.print("  - ghcr.io/username/component:version");
     deps.ui.print("  - docker.io/username/component:version");
-    deps.ui.print("  - component-name (searches default registry)");
+    deps.ui
+        .print("  - component-name (searches default registry)");
 
     Ok(())
 }

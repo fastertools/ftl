@@ -5,9 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::deps::{
-    CommandExecutor, FileSystem, UserInterface, SpinInstaller, MessageStyle
-};
+use crate::deps::{CommandExecutor, FileSystem, MessageStyle, SpinInstaller, UserInterface};
 use crate::language::Language;
 
 /// Add command configuration
@@ -31,10 +29,7 @@ pub struct AddDependencies {
 }
 
 /// Execute the add command with injected dependencies
-pub async fn execute_with_deps(
-    config: AddConfig,
-    deps: Arc<AddDependencies>,
-) -> Result<()> {
+pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) -> Result<()> {
     // Check if we're in a Spin project directory
     if !deps.file_system.exists(Path::new("spin.toml")) {
         anyhow::bail!("No spin.toml found. Not in a Spin project directory? Run 'ftl init' first.");
@@ -81,11 +76,12 @@ pub async fn execute_with_deps(
     };
 
     // Check if custom template source is provided
-    let using_custom_template = config.git.is_some() || config.dir.is_some() || config.tar.is_some();
+    let using_custom_template =
+        config.git.is_some() || config.dir.is_some() || config.tar.is_some();
 
     // Build spin add command
     let mut args = vec!["add"];
-    
+
     // Add template source options
     if let Some(git_url) = &config.git {
         args.push("--git");
@@ -113,7 +109,10 @@ pub async fn execute_with_deps(
     args.push(&component_name);
 
     // Execute spin add
-    let output = deps.command_executor.execute(&spin_path, &args).await
+    let output = deps
+        .command_executor
+        .execute(&spin_path, &args)
+        .await
         .context("Failed to run spin add")?;
 
     if !output.success {
@@ -124,9 +123,11 @@ pub async fn execute_with_deps(
             && (stderr.contains("no such template") || stderr.contains("template not found"))
         {
             deps.ui.print("");
-            deps.ui.print_styled("✗ ftl-mcp templates not found.", MessageStyle::Error);
+            deps.ui
+                .print_styled("✗ ftl-mcp templates not found.", MessageStyle::Error);
             deps.ui.print("");
-            deps.ui.print("Please install the ftl-mcp templates by running:");
+            deps.ui
+                .print("Please install the ftl-mcp templates by running:");
             deps.ui.print("  ftl setup templates");
             deps.ui.print("");
             anyhow::bail!("ftl-mcp templates not installed");
@@ -172,10 +173,7 @@ fn validate_component_name(name: &str) -> Result<()> {
 }
 
 /// Determine the language to use
-fn determine_language(
-    language: &Option<String>,
-    ui: &Arc<dyn UserInterface>,
-) -> Result<Language> {
+fn determine_language(language: &Option<String>, ui: &Arc<dyn UserInterface>) -> Result<Language> {
     match language {
         Some(lang_str) => {
             let lang_lower = lang_str.to_lowercase();
@@ -207,7 +205,8 @@ fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Res
     use toml_edit::{DocumentMut, InlineTable};
 
     // Read the spin.toml file
-    let content = fs.read_to_string(Path::new("spin.toml"))
+    let content = fs
+        .read_to_string(Path::new("spin.toml"))
         .context("Failed to read spin.toml")?;
 
     // Parse as TOML document (preserves formatting)
@@ -287,11 +286,7 @@ where
 }
 
 /// Print success message
-fn print_success_message(
-    ui: &Arc<dyn UserInterface>,
-    component_name: &str,
-    language: Language,
-) {
+fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, language: Language) {
     let route = format!("/{}", component_name.replace('_', "-"));
     let main_file = match language {
         Language::Rust => format!("{}/src/lib.rs", component_name),
@@ -299,18 +294,30 @@ fn print_success_message(
     };
 
     ui.print("");
-    ui.print_styled(&format!("✓ {} tool added successfully!", language), MessageStyle::Success);
+    ui.print_styled(
+        &format!("✓ {} tool added successfully!", language),
+        MessageStyle::Success,
+    );
     ui.print("");
     ui.print("📁 Tool location:");
-    ui.print(&format!("  └── {}/         # Tool source code", component_name));
+    ui.print(&format!(
+        "  └── {}/         # Tool source code",
+        component_name
+    ));
     ui.print("");
-    ui.print(&format!("💡 Edit {} to implement your tool logic", main_file));
+    ui.print(&format!(
+        "💡 Edit {} to implement your tool logic",
+        main_file
+    ));
     ui.print("");
     ui.print("🔨 Build and run:");
     ui.print("  ftl build       # Build all tools");
     ui.print("  ftl up          # Start the MCP server");
     ui.print("");
-    ui.print(&format!("🚀 Your tool will be available at route: {}", route));
+    ui.print(&format!(
+        "🚀 Your tool will be available at route: {}",
+        route
+    ));
     ui.print("");
 }
 

@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use mockall::mock;
 use mockall::Predicate;
+use mockall::mock;
 
 use crate::api_client::types;
 use crate::commands::login::StoredCredentials as Credentials;
@@ -17,7 +17,7 @@ use base64::Engine;
 /// Mock implementations using mockall
 mock! {
     pub FileSystemMock {}
-    
+
     impl FileSystem for FileSystemMock {
         fn exists(&self, path: &Path) -> bool;
         fn read_to_string(&self, path: &Path) -> Result<String>;
@@ -30,7 +30,8 @@ mock! {
 pub struct MockCommandExecutorMock {
     check_command_exists_fn: Option<Box<dyn Fn(&str) -> Result<()> + Send + Sync>>,
     execute_fn: Option<Box<dyn Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync>>,
-    execute_with_stdin_fn: Option<Box<dyn Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync>>,
+    execute_with_stdin_fn:
+        Option<Box<dyn Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync>>,
 }
 
 impl MockCommandExecutorMock {
@@ -68,8 +69,8 @@ impl<'a> CheckCommandExistsExpectation<'a> {
         self
     }
 
-    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock 
-    where 
+    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
+    where
         F: Fn(&str) -> Result<()> + Send + Sync + 'static,
     {
         self.mock.check_command_exists_fn = Some(Box::new(f));
@@ -90,8 +91,8 @@ impl<'a> ExecuteExpectation<'a> {
         self
     }
 
-    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock 
-    where 
+    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
+    where
         F: Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync + 'static,
     {
         // Store the function to be called
@@ -113,8 +114,8 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
         self
     }
 
-    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock 
-    where 
+    pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
+    where
         F: Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync + 'static,
     {
         self.mock.execute_with_stdin_fn = Some(Box::new(f));
@@ -146,7 +147,12 @@ impl CommandExecutor for MockCommandExecutorMock {
         }
     }
 
-    async fn execute_with_stdin(&self, command: &str, args: &[&str], stdin: &str) -> Result<CommandOutput> {
+    async fn execute_with_stdin(
+        &self,
+        command: &str,
+        args: &[&str],
+        stdin: &str,
+    ) -> Result<CommandOutput> {
         if let Some(ref f) = self.execute_with_stdin_fn {
             f(command, args, stdin)
         } else {
@@ -162,7 +168,7 @@ impl CommandExecutor for MockCommandExecutorMock {
 
 mock! {
     pub FtlApiClientMock {}
-    
+
     #[async_trait]
     impl FtlApiClient for FtlApiClientMock {
         async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse>;
@@ -174,7 +180,7 @@ mock! {
 
 mock! {
     pub ClockMock {}
-    
+
     impl Clock for ClockMock {
         fn now(&self) -> Instant;
         fn duration_from_millis(&self, millis: u64) -> Duration;
@@ -184,7 +190,7 @@ mock! {
 
 mock! {
     pub CredentialsProviderMock {}
-    
+
     #[async_trait]
     impl CredentialsProvider for CredentialsProviderMock {
         async fn get_or_refresh_credentials(&self) -> Result<Credentials>;
@@ -198,21 +204,19 @@ pub struct MockBuildExecutorMock {
 
 impl MockBuildExecutorMock {
     pub fn new() -> Self {
-        Self {
-            execute_fn: None,
-        }
+        Self { execute_fn: None }
     }
-    
+
     pub fn expect_execute(&mut self) -> &mut Self {
         self
     }
-    
+
     pub fn times(&mut self, _n: usize) -> &mut Self {
         self
     }
-    
-    pub fn returning<F>(&mut self, f: F) -> &mut Self 
-    where 
+
+    pub fn returning<F>(&mut self, f: F) -> &mut Self
+    where
         F: Fn(Option<&Path>, bool) -> Result<()> + Send + Sync + 'static,
     {
         self.execute_fn = Some(Box::new(move |path: Option<PathBuf>, release| {
@@ -235,7 +239,7 @@ impl BuildExecutor for MockBuildExecutorMock {
 
 mock! {
     pub AsyncRuntimeMock {}
-    
+
     #[async_trait]
     impl AsyncRuntime for AsyncRuntimeMock {
         async fn sleep(&self, duration: Duration);
@@ -244,7 +248,7 @@ mock! {
 
 mock! {
     pub SpinInstallerMock {}
-    
+
     #[async_trait]
     impl SpinInstaller for SpinInstallerMock {
         async fn check_and_install(&self) -> Result<String>;
@@ -276,14 +280,15 @@ impl TestFixture {
             async_runtime: MockAsyncRuntimeMock::new(),
         }
     }
-    
+
     pub fn to_deps(self) -> Arc<crate::commands::deploy::DeployDependencies> {
         Arc::new(crate::commands::deploy::DeployDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
             command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,
             api_client: Arc::new(self.api_client) as Arc<dyn FtlApiClient>,
             clock: Arc::new(self.clock) as Arc<dyn Clock>,
-            credentials_provider: Arc::new(self.credentials_provider) as Arc<dyn CredentialsProvider>,
+            credentials_provider: Arc::new(self.credentials_provider)
+                as Arc<dyn CredentialsProvider>,
             ui: self.ui as Arc<dyn UserInterface>,
             build_executor: Arc::new(self.build_executor) as Arc<dyn BuildExecutor>,
             async_runtime: Arc::new(self.async_runtime) as Arc<dyn AsyncRuntime>,
@@ -316,9 +321,9 @@ pub fn test_ecr_credentials() -> types::GetEcrCredentialsResponse {
 /// Helper to create test deployment response
 pub fn test_deployment_response(deployment_id: &str) -> types::DeploymentResponse {
     // Use a fixed UUID if the provided ID is not a valid UUID
-    let uuid = deployment_id.parse().unwrap_or_else(|_| {
-        "550e8400-e29b-41d4-a716-446655440000".parse().unwrap()
-    });
+    let uuid = deployment_id
+        .parse()
+        .unwrap_or_else(|_| "550e8400-e29b-41d4-a716-446655440000".parse().unwrap());
     types::DeploymentResponse {
         deployment_id: uuid,
         status: types::DeploymentResponseStatus::Accepted,
@@ -333,9 +338,9 @@ pub fn test_deployment_status(
     status: types::DeploymentStatusDeploymentStatus,
 ) -> types::DeploymentStatus {
     // Use a fixed UUID if the provided ID is not a valid UUID
-    let uuid = deployment_id.parse().unwrap_or_else(|_| {
-        "550e8400-e29b-41d4-a716-446655440000".parse().unwrap()
-    });
+    let uuid = deployment_id
+        .parse()
+        .unwrap_or_else(|_| "550e8400-e29b-41d4-a716-446655440000".parse().unwrap());
     types::DeploymentStatus {
         deployment: types::DeploymentStatusDeployment {
             deployment_id: uuid,
@@ -358,7 +363,10 @@ pub fn test_deployment_status(
 /// Helper to create test repository response
 pub fn test_repository_response(tool_name: &str) -> types::CreateEcrRepositoryResponse {
     types::CreateEcrRepositoryResponse {
-        repository_uri: format!("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/{}", tool_name),
+        repository_uri: format!(
+            "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/{}",
+            tool_name
+        ),
         repository_name: format!("user/{}", tool_name),
         already_exists: false,
     }

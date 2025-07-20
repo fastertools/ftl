@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// Stored credentials structure
 #[derive(Debug, Clone)]
@@ -36,12 +36,16 @@ pub struct AuthDependencies {
 
 /// Execute the auth status command with injected dependencies
 pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
-    deps.ui.print_styled("→ Authentication Status", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ Authentication Status", MessageStyle::Cyan);
     deps.ui.print("");
 
     match deps.credentials_provider.get_stored_credentials() {
         Ok(credentials) => {
-            deps.ui.print(&format!("✅ {}", styled_text("Logged in", MessageStyle::Success)));
+            deps.ui.print(&format!(
+                "✅ {}",
+                styled_text("Logged in", MessageStyle::Success)
+            ));
             deps.ui.print("");
             deps.ui.print(&format!(
                 "AuthKit Domain: {}",
@@ -51,7 +55,10 @@ pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
             if let Some(expires_at) = credentials.expires_at {
                 let now = deps.clock.now();
                 if expires_at < now {
-                    deps.ui.print(&format!("Access Token: ⚠️  {}", styled_text("Expired", MessageStyle::Yellow)));
+                    deps.ui.print(&format!(
+                        "Access Token: ⚠️  {}",
+                        styled_text("Expired", MessageStyle::Yellow)
+                    ));
                 } else {
                     let duration = expires_at - now;
                     let hours = duration.num_hours();
@@ -63,11 +70,17 @@ pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
                     ));
                 }
             } else {
-                deps.ui.print(&format!("Access Token: {}", styled_text("Valid", MessageStyle::Success)));
+                deps.ui.print(&format!(
+                    "Access Token: {}",
+                    styled_text("Valid", MessageStyle::Success)
+                ));
             }
 
             if credentials.refresh_token.is_some() {
-                deps.ui.print(&format!("Refresh Token: {}", styled_text("Available", MessageStyle::Success)));
+                deps.ui.print(&format!(
+                    "Refresh Token: {}",
+                    styled_text("Available", MessageStyle::Success)
+                ));
             }
 
             Ok(())
@@ -76,7 +89,10 @@ pub async fn status_with_deps(deps: Arc<AuthDependencies>) -> Result<()> {
             if e.to_string().contains("No matching entry found") {
                 deps.ui.print("🔐 Not logged in");
                 deps.ui.print("");
-                deps.ui.print(&format!("Run {} to authenticate", styled_text("ftl login", MessageStyle::Cyan)));
+                deps.ui.print(&format!(
+                    "Run {} to authenticate",
+                    styled_text("ftl login", MessageStyle::Cyan)
+                ));
             } else {
                 deps.ui.print("⚠️  Error checking authentication status");
                 deps.ui.print("");

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::deps::{UserInterface, MessageStyle};
+use crate::deps::{MessageStyle, UserInterface};
 
 /// Credentials clearer trait
 pub trait CredentialsClearer: Send + Sync {
@@ -19,13 +19,16 @@ pub struct LogoutDependencies {
 
 /// Execute the logout command with injected dependencies
 pub async fn execute_with_deps(deps: Arc<LogoutDependencies>) -> Result<()> {
-    deps.ui.print_styled("→ Logging out of FTL", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("→ Logging out of FTL", MessageStyle::Cyan);
     deps.ui.print("");
 
     match deps.credentials_clearer.clear_stored_credentials() {
         Ok(_) => {
-            deps.ui.print(&format!("✅ {} Successfully logged out!", 
-                styled_text("Success!", MessageStyle::Success)));
+            deps.ui.print(&format!(
+                "✅ {} Successfully logged out!",
+                styled_text("Success!", MessageStyle::Success)
+            ));
             Ok(())
         }
         Err(e) => {
