@@ -45,6 +45,8 @@ pub struct RegistryConfig {
     pub priority: u32,
     #[serde(default)]
     pub config: JsonValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_url: Option<String>,
 }
 
 impl RegistryConfig {
@@ -58,6 +60,7 @@ impl RegistryConfig {
             config: serde_json::json!({
                 "organization": organization
             }),
+            display_url: Some(format!("https://github.com/orgs/{}/packages", organization)),
         }
     }
 
@@ -69,6 +72,7 @@ impl RegistryConfig {
             enabled: true,
             priority: 2,
             config: serde_json::json!({}),
+            display_url: Some("https://hub.docker.com".to_string()),
         }
     }
 
@@ -90,6 +94,7 @@ impl RegistryConfig {
             enabled: true,
             priority: 3,
             config,
+            display_url: None, // ECR URLs are account-specific
         }
     }
 
@@ -109,6 +114,7 @@ impl RegistryConfig {
             enabled: true,
             priority: 4,
             config,
+            display_url: None, // Custom registries define their own URLs
         }
     }
 

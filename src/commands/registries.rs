@@ -143,6 +143,11 @@ async fn list_registries() -> Result<()> {
             default_marker
         );
         
+        // Show display URL if available
+        if let Some(url) = &registry.display_url {
+            println!("      URL: {}", style(url).blue().underlined());
+        }
+        
         // Show additional configuration details
         match registry.registry_type {
             RegistryType::Ghcr => {
@@ -215,6 +220,9 @@ async fn add_registry(
     let mut registry = registry;
     registry.priority = priority;
     registry.enabled = enabled;
+    
+    // Clear display_url for user-added registries (will use default from constructors)
+    // User can manually edit the config file if they want custom display URLs
     
     // Add to config
     config.add_registry(registry)?;

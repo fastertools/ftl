@@ -21,28 +21,12 @@ impl FtlConfig {
             version: "1".to_string(),
             default_registry: "ghcr".to_string(),
             registries: vec![
-                RegistryConfig {
-                    name: "ghcr".to_string(),
-                    registry_type: RegistryType::Ghcr,
-                    enabled: true,
-                    priority: 1,
-                    config: serde_json::json!({
-                        "organization": "fastertools"
-                    }),
-                },
-                RegistryConfig {
-                    name: "docker".to_string(),
-                    registry_type: RegistryType::Docker,
-                    enabled: true,
-                    priority: 2,
-                    config: serde_json::json!({}),
-                },
-                RegistryConfig {
-                    name: "ecr".to_string(),
-                    registry_type: RegistryType::Ecr,
-                    enabled: false, // Disabled by default as it requires AWS credentials
-                    priority: 3,
-                    config: serde_json::json!({}),
+                RegistryConfig::new_ghcr("ghcr".to_string(), "fastertools".to_string()),
+                RegistryConfig::new_docker("docker".to_string()),
+                {
+                    let mut ecr = RegistryConfig::new_ecr("ecr".to_string(), None, None);
+                    ecr.enabled = false; // Disabled by default as it requires AWS credentials
+                    ecr
                 },
             ],
         }
