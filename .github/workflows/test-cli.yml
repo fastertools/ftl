@@ -53,9 +53,6 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-      
       - name: Install ftl CLI
         run: |
           cargo install --path .

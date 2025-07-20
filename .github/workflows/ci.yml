@@ -98,11 +98,8 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-      
-      - name: Install cargo-nextest
-        run: cargo binstall cargo-nextest --no-confirm --force
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
       
       - name: Build
         run: cargo build --all-features
@@ -146,13 +143,11 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
       
-      - name: Install cargo-llvm-cov and cargo-nextest
-        run: |
-          cargo binstall cargo-llvm-cov --no-confirm --force
-          cargo binstall cargo-nextest --no-confirm --force
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
       
       - name: Generate code coverage
         run: |
@@ -182,9 +177,7 @@ jobs:
           sudo apt-get install -y libdbus-1-dev
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-audit
-        run: cargo binstall cargo-audit --no-confirm --force
+        uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
         run: cargo audit
