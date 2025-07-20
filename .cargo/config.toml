@@ -1,9 +1,0 @@
-[env]
-# cargo-llvm-cov configuration
-# Exclude files from coverage:
-# - main.rs: CLI entry point, mostly argument parsing and wiring
-# - deps.rs: Testing infrastructure (trait definitions for DI)
-# - ui.rs: Interactive UI components that are difficult to unit test
-# - api_client.rs: Thin wrapper around auto-generated API client code
-# - *_test.rs, *_tests.rs, test_*.rs: Test files themselves
-CARGO_LLVM_COV_FLAGS = "--ignore-filename-regex='(main\\.rs|deps\\.rs|ui\\.rs|api_client\\.rs|.*_test\\.rs|.*_tests\\.rs|test_.*\\.rs)'"
