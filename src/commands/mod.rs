@@ -6,6 +6,7 @@ pub mod init;
 pub mod login;
 pub mod logout;
 pub mod publish;
+pub mod registries;
 pub mod registry;
 pub mod setup;
 pub mod test;

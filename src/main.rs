@@ -528,6 +528,12 @@ enum Command {
         command: RegistryCommand,
     },
 
+    /// Manage registry configurations
+    Registries {
+        #[command(subcommand)]
+        command: commands::registries::RegistriesCommand,
+    },
+
     /// Setup and configure FTL
     Setup {
         #[command(subcommand)]
@@ -819,6 +825,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Command::Registries { command } => commands::registries::handle_command(command).await,
         Command::Setup { command } => {
             // Create dependencies
             let ui = Arc::new(ui::RealUserInterface);
