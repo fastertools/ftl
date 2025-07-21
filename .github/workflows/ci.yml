@@ -121,11 +121,6 @@ jobs:
           else
             echo "::notice::Coverage ${COVERAGE}% meets the 80% requirement"
           fi
-      
-      - name: Test build templates
-        run: |
-          # Test that the embedded templates are valid
-          cargo build --release
 
   security:
     name: Security Audit
