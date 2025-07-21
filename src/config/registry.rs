@@ -126,6 +126,7 @@ impl RegistryConfig {
     }
 
     /// Check if this registry requires authentication
+    #[allow(dead_code)]
     pub fn requires_auth(&self) -> bool {
         match self.registry_type {
             RegistryType::Ghcr => false, // Public GHCR repos don't require auth

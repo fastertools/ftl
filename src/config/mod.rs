@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 pub mod registry;
 
-use registry::{RegistryConfig, RegistryType};
+use registry::RegistryConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FtlConfig {
@@ -167,6 +167,7 @@ impl FtlConfig {
 }
 
 /// Load project-specific configuration if it exists
+#[allow(dead_code)]
 pub fn load_project_config(project_root: &Path) -> Option<FtlConfig> {
     let config_path = project_root.join(".ftl").join("registries.toml");
     
@@ -194,6 +195,7 @@ pub fn load_project_config(project_root: &Path) -> Option<FtlConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::registry::RegistryType;
 
     #[test]
     fn test_default_config() {
@@ -220,6 +222,7 @@ mod tests {
             registry_type: RegistryType::Custom,
             enabled: true,
             priority: 4,
+            display_url: Some("https://registry.example.com".to_string()),
             config: serde_json::json!({
                 "url_pattern": "registry.example.com/{image_name}:latest"
             }),
@@ -234,6 +237,7 @@ mod tests {
             registry_type: RegistryType::Ghcr,
             enabled: true,
             priority: 5,
+            display_url: Some("https://github.com/orgs/fastertools/packages".to_string()),
             config: serde_json::json!({}),
         };
         

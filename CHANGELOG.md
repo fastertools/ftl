@@ -11,8 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `ftl tools` subcommand for managing pre-built FTL tool components
   - `ftl tools list`: Browse 82+ pre-built tools with category filtering and search
   - `ftl tools add`: Add tools to your project's spin.toml configuration
-  - Support for multiple registries (GHCR and ECR) via `--registry` flag
+  - Support for multiple registries (GHCR, Docker Hub, ECR, and custom) via `--registry` flag
+  - `--all` flag for multi-registry tool discovery with smart deduplication
+  - Registry prefix support: `ftl tools add docker:tool-name` or `ghcr:tool-name`
   - Embedded tools manifest with categories: basic_math, text_processing, encoding, formatters, utilities, cryptography, network, filesystem, data_processing, validation
+- New `ftl registries` subcommand for registry configuration management
+  - `ftl registries list`: View all configured registries with status and priority
+  - `ftl registries add`: Add new registries (GHCR, Docker Hub, ECR, or custom)
+  - `ftl registries remove`: Remove registries from configuration
+  - `ftl registries set-default`: Change the default registry for tool operations
+  - `ftl registries enable/disable`: Control which registries are active
+  - `ftl registries set-priority`: Manage registry search order
+  - User and project-level configuration support via ~/.ftl/registries.toml
+- Docker Hub registry adapter with support for official and user repositories
+- Custom registry support with configurable URL patterns and authentication
+- Enhanced multi-registry tool discovery with performance optimization
 - Support for Spin template options in `ftl init` and `ftl setup templates` commands
   - `--git`: Use a Git repository as the template source
   - `--branch`: Specify Git branch (requires `--git`)
