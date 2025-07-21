@@ -309,7 +309,7 @@ pub fn test_deployment_status(
             status,
             deployment_url: Some("https://test-app.example.com".to_string()),
             image_url: "test-image:latest".to_string(),
-            platform: types::DeploymentStatusDeploymentPlatform::Fermyon,
+            platform: "Fermyon".to_string(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             completed_at: None,

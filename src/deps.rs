@@ -258,31 +258,55 @@ impl CommandExecutor for RealCommandExecutor {
 /// Production API client wrapper
 pub struct RealFtlApiClient {
     client: ApiClient,
+    auth_token: Option<String>,
 }
 
 impl RealFtlApiClient {
+    #[allow(dead_code)]
     pub const fn new(client: ApiClient) -> Self {
-        Self { client }
+        Self {
+            client,
+            auth_token: None,
+        }
+    }
+
+    pub const fn new_with_auth(client: ApiClient, auth_token: String) -> Self {
+        Self {
+            client,
+            auth_token: Some(auth_token),
+        }
     }
 }
 
 #[async_trait]
 impl FtlApiClient for RealFtlApiClient {
     async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
         self.client
             .get_ecr_credentials()
+            .authorization(format!("Bearer {auth}"))
             .send()
             .await
             .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to get ECR credentials: {}", e))
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     async fn create_ecr_repository(
         &self,
         request: &types::CreateEcrRepositoryRequest,
     ) -> Result<types::CreateEcrRepositoryResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
         self.client
             .create_ecr_repository()
+            .authorization(format!("Bearer {auth}"))
             .body(request)
             .send()
             .await
@@ -291,8 +315,14 @@ impl FtlApiClient for RealFtlApiClient {
     }
 
     async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
         self.client
             .get_deployment_status()
+            .authorization(format!("Bearer {auth}"))
             .deployment_id(deployment_id)
             .send()
             .await
@@ -304,8 +334,14 @@ impl FtlApiClient for RealFtlApiClient {
         &self,
         request: &types::DeploymentRequest,
     ) -> Result<types::DeploymentResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
         self.client
             .deploy_app()
+            .authorization(format!("Bearer {auth}"))
             .body(request)
             .send()
             .await
