@@ -147,22 +147,6 @@
         "responses": {
           "200": {
             "description": "List of applications",
-            "headers": {
-              "X-Cache": {
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "HIT",
-                    "MISS"
-                  ]
-                }
-              },
-              "X-Cached-At": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
             "content": {
               "application/json": {
                 "schema": {
@@ -229,22 +213,6 @@
         "responses": {
           "200": {
             "description": "Application status retrieved successfully",
-            "headers": {
-              "X-Cache": {
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "HIT",
-                    "MISS"
-                  ]
-                }
-              },
-              "X-Cached-At": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
             "content": {
               "application/json": {
                 "schema": {
@@ -470,17 +438,7 @@
         },
         "responses": {
           "200": {
-            "description": "Repository already exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateEcrRepositoryResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Repository created successfully",
+            "description": "Repository created successfully or already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -588,7 +546,7 @@
             "description": "Application name",
             "type": "string",
             "minLength": 1,
-            "maxLength": 50,
+            "maxLength": 200,
             "pattern": "^[a-zA-Z0-9-_]+$"
           },
           "tools": {
@@ -632,9 +590,6 @@
           "variables": {
             "description": "Environment variables as key-value pairs",
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "type": "string"
             }
@@ -707,8 +662,8 @@
         "description": "Standard error response format",
         "type": "object",
         "properties": {
-          "error": {
-            "description": "Human-readable error message",
+          "message": {
+            "description": "Error message",
             "type": "string"
           },
           "code": {
@@ -739,8 +694,7 @@
           }
         },
         "required": [
-          "error",
-          "code"
+          "message"
         ],
         "additionalProperties": false
       },
@@ -1078,7 +1032,7 @@
               "platform": {
                 "description": "Deployment platform",
                 "type": "string",
-                "enum": ["Fermyon"]
+                "const": "Fermyon"
               },
               "createdAt": {
                 "description": "ISO 8601 timestamp",

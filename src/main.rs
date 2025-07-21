@@ -27,6 +27,8 @@ mod deps;
 mod language;
 mod ui;
 
+use deps::CredentialsProvider;
+
 // Implementations for up command dependencies
 struct RealFileWatcher;
 
@@ -775,14 +777,32 @@ async fn main() -> Result<()> {
         Command::Deploy => {
             // Create dependencies
             let ui = Arc::new(ui::RealUserInterface);
+
+            // Get credentials first to create authenticated API client
+            let credentials_provider = deps::RealCredentialsProvider;
+            let Ok(credentials) = credentials_provider.get_or_refresh_credentials().await else {
+                return Err(anyhow::anyhow!(
+                    "Not logged in to FTL. Run 'ftl login' first."
+                ));
+            };
+
+            // Create API client with authentication
+            let api_client_config = api_client::ApiConfig {
+                base_url: "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string(),
+                auth_token: Some(credentials.access_token.clone()),
+                timeout: std::time::Duration::from_secs(30),
+            };
+            let api_client = api_client::create_client(api_client_config)?;
+
             let deps = Arc::new(commands::deploy::DeployDependencies {
                 file_system: Arc::new(deps::RealFileSystem),
                 command_executor: Arc::new(deps::RealCommandExecutor),
                 ui: ui.clone(),
                 credentials_provider: Arc::new(deps::RealCredentialsProvider),
-                api_client: Arc::new(deps::RealFtlApiClient::new(crate::api_client::Client::new(
-                    "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com",
-                ))),
+                api_client: Arc::new(deps::RealFtlApiClient::new_with_auth(
+                    api_client,
+                    credentials.access_token,
+                )),
                 clock: Arc::new(deps::RealClock),
                 async_runtime: Arc::new(deps::RealAsyncRuntime),
                 build_executor: Arc::new(deps::RealBuildExecutor),
