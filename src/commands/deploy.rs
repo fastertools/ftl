@@ -381,7 +381,6 @@ async fn create_repositories_and_push_with_progress(
                 return Err(anyhow!(error));
             }
 
-
             // Add to deployed tools
             let mut tools = deployed_tools.lock().await;
             tools.push(types::DeploymentRequestToolsItem {

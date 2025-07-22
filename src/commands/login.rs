@@ -37,7 +37,6 @@ pub struct TokenError {
     pub error_description: Option<String>,
 }
 
-
 /// HTTP client trait for making requests
 #[async_trait::async_trait]
 pub trait HttpClient: Send + Sync {

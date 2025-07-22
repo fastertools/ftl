@@ -4,9 +4,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 
-use crate::commands::auth::{
-    AuthDependencies, Clock, CredentialsProvider, status_with_deps,
-};
+use crate::commands::auth::{AuthDependencies, Clock, CredentialsProvider, status_with_deps};
 use crate::deps::{StoredCredentials, UserInterface};
 use crate::ui::TestUserInterface;
 
