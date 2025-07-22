@@ -29,7 +29,7 @@ pub struct ApiConfig {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            base_url: "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string(),
+            base_url: "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string(),
             auth_token: None,
             timeout: Duration::from_secs(30),
         }
@@ -59,7 +59,7 @@ pub fn create_client(config: ApiConfig) -> Result<Client> {
 #[allow(dead_code)]
 pub fn create_client_from_env() -> Result<Client> {
     let base_url = std::env::var("FTL_API_URL")
-        .unwrap_or_else(|_| "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string());
+        .unwrap_or_else(|_| "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string());
 
     let auth_token = std::env::var("FTL_AUTH_TOKEN").ok();
 

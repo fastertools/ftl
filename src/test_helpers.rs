@@ -285,7 +285,7 @@ pub fn test_deployment_response(deployment_id: &str) -> types::DeploymentRespons
         .unwrap_or_else(|_| "550e8400-e29b-41d4-a716-446655440000".parse().unwrap());
     types::DeploymentResponse {
         deployment_id: uuid,
-        status: types::DeploymentResponseStatus::Accepted,
+        status: types::DeploymentResponseStatus::Initializing,
         message: "Deployment started".to_string(),
         status_url: format!("/v1/deployments/{deployment_id}/status"),
     }

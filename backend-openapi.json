@@ -15,7 +15,7 @@
   },
   "servers": [
     {
-      "url": "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com",
+      "url": "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com",
       "description": "Production API"
     }
   ],
@@ -630,14 +630,14 @@
             "description": "Current deployment status",
             "type": "string",
             "enum": [
-              "pending",
-              "accepted",
+              "initializing",
+              "provisioning",
+              "authenticating",
               "building",
-              "preparing",
               "deploying",
-              "validating",
               "deployed",
               "failed",
+              "timeout",
               "cancelled"
             ]
           },
@@ -869,14 +869,14 @@
                   "status": {
                     "type": "string",
                     "enum": [
-                      "pending",
-                      "accepted",
+                      "initializing",
+                      "provisioning",
+                      "authenticating",
                       "building",
-                      "preparing",
                       "deploying",
-                      "validating",
                       "deployed",
                       "failed",
+                      "timeout",
                       "cancelled"
                     ]
                   },
@@ -1010,14 +1010,14 @@
               "status": {
                 "type": "string",
                 "enum": [
-                  "pending",
-                  "accepted",
+                  "initializing",
+                  "provisioning",
+                  "authenticating",
                   "building",
-                  "preparing",
                   "deploying",
-                  "validating",
                   "deployed",
                   "failed",
+                  "timeout",
                   "cancelled"
                 ]
               },
