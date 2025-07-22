@@ -44,9 +44,7 @@
         "operationId": "deployApp",
         "summary": "Deploy a new application",
         "description": "Creates a new deployment for an application with the specified Docker image and tools configuration",
-        "tags": [
-          "Deployments"
-        ],
+        "tags": ["Deployments"],
         "parameters": [
           {
             "in": "header",
@@ -128,9 +126,7 @@
         "operationId": "listApps",
         "summary": "List applications",
         "description": "Retrieves a list of all applications for the authenticated user",
-        "tags": [
-          "Applications"
-        ],
+        "tags": ["Applications"],
         "parameters": [
           {
             "in": "header",
@@ -183,9 +179,7 @@
         "operationId": "getAppStatus",
         "summary": "Get application status",
         "description": "Retrieves detailed status information for a specific application",
-        "tags": [
-          "Applications"
-        ],
+        "tags": ["Applications"],
         "parameters": [
           {
             "in": "path",
@@ -257,9 +251,7 @@
         "operationId": "deleteApp",
         "summary": "Delete an application",
         "description": "Permanently deletes an application and all associated data",
-        "tags": [
-          "Applications"
-        ],
+        "tags": ["Applications"],
         "parameters": [
           {
             "in": "path",
@@ -333,9 +325,7 @@
         "operationId": "getDeploymentStatus",
         "summary": "Get deployment status",
         "description": "Retrieves the current status of a deployment",
-        "tags": [
-          "Deployments"
-        ],
+        "tags": ["Deployments"],
         "parameters": [
           {
             "in": "path",
@@ -410,9 +400,7 @@
         "operationId": "createEcrRepository",
         "summary": "Create ECR repository",
         "description": "Creates an ECR repository for storing container images for a specific tool",
-        "tags": [
-          "Registry"
-        ],
+        "tags": ["Registry"],
         "parameters": [
           {
             "in": "header",
@@ -485,9 +473,7 @@
         "operationId": "getEcrCredentials",
         "summary": "Get ECR push credentials",
         "description": "Returns temporary credentials for pushing container images to ECR",
-        "tags": [
-          "Registry"
-        ],
+        "tags": ["Registry"],
         "parameters": [
           {
             "in": "header",
@@ -581,10 +567,7 @@
                   }
                 }
               },
-              "required": [
-                "name",
-                "tag"
-              ]
+              "required": ["name", "tag"]
             }
           },
           "variables": {
@@ -595,10 +578,7 @@
             }
           }
         },
-        "required": [
-          "appName",
-          "tools"
-        ]
+        "required": ["appName", "tools"]
       },
       "CreateEcrRepositoryRequest": {
         "description": "Request to create an ECR repository for a tool",
@@ -612,9 +592,7 @@
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$"
           }
         },
-        "required": [
-          "toolName"
-        ]
+        "required": ["toolName"]
       },
       "DeploymentResponse": {
         "description": "Response for successful deployment creation",
@@ -625,6 +603,10 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          },
+          "appName": {
+            "description": "Application name",
+            "type": "string"
           },
           "status": {
             "description": "Current deployment status",
@@ -650,12 +632,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "deploymentId",
-          "status",
-          "message",
-          "statusUrl"
-        ],
+        "required": ["deploymentId", "appName", "status", "message", "statusUrl"],
         "additionalProperties": false
       },
       "ErrorResponse": {
@@ -685,17 +662,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "field",
-                "message"
-              ],
+              "required": ["field", "message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "additionalProperties": false
       },
       "ListAppsResponse": {
@@ -731,12 +703,7 @@
                 "status": {
                   "description": "Current application status",
                   "type": "string",
-                  "enum": [
-                    "deployed",
-                    "deploying",
-                    "failed",
-                    "unknown"
-                  ]
+                  "enum": ["deployed", "deploying", "failed", "unknown"]
                 },
                 "createdAt": {
                   "description": "When the app was created",
@@ -755,11 +722,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "url"
-              ],
+              "required": ["id", "name", "url"],
               "additionalProperties": false
             }
           },
@@ -776,17 +739,11 @@
                 "nullable": true
               }
             },
-            "required": [
-              "hasMore",
-              "cursor"
-            ],
+            "required": ["hasMore", "cursor"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "apps",
-          "pagination"
-        ],
+        "required": ["apps", "pagination"],
         "additionalProperties": false
       },
       "GetAppStatusResponse": {
@@ -820,12 +777,7 @@
               "status": {
                 "description": "Current application status",
                 "type": "string",
-                "enum": [
-                  "deployed",
-                  "deploying",
-                  "failed",
-                  "unknown"
-                ]
+                "enum": ["deployed", "deploying", "failed", "unknown"]
               },
               "createdAt": {
                 "description": "When the app was created",
@@ -890,26 +842,15 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "deploymentId",
-                  "status",
-                  "createdAt"
-                ],
+                "required": ["deploymentId", "status", "createdAt"],
                 "additionalProperties": false
               }
             },
-            "required": [
-              "id",
-              "name",
-              "url",
-              "deploymentCount"
-            ],
+            "required": ["id", "name", "url", "deploymentCount"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "app"
-        ],
+        "required": ["app"],
         "additionalProperties": false
       },
       "DeleteAppResponse": {
@@ -949,18 +890,11 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "deploymentId",
-                  "createdAt",
-                  "deploymentUrl"
-                ],
+                "required": ["deploymentId", "createdAt", "deploymentUrl"],
                 "additionalProperties": false
               }
             },
-            "required": [
-              "name",
-              "deletedAt"
-            ],
+            "required": ["name", "deletedAt"],
             "additionalProperties": false
           },
           "warning": {
@@ -968,11 +902,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "message",
-          "app",
-          "warning"
-        ],
+        "required": ["message", "app", "warning"],
         "additionalProperties": false
       },
       "DeploymentStatus": {
@@ -1057,21 +987,11 @@
                   "properties": {
                     "stage": {
                       "type": "string",
-                      "enum": [
-                        "IMAGE_BUILD",
-                        "PLATFORM_UPLOAD",
-                        "PLATFORM_DEPLOY",
-                        "VALIDATION"
-                      ]
+                      "enum": ["IMAGE_BUILD", "PLATFORM_UPLOAD", "PLATFORM_DEPLOY", "VALIDATION"]
                     },
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "pending",
-                        "in_progress",
-                        "completed",
-                        "failed"
-                      ]
+                      "enum": ["pending", "in_progress", "completed", "failed"]
                     },
                     "startedAt": {
                       "description": "ISO 8601 timestamp",
@@ -1092,10 +1012,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "stage",
-                    "status"
-                  ],
+                  "required": ["stage", "status"],
                   "additionalProperties": false
                 }
               }
@@ -1114,9 +1031,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "deployment"
-        ],
+        "required": ["deployment"],
         "additionalProperties": false
       },
       "CreateEcrRepositoryResponse": {
@@ -1136,11 +1051,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "repositoryUri",
-          "repositoryName",
-          "alreadyExists"
-        ],
+        "required": ["repositoryUri", "repositoryName", "alreadyExists"],
         "additionalProperties": false
       },
       "GetEcrCredentialsResponse": {
@@ -1170,13 +1081,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "registryUri",
-          "authorizationToken",
-          "proxyEndpoint",
-          "expiresAt",
-          "region"
-        ],
+        "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
         "additionalProperties": false
       }
     },
