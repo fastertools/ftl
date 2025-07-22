@@ -600,9 +600,9 @@ enum SetupCommand {
 
 #[derive(Subcommand)]
 enum RegistryCommand {
-    /// List available MCP tools from registries
+    /// List configured registries
     List {
-        /// Registry to list from
+        /// Registry to list from (currently unused)
         #[arg(short, long)]
         registry: Option<String>,
     },
@@ -623,9 +623,6 @@ enum RegistryCommand {
         component: String,
     },
 
-    /// List all configured registries
-    Registries,
-    
     /// Add a new registry
     Add {
         /// Name for the registry
@@ -884,9 +881,9 @@ async fn main() -> Result<()> {
             let deps = Arc::new(commands::registry::RegistryDependencies { ui: ui.clone() });
 
             match command {
-                RegistryCommand::List { registry } => {
-                    commands::registry::list_with_deps(registry.as_deref(), &deps);
-                    Ok(())
+                RegistryCommand::List { registry: _ } => {
+                    // List configured registries (what was ftl registries list)
+                    commands::registries::list_registries().await
                 }
                 RegistryCommand::Search { query, registry } => {
                     commands::registry::search_with_deps(&query, registry.as_deref(), &deps);
@@ -896,7 +893,6 @@ async fn main() -> Result<()> {
                     commands::registry::info_with_deps(&component, &deps);
                     Ok(())
                 }
-                RegistryCommand::Registries => commands::registries::list_registries().await,
                 RegistryCommand::Add { 
                     name, 
                     registry_type, 

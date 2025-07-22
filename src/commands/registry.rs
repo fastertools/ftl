@@ -9,7 +9,8 @@ pub struct RegistryDependencies {
     pub ui: Arc<dyn UserInterface>,
 }
 
-/// Execute the list subcommand with injected dependencies
+/// Execute the list subcommand with injected dependencies (currently unused)
+#[allow(dead_code)]
 pub fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) {
     let registry_url = registry.unwrap_or("ghcr.io");
 
