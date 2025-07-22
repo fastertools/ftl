@@ -210,11 +210,10 @@ impl CommandExecutor for RealCommandExecutor {
     }
 
     async fn execute(&self, command: &str, args: &[&str]) -> Result<CommandOutput> {
-        use std::process::Command;
-
-        let output = Command::new(command)
+        let output = tokio::process::Command::new(command)
             .args(args)
             .output()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to execute {}: {}", command, e))?;
 
         Ok(CommandOutput {
@@ -230,22 +229,26 @@ impl CommandExecutor for RealCommandExecutor {
         args: &[&str],
         stdin: &str,
     ) -> Result<CommandOutput> {
-        use std::io::Write;
-        use std::process::{Command, Stdio};
+        use tokio::io::AsyncWriteExt;
+        use tokio::process::Command as TokioCommand;
 
-        let mut child = Command::new(command)
+        let mut child = TokioCommand::new(command)
             .args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn {}: {}", command, e))?;
 
         if let Some(mut stdin_handle) = child.stdin.take() {
-            stdin_handle.write_all(stdin.as_bytes())?;
+            stdin_handle.write_all(stdin.as_bytes()).await?;
+            stdin_handle.shutdown().await?;
         }
 
-        let output = child.wait_with_output()?;
+        let output = child
+            .wait_with_output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to wait for {}: {}", command, e))?;
 
         Ok(CommandOutput {
             success: output.status.success(),

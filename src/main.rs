@@ -788,7 +788,7 @@ async fn main() -> Result<()> {
 
             // Create API client with authentication
             let api_client_config = api_client::ApiConfig {
-                base_url: "https://fqwe5s59ob.execute-api.us-east-1.amazonaws.com".to_string(),
+                base_url: "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string(),
                 auth_token: Some(credentials.access_token.clone()),
                 timeout: std::time::Duration::from_secs(30),
             };
