@@ -25,6 +25,7 @@ mod commands;
 mod common;
 mod config;
 mod deps;
+mod formatters;
 mod language;
 mod registry;
 mod ui;
@@ -406,6 +407,9 @@ impl commands::auth::Clock for RealClockForAuth {
 
 #[cfg(test)]
 mod test_helpers;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Parser)]
 #[command(name = "ftl")]

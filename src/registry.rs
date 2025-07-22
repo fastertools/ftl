@@ -1,11 +1,26 @@
 use anyhow::{Context, Result};
 use std::env;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+
+/// Registry components for Spin manifest generation
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegistryComponents {
+    /// Registry domain (e.g., "docker.io", "ghcr.io")
+    pub registry_domain: String,
+    /// Package name (e.g., "library/nginx", "fastertools:ftl-tool-add")
+    pub package_name: String,
+    /// Semantic version (e.g., "1.0.0", "2.1.3-alpha")
+    pub version: String,
+}
 
 /// Trait for adapting different registry formats
 pub trait RegistryAdapter {
     /// Get the full registry URL for a given image name
     fn get_registry_url(&self, image_name: &str) -> String;
+    
+    /// Get registry components for Spin manifest generation
+    async fn get_registry_components(&self, client: &Client, image_name: &str) -> Result<RegistryComponents>;
     
     /// Get a human-readable name for this registry
     #[allow(dead_code)]
@@ -14,6 +29,56 @@ pub trait RegistryAdapter {
     /// Verify if an image exists in this registry
     async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool>;
 }
+
+/// Parse image name and tag, defaulting to "latest" if no tag specified
+fn parse_image_and_tag(image_name: &str) -> (String, String) {
+    if let Some(pos) = image_name.rfind(':') {
+        let image = image_name[..pos].to_string();
+        let tag = image_name[pos + 1..].to_string();
+        (image, tag)
+    } else {
+        (image_name.to_string(), "latest".to_string())
+    }
+}
+
+/// Validate and normalize a semantic version
+fn validate_and_normalize_semver(version: &str) -> Result<String> {
+    use semver::Version;
+    
+    // Remove common prefixes
+    let clean_version = version.trim_start_matches('v');
+    
+    // Check for common non-semver tags first
+    match clean_version {
+        "latest" | "main" | "master" | "stable" | "dev" | "edge" => {
+            anyhow::bail!("Invalid version format: {}. Must be valid semantic version (e.g., 1.0.0)", version)
+        }
+        _ => {}
+    }
+    
+    // Try to parse as semver
+    match Version::parse(clean_version) {
+        Ok(v) => Ok(v.to_string()),
+        Err(_) => {
+            // If it's not valid semver, try to make it valid (only if it looks like a number)
+            if clean_version.chars().all(|c| c.is_numeric() || c == '.') {
+                if clean_version.matches('.').count() == 0 {
+                    // Single number like "1" -> "1.0.0"
+                    Ok(format!("{}.0.0", clean_version))
+                } else if clean_version.matches('.').count() == 1 {
+                    // Two numbers like "1.2" -> "1.2.0"
+                    Ok(format!("{}.0", clean_version))
+                } else {
+                    anyhow::bail!("Invalid version format: {}. Must be valid semantic version (e.g., 1.0.0)", version)
+                }
+            } else {
+                anyhow::bail!("Invalid version format: {}. Must be valid semantic version (e.g., 1.0.0)", version)
+            }
+        }
+    }
+}
+
+/// Resolve "latest" tag to actual semantic version from registry
 
 /// Docker Hub adapter
 pub struct DockerHubAdapter;
@@ -31,6 +96,31 @@ impl RegistryAdapter for DockerHubAdapter {
             // Official image - use library namespace
             format!("docker.io/library/{}", image_name)
         }
+    }
+    
+    async fn get_registry_components(&self, _client: &Client, image_name: &str) -> Result<RegistryComponents> {
+        let (image_without_tag, tag) = parse_image_and_tag(image_name);
+        
+        let package_name = if image_without_tag.contains('/') {
+            image_without_tag.to_string()
+        } else {
+            format!("library/{}", image_without_tag)
+        };
+        
+        let version = if tag == "latest" {
+            // For Spin manifests, we need an actual semver, not "latest"
+            // In production, this should resolve to actual version from registry
+            // For now, return error to force explicit semver usage
+            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+        } else {
+            validate_and_normalize_semver(&tag)?
+        };
+        
+        Ok(RegistryComponents {
+            registry_domain: "docker.io".to_string(),
+            package_name,
+            version,
+        })
     }
     
     fn name(&self) -> &'static str {
@@ -73,6 +163,25 @@ impl GhcrAdapter {
 impl RegistryAdapter for GhcrAdapter {
     fn get_registry_url(&self, image_name: &str) -> String {
         format!("ghcr.io/{}/{}", self.organization, image_name)
+    }
+    
+    async fn get_registry_components(&self, _client: &Client, image_name: &str) -> Result<RegistryComponents> {
+        let (image_without_tag, tag) = parse_image_and_tag(image_name);
+        
+        // GHCR uses colon separator for Spin manifests: "org:repo" not "org/repo"
+        let package_name = format!("{}:{}", self.organization, image_without_tag);
+        
+        let version = if tag == "latest" {
+            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+        } else {
+            validate_and_normalize_semver(&tag)?
+        };
+        
+        Ok(RegistryComponents {
+            registry_domain: "ghcr.io".to_string(),
+            package_name,
+            version,
+        })
     }
     
     fn name(&self) -> &'static str {
@@ -135,6 +244,25 @@ impl RegistryAdapter for EcrAdapter {
         )
     }
     
+    async fn get_registry_components(&self, _client: &Client, image_name: &str) -> Result<RegistryComponents> {
+        let (image_without_tag, tag) = parse_image_and_tag(image_name);
+        
+        let registry_domain = format!("{}.dkr.ecr.{}.amazonaws.com", self.account_id, self.region);
+        let package_name = image_without_tag;
+        
+        let version = if tag == "latest" {
+            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+        } else {
+            validate_and_normalize_semver(&tag)?
+        };
+        
+        Ok(RegistryComponents {
+            registry_domain,
+            package_name,
+            version,
+        })
+    }
+    
     fn name(&self) -> &'static str {
         "AWS Elastic Container Registry (ECR)"
     }
@@ -151,6 +279,41 @@ impl RegistryAdapter for CustomAdapter {
         self.url_pattern.replace("{image_name}", image_name)
     }
     
+    async fn get_registry_components(&self, _client: &Client, image_name: &str) -> Result<RegistryComponents> {
+        let (image_without_tag, tag) = parse_image_and_tag(image_name);
+        
+        // For custom registries, try to extract registry domain from pattern
+        let registry_domain = if let Some(start) = self.url_pattern.find("://") {
+            let after_scheme = &self.url_pattern[start + 3..];
+            if let Some(end) = after_scheme.find('/') {
+                after_scheme[..end].to_string()
+            } else {
+                after_scheme.to_string()
+            }
+        } else {
+            // Fallback: assume pattern starts with domain
+            if let Some(end) = self.url_pattern.find('/') {
+                self.url_pattern[..end].to_string()
+            } else {
+                "github.com/fastertools".to_string()
+            }
+        };
+        
+        let package_name = image_without_tag;
+        
+        let version = if tag == "latest" {
+            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+        } else {
+            validate_and_normalize_semver(&tag)?
+        };
+        
+        Ok(RegistryComponents {
+            registry_domain,
+            package_name,
+            version,
+        })
+    }
+    
     fn name(&self) -> &'static str {
         "Custom Registry"
     }
@@ -159,13 +322,21 @@ impl RegistryAdapter for CustomAdapter {
         // For custom registries, try a HEAD request to the manifest
         let url = self.get_registry_url(image_name);
         
-        // Try to construct a manifest URL (this is a best guess)
+        // Try to construct a manifest URL
         let manifest_url = if url.contains("/manifests/") {
             url
         } else {
-            // Convert from image URL to manifest URL (best effort)
-            url.replace(":latest", "/manifests/latest")
-               .replace(format!("{}:latest", image_name).as_str(), format!("{}/manifests/latest", image_name).as_str())
+            // Parse image and tag properly
+            let (_image_without_tag, tag) = parse_image_and_tag(image_name);
+            
+            // Convert from image URL to manifest URL
+            // Replace the tag portion with /manifests/tag
+            if let Some(tag_pos) = url.rfind(&format!(":{}", tag)) {
+                format!("{}/manifests/{}", &url[..tag_pos], tag)
+            } else {
+                // Fallback: append /manifests/tag to the URL
+                format!("{}/manifests/{}", url, tag)
+            }
         };
         
         let response = client
@@ -193,6 +364,15 @@ impl RegistryAdapter for ConcreteRegistryAdapter {
             ConcreteRegistryAdapter::Ghcr(adapter) => adapter.get_registry_url(image_name),
             ConcreteRegistryAdapter::Ecr(adapter) => adapter.get_registry_url(image_name),
             ConcreteRegistryAdapter::Custom(adapter) => adapter.get_registry_url(image_name),
+        }
+    }
+    
+    async fn get_registry_components(&self, client: &Client, image_name: &str) -> Result<RegistryComponents> {
+        match self {
+            ConcreteRegistryAdapter::DockerHub(adapter) => adapter.get_registry_components(client, image_name).await,
+            ConcreteRegistryAdapter::Ghcr(adapter) => adapter.get_registry_components(client, image_name).await,
+            ConcreteRegistryAdapter::Ecr(adapter) => adapter.get_registry_components(client, image_name).await,
+            ConcreteRegistryAdapter::Custom(adapter) => adapter.get_registry_components(client, image_name).await,
         }
     }
     
@@ -297,5 +477,105 @@ mod tests {
         
         let default_adapter = get_registry_adapter(None).unwrap();
         assert_eq!(default_adapter.name(), "GitHub Container Registry (ghcr.io)");
+    }
+
+    #[test]
+    fn test_parse_image_and_tag() {
+        assert_eq!(parse_image_and_tag("nginx"), ("nginx".to_string(), "latest".to_string()));
+        assert_eq!(parse_image_and_tag("nginx:1.21"), ("nginx".to_string(), "1.21".to_string()));
+        assert_eq!(parse_image_and_tag("user/app:v1.0"), ("user/app".to_string(), "v1.0".to_string()));
+        assert_eq!(parse_image_and_tag("registry.io/org/app:1.0.0"), ("registry.io/org/app".to_string(), "1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_validate_and_normalize_semver() {
+        // Valid semantic versions
+        assert_eq!(validate_and_normalize_semver("1.0.0").unwrap(), "1.0.0");
+        assert_eq!(validate_and_normalize_semver("v1.0.0").unwrap(), "1.0.0");
+        assert_eq!(validate_and_normalize_semver("2.1.3-alpha").unwrap(), "2.1.3-alpha");
+        assert_eq!(validate_and_normalize_semver("0.0.6").unwrap(), "0.0.6");
+        
+        // Auto-completion of versions
+        assert_eq!(validate_and_normalize_semver("1").unwrap(), "1.0.0");
+        assert_eq!(validate_and_normalize_semver("1.2").unwrap(), "1.2.0");
+        assert_eq!(validate_and_normalize_semver("v1.2").unwrap(), "1.2.0");
+        
+        // Invalid versions should return error
+        assert!(validate_and_normalize_semver("latest").is_err());
+        assert!(validate_and_normalize_semver("main").is_err());
+        assert!(validate_and_normalize_semver("invalid.version.format.too.many").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_docker_hub_registry_components() {
+        let adapter = DockerHubAdapter;
+        let client = reqwest::Client::new();
+        
+        // Test official image without tag - should error for "latest"
+        let result = adapter.get_registry_components(&client, "nginx").await;
+        assert!(result.is_err()); // "latest" should be rejected
+        
+        // Test user image with tag
+        let components = adapter.get_registry_components(&client, "user/app:1.2.0").await.unwrap();
+        assert_eq!(components.registry_domain, "docker.io");
+        assert_eq!(components.package_name, "user/app");
+        assert_eq!(components.version, "1.2.0");
+        
+        // Test version normalization
+        let components = adapter.get_registry_components(&client, "nginx:v1.21").await.unwrap();
+        assert_eq!(components.version, "1.21.0");
+    }
+
+    #[tokio::test]
+    async fn test_ghcr_registry_components() {
+        let adapter = GhcrAdapter::new();
+        let client = reqwest::Client::new();
+        
+        // Test GHCR with colon separator
+        let components = adapter.get_registry_components(&client, "ftl-auth-gateway:0.0.6").await.unwrap();
+        assert_eq!(components.registry_domain, "ghcr.io");
+        assert_eq!(components.package_name, "fastertools:ftl-auth-gateway");
+        assert_eq!(components.version, "0.0.6");
+        
+        // Test without tag (should error for "latest")
+        let result = adapter.get_registry_components(&client, "my-tool").await;
+        assert!(result.is_err()); // "latest" should be rejected
+    }
+
+    #[tokio::test]
+    async fn test_ecr_registry_components() {
+        let adapter = EcrAdapter::new("123456".to_string(), "us-east-1".to_string());
+        let client = reqwest::Client::new();
+        
+        let components = adapter.get_registry_components(&client, "my-app:1.0.0").await.unwrap();
+        assert_eq!(components.registry_domain, "123456.dkr.ecr.us-east-1.amazonaws.com");
+        assert_eq!(components.package_name, "my-app");
+        assert_eq!(components.version, "1.0.0");
+    }
+
+    #[tokio::test]
+    async fn test_custom_registry_components() {
+        let adapter = CustomAdapter {
+            url_pattern: "registry.example.com/{image_name}".to_string(),
+        };
+        let client = reqwest::Client::new();
+        
+        let components = adapter.get_registry_components(&client, "tool:v2.0.0").await.unwrap();
+        assert_eq!(components.registry_domain, "registry.example.com");
+        assert_eq!(components.package_name, "tool");
+        assert_eq!(components.version, "2.0.0");
+    }
+
+    #[tokio::test]
+    async fn test_custom_registry_with_port() {
+        let adapter = CustomAdapter {
+            url_pattern: "https://registry.company.com:5000/v2/{image_name}".to_string(),
+        };
+        let client = reqwest::Client::new();
+        
+        let components = adapter.get_registry_components(&client, "myapp:1.2.3").await.unwrap();
+        assert_eq!(components.registry_domain, "registry.company.com:5000");
+        assert_eq!(components.package_name, "myapp");
+        assert_eq!(components.version, "1.2.3");
     }
 }

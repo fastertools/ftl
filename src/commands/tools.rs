@@ -8,7 +8,6 @@ use std::path::Path;
 use toml_edit::{DocumentMut, Item, Table};
 use reqwest::Client;
 
-use crate::config::registry::RegistryConfig;
 
 use crate::config::FtlConfig;
 use crate::registry::{get_registry_adapter, RegistryAdapter};
@@ -85,17 +84,14 @@ struct ResolvedTool {
     name: String,
     description: String,
     image_name: String,
+    #[allow(dead_code)]
     category: String,
+    #[allow(dead_code)]
     tags: Vec<String>,
     from_manifest: bool,
     version: String,
 }
 
-/// Apply registry-specific naming conventions for unknown tools
-fn apply_registry_naming_conventions(_registry_config: &RegistryConfig, tool_name: &str) -> String {
-    // Use tool name as-is for all registries - no automatic prefix addition
-    tool_name.to_string()
-}
 
 pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
     match cmd {
@@ -326,8 +322,8 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
         // CLI version flag overrides any parsed version
         let tag = version.as_ref().unwrap_or(&parsed_tag).clone();
         
-        // Find the registry config
-        let registry_config = config.registries.iter()
+        // Verify registry exists
+        let _registry_config = config.registries.iter()
             .find(|r| r.name == reg_name)
             .context(format!("Registry '{}' not found", reg_name))?;
         
@@ -344,8 +340,8 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
                 version: tag,
             }
         } else {
-            // Not in manifest - create from tool name with registry conventions
-            let image_name = apply_registry_naming_conventions(registry_config, &tool_name);
+            // Not in manifest - use tool name as-is
+            let image_name = tool_name.clone();
             ResolvedTool {
                 name: tool_name.clone(),
                 description: format!("Custom tool: {}", tool_name),

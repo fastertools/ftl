@@ -1,0 +1,100 @@
+spin_manifest_version = 2
+
+[application]
+name = "test-fixed"
+version = "0.1.0"
+authors = ["Corey Ryan <corey@coreyr.com>"]
+description = "FTL MCP server for hosting MCP tools"
+
+[variables]
+tool_components = { default = "nginx,postgres,redis" }
+
+# ========================================
+# Auth Gateway Configuration
+# ========================================
+# Authentication is DISABLED by default. To enable, set auth_enabled = "true"
+
+# Core auth settings
+auth_enabled = { default = "false" }
+auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+auth_trace_header = { default = "X-Trace-Id" }
+
+# Provider configuration (required when auth_enabled = "true")
+auth_provider_type = { default = "" }  # "authkit" or "oidc"
+auth_provider_issuer = { default = "" }
+auth_provider_audience = { default = "" }
+
+# OIDC-specific settings (only required for auth_provider_type = "oidc")
+auth_provider_name = { default = "" }
+auth_provider_jwks_uri = { default = "" }
+auth_provider_authorize_endpoint = { default = "" }
+auth_provider_token_endpoint = { default = "" }
+auth_provider_userinfo_endpoint = { default = "" }
+auth_provider_allowed_domains = { default = "" }  # comma-separated list
+
+# ========================================
+# Example configurations:
+# ========================================
+# AuthKit:
+#   auth_enabled = "true"
+#   auth_provider_type = "authkit"
+#   auth_provider_issuer = "https://your-tenant.authkit.app"
+#   auth_provider_audience = "mcp-api"  # optional
+#
+# Auth0:
+#   auth_enabled = "true"
+#   auth_provider_type = "oidc"
+#   auth_provider_name = "auth0"
+#   auth_provider_issuer = "https://your-domain.auth0.com"
+#   auth_provider_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+#   auth_provider_authorize_endpoint = "https://your-domain.auth0.com/authorize"
+#   auth_provider_token_endpoint = "https://your-domain.auth0.com/oauth/token"
+#   auth_provider_userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
+#   auth_provider_audience = "your-api-identifier"  # optional
+#   auth_provider_allowed_domains = "*.auth0.com"  # optional
+
+# Auth Gateway - handles authentication and OAuth discovery
+[[trigger.http]]
+route = "/mcp"
+component = "mcp"
+
+[[trigger.http]]
+route = "/.well-known/oauth-protected-resource"
+component = "mcp"
+
+[[trigger.http]]
+route = "/.well-known/oauth-authorization-server"
+component = "mcp"
+
+[component.mcp]
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.6" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
+[component.mcp.variables]
+auth_enabled = "{{ auth_enabled }}"
+auth_gateway_url = "{{ auth_gateway_url }}"
+auth_trace_header = "{{ auth_trace_header }}"
+auth_provider_type = "{{ auth_provider_type }}"
+auth_provider_issuer = "{{ auth_provider_issuer }}"
+auth_provider_audience = "{{ auth_provider_audience }}"
+auth_provider_name = "{{ auth_provider_name }}"
+auth_provider_jwks_uri = "{{ auth_provider_jwks_uri }}"
+auth_provider_authorize_endpoint = "{{ auth_provider_authorize_endpoint }}"
+auth_provider_token_endpoint = "{{ auth_provider_token_endpoint }}"
+auth_provider_userinfo_endpoint = "{{ auth_provider_userinfo_endpoint }}"
+auth_provider_allowed_domains = "{{ auth_provider_allowed_domains }}"
+
+# MCP Gateway - internal endpoint (protected by auth gateway)
+[[trigger.http]]
+route = { private = true }
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.ftl-mcp-gateway.variables]
+tool_components = "{{ tool_components }}"
+validate_arguments = "true"
+
+
+[component.redis]
+source = { registry = "ghcr.io", package = "fermyon:redis", version = "1.0.0" }
