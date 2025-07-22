@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use mockall::mock;
 
 use crate::api_client::types;
-use crate::commands::login::StoredCredentials as Credentials;
 use crate::deps::*;
 use base64::Engine;
 
@@ -36,6 +35,9 @@ mock! {
         async fn create_ecr_repository(&self, request: &types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>;
         async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus>;
         async fn deploy_app(&self, request: &types::DeploymentRequest) -> Result<types::DeploymentResponse>;
+        async fn list_apps(&self) -> Result<types::ListAppsResponse>;
+        async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse>;
+        async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse>;
     }
 }
 
@@ -54,7 +56,7 @@ mock! {
 
     #[async_trait]
     impl CredentialsProvider for CredentialsProviderMock {
-        async fn get_or_refresh_credentials(&self) -> Result<Credentials>;
+        async fn get_or_refresh_credentials(&self) -> Result<StoredCredentials>;
     }
 }
 
@@ -254,8 +256,8 @@ impl CommandExecutor for MockCommandExecutorMock {
 
 /// Helper to create test credentials
 #[allow(dead_code)]
-pub fn test_credentials() -> Credentials {
-    Credentials {
+pub fn test_credentials() -> StoredCredentials {
+    StoredCredentials {
         access_token: "test-token".to_string(),
         refresh_token: Some("refresh-token".to_string()),
         id_token: None,

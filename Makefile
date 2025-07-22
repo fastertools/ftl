@@ -38,12 +38,11 @@ test:
 
 # Run tests with coverage
 coverage:
-	cargo llvm-cov nextest --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+	cargo llvm-cov nextest
 
 # Generate HTML coverage report
-coverage-html:
-	cargo llvm-cov nextest --html --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
-	@echo "Coverage report generated at target/llvm-cov/html/index.html"
+coverage-open:
+	cargo llvm-cov nextest --open
 
 # Fix formatting
 fmt:

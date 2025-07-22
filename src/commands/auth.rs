@@ -5,18 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
-use crate::deps::{MessageStyle, UserInterface};
-
-/// Stored credentials structure
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct StoredCredentials {
-    pub access_token: String,
-    pub refresh_token: Option<String>,
-    pub id_token: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub authkit_domain: String,
-}
+use crate::deps::{MessageStyle, StoredCredentials, UserInterface};
 
 /// Credentials provider trait
 pub trait CredentialsProvider: Send + Sync {

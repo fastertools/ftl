@@ -712,11 +712,7 @@
                   "type": "string"
                 },
                 "name": {
-                  "description": "Full application name",
-                  "type": "string"
-                },
-                "displayName": {
-                  "description": "User-friendly display name",
+                  "description": "Application name",
                   "type": "string"
                 },
                 "urls": {
@@ -762,7 +758,6 @@
               "required": [
                 "id",
                 "name",
-                "displayName",
                 "url"
               ],
               "additionalProperties": false
@@ -806,11 +801,7 @@
                 "type": "string"
               },
               "name": {
-                "description": "Full application name",
-                "type": "string"
-              },
-              "displayName": {
-                "description": "User-friendly display name",
+                "description": "Application name",
                 "type": "string"
               },
               "urls": {
@@ -910,7 +901,6 @@
             "required": [
               "id",
               "name",
-              "displayName",
               "url",
               "deploymentCount"
             ],
@@ -934,9 +924,7 @@
             "type": "object",
             "properties": {
               "name": {
-                "type": "string"
-              },
-              "displayName": {
+                "description": "Application name",
                 "type": "string"
               },
               "deletedAt": {
@@ -971,7 +959,6 @@
             },
             "required": [
               "name",
-              "displayName",
               "deletedAt"
             ],
             "additionalProperties": false

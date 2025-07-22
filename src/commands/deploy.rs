@@ -355,7 +355,7 @@ async fn create_repositories_and_push_with_progress(
                 }
             };
 
-            // Push with version tag
+            // Push component with version tag
             pb.set_message(&format!("Pushing v{}...", component.version));
             let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
             let output = deps
@@ -380,13 +380,6 @@ async fn create_repositories_and_push_with_progress(
                 }
                 return Err(anyhow!(error));
             }
-
-            // Also push as latest
-            pb.set_message("Pushing latest tag...");
-            let latest_tag = format!("{}:latest", repo_response.repository_uri);
-            deps.command_executor
-                .execute("wkg", &["oci", "push", &latest_tag, &component.source_path])
-                .await?;
 
             // Add to deployed tools
             let mut tools = deployed_tools.lock().await;
