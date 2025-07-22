@@ -108,10 +108,10 @@ jobs:
       - name: Run tests with coverage
         run: |
           # Run tests with coverage in one command
-          cargo llvm-cov nextest --all-features --profile ci --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)"
+          cargo llvm-cov nextest --all-features --profile ci
           
           # Generate coverage report and extract percentage
-          COVERAGE=$(cargo llvm-cov report --ignore-filename-regex="(main\.rs|deps\.rs|ui\.rs|api_client\.rs|.*_test\.rs|.*_tests\.rs|test_.*\.rs)" | tail -1 | awk '{print $4}' | sed 's/%//')
+          COVERAGE=$(cargo llvm-cov report | tail -1 | awk '{print $4}' | sed 's/%//')
           echo "Coverage: ${COVERAGE}%"
           
           # Fail if coverage drops below 80%

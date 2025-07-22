@@ -9,9 +9,20 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::api_client::{Client as ApiClient, types};
-use crate::commands::login::StoredCredentials as Credentials;
+
+/// Unified stored credentials structure used across the application
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredCredentials {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub id_token: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub authkit_domain: String,
+}
 
 /// File system operations
 pub trait FileSystem: Send + Sync {
@@ -71,6 +82,15 @@ pub trait FtlApiClient: Send + Sync {
         &self,
         request: &types::DeploymentRequest,
     ) -> Result<types::DeploymentResponse>;
+
+    /// List applications
+    async fn list_apps(&self) -> Result<types::ListAppsResponse>;
+
+    /// Get application status
+    async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse>;
+
+    /// Delete application
+    async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse>;
 }
 
 /// Time/clock operations
@@ -89,7 +109,7 @@ pub trait Clock: Send + Sync {
 #[async_trait]
 pub trait CredentialsProvider: Send + Sync {
     /// Get or refresh credentials
-    async fn get_or_refresh_credentials(&self) -> Result<Credentials>;
+    async fn get_or_refresh_credentials(&self) -> Result<StoredCredentials>;
 }
 
 /// User interface operations
@@ -265,14 +285,6 @@ pub struct RealFtlApiClient {
 }
 
 impl RealFtlApiClient {
-    #[allow(dead_code)]
-    pub const fn new(client: ApiClient) -> Self {
-        Self {
-            client,
-            auth_token: None,
-        }
-    }
-
     pub const fn new_with_auth(client: ApiClient, auth_token: String) -> Self {
         Self {
             client,
@@ -351,6 +363,53 @@ impl FtlApiClient for RealFtlApiClient {
             .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to deploy app: {}", e))
     }
+
+    async fn list_apps(&self) -> Result<types::ListAppsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .list_apps()
+            .authorization(format!("Bearer {auth}"))
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to list apps: {}", e))
+    }
+
+    async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .get_app_status()
+            .authorization(format!("Bearer {auth}"))
+            .app_name(app_name)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to get app status: {}", e))
+    }
+
+    async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .delete_app()
+            .authorization(format!("Bearer {auth}"))
+            .app_name(app_name)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to delete app: {}", e))
+    }
 }
 
 /// Production clock implementation
@@ -375,7 +434,7 @@ pub struct RealCredentialsProvider;
 
 #[async_trait]
 impl CredentialsProvider for RealCredentialsProvider {
-    async fn get_or_refresh_credentials(&self) -> Result<Credentials> {
+    async fn get_or_refresh_credentials(&self) -> Result<StoredCredentials> {
         crate::commands::login::get_or_refresh_credentials().await
     }
 }

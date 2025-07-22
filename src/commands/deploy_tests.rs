@@ -569,12 +569,12 @@ fn setup_successful_push(fixture: &mut TestFixture) {
             Ok(crate::test_helpers::test_repository_response(tool_name))
         });
 
-    // Mock: wkg push succeeds (both version and latest tags)
+    // Mock: wkg push succeeds (version tag only)
     fixture
         .command_executor
         .expect_execute()
         .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
-        .times(2)
+        .times(1)
         .returning(|_, _| {
             Ok(CommandOutput {
                 success: true,

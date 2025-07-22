@@ -3,6 +3,8 @@ use std::time::Duration;
 use anyhow::Result;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
+use crate::config::{DEFAULT_API_BASE_URL, API_URL_ENV_VAR, AUTH_TOKEN_ENV_VAR, DEFAULT_API_TIMEOUT_SECS};
+
 // Include the generated client code
 #[allow(clippy::use_self)]
 #[allow(clippy::pedantic)]
@@ -29,9 +31,9 @@ pub struct ApiConfig {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            base_url: "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string(),
+            base_url: DEFAULT_API_BASE_URL.to_string(),
             auth_token: None,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(DEFAULT_API_TIMEOUT_SECS),
         }
     }
 }
@@ -58,14 +60,20 @@ pub fn create_client(config: ApiConfig) -> Result<Client> {
 /// Helper function to create client from environment variables
 #[allow(dead_code)]
 pub fn create_client_from_env() -> Result<Client> {
-    let base_url = std::env::var("FTL_API_URL")
-        .unwrap_or_else(|_| "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string());
+    let base_url = std::env::var(API_URL_ENV_VAR)
+        .unwrap_or_else(|_| DEFAULT_API_BASE_URL.to_string());
 
-    let auth_token = std::env::var("FTL_AUTH_TOKEN").ok();
+    let auth_token = std::env::var(AUTH_TOKEN_ENV_VAR).ok();
 
     create_client(ApiConfig {
         base_url,
         auth_token,
         ..Default::default()
     })
+}
+
+/// Get the API base URL from environment or default
+pub fn get_api_base_url() -> String {
+    std::env::var(API_URL_ENV_VAR)
+        .unwrap_or_else(|_| DEFAULT_API_BASE_URL.to_string())
 }

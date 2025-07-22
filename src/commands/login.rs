@@ -6,14 +6,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::deps::{AsyncRuntime, MessageStyle, UserInterface};
+use crate::deps::{AsyncRuntime, MessageStyle, StoredCredentials, UserInterface};
 
 pub const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
 pub const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
 pub const LOGIN_TIMEOUT: Duration = Duration::from_secs(60 * 30); // 30 minutes
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-#[allow(dead_code)]
 pub struct DeviceAuthResponse {
     pub device_code: String,
     pub user_code: String,
@@ -24,7 +23,6 @@ pub struct DeviceAuthResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-#[allow(dead_code)]
 pub struct TokenResponse {
     pub access_token: String,
     pub token_type: String,
@@ -39,15 +37,6 @@ pub struct TokenError {
     pub error_description: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct StoredCredentials {
-    pub access_token: String,
-    pub refresh_token: Option<String>,
-    pub id_token: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub authkit_domain: String,
-}
 
 /// HTTP client trait for making requests
 #[async_trait::async_trait]
@@ -121,7 +110,7 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
     deps.ui
         .print(&format!("   {}", auth_response.verification_uri));
     deps.ui.print("");
-    deps.ui.print("And enter this code:");
+    deps.ui.print("And confirm this code:");
     deps.ui.print_styled(
         &format!("   {}", auth_response.user_code),
         MessageStyle::Success,

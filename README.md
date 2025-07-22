@@ -14,18 +14,18 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source tool framework for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for the whole development cycle of writing and running secure, portable, performant [Model Context Protocol](https://modelcontextprotocol.io) tools.
+FTL is an open source tool framework for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for the whole development cycle of writing and running secure, performant, deployable [Model Context Protocol](https://modelcontextprotocol.io) servers.
 
-FTL tools can be authored in multiple [languages](https://component-model.bytecodealliance.org/language-support.html) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
+FTL tools can be authored in multiple [source languages](https://component-model.bytecodealliance.org/language-support.html) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-The FTL Platform aims to be an excellent choice for deploying remote tools with SOTA performance on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
+The FTL Platform aims to be an excellent choice for managing remote MCP tools with SOTA performance on [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions).
 
 ## Why?
 
 <details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
-- Tools run as individual WebAssembly components to provide sandboxed tool executions on a provably airtight [security model](https://webassembly.org/docs/security/).
+- Tools run as individual WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
 - MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own JWT issuer or OIDC provider with simple configuration.
 - Allowed outbound network calls are configurable per tool. This is especially useful when including third party tool components in your MCP server (see below).
@@ -37,7 +37,6 @@ The FTL Platform aims to be an excellent choice for deploying remote tools with 
 - Tools are compiled to self-contained Wasm binaries that are often < 1MB.
 - Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 - Mix and match individual tools in your MCP server by registry URI. Allowed outbound network calls are configurable per tool.
-- Tool binary size and performance are influenced by the tool's individual source language.
 </details>
 
 <details>
@@ -46,15 +45,16 @@ The FTL Platform aims to be an excellent choice for deploying remote tools with 
 - Combine tools written in different source languages within one MCP server.
 - Use Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html).
 - High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C.
+- Tool binary size and performance are influenced by the tool's source language.
 </details>
 
 <details>
 <summary><strong>⤵ Deploy on the FTL Platform</strong></summary>
 
-Latency and compute overhead for remote tool calls should not be something you have to design your agents around. Instant, sandboxed, globally distributed, high performance compute should be accessible to agents as a resource. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
+Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
 
-- FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
+- FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - The FTL [gateway components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
 - Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
 - High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.

@@ -23,6 +23,7 @@ use tracing_subscriber::EnvFilter;
 mod api_client;
 mod commands;
 mod common;
+mod config;
 mod deps;
 mod language;
 mod ui;
@@ -382,17 +383,9 @@ impl commands::logout::CredentialsClearer for RealCredentialsClearer {
 struct RealCredentialsProviderForAuth;
 
 impl commands::auth::CredentialsProvider for RealCredentialsProviderForAuth {
-    fn get_stored_credentials(&self) -> Result<commands::auth::StoredCredentials> {
+    fn get_stored_credentials(&self) -> Result<deps::StoredCredentials> {
         use crate::commands::login::get_stored_credentials;
-        let creds =
-            get_stored_credentials()?.ok_or_else(|| anyhow::anyhow!("No matching entry found"))?;
-        Ok(commands::auth::StoredCredentials {
-            access_token: creds.access_token,
-            refresh_token: creds.refresh_token,
-            id_token: None, // Original doesn't have this
-            expires_at: creds.expires_at,
-            authkit_domain: "auth.ftl.sh".to_string(), // Default value
-        })
+        get_stored_credentials()?.ok_or_else(|| anyhow::anyhow!("No matching entry found"))
     }
 }
 
@@ -522,6 +515,12 @@ enum Command {
     /// Deploy the project to FTL
     Deploy,
 
+    /// Manage FTL applications
+    App {
+        #[command(subcommand)]
+        command: AppCommand,
+    },
+
     /// Interact with MCP tool registries
     Registry {
         #[command(subcommand)]
@@ -555,6 +554,32 @@ enum Command {
     Auth {
         #[command(subcommand)]
         command: AuthCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AppCommand {
+    /// List all applications
+    List {
+        /// Output format (table or json)
+        #[arg(short, long, default_value = "table")]
+        format: String,
+    },
+    /// Show application status
+    Status {
+        /// Application name
+        name: String,
+        /// Output format (table or json)
+        #[arg(short, long, default_value = "table")]
+        format: String,
+    },
+    /// Delete an application
+    Delete {
+        /// Application name
+        name: String,
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -788,9 +813,9 @@ async fn main() -> Result<()> {
 
             // Create API client with authentication
             let api_client_config = api_client::ApiConfig {
-                base_url: "https://nstr9t6nb7.execute-api.us-west-2.amazonaws.com".to_string(),
+                base_url: api_client::get_api_base_url(),
                 auth_token: Some(credentials.access_token.clone()),
-                timeout: std::time::Duration::from_secs(30),
+                timeout: std::time::Duration::from_secs(config::DEFAULT_API_TIMEOUT_SECS),
             };
             let api_client = api_client::create_client(api_client_config)?;
 
@@ -810,6 +835,55 @@ async fn main() -> Result<()> {
 
             // Execute with v2
             commands::deploy::execute_with_deps(deps).await
+        }
+        Command::App { command } => {
+            // Create dependencies
+            let ui = Arc::new(ui::RealUserInterface);
+
+            // Get credentials first to create authenticated API client
+            let credentials_provider = deps::RealCredentialsProvider;
+            let Ok(credentials) = credentials_provider.get_or_refresh_credentials().await else {
+                return Err(anyhow::anyhow!(
+                    "Not logged in to FTL. Run 'ftl login' first."
+                ));
+            };
+
+            // Create API client with authentication
+            let api_client_config = api_client::ApiConfig {
+                base_url: api_client::get_api_base_url(),
+                auth_token: Some(credentials.access_token.clone()),
+                timeout: std::time::Duration::from_secs(config::DEFAULT_API_TIMEOUT_SECS),
+            };
+            let api_client = api_client::create_client(api_client_config)?;
+            let api_client = Arc::new(deps::RealFtlApiClient::new_with_auth(
+                api_client,
+                credentials.access_token,
+            ));
+
+            let deps = Arc::new(commands::app::AppDependencies {
+                ui: ui.clone(),
+                api_client,
+            });
+
+            match command {
+                AppCommand::List { format } => {
+                    let output_format = match format.as_str() {
+                        "json" => commands::app::OutputFormat::Json,
+                        _ => commands::app::OutputFormat::Table,
+                    };
+                    commands::app::list_with_deps(output_format, &deps).await
+                }
+                AppCommand::Status { name, format } => {
+                    let output_format = match format.as_str() {
+                        "json" => commands::app::OutputFormat::Json,
+                        _ => commands::app::OutputFormat::Table,
+                    };
+                    commands::app::status_with_deps(&name, output_format, &deps).await
+                }
+                AppCommand::Delete { name, force } => {
+                    commands::app::delete_with_deps(&name, force, &deps).await
+                }
+            }
         }
         Command::Registry { command } => {
             // Create dependencies
