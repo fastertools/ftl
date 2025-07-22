@@ -194,25 +194,24 @@ graph TB
     
     MCP["Model Context Protocol<br/>(Streamable HTTP)"]
     
-    subgraph "Akamai Edge Worker"
-        subgraph "Fermyon Wasm Function"
-            subgraph "Spin/Wasmtime Runtime"
-                subgraph "FTL Application"
-                    subgraph "FTL Gateway Components"
-                        AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
-                        MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
-                    end
-                    
-                    subgraph "User Tool Components"
-                        Weather["Weather Tool<br/>(TypeScript)"]
-                        GitHub["GitHub Tool<br/>(Rust)"]
-                        Database["Database Tool<br/>(JavaScript)"]
-                        Custom["Custom Tool<br/>(Another Language)"]
-                    end
-                end
-            end
-        end
-    end
+
+      subgraph "Host"
+          subgraph "Spin/Wasmtime Runtime"
+              subgraph "FTL Application"
+                  subgraph "FTL Components"
+                      AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
+                      MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
+                  end
+                  
+                  subgraph "User Tool Components"
+                      Weather["Weather Tool<br/>(TypeScript)"]
+                      GitHub["GitHub Tool<br/>(Rust)"]
+                      Database["Database Tool<br/>(JavaScript)"]
+                      Custom["Custom Tool<br/>(Another Language)"]
+                  end
+              end
+          end
+      end
     
     Desktops -.->| | MCP
     Agents -.->| | MCP
