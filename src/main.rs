@@ -526,17 +526,12 @@ enum Command {
     /// Deploy the project to FTL
     Deploy,
 
-    /// Interact with MCP tool registries
+    /// Manage registries and search for MCP tools
     Registry {
         #[command(subcommand)]
         command: RegistryCommand,
     },
 
-    /// Manage registry configurations
-    Registries {
-        #[command(subcommand)]
-        command: commands::registries::RegistriesCommand,
-    },
 
     /// Setup and configure FTL
     Setup {
@@ -605,14 +600,14 @@ enum SetupCommand {
 
 #[derive(Subcommand)]
 enum RegistryCommand {
-    /// List available MCP tools
+    /// List available MCP tools from registries
     List {
         /// Registry to list from
         #[arg(short, long)]
         registry: Option<String>,
     },
 
-    /// Search for MCP tools
+    /// Search for MCP tools in registries
     Search {
         /// Search query
         query: String,
@@ -626,6 +621,80 @@ enum RegistryCommand {
     Info {
         /// MCP tool name or URL
         component: String,
+    },
+
+    /// List all configured registries
+    Registries,
+    
+    /// Add a new registry
+    Add {
+        /// Name for the registry
+        name: String,
+        
+        /// Registry type (ghcr, docker, ecr, custom)
+        #[arg(short = 't', long)]
+        registry_type: String,
+        
+        /// Organization (for GHCR)
+        #[arg(long)]
+        org: Option<String>,
+        
+        /// AWS Account ID (for ECR)
+        #[arg(long)]
+        account: Option<String>,
+        
+        /// AWS Region (for ECR)
+        #[arg(long)]
+        region: Option<String>,
+        
+        /// URL pattern (for custom registries)
+        #[arg(long)]
+        url_pattern: Option<String>,
+        
+        /// Authentication type (for custom registries: none, basic, bearer)
+        #[arg(long)]
+        auth_type: Option<String>,
+        
+        /// Priority for registry searches (lower = higher priority)
+        #[arg(long, default_value = "10")]
+        priority: u32,
+        
+        /// Whether to enable the registry immediately
+        #[arg(long, default_value = "true")]
+        enabled: bool,
+    },
+    
+    /// Remove a registry
+    Remove {
+        /// Name of the registry to remove
+        name: String,
+    },
+    
+    /// Set the default registry
+    SetDefault {
+        /// Name of the registry to set as default
+        name: String,
+    },
+    
+    /// Enable a registry
+    Enable {
+        /// Name of the registry to enable
+        name: String,
+    },
+    
+    /// Disable a registry
+    Disable {
+        /// Name of the registry to disable
+        name: String,
+    },
+    
+    /// Set registry priority
+    SetPriority {
+        /// Name of the registry
+        name: String,
+        
+        /// New priority (lower = higher priority)
+        priority: u32,
     },
 }
 
@@ -827,9 +896,35 @@ async fn main() -> Result<()> {
                     commands::registry::info_with_deps(&component, &deps);
                     Ok(())
                 }
+                RegistryCommand::Registries => commands::registries::list_registries().await,
+                RegistryCommand::Add { 
+                    name, 
+                    registry_type, 
+                    org, 
+                    account, 
+                    region, 
+                    url_pattern, 
+                    auth_type, 
+                    priority, 
+                    enabled 
+                } => commands::registries::add_registry(
+                    name, 
+                    registry_type, 
+                    org, 
+                    account, 
+                    region, 
+                    url_pattern, 
+                    auth_type, 
+                    priority, 
+                    enabled
+                ).await,
+                RegistryCommand::Remove { name } => commands::registries::remove_registry(name).await,
+                RegistryCommand::SetDefault { name } => commands::registries::set_default_registry(name).await,
+                RegistryCommand::Enable { name } => commands::registries::enable_registry(name, true).await,
+                RegistryCommand::Disable { name } => commands::registries::enable_registry(name, false).await,
+                RegistryCommand::SetPriority { name, priority } => commands::registries::set_priority(name, priority).await,
             }
         }
-        Command::Registries { command } => commands::registries::handle_command(command).await,
         Command::Setup { command } => {
             // Create dependencies
             let ui = Arc::new(ui::RealUserInterface);

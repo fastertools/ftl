@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use clap::Subcommand;
 use console::{style, Emoji};
 
 use crate::config::{FtlConfig, registry::{RegistryConfig, RegistryType}};
@@ -8,108 +7,9 @@ static CHECK: Emoji<'_, '_> = Emoji("✓", "");
 static ARROW: Emoji<'_, '_> = Emoji("→", "->");
 static WARN: Emoji<'_, '_> = Emoji("⚠", "!");
 
-#[derive(Subcommand)]
-pub enum RegistriesCommand {
-    /// List all configured registries
-    List,
-    
-    /// Add a new registry
-    Add {
-        /// Name for the registry
-        name: String,
-        
-        /// Registry type (ghcr, docker, ecr, custom)
-        #[arg(short = 't', long)]
-        registry_type: String,
-        
-        /// Organization (for GHCR)
-        #[arg(long)]
-        org: Option<String>,
-        
-        /// AWS Account ID (for ECR)
-        #[arg(long)]
-        account: Option<String>,
-        
-        /// AWS Region (for ECR)
-        #[arg(long)]
-        region: Option<String>,
-        
-        /// URL pattern (for custom registries)
-        #[arg(long)]
-        url_pattern: Option<String>,
-        
-        /// Authentication type (for custom registries: none, basic, bearer)
-        #[arg(long)]
-        auth_type: Option<String>,
-        
-        /// Priority for registry searches (lower = higher priority)
-        #[arg(long, default_value = "10")]
-        priority: u32,
-        
-        /// Whether to enable the registry immediately
-        #[arg(long, default_value = "true")]
-        enabled: bool,
-    },
-    
-    /// Remove a registry
-    Remove {
-        /// Name of the registry to remove
-        name: String,
-    },
-    
-    /// Set the default registry
-    SetDefault {
-        /// Name of the registry to set as default
-        name: String,
-    },
-    
-    /// Enable a registry
-    Enable {
-        /// Name of the registry to enable
-        name: String,
-    },
-    
-    /// Disable a registry
-    Disable {
-        /// Name of the registry to disable
-        name: String,
-    },
-    
-    /// Set registry priority
-    SetPriority {
-        /// Name of the registry
-        name: String,
-        
-        /// New priority (lower = higher priority)
-        priority: u32,
-    },
-}
 
-pub async fn handle_command(cmd: RegistriesCommand) -> Result<()> {
-    match cmd {
-        RegistriesCommand::List => list_registries().await,
-        RegistriesCommand::Add { 
-            name, 
-            registry_type, 
-            org, 
-            account, 
-            region, 
-            url_pattern, 
-            auth_type,
-            priority,
-            enabled,
-        } => {
-            add_registry(name, registry_type, org, account, region, url_pattern, auth_type, priority, enabled).await
-        },
-        RegistriesCommand::Remove { name } => remove_registry(name).await,
-        RegistriesCommand::SetDefault { name } => set_default_registry(name).await,
-        RegistriesCommand::Enable { name } => enable_registry(name, true).await,
-        RegistriesCommand::Disable { name } => enable_registry(name, false).await,
-        RegistriesCommand::SetPriority { name, priority } => set_priority(name, priority).await,
-    }
-}
 
-async fn list_registries() -> Result<()> {
+pub async fn list_registries() -> Result<()> {
     let config = FtlConfig::load()?;
     
     println!("{} Registry Configuration", style("FTL").bold().cyan());
@@ -176,12 +76,12 @@ async fn list_registries() -> Result<()> {
     }
     
     println!();
-    println!("{} Use 'ftl registries add' to add a new registry", ARROW);
+    println!("{} Use 'ftl registry add' to add a new registry", ARROW);
     
     Ok(())
 }
 
-async fn add_registry(
+pub async fn add_registry(
     name: String,
     registry_type: String,
     org: Option<String>,
@@ -233,13 +133,13 @@ async fn add_registry(
     if enabled {
         println!("{} Registry is enabled and ready to use", ARROW);
     } else {
-        println!("{} Registry is disabled. Use 'ftl registries enable {}' to enable it", WARN, name);
+        println!("{} Registry is disabled. Use 'ftl registry enable {}' to enable it", WARN, name);
     }
     
     Ok(())
 }
 
-async fn remove_registry(name: String) -> Result<()> {
+pub async fn remove_registry(name: String) -> Result<()> {
     let mut config = FtlConfig::load()?;
     
     config.remove_registry(&name)?;
@@ -250,7 +150,7 @@ async fn remove_registry(name: String) -> Result<()> {
     Ok(())
 }
 
-async fn set_default_registry(name: String) -> Result<()> {
+pub async fn set_default_registry(name: String) -> Result<()> {
     let mut config = FtlConfig::load()?;
     
     config.set_default(&name)?;
@@ -261,7 +161,7 @@ async fn set_default_registry(name: String) -> Result<()> {
     Ok(())
 }
 
-async fn enable_registry(name: String, enabled: bool) -> Result<()> {
+pub async fn enable_registry(name: String, enabled: bool) -> Result<()> {
     let mut config = FtlConfig::load()?;
     
     config.set_enabled(&name, enabled)?;
@@ -273,7 +173,7 @@ async fn enable_registry(name: String, enabled: bool) -> Result<()> {
     Ok(())
 }
 
-async fn set_priority(name: String, priority: u32) -> Result<()> {
+pub async fn set_priority(name: String, priority: u32) -> Result<()> {
     let mut config = FtlConfig::load()?;
     
     config.set_priority(&name, priority)?;

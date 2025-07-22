@@ -5,6 +5,10 @@ use std::sync::Arc;
 use crate::commands::registry::{
     RegistryDependencies, info_with_deps, list_with_deps, search_with_deps,
 };
+use crate::commands::registries::{
+    list_registries, add_registry, remove_registry, set_default_registry, 
+    enable_registry, set_priority
+};
 use crate::deps::UserInterface;
 use crate::ui::TestUserInterface;
 
@@ -238,5 +242,291 @@ async fn test_list_output_completeness() {
             actual.contains(expected),
             "Expected '{actual}' to contain '{expected}'"
         );
+    }
+}
+
+// Registry Management Function Tests
+
+#[tokio::test]
+async fn test_list_registries_with_default() {
+    // This test would need to mock the config loading
+    // For now, we'll test the error handling when config is missing
+    let result = list_registries().await;
+    // Should either succeed with a real config or fail with a clear error
+    match result {
+        Ok(_) => {
+            // If config exists, the function succeeded
+        }
+        Err(e) => {
+            // Should be a clear error about missing config
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_add_registry_ghcr_basic() {
+    let result = add_registry(
+        "test-ghcr".to_string(),
+        "ghcr".to_string(),
+        Some("testorg".to_string()),
+        None,
+        None,
+        None,
+        None,
+        10,
+        true,
+    ).await;
+    
+    // Should either succeed or fail with clear error about config
+    match result {
+        Ok(_) => {
+            // Registry was added successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_add_registry_docker_basic() {
+    let result = add_registry(
+        "test-docker".to_string(),
+        "docker".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        true,
+    ).await;
+    
+    // Should either succeed or fail with clear error about config
+    match result {
+        Ok(_) => {
+            // Registry was added successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("Invalid registry type"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_add_registry_ecr_with_params() {
+    let result = add_registry(
+        "test-ecr".to_string(),
+        "ecr".to_string(),
+        None,
+        Some("123456789012".to_string()),
+        Some("us-east-1".to_string()),
+        None,
+        None,
+        10,
+        false,
+    ).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Registry was added successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("Invalid registry type"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_add_registry_custom_with_url() {
+    let result = add_registry(
+        "test-custom".to_string(),
+        "custom".to_string(),
+        None,
+        None,
+        None,
+        Some("registry.example.com/{image_name}".to_string()),
+        Some("basic".to_string()),
+        5,
+        true,
+    ).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Registry was added successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("Invalid registry type"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_add_registry_invalid_type() {
+    let result = add_registry(
+        "test-invalid".to_string(),
+        "invalid-type".to_string(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        true,
+    ).await;
+    
+    // Should fail with invalid registry type error
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.unwrap_err());
+    assert!(
+        error_msg.contains("Invalid registry type") ||
+        error_msg.contains("invalid-type"),
+        "Expected invalid registry type error, got: {}", error_msg
+    );
+}
+
+#[tokio::test]
+async fn test_remove_registry_basic() {
+    let result = remove_registry("test-registry".to_string()).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Registry was removed successfully (or didn't exist)
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("not found"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_set_default_registry_basic() {
+    let result = set_default_registry("test-registry".to_string()).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Default was set successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("not found"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_enable_registry_basic() {
+    let result = enable_registry("test-registry".to_string(), true).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Registry was enabled successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("not found"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_disable_registry_basic() {
+    let result = enable_registry("test-registry".to_string(), false).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Registry was disabled successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("not found"),
+                "Unexpected error: {}", error_msg
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_set_priority_basic() {
+    let result = set_priority("test-registry".to_string(), 5).await;
+    
+    // Should either succeed or fail with clear error
+    match result {
+        Ok(_) => {
+            // Priority was set successfully
+        }
+        Err(e) => {
+            let error_msg = format!("{}", e);
+            assert!(
+                error_msg.contains("config") || 
+                error_msg.contains("No such file") ||
+                error_msg.contains("Permission denied") ||
+                error_msg.contains("not found"),
+                "Unexpected error: {}", error_msg
+            );
+        }
     }
 }

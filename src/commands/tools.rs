@@ -57,6 +57,34 @@ pub enum ToolsCommand {
         #[arg(short = 'y', long)]
         yes: bool,
     },
+
+    /// Update existing tools in your project
+    Update {
+        /// Tool names to update (can include registry prefix like docker:tool-name)
+        tools: Vec<String>,
+
+        /// Registry to use (overrides config and tool prefix)
+        #[arg(short, long)]
+        registry: Option<String>,
+
+        /// Version/tag to update to (overrides tool:version syntax)
+        #[arg(short, long)]
+        version: Option<String>,
+
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+
+    /// Remove tools from your project
+    Remove {
+        /// Tool names to remove
+        tools: Vec<String>,
+
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +128,12 @@ pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
         }
         ToolsCommand::Add { tools, registry, version, yes } => {
             add_tools(tools, registry, version, yes).await
+        }
+        ToolsCommand::Update { tools, registry, version, yes } => {
+            update_tools(tools, registry, version, yes).await
+        }
+        ToolsCommand::Remove { tools, yes } => {
+            remove_tools(tools, yes).await
         }
     }
 }
@@ -466,6 +500,291 @@ fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_url: &str, 
     } else {
         format!("{},{}", current_value, tool_name)
     };
+    
+    tool_components["default"] = toml_edit::Value::from(new_value);
+    
+    Ok(())
+}
+
+async fn update_tools(tools: Vec<String>, registry: Option<String>, version: Option<String>, yes: bool) -> Result<()> {
+    let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
+        .context("Failed to parse tools manifest")?;
+    
+    let config = FtlConfig::load()?;
+    
+    // Check if spin.toml exists
+    if !Path::new("spin.toml").exists() {
+        println!("{} No spin.toml found in current directory", style("✗").red());
+        println!("{} Run this command from your FTL project root", style("→").cyan());
+        return Ok(());
+    }
+
+    // Read current spin.toml to check which tools are installed
+    let contents = fs::read_to_string("spin.toml")
+        .context("Failed to read spin.toml")?;
+    
+    let doc = contents.parse::<DocumentMut>()
+        .context("Failed to parse spin.toml")?;
+
+    // Get current tool_components to verify which tools exist
+    let current_components = doc.get("variables")
+        .and_then(|v| v.as_table())
+        .and_then(|vars| vars.get("tool_components"))
+        .and_then(|tc| tc.as_inline_table())
+        .and_then(|tc| tc.get("default"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<std::collections::HashSet<_>>();
+
+    // Parse tools and validate they exist in project
+    let mut tools_to_update = Vec::new();
+    
+    for tool_spec in &tools {
+        // Parse tool specification: could be "tool", "tool:tag", or "registry:tool:tag"
+        let parts: Vec<&str> = tool_spec.splitn(3, ':').collect();
+        
+        let (reg_name, tool_name, parsed_tag) = match parts.as_slice() {
+            [single] => {
+                // Just tool name, use default registry and tag
+                let reg = registry.as_ref().unwrap_or(&config.default_registry).clone();
+                (reg, single.to_string(), "latest".to_string())
+            }
+            [first, second] => {
+                // Could be "registry:tool" or "tool:tag"
+                // Check if first part is a known registry
+                if config.registries.iter().any(|r| r.name == *first) {
+                    // It's "registry:tool"
+                    (first.to_string(), second.to_string(), "latest".to_string())
+                } else {
+                    // It's "tool:tag"
+                    let reg = registry.as_ref().unwrap_or(&config.default_registry).clone();
+                    (reg, first.to_string(), second.to_string())
+                }
+            }
+            [reg, tool, tag] => {
+                // Full "registry:tool:tag"
+                (reg.to_string(), tool.to_string(), tag.to_string())
+            }
+            _ => anyhow::bail!("Invalid tool specification: {}", tool_spec),
+        };
+        
+        // CLI version flag overrides any parsed version
+        let tag = version.as_ref().unwrap_or(&parsed_tag).clone();
+        
+        // Verify tool is currently installed
+        if !current_components.contains(tool_name.as_str()) {
+            println!("{} Tool '{}' is not currently installed", style("✗").red(), tool_name);
+            println!("{} Use 'ftl tools add {}' to install it first", style("→").cyan(), tool_name);
+            continue;
+        }
+        
+        // Verify registry exists
+        let _registry_config = config.registries.iter()
+            .find(|r| r.name == reg_name)
+            .context(format!("Registry '{}' not found", reg_name))?;
+        
+        // Try to find tool in manifest first
+        let resolved_tool = if let Some(manifest_tool) = manifest.tools.iter().find(|t| t.name == tool_name) {
+            // Found in manifest - use manifest data, but allow version override
+            ResolvedTool {
+                name: manifest_tool.name.clone(),
+                description: manifest_tool.description.clone(),
+                image_name: manifest_tool.image_name.clone(),
+                category: manifest_tool.category.clone(),
+                tags: manifest_tool.tags.clone(),
+                from_manifest: true,
+                version: tag,
+            }
+        } else {
+            // Not in manifest - use tool name as-is
+            let image_name = tool_name.clone();
+            ResolvedTool {
+                name: tool_name.clone(),
+                description: format!("Custom tool: {}", tool_name),
+                image_name,
+                category: "custom".to_string(),
+                tags: vec!["user-defined".to_string()],
+                from_manifest: false,
+                version: tag,
+            }
+        };
+        
+        tools_to_update.push((reg_name, resolved_tool));
+    }
+
+    if tools_to_update.is_empty() {
+        println!("{} No tools to update", style("!").yellow());
+        return Ok(());
+    }
+
+    // Show what will be updated
+    println!("{} Updating the following tools:\n", style("→").cyan());
+    for (reg, resolved_tool) in &tools_to_update {
+        let source_indicator = if resolved_tool.from_manifest { "" } else { " [custom]" };
+        println!("  {} {} ({}{}) to version {} - {}", 
+            style("•").green(), 
+            style(&resolved_tool.name).bold(),
+            style(reg).dim(),
+            style(source_indicator).dim(),
+            style(&resolved_tool.version).yellow(),
+            resolved_tool.description
+        );
+    }
+
+    // Confirm unless -y flag is provided
+    if !yes {
+        use dialoguer::Confirm;
+        let proceed = Confirm::new()
+            .with_prompt("Do you want to update these tools?")
+            .default(true)
+            .interact()?;
+        
+        if !proceed {
+            println!("Operation cancelled");
+            return Ok(());
+        }
+    }
+
+    // Parse spin.toml again for updating
+    let mut doc = contents.parse::<DocumentMut>()
+        .context("Failed to parse spin.toml")?;
+
+    // Update tools by replacing their component entries
+    for (reg_name, resolved_tool) in &tools_to_update {
+        let adapter = get_registry_adapter(Some(reg_name))?;
+        let registry_url = adapter.get_registry_url(&resolved_tool.image_name);
+        
+        // Remove the old component entry and add the new one
+        if let Some(component_section) = doc.get_mut("component").and_then(|item| item.as_table_mut()) {
+            component_section.remove(&resolved_tool.name);
+        }
+        
+        add_tool_to_spin(&mut doc, &resolved_tool.name, &registry_url, &resolved_tool.version)?;
+    }
+
+    // Write back to spin.toml
+    fs::write("spin.toml", doc.to_string())
+        .context("Failed to write spin.toml")?;
+
+    println!();
+    println!("{} Successfully updated tools in spin.toml", style("✓").green());
+    println!("{} Remember to run 'ftl build' to pull the updated components", style("→").cyan());
+
+    Ok(())
+}
+
+async fn remove_tools(tools: Vec<String>, yes: bool) -> Result<()> {
+    // Check if spin.toml exists
+    if !Path::new("spin.toml").exists() {
+        println!("{} No spin.toml found in current directory", style("✗").red());
+        println!("{} Run this command from your FTL project root", style("→").cyan());
+        return Ok(());
+    }
+
+    // Read current spin.toml to check which tools are installed
+    let contents = fs::read_to_string("spin.toml")
+        .context("Failed to read spin.toml")?;
+    
+    let doc = contents.parse::<DocumentMut>()
+        .context("Failed to parse spin.toml")?;
+
+    // Get current tool_components to verify which tools exist
+    let current_components = doc.get("variables")
+        .and_then(|v| v.as_table())
+        .and_then(|vars| vars.get("tool_components"))
+        .and_then(|tc| tc.as_inline_table())
+        .and_then(|tc| tc.get("default"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<std::collections::HashSet<_>>();
+
+    // Validate tools exist and collect valid ones
+    let mut tools_to_remove = Vec::new();
+    
+    for tool_name in &tools {
+        if current_components.contains(tool_name.as_str()) {
+            tools_to_remove.push(tool_name.clone());
+        } else {
+            println!("{} Tool '{}' is not currently installed", style("!").yellow(), tool_name);
+        }
+    }
+
+    if tools_to_remove.is_empty() {
+        println!("{} No tools to remove", style("!").yellow());
+        return Ok(());
+    }
+
+    // Show what will be removed
+    println!("{} Removing the following tools:\n", style("→").cyan());
+    for tool_name in &tools_to_remove {
+        println!("  {} {}", style("•").red(), style(tool_name).bold());
+    }
+
+    // Confirm unless -y flag is provided
+    if !yes {
+        use dialoguer::Confirm;
+        let proceed = Confirm::new()
+            .with_prompt("Do you want to remove these tools?")
+            .default(true)
+            .interact()?;
+        
+        if !proceed {
+            println!("Operation cancelled");
+            return Ok(());
+        }
+    }
+
+    // Parse spin.toml again for modification
+    let mut doc = contents.parse::<DocumentMut>()
+        .context("Failed to parse spin.toml")?;
+
+    // Remove tools
+    for tool_name in &tools_to_remove {
+        remove_tool_from_spin(&mut doc, tool_name)?;
+    }
+
+    // Write back to spin.toml
+    fs::write("spin.toml", doc.to_string())
+        .context("Failed to write spin.toml")?;
+
+    println!();
+    println!("{} Successfully removed tools from spin.toml", style("✓").green());
+
+    Ok(())
+}
+
+fn remove_tool_from_spin(doc: &mut DocumentMut, tool_name: &str) -> Result<()> {
+    // Remove from component section
+    if let Some(component_section) = doc.get_mut("component").and_then(|item| item.as_table_mut()) {
+        component_section.remove(tool_name);
+    }
+    
+    // Update tool_components variable by removing the tool
+    let variables = doc.get_mut("variables")
+        .and_then(|v| v.as_table_mut())
+        .context("Missing [variables] section in spin.toml")?;
+    
+    let tool_components = variables.get_mut("tool_components")
+        .and_then(|v| v.as_inline_table_mut())
+        .context("Missing tool_components variable")?;
+    
+    let current_value = tool_components.get("default")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    
+    // Remove the tool from the comma-separated list
+    let new_value = current_value
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty() && *s != tool_name)
+        .collect::<Vec<_>>()
+        .join(",");
     
     tool_components["default"] = toml_edit::Value::from(new_value);
     
