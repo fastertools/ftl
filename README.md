@@ -32,7 +32,7 @@ The FTL Platform aims to be an excellent choice for deploying and managing remot
 </details>
 
 <details>
-<summary><strong>⤵ Distribute and compose tools like tiny docker images</strong></summary>
+<summary><strong>⤵ Distribute and compose tools like lightweight docker images</strong></summary>
 
 - Tools are compiled to self-contained Wasm binaries that are often < 1MB.
 - Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
