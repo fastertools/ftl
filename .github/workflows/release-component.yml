@@ -86,7 +86,9 @@ jobs:
           targets: wasm32-wasip1
       
       - name: Install cargo-component
-        run: cargo install cargo-component --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
       
       - name: Install wkg
         run: |

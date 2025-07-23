@@ -167,7 +167,9 @@ jobs:
           key: ${{ runner.os }}-cargo-build-wasm-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install cargo-component
-        run: cargo install cargo-component --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
       
       - name: Build WebAssembly components
         run: |
