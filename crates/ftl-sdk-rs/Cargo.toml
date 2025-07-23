@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-documentation = "https://github.com/fastertools/ftl-mcp"
+documentation = "https://github.com/fastertools/ftl-cli"
 keywords = ["mcp", "ftl", "webassembly", "spin"]
 categories = ["web-programming", "wasm"]
 

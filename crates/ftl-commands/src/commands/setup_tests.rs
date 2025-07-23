@@ -215,7 +215,7 @@ async fn test_templates_install_default() {
                     "templates",
                     "install",
                     "--git",
-                    "https://github.com/fastertools/ftl-mcp",
+                    "https://github.com/fastertools/ftl-cli",
                     "--upgrade",
                 ],
                 MockSetupCommandExecutor::successful_output("Templates installed"),
@@ -238,7 +238,7 @@ async fn test_templates_install_default() {
     // Verify output
     let output = ui.get_output();
     assert!(output.iter().any(|s| {
-        s.contains("Installing ftl-mcp templates from https://github.com/fastertools/ftl-mcp")
+        s.contains("Installing ftl-mcp templates from https://github.com/fastertools/ftl-cli")
     }));
     assert!(
         output
@@ -445,7 +445,7 @@ async fn test_templates_force_reinstall() {
                     "templates",
                     "install",
                     "--git",
-                    "https://github.com/fastertools/ftl-mcp",
+                    "https://github.com/fastertools/ftl-cli",
                     "--upgrade",
                 ],
                 MockSetupCommandExecutor::successful_output("Templates installed"),
@@ -480,7 +480,7 @@ async fn test_templates_install_failure() {
                     "templates",
                     "install",
                     "--git",
-                    "https://github.com/fastertools/ftl-mcp",
+                    "https://github.com/fastertools/ftl-cli",
                     "--upgrade",
                 ],
                 MockSetupCommandExecutor::failed_output("Failed to clone repository"),

@@ -229,7 +229,7 @@ graph TB
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
-- The FTL Wasm components and language SDKs are managed in [ftl-mcp](https://github.com/fastertools/ftl-mcp).
+- The FTL Wasm components and language SDKs are managed in [ftl-mcp](https://github.com/fastertools/ftl-cli).
 
 ## Contributing
 

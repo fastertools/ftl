@@ -235,7 +235,7 @@ if (isTextContent(content)) {
 
 ## Examples
 
-See the [examples directory](https://github.com/fastertools/ftl-mcp/tree/main/examples/demo) for complete examples:
+See the [examples directory](https://github.com/fastertools/ftl-cli/tree/main/examples/demo) for complete examples:
 
 - `echo-simplified-ts`: Minimal echo tool using Zod
 - `calculator-ts`: Complex validation with Zod refinements

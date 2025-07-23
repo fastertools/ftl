@@ -105,7 +105,7 @@ pub fn templates_with_deps(
         args.push(tar_path);
     } else {
         // Default: install from ftl-mcp repository
-        let ftl_mcp_repo = "https://github.com/fastertools/ftl-mcp";
+        let ftl_mcp_repo = "https://github.com/fastertools/ftl-cli";
         source_info = format!("→ Installing ftl-mcp templates from {ftl_mcp_repo}");
         args.push("--git");
         args.push(ftl_mcp_repo);
