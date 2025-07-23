@@ -24,6 +24,65 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 ## Why?
 
 <details>
+<summary><strong>⤵ Simple API</strong></summary>
+
+<details>
+<summary><strong>🦀 Rust</strong></summary>
+
+```rust
+use ftl_sdk::{tool, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
+
+#[derive(Deserialize, JsonSchema)]
+struct MyToolInput {
+    /// The message to process
+    message: String,
+}
+
+/// A simple MCP tool
+#[tool]
+fn my_tool(input: MyToolInput) -> ToolResponse {
+    ToolResponse::text(format!("Processed: {}", input.message))
+}
+```
+</details>
+
+<details>
+<summary><strong>🟦 TypeScript</strong></summary>
+
+```typescript
+import { createTool, ToolResponse } from 'ftl-sdk'
+import { z } from 'zod'
+
+// Define the schema using Zod
+const ToolSchema = z.object({
+  message: z.string().describe('The message to process')
+})
+
+type ToolInput = z.infer<typeof ToolSchema>
+
+const tool = createTool<ToolInput>({
+  metadata: {
+    name: 'my_tool',
+    title: 'My Tool',
+    description: 'A simple MCP tool',
+    inputSchema: z.toJSONSchema(ToolSchema)
+  },
+  handler: async (input) => {
+    return ToolResponse.text(`Processed: ${input.message}`)
+  }
+})
+
+//@ts-ignore
+addEventListener('fetch', (event: FetchEvent) => {
+  event.respondWith(tool(event.request))
+})
+```
+</details>
+</details>
+
+<details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
 - Tools run as individual WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
@@ -126,63 +185,6 @@ Plug it in
 }
 ```
 
-## Developing tools
-
-<details>
-<summary><strong>🦀 Rust</strong></summary>
-
-```rust
-use ftl_sdk::{tool, ToolResponse};
-use serde::Deserialize;
-use schemars::JsonSchema;
-
-#[derive(Deserialize, JsonSchema)]
-struct MyToolInput {
-    /// The message to process
-    message: String,
-}
-
-/// A simple MCP tool
-#[tool]
-fn my_tool(input: MyToolInput) -> ToolResponse {
-    ToolResponse::text(format!("Processed: {}", input.message))
-}
-```
-</details>
-
-<details>
-<summary><strong>🟦 TypeScript</strong></summary>
-
-```typescript
-import { createTool, ToolResponse } from 'ftl-sdk'
-import { z } from 'zod'
-
-// Define the schema using Zod
-const ToolSchema = z.object({
-  message: z.string().describe('The message to process')
-})
-
-type ToolInput = z.infer<typeof ToolSchema>
-
-const tool = createTool<ToolInput>({
-  metadata: {
-    name: 'my_tool',
-    title: 'My Tool',
-    description: 'A simple MCP tool',
-    inputSchema: z.toJSONSchema(ToolSchema)
-  },
-  handler: async (input) => {
-    return ToolResponse.text(`Processed: ${input.message}`)
-  }
-})
-
-//@ts-ignore
-addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(tool(event.request))
-})
-```
-</details>
-
 ## Architecture
 
 ```mermaid
@@ -200,7 +202,7 @@ graph TB
           subgraph "Spin/Wasmtime Runtime"
               subgraph "FTL Application"
                   subgraph "FTL Components"
-                      AuthGateway["Auth Gateway<br/>(Authentication, Authorization)"]
+                      MCPAuth["MCP Authorizer"]
                       MCPGateway["MCP Gateway<br/>(Protocol, Routing, Validation)"]
                   end
                   
@@ -218,7 +220,7 @@ graph TB
     Agents -.->| | MCP
     Realtime -.->| | MCP
     MCP -.->| | AuthGateway
-    AuthGateway -.->|"Authorized requests (in-memory call)"| MCPGateway
+    MCPAuth -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
     MCPGateway -.->|"In-memory call"| GitHub
     MCPGateway -.->|"In-memory call"| Database
