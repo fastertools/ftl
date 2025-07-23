@@ -6,8 +6,8 @@ use std::time::Duration;
 use console::style;
 use indicatif::{MultiProgress as IndicatifMultiProgress, ProgressBar, ProgressStyle};
 
-use ftl_core::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
 use anyhow::Result;
+use ftl_core::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
 
 /// Production UI implementation using indicatif
 pub struct RealUserInterface;

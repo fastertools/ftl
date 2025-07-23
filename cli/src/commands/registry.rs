@@ -1,5 +1,5 @@
-use clap::{Args, Subcommand};
 use anyhow::Result;
+use clap::{Args, Subcommand};
 
 #[derive(Debug, Args)]
 pub struct RegistryArgs {
@@ -15,17 +15,17 @@ pub enum RegistryCommand {
         #[arg(short, long)]
         registry: Option<String>,
     },
-    
+
     /// Search for components
     Search {
         /// Search query
         query: String,
-        
+
         /// Registry URL
         #[arg(short, long)]
         registry: Option<String>,
     },
-    
+
     /// Get info about a component
     Info {
         /// Component name
@@ -45,8 +45,8 @@ pub async fn execute(args: RegistryArgs) -> Result<()> {
             ftl_commands::registry::RegistryCommand::Info { component }
         }
     };
-    
+
     let cmd_args = ftl_commands::registry::RegistryArgs { command };
-    
+
     ftl_commands::registry::execute(cmd_args).await
 }

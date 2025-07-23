@@ -8,8 +8,8 @@ use crate::commands::publish::{
     SpinInstaller, execute_with_deps,
 };
 use crate::test_helpers::*;
-use ftl_core::deps::{FileSystem, UserInterface};
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::{FileSystem, UserInterface};
 
 // Mock implementation of BuildExecutor
 struct MockBuildExecutor {

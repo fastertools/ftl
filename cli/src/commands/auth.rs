@@ -1,5 +1,5 @@
-use clap::{Args, Subcommand};
 use anyhow::Result;
+use clap::{Args, Subcommand};
 
 #[derive(Debug, Args)]
 pub struct AuthArgs {
@@ -17,10 +17,8 @@ pub async fn execute(args: AuthArgs) -> Result<()> {
     let command = match args.command {
         AuthCommand::Status => ftl_commands::auth::AuthCommand::Status,
     };
-    
-    let cmd_args = ftl_commands::auth::AuthArgs {
-        command,
-    };
-    
+
+    let cmd_args = ftl_commands::auth::AuthArgs { command };
+
     ftl_commands::auth::execute(cmd_args).await
 }

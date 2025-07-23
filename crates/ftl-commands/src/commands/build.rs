@@ -8,11 +8,10 @@ use anyhow::{Context, Result};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use ftl_core::deps::{
-    CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator,
-    UserInterface,
-};
 use ftl_common::SpinInstaller;
+use ftl_core::deps::{
+    CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, UserInterface,
+};
 
 /// Information about a component to build
 #[derive(Debug, Clone)]
@@ -320,9 +319,9 @@ impl SpinInstaller for SpinInstallerWrapper {
 
 /// Execute the build command with default dependencies
 pub async fn execute(args: BuildArgs) -> Result<()> {
-    use ftl_core::deps::{RealCommandExecutor, RealFileSystem};
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::{RealCommandExecutor, RealFileSystem};
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(BuildDependencies {
         file_system: Arc::new(RealFileSystem),

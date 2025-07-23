@@ -7,11 +7,10 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 
-use ftl_core::deps::{
-    AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, ProcessManager,
-    UserInterface,
-};
 use ftl_common::SpinInstaller;
+use ftl_core::deps::{
+    AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, ProcessManager, UserInterface,
+};
 
 /// File watcher trait for testability
 #[async_trait::async_trait]
@@ -224,7 +223,7 @@ async fn run_with_watch(
 
                     // Kill the current server
                     server_process.shutdown().await?;
-                    
+
                     // Give the OS a moment to fully release the port
                     deps.async_runtime.sleep(Duration::from_secs(1)).await;
 
@@ -351,24 +350,32 @@ impl FileWatcher for RealFileWatcher {
     async fn watch(&self, path: &Path, recursive: bool) -> Result<Box<dyn WatchHandle>> {
         use notify::{RecursiveMode, Watcher};
         use tokio::sync::mpsc;
-        
+
         let (tx, rx) = mpsc::unbounded_channel();
         let path = path.to_path_buf();
-        
-        let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-            if let Ok(event) = res {
-                if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
-                    for path in event.paths {
-                        let _ = tx.send(path);
+
+        let mut watcher =
+            notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+                if let Ok(event) = res {
+                    if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
+                        for path in event.paths {
+                            let _ = tx.send(path);
+                        }
                     }
                 }
-            }
-        })?;
-        
-        let mode = if recursive { RecursiveMode::Recursive } else { RecursiveMode::NonRecursive };
+            })?;
+
+        let mode = if recursive {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
         watcher.watch(&path, mode)?;
-        
-        Ok(Box::new(RealWatchHandle { _watcher: Box::new(watcher), rx }))
+
+        Ok(Box::new(RealWatchHandle {
+            _watcher: Box::new(watcher),
+            rx,
+        }))
     }
 }
 
@@ -381,21 +388,21 @@ struct RealWatchHandle {
 impl WatchHandle for RealWatchHandle {
     async fn wait_for_change(&mut self) -> Result<Vec<PathBuf>> {
         let mut changes = Vec::new();
-        
+
         // Wait for first change
         if let Some(path) = self.rx.recv().await {
             changes.push(path);
         }
-        
+
         // Collect any additional changes that arrive quickly
         while let Ok(path) = self.rx.try_recv() {
             changes.push(path);
         }
-        
+
         if changes.is_empty() {
             anyhow::bail!("Watcher closed unexpectedly");
         }
-        
+
         Ok(changes)
     }
 }
@@ -424,9 +431,11 @@ impl SpinInstaller for SpinInstallerWrapper {
 
 /// Execute the up command with default dependencies
 pub async fn execute(args: UpArgs) -> Result<()> {
-    use ftl_core::deps::{RealCommandExecutor, RealFileSystem, RealProcessManager, RealAsyncRuntime};
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::{
+        RealAsyncRuntime, RealCommandExecutor, RealFileSystem, RealProcessManager,
+    };
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(UpDependencies {
         file_system: Arc::new(RealFileSystem),
@@ -438,7 +447,7 @@ pub async fn execute(args: UpArgs) -> Result<()> {
         file_watcher: Arc::new(RealFileWatcher),
         signal_handler: Arc::new(RealSignalHandler),
     });
-    
+
     let config = UpConfig {
         path: args.path,
         port: args.port.unwrap_or(3000),
@@ -446,7 +455,7 @@ pub async fn execute(args: UpArgs) -> Result<()> {
         watch: args.watch,
         clear: args.clear,
     };
-    
+
     execute_with_deps(config, deps).await
 }
 

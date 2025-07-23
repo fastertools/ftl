@@ -11,6 +11,5 @@ pub mod test_helpers;
 
 // Re-export all commands at the crate root for easier access
 pub use commands::{
-    add, app, auth, build, deploy, init, login, logout, publish, registry, 
-    setup, test, up, update
+    add, app, auth, build, deploy, init, login, logout, publish, registry, setup, test, up, update,
 };

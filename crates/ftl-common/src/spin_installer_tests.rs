@@ -286,7 +286,6 @@ async fn test_check_and_install_plugin_list_command_fails() {
 
 #[test]
 fn test_spin_installer_creation() {
-
     let deps = Arc::new(SpinInstallerDependencies {
         command_executor: Arc::new(MockCommandExecutorMock::new()),
         ui: Arc::new(TestUserInterface::new()),

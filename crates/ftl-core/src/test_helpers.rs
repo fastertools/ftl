@@ -63,7 +63,7 @@ type CommandWithStdinMatcher = Box<dyn Fn(&str, &[&str], &str) -> bool + Send + 
 /// use std::path::Path;
 ///
 /// let mut fs_mock = MockFileSystemMock::new();
-/// 
+///
 /// // Mock that a file exists
 /// fs_mock
 ///     .expect_exists()
@@ -99,7 +99,7 @@ mock! {
 /// use ftl_core::api_client::types;
 ///
 /// let mut api_mock = MockFtlApiClientMock::new();
-/// 
+///
 /// // Mock listing apps
 /// api_mock
 ///     .expect_list_apps()
@@ -143,7 +143,7 @@ mock! {
 /// use std::time::{Duration, Instant};
 ///
 /// let mut clock_mock = MockClockMock::new();
-/// 
+///
 /// // Mock the current time
 /// let now = Instant::now();
 /// clock_mock
@@ -177,7 +177,7 @@ mock! {
 /// use ftl_core::test_helpers::{MockCredentialsProviderMock, test_credentials};
 ///
 /// let mut creds_mock = MockCredentialsProviderMock::new();
-/// 
+///
 /// // Return test credentials
 /// creds_mock
 ///     .expect_get_or_refresh_credentials()
@@ -204,7 +204,7 @@ mock! {
 /// use std::time::Duration;
 ///
 /// let mut runtime_mock = MockAsyncRuntimeMock::new();
-/// 
+///
 /// // Make sleep return immediately instead of waiting
 /// runtime_mock
 ///     .expect_sleep()
@@ -219,7 +219,6 @@ mock! {
         async fn sleep(&self, duration: Duration);
     }
 }
-
 
 // Simple manual mock implementation for CommandExecutor
 // This avoids mockall's issues with async traits containing slice references

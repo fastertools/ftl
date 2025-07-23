@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::commands::login::{self, *};
-use ftl_core::deps::{AsyncRuntime, UserInterface};
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::{AsyncRuntime, UserInterface};
 
 // Mock implementations
 struct MockHttpClient {

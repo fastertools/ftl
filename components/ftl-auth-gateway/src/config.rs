@@ -280,10 +280,12 @@ mod tests {
         // Test with http:// should fail
         let result = GatewayConfig::ensure_https_url("http://example.com".to_string());
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Auth provider URLs must use HTTPS"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Auth provider URLs must use HTTPS")
+        );
 
         // Test without protocol - should add https://
         assert_eq!(

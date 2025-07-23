@@ -5,8 +5,8 @@ use std::sync::Arc;
 use crate::commands::registry::{
     RegistryDependencies, info_with_deps, list_with_deps, search_with_deps,
 };
-use ftl_core::deps::UserInterface;
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::UserInterface;
 
 struct TestFixture {
     ui: Arc<TestUserInterface>,

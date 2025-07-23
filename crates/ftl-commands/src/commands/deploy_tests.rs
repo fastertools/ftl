@@ -1,11 +1,11 @@
 //! Comprehensive unit tests for `deploy_v2` module
 
-use ftl_core::api_client::types;
 use crate::commands::deploy::*;
 use crate::test_helpers::*;
-use ftl_core::deps::*;
-use ftl_common::ui::TestUserInterface;
 use anyhow::{Result, anyhow};
+use ftl_common::ui::TestUserInterface;
+use ftl_core::api_client::types;
+use ftl_core::deps::*;
 use mockall::predicate::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -379,11 +379,7 @@ async fn test_deployment_timeout() {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| {
-            Ok(test_deployment_response(
-                "test-deployment-id",
-            ))
-        });
+        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
 
     // Mock: status always returns "deploying" (60 times = timeout)
     fixture
@@ -429,11 +425,7 @@ async fn test_deployment_failed_status() {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| {
-            Ok(test_deployment_response(
-                "test-deployment-id",
-            ))
-        });
+        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
 
     // Mock: status returns failed
     fixture
@@ -590,11 +582,7 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .api_client
         .expect_deploy_app()
         .times(1)
-        .returning(|_| {
-            Ok(test_deployment_response(
-                "test-deployment-id",
-            ))
-        });
+        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
 
     // Mock: deployment status checks - first returns deploying, then deployed
     let mut call_count = 0;

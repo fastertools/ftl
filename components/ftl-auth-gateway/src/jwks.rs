@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use jsonwebtoken::{Algorithm, DecodingKey};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};

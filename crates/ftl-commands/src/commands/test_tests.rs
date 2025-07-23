@@ -8,8 +8,8 @@ use std::sync::Arc;
 use crate::commands::test::{
     DirectoryReader, FileChecker, TestCommandExecutor, TestDependencies, execute_with_deps,
 };
-use ftl_core::deps::UserInterface;
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::UserInterface;
 
 // Mock implementation of DirectoryReader
 struct MockDirectoryReader {

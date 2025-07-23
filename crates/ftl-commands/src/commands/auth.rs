@@ -123,14 +123,14 @@ struct RealCredentialsProviderWrapper;
 impl CredentialsProvider for RealCredentialsProviderWrapper {
     fn get_stored_credentials(&self) -> Result<StoredCredentials> {
         use keyring::Entry;
-        
+
         let entry = Entry::new("ftl-cli", "default")
             .map_err(|e| anyhow::anyhow!("Failed to access keyring: {}", e))?;
-        
+
         let stored_json = entry
             .get_password()
             .map_err(|e| anyhow::anyhow!("No matching entry found: {}", e))?;
-        
+
         serde_json::from_str(&stored_json)
             .map_err(|e| anyhow::anyhow!("Failed to parse credentials: {}", e))
     }
@@ -148,14 +148,14 @@ impl Clock for RealClockWrapper {
 /// Execute the auth command with default dependencies
 pub async fn execute(args: AuthArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(AuthDependencies {
         ui: ui.clone(),
         credentials_provider: Arc::new(RealCredentialsProviderWrapper),
         clock: Arc::new(RealClockWrapper),
     });
-    
+
     match args.command {
         AuthCommand::Status => {
             status_with_deps(&deps);

@@ -21,55 +21,53 @@ struct Cli {
 enum Commands {
     /// Initialize a new FTL project
     Init(commands::init::InitArgs),
-    
+
     /// Build a Spin application
     Build(commands::build::BuildArgs),
-    
+
     /// Deploy a Spin application
     Deploy(commands::deploy::DeployArgs),
-    
+
     /// Start the Spin development server
     Up(commands::up::UpArgs),
-    
+
     /// Publish a component to the registry
     Publish(commands::publish::PublishArgs),
-    
+
     /// Authenticate with FTL platform
     Auth(commands::auth::AuthArgs),
-    
+
     /// Set up FTL dependencies
     Setup(commands::setup::SetupArgs),
-    
+
     /// Update FTL CLI to the latest version
     Update(commands::update::UpdateArgs),
-    
+
     /// Add new components to your project
     Add(commands::add::AddArgs),
-    
+
     /// Log in to FTL platform
     Login(commands::login::LoginArgs),
-    
+
     /// Log out from FTL platform
     Logout(commands::logout::LogoutArgs),
-    
+
     /// Run tests for your FTL project
     Test(commands::test::TestArgs),
-    
+
     /// Manage applications
     App(commands::app::AppArgs),
-    
+
     /// Manage FTL component registry
     Registry(commands::registry::RegistryArgs),
 }
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 

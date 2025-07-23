@@ -150,11 +150,11 @@ impl HttpClient for RealHttpClient {
             .header("User-Agent", user_agent)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             anyhow::bail!("HTTP request failed with status: {}", response.status());
         }
-        
+
         response.text().await.map_err(Into::into)
     }
 }
@@ -165,12 +165,12 @@ struct RealCommandExecutorWrapper;
 impl CommandExecutor for RealCommandExecutorWrapper {
     fn execute(&self, command: &str, args: &[&str]) -> Result<CommandOutput> {
         use std::process::Command;
-        
+
         let output = Command::new(command)
             .args(args)
             .output()
             .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
-        
+
         Ok(CommandOutput {
             success: output.status.success(),
             stderr: output.stderr,
@@ -190,7 +190,7 @@ impl Environment for RealEnvironmentWrapper {
 /// Execute the update command with default dependencies
 pub async fn execute(args: UpdateArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(UpdateDependencies {
         ui: ui.clone(),
@@ -198,7 +198,7 @@ pub async fn execute(args: UpdateArgs) -> Result<()> {
         command_executor: Arc::new(RealCommandExecutorWrapper),
         environment: Arc::new(RealEnvironmentWrapper),
     });
-    
+
     execute_with_deps(args.force, deps).await
 }
 

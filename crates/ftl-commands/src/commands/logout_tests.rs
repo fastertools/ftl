@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use crate::commands::logout::*;
-use ftl_core::deps::UserInterface;
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::UserInterface;
 
 // Mock implementation of CredentialsClearer
 struct MockCredentialsClearer {

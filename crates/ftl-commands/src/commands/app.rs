@@ -270,13 +270,13 @@ impl OutputFormat {
 
 /// Execute the app command with default dependencies
 pub async fn execute(args: AppArgs) -> Result<()> {
-    use ftl_core::deps::{RealFtlApiClient, RealCredentialsProvider, CredentialsProvider};
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::{CredentialsProvider, RealCredentialsProvider, RealFtlApiClient};
+
     // Get credentials first to create authenticated API client
     let credentials_provider = RealCredentialsProvider;
     let credentials = credentials_provider.get_or_refresh_credentials().await?;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(AppDependencies {
         ui: ui.clone(),
@@ -285,7 +285,7 @@ pub async fn execute(args: AppArgs) -> Result<()> {
             credentials.access_token,
         )),
     });
-    
+
     match args.command {
         AppCommand::List { format } => list_with_deps(format, &deps).await,
         AppCommand::Status { app_name, format } => status_with_deps(&app_name, format, &deps).await,

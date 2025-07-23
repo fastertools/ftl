@@ -4,9 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::version_cache::*;
 use crate::ui::TestUserInterface;
-use ftl_core::deps::{FileSystem, UserInterface, MessageStyle, ProgressIndicator, MultiProgressManager};
+use crate::version_cache::*;
+use ftl_core::deps::{
+    FileSystem, MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface,
+};
 use mockall::mock;
 
 // Mock for FileSystem

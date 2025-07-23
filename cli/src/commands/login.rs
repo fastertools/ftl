@@ -1,16 +1,16 @@
-use clap::Args;
 use anyhow::Result;
+use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct LoginArgs {
     /// Don't open browser automatically
     #[arg(long)]
     pub no_browser: bool,
-    
+
     /// AuthKit domain (for testing)
     #[arg(long, hide = true)]
     pub authkit_domain: Option<String>,
-    
+
     /// OAuth client ID (for testing)
     #[arg(long, hide = true)]
     pub client_id: Option<String>,
@@ -22,6 +22,6 @@ pub async fn execute(args: LoginArgs) -> Result<()> {
         authkit_domain: args.authkit_domain,
         client_id: args.client_id,
     };
-    
+
     ftl_commands::login::execute(cmd_args).await
 }

@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use crate::commands::up::{self, *};
 use crate::test_helpers::*;
-use ftl_core::deps::*;
 use ftl_common::{SpinInstaller, ui::TestUserInterface};
+use ftl_core::deps::*;
 
 // Type alias for spawn responses
 type SpawnResponse = Result<Box<dyn ProcessHandle>, anyhow::Error>;

@@ -500,9 +500,9 @@ impl BrowserLauncher for RealBrowserLauncher {
 
 /// Execute the login command with default dependencies
 pub async fn execute(args: LoginArgs) -> Result<()> {
-    use ftl_core::deps::RealAsyncRuntime;
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::RealAsyncRuntime;
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(LoginDependencies {
         ui: ui.clone(),
@@ -512,13 +512,13 @@ pub async fn execute(args: LoginArgs) -> Result<()> {
         async_runtime: Arc::new(RealAsyncRuntime),
         clock: Arc::new(RealClock),
     });
-    
+
     let config = LoginConfig {
         no_browser: args.no_browser,
         authkit_domain: args.authkit_domain,
         client_id: args.client_id,
     };
-    
+
     execute_with_deps(config, deps).await
 }
 

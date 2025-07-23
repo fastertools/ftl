@@ -114,12 +114,10 @@ pub enum RegistryCommand {
 /// Execute the registry command with default dependencies
 pub async fn execute(args: RegistryArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
-    let deps = Arc::new(RegistryDependencies {
-        ui: ui.clone(),
-    });
-    
+    let deps = Arc::new(RegistryDependencies { ui: ui.clone() });
+
     match args.command {
         RegistryCommand::List { registry } => {
             list_with_deps(registry.as_deref(), &deps);

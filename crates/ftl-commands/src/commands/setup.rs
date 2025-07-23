@@ -301,12 +301,11 @@ struct RealSetupSpinInstaller;
 impl SetupSpinInstaller for RealSetupSpinInstaller {
     fn check_and_install(&self) -> Result<PathBuf> {
         tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                ftl_common::check_and_install_spin().await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { ftl_common::check_and_install_spin().await })
         })
     }
-    
+
     fn get_spin_path(&self) -> Result<PathBuf> {
         match which::which("spin") {
             Ok(path) => Ok(path),
@@ -321,7 +320,7 @@ struct RealSetupCommandExecutor;
 impl SetupCommandExecutor for RealSetupCommandExecutor {
     fn execute(&self, command: &str, args: &[&str]) -> Result<Output> {
         use std::process::Command;
-        
+
         Command::new(command)
             .args(args)
             .output()
@@ -341,7 +340,7 @@ impl Environment for RealEnvironment {
 /// Execute the setup command with default dependencies
 pub async fn execute(args: SetupArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(SetupDependencies {
         ui: ui.clone(),
@@ -349,18 +348,22 @@ pub async fn execute(args: SetupArgs) -> Result<()> {
         command_executor: Arc::new(RealSetupCommandExecutor),
         environment: Arc::new(RealEnvironment),
     });
-    
+
     match args.command {
-        SetupCommand::Templates { force, git, branch, dir, tar } => {
-            templates_with_deps(
-                force,
-                git.as_deref(),
-                branch.as_deref(),
-                dir.as_ref(),
-                tar.as_deref(),
-                &deps,
-            )
-        }
+        SetupCommand::Templates {
+            force,
+            git,
+            branch,
+            dir,
+            tar,
+        } => templates_with_deps(
+            force,
+            git.as_deref(),
+            branch.as_deref(),
+            dir.as_ref(),
+            tar.as_deref(),
+            &deps,
+        ),
         SetupCommand::Info => {
             info_with_deps(&deps);
             Ok(())

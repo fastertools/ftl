@@ -6,11 +6,11 @@ use std::process::{ExitStatus, Output};
 use std::sync::Arc;
 
 use crate::commands::setup::{
-    Environment, SetupCommandExecutor, SetupDependencies, SetupSpinInstaller,
-    info_with_deps, templates_with_deps,
+    Environment, SetupCommandExecutor, SetupDependencies, SetupSpinInstaller, info_with_deps,
+    templates_with_deps,
 };
-use ftl_core::deps::UserInterface;
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::UserInterface;
 
 // Mock implementation of SpinInstaller
 struct MockSpinInstaller {

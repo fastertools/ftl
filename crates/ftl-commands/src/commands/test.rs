@@ -154,18 +154,18 @@ struct RealDirectoryReader;
 impl DirectoryReader for RealDirectoryReader {
     fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
         use std::fs;
-        
+
         let entries = fs::read_dir(path)?;
         let mut paths = Vec::new();
-        
+
         for entry in entries {
             let entry = entry?;
             paths.push(entry.path());
         }
-        
+
         Ok(paths)
     }
-    
+
     fn is_dir(&self, path: &Path) -> Result<bool> {
         Ok(path.is_dir())
     }
@@ -186,14 +186,14 @@ struct RealTestCommandExecutor;
 impl TestCommandExecutor for RealTestCommandExecutor {
     fn execute(&self, command: &str, args: &[&str], working_dir: Option<&str>) -> Result<Output> {
         use std::process::Command;
-        
+
         let mut cmd = Command::new(command);
         cmd.args(args);
-        
+
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }
-        
+
         cmd.output()
             .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))
     }
@@ -202,7 +202,7 @@ impl TestCommandExecutor for RealTestCommandExecutor {
 /// Execute the test command with default dependencies
 pub async fn execute(args: TestArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(TestDependencies {
         ui: ui.clone(),
@@ -210,7 +210,7 @@ pub async fn execute(args: TestArgs) -> Result<()> {
         file_checker: Arc::new(RealFileChecker),
         command_executor: Arc::new(RealTestCommandExecutor),
     });
-    
+
     execute_with_deps(args.path, &deps)
 }
 

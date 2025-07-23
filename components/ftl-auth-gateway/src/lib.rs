@@ -12,7 +12,7 @@ mod proxy;
 
 use config::GatewayConfig;
 use handlers::{handle_authenticated_request, handle_cors_preflight, handle_metadata_endpoints};
-use logging::{get_trace_id, Logger};
+use logging::{Logger, get_trace_id};
 
 /// Main entry point for the authentication gateway
 #[spin_sdk::http_component]

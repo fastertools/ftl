@@ -298,7 +298,7 @@ impl RealFtlApiClient {
 impl Default for RealFtlApiClient {
     fn default() -> Self {
         use crate::config::DEFAULT_API_BASE_URL;
-        
+
         // Create with no auth token - will need to be set later via credentials provider
         Self {
             client: ApiClient::new(DEFAULT_API_BASE_URL),
@@ -450,37 +450,45 @@ pub struct RealCredentialsProvider;
 impl CredentialsProvider for RealCredentialsProvider {
     async fn get_or_refresh_credentials(&self) -> Result<StoredCredentials> {
         use keyring::Entry;
-        
+
         // Try to get stored credentials
         let entry = Entry::new("ftl-cli", "default")
             .map_err(|e| anyhow::anyhow!("Failed to access keyring: {}", e))?;
-            
-        let json = entry.get_password()
+
+        let json = entry
+            .get_password()
             .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))?;
-            
+
         let credentials: StoredCredentials = serde_json::from_str(&json)
             .map_err(|e| anyhow::anyhow!("Failed to parse stored credentials: {}", e))?;
-            
+
         // Check if token is expired or about to expire (within 30 seconds)
         if let Some(expires_at) = credentials.expires_at {
             let now = Utc::now();
             let buffer = chrono::Duration::seconds(30);
-            
+
             if expires_at < now + buffer {
                 // Token is expired or about to expire, try to refresh
                 if let Some(refresh_token) = credentials.refresh_token.clone() {
-                    match self.refresh_access_token(&credentials.authkit_domain, &refresh_token).await {
+                    match self
+                        .refresh_access_token(&credentials.authkit_domain, &refresh_token)
+                        .await
+                    {
                         Ok(new_credentials) => {
                             // Store updated credentials
                             let updated_json = serde_json::to_string(&new_credentials)?;
-                            entry.set_password(&updated_json)
-                                .map_err(|e| anyhow::anyhow!("Failed to store updated credentials: {}", e))?;
+                            entry.set_password(&updated_json).map_err(|e| {
+                                anyhow::anyhow!("Failed to store updated credentials: {}", e)
+                            })?;
                             return Ok(new_credentials);
                         }
                         Err(e) => {
                             // Log refresh error but continue with existing token if not fully expired
                             if expires_at < now {
-                                return Err(anyhow::anyhow!("Token expired and refresh failed: {}", e));
+                                return Err(anyhow::anyhow!(
+                                    "Token expired and refresh failed: {}",
+                                    e
+                                ));
                             }
                             // Otherwise continue with existing token
                         }
@@ -488,7 +496,7 @@ impl CredentialsProvider for RealCredentialsProvider {
                 }
             }
         }
-        
+
         Ok(credentials)
     }
 }
@@ -501,7 +509,7 @@ impl RealCredentialsProvider {
     ) -> Result<StoredCredentials> {
         let client = reqwest::Client::new();
         let token_url = format!("https://{}/oauth/token", authkit_domain);
-        
+
         let response = client
             .post(&token_url)
             .form(&[
@@ -511,7 +519,7 @@ impl RealCredentialsProvider {
             .send()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send refresh request: {}", e))?;
-            
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -521,7 +529,7 @@ impl RealCredentialsProvider {
                 body
             ));
         }
-        
+
         #[derive(Deserialize)]
         struct TokenResponse {
             access_token: String,
@@ -529,16 +537,16 @@ impl RealCredentialsProvider {
             id_token: Option<String>,
             expires_in: Option<u64>,
         }
-        
+
         let token_response: TokenResponse = response
             .json()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to parse token response: {}", e))?;
-            
-        let expires_at = token_response.expires_in.map(|seconds| {
-            Utc::now() + chrono::Duration::seconds(seconds as i64)
-        });
-        
+
+        let expires_at = token_response
+            .expires_in
+            .map(|seconds| Utc::now() + chrono::Duration::seconds(seconds as i64));
+
         Ok(StoredCredentials {
             access_token: token_response.access_token,
             refresh_token: token_response.refresh_token,
@@ -549,7 +557,6 @@ impl RealCredentialsProvider {
     }
 }
 
-
 /// Production async runtime
 pub struct RealAsyncRuntime;
 
@@ -559,7 +566,6 @@ impl AsyncRuntime for RealAsyncRuntime {
         tokio::time::sleep(duration).await;
     }
 }
-
 
 /// Process management traits
 #[async_trait]
@@ -581,7 +587,7 @@ pub trait ProcessHandle: Send + Sync {
 
     /// Send termination signal to the process (does not wait for exit)
     async fn terminate(&mut self) -> Result<()>;
-    
+
     /// Terminate the process and wait for it to exit
     async fn shutdown(&mut self) -> Result<ExitStatus> {
         self.terminate().await?;
@@ -676,20 +682,20 @@ impl ProcessHandle for RealProcessHandle {
             {
                 use nix::sys::signal::{self, Signal};
                 use nix::unistd::Pid;
-                
+
                 let pid = child.id() as i32;
                 // Kill the entire process group (negative PID)
                 let pgid = Pid::from_raw(-pid);
-                
+
                 // Try SIGTERM first for graceful shutdown
                 let _ = signal::kill(pgid, Signal::SIGTERM);
-                
+
                 // Give it a moment to terminate gracefully
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                
+
                 // Check if the main process is still running
                 match child.try_wait() {
-                    Ok(Some(_)) => {}, // Process already exited
+                    Ok(Some(_)) => {} // Process already exited
                     _ => {
                         // Force kill the process group
                         let _ = signal::kill(pgid, Signal::SIGKILL);
@@ -698,7 +704,7 @@ impl ProcessHandle for RealProcessHandle {
                     }
                 }
             }
-            
+
             #[cfg(not(unix))]
             {
                 let _ = child.kill();

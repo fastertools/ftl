@@ -1,5 +1,5 @@
-use clap::{Args, Subcommand, ValueEnum};
 use anyhow::Result;
+use clap::{Args, Subcommand, ValueEnum};
 
 #[derive(Debug, Args)]
 pub struct AppArgs {
@@ -15,22 +15,22 @@ pub enum AppCommand {
         #[arg(short, long, value_enum, default_value = "table")]
         format: OutputFormat,
     },
-    
+
     /// Get status of an application
     Status {
         /// Application name
         app_name: String,
-        
+
         /// Output format
         #[arg(short, long, value_enum, default_value = "table")]
         format: OutputFormat,
     },
-    
+
     /// Delete an application
     Delete {
         /// Application name
         app_name: String,
-        
+
         /// Force deletion without confirmation
         #[arg(short, long)]
         force: bool,
@@ -45,27 +45,20 @@ pub enum OutputFormat {
 
 pub async fn execute(args: AppArgs) -> Result<()> {
     let command = match args.command {
-        AppCommand::List { format } => {
-            ftl_commands::app::AppCommand::List {
-                format: format.into(),
-            }
-        }
-        AppCommand::Status { app_name, format } => {
-            ftl_commands::app::AppCommand::Status {
-                app_name,
-                format: format.into(),
-            }
-        }
+        AppCommand::List { format } => ftl_commands::app::AppCommand::List {
+            format: format.into(),
+        },
+        AppCommand::Status { app_name, format } => ftl_commands::app::AppCommand::Status {
+            app_name,
+            format: format.into(),
+        },
         AppCommand::Delete { app_name, force } => {
-            ftl_commands::app::AppCommand::Delete {
-                app_name,
-                force,
-            }
+            ftl_commands::app::AppCommand::Delete { app_name, force }
         }
     };
-    
+
     let cmd_args = ftl_commands::app::AppArgs { command };
-    
+
     ftl_commands::app::execute(cmd_args).await
 }
 

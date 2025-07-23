@@ -10,6 +10,7 @@ mod tests {
     use chrono::DateTime;
     use uuid::Uuid;
 
+    use crate::commands::app::{self, AppDependencies, OutputFormat};
     use ftl_core::api_client::types::{
         self, DeleteAppResponse, DeleteAppResponseApp, GetAppStatusResponse,
         GetAppStatusResponseApp, GetAppStatusResponseAppLastDeploymentInfo,
@@ -17,7 +18,6 @@ mod tests {
         ListAppsResponse, ListAppsResponseAppsItem, ListAppsResponseAppsItemStatus,
         ListAppsResponsePagination,
     };
-    use crate::commands::app::{self, AppDependencies, OutputFormat};
     use ftl_core::deps::{
         FtlApiClient, MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface,
     };

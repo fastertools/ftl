@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use ftl_core::deps::{FileSystem, MessageStyle, UserInterface};
 use ftl_common::SpinInstaller;
+use ftl_core::deps::{FileSystem, MessageStyle, UserInterface};
 
 /// Build executor trait
 #[async_trait::async_trait]
@@ -102,9 +102,9 @@ pub async fn execute_with_deps(
 
     deps.ui.print("→ Publishing to registry...");
 
-    let output =
-        deps.process_executor
-            .execute(&spin_path, &args, Some(&project_path))?;
+    let output = deps
+        .process_executor
+        .execute(&spin_path, &args, Some(&project_path))?;
 
     if !output.success {
         anyhow::bail!("Publishing failed:\n{}\n{}", output.stdout, output.stderr);
@@ -139,12 +139,9 @@ struct BuildExecutorWrapper;
 impl BuildExecutor for BuildExecutorWrapper {
     async fn execute(&self, path: Option<PathBuf>, release: bool) -> Result<()> {
         use crate::commands::build;
-        
-        let args = build::BuildArgs {
-            path,
-            release,
-        };
-        
+
+        let args = build::BuildArgs { path, release };
+
         build::execute(args).await
     }
 }
@@ -160,17 +157,18 @@ impl ProcessExecutor for ProcessExecutorWrapper {
         working_dir: Option<&Path>,
     ) -> Result<ProcessOutput> {
         use std::process::Command;
-        
+
         let mut cmd = Command::new(command);
         cmd.args(args);
-        
+
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }
-        
-        let output = cmd.output()
+
+        let output = cmd
+            .output()
             .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
-        
+
         Ok(ProcessOutput {
             success: output.status.success(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -192,9 +190,9 @@ impl SpinInstaller for SpinInstallerWrapper {
 
 /// Execute the publish command with default dependencies
 pub async fn execute(args: PublishArgs) -> Result<()> {
-    use ftl_core::deps::RealFileSystem;
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::RealFileSystem;
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(PublishDependencies {
         ui: ui.clone(),
@@ -203,13 +201,13 @@ pub async fn execute(args: PublishArgs) -> Result<()> {
         spin_installer: Arc::new(SpinInstallerWrapper),
         build_executor: Arc::new(BuildExecutorWrapper),
     });
-    
+
     let config = PublishConfig {
         path: args.path,
         registry: args.registry,
         tag: args.tag,
     };
-    
+
     execute_with_deps(config, deps).await
 }
 

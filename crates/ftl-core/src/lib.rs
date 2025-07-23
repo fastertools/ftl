@@ -15,11 +15,12 @@ pub mod deps;
 pub mod test_helpers;
 
 // Re-export commonly used types at the crate root
-pub use config::{DEFAULT_API_BASE_URL, API_URL_ENV_VAR, AUTH_TOKEN_ENV_VAR, DEFAULT_API_TIMEOUT_SECS};
+pub use config::{
+    API_URL_ENV_VAR, AUTH_TOKEN_ENV_VAR, DEFAULT_API_BASE_URL, DEFAULT_API_TIMEOUT_SECS,
+};
 pub use deps::{
-    StoredCredentials, FileSystem, CommandExecutor, CommandOutput, FtlApiClient,
-    Clock, CredentialsProvider, UserInterface, ProgressIndicator, MultiProgressManager,
-    MessageStyle, AsyncRuntime, ProcessManager, ProcessHandle,
-    ExitStatus, RealFileSystem, RealCommandExecutor, RealFtlApiClient, RealClock,
-    RealCredentialsProvider, RealAsyncRuntime, RealProcessManager
+    AsyncRuntime, Clock, CommandExecutor, CommandOutput, CredentialsProvider, ExitStatus,
+    FileSystem, FtlApiClient, MessageStyle, MultiProgressManager, ProcessHandle, ProcessManager,
+    ProgressIndicator, RealAsyncRuntime, RealClock, RealCommandExecutor, RealCredentialsProvider,
+    RealFileSystem, RealFtlApiClient, RealProcessManager, StoredCredentials, UserInterface,
 };

@@ -5,8 +5,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, Utc};
 
 use crate::commands::auth::{AuthDependencies, Clock, CredentialsProvider, status_with_deps};
-use ftl_core::deps::{StoredCredentials, UserInterface};
 use ftl_common::ui::TestUserInterface;
+use ftl_core::deps::{StoredCredentials, UserInterface};
 
 // Mock implementation of CredentialsProvider
 struct MockCredentialsProvider {

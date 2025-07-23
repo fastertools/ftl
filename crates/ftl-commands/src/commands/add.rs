@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use ftl_core::deps::{CommandExecutor, FileSystem, MessageStyle, UserInterface};
 use ftl_common::SpinInstaller;
+use ftl_core::deps::{CommandExecutor, FileSystem, MessageStyle, UserInterface};
 use ftl_language::Language;
 
 /// Add command configuration
@@ -352,9 +352,9 @@ impl SpinInstaller for SpinInstallerWrapper {
 
 /// Execute the add command with default dependencies
 pub async fn execute(args: AddArgs) -> Result<()> {
-    use ftl_core::deps::{RealCommandExecutor, RealFileSystem};
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::{RealCommandExecutor, RealFileSystem};
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(AddDependencies {
         file_system: Arc::new(RealFileSystem),
@@ -362,7 +362,7 @@ pub async fn execute(args: AddArgs) -> Result<()> {
         ui: ui.clone(),
         spin_installer: Arc::new(SpinInstallerWrapper),
     });
-    
+
     let config = AddConfig {
         name: args.name,
         description: args.description,
@@ -372,7 +372,7 @@ pub async fn execute(args: AddArgs) -> Result<()> {
         dir: args.dir,
         tar: args.tar,
     };
-    
+
     execute_with_deps(config, deps).await
 }
 

@@ -11,8 +11,8 @@ use tokio::task::JoinSet;
 
 use ftl_core::api_client::{error::ConversionError, types};
 use ftl_core::deps::{
-    AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem,
-    FtlApiClient, MessageStyle, UserInterface,
+    AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem, FtlApiClient,
+    MessageStyle, UserInterface,
 };
 
 /// Build executor trait for running builds
@@ -597,26 +597,28 @@ struct BuildExecutorImpl;
 impl BuildExecutor for BuildExecutorImpl {
     async fn execute(&self, path: Option<&Path>, release: bool) -> Result<()> {
         use crate::commands::build;
-        
+
         let args = build::BuildArgs {
             path: path.map(|p| p.to_path_buf()),
             release,
         };
-        
+
         build::execute(args).await
     }
 }
 
 /// Execute the deploy command with default dependencies
 pub async fn execute(_args: DeployArgs) -> Result<()> {
-    use ftl_core::deps::{RealCommandExecutor, RealFileSystem, RealFtlApiClient, RealClock, 
-                         RealCredentialsProvider, RealAsyncRuntime};
     use ftl_common::RealUserInterface;
-    
+    use ftl_core::deps::{
+        RealAsyncRuntime, RealClock, RealCommandExecutor, RealCredentialsProvider, RealFileSystem,
+        RealFtlApiClient,
+    };
+
     // Get credentials first to create authenticated API client
     let credentials_provider = Arc::new(RealCredentialsProvider);
     let credentials = credentials_provider.get_or_refresh_credentials().await?;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(DeployDependencies {
         file_system: Arc::new(RealFileSystem),

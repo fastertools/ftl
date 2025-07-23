@@ -1,5 +1,5 @@
-use clap::Args;
 use anyhow::Result;
+use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct UpdateArgs {
@@ -9,9 +9,7 @@ pub struct UpdateArgs {
 }
 
 pub async fn execute(args: UpdateArgs) -> Result<()> {
-    let cmd_args = ftl_commands::update::UpdateArgs {
-        force: args.force,
-    };
-    
+    let cmd_args = ftl_commands::update::UpdateArgs { force: args.force };
+
     ftl_commands::update::execute(cmd_args).await
 }

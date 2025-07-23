@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, decode_header, Validation};
+use jsonwebtoken::{Validation, decode, decode_header};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use spin_sdk::http::{Request, Response};

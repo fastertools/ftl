@@ -62,11 +62,12 @@ struct RealCredentialsClearer;
 impl CredentialsClearer for RealCredentialsClearer {
     fn clear_stored_credentials(&self) -> Result<()> {
         use keyring::Entry;
-        
+
         let entry = Entry::new("ftl-cli", "default")
             .map_err(|e| anyhow::anyhow!("Failed to access keyring: {}", e))?;
-        
-        entry.delete_credential()
+
+        entry
+            .delete_credential()
             .map_err(|e| anyhow::anyhow!("Failed to clear credentials: {}", e))
     }
 }
@@ -74,13 +75,13 @@ impl CredentialsClearer for RealCredentialsClearer {
 /// Execute the logout command with default dependencies
 pub async fn execute(_args: LogoutArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
-    
+
     let ui = Arc::new(RealUserInterface);
     let deps = Arc::new(LogoutDependencies {
         ui: ui.clone(),
         credentials_clearer: Arc::new(RealCredentialsClearer),
     });
-    
+
     execute_with_deps(&deps)
 }
 

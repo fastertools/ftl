@@ -5,8 +5,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 
-use ftl_core::deps::{CommandExecutor, FileSystem, UserInterface, RealCommandExecutor, RealFileSystem};
-use ftl_common::{SpinInstaller, RealUserInterface, check_and_install_spin};
+use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
+use ftl_core::deps::{
+    CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
+};
 
 /// Init command arguments (matches CLI parser)
 #[derive(Debug, Clone)]

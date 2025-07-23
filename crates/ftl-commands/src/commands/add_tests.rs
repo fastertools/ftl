@@ -7,8 +7,8 @@ use mockall::predicate::*;
 
 use crate::commands::add::*;
 use crate::test_helpers::*;
-use ftl_core::deps::*;
 use ftl_common::SpinInstaller;
+use ftl_core::deps::*;
 
 struct TestFixture {
     file_system: MockFileSystemMock,
