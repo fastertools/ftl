@@ -18,7 +18,7 @@ FTL is an open source tool framework for AI agents. It builds on the [WebAssembl
 
 FTL tools can be authored in multiple [source languages](https://component-model.bytecodealliance.org/language-support.html) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Edge is an early platform aiming to become a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). Access is currently limited. Join the waitlist using `ftl login`.
+FTL Edge is an early platform aiming to be a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). Access is currently limited. Run `ftl login` to join the waitlist.
 
 ## Why?
 
