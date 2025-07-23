@@ -34,23 +34,8 @@ jobs:
         with:
           components: rustfmt, clippy
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
       
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -76,23 +61,8 @@ jobs:
         with:
           components: llvm-tools-preview
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
       
       - name: Install cargo-llvm-cov and nextest
         uses: taiki-e/install-action@v2
@@ -129,6 +99,8 @@ jobs:
           sudo apt-get install -y libdbus-1-dev
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
@@ -148,23 +120,11 @@ jobs:
           toolchain: 1.86.0
           target: wasm32-wasip1
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-wasm-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-wasm-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target/wasm32-wasip1
-          key: ${{ runner.os }}-cargo-build-wasm-target-${{ hashFiles('**/Cargo.lock') }}
+          cache-targets: true
+          cache-on-failure: true
       
       - name: Install cargo-component
         uses: taiki-e/install-action@v2
