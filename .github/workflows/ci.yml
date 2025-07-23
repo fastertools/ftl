@@ -174,7 +174,7 @@ jobs:
       
       - name: Build WebAssembly components
         run: |
-          cargo build-wasm
+          cargo build-wasm --release
           
       - name: Verify WebAssembly artifacts
         run: |
