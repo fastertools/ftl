@@ -35,6 +35,11 @@ jobs:
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          # Use a shared cache key for better reuse across branches
+          shared-key: "ci-lint"
+          # Only save caches from the main branch to avoid PR pollution
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -62,6 +67,9 @@ jobs:
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "ci-test"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
       - name: Install cargo-llvm-cov and nextest
         uses: taiki-e/install-action@v2
@@ -100,6 +108,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "ci-security"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
@@ -122,8 +133,10 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: "ci-wasm"
           cache-targets: true
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
       - name: Install cargo-component
         uses: taiki-e/install-action@v2
