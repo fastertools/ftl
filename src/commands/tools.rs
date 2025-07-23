@@ -159,9 +159,13 @@ async fn verify_tools_in_registries(
                     Ok(false) => {
                         // Tool doesn't exist in this registry - this is normal
                     }
-                    Err(_) => {
-                        // Error checking registry (rate limit, network, etc.)
-                        // Skip this registry for this tool
+                    Err(e) => {
+                        // Check if it's a crane availability issue
+                        if e.to_string().contains("crane") {
+                            // Re-return the error to propagate it up
+                            return Err(e);
+                        }
+                        // Other errors (rate limit, network, etc.) - skip this registry
                     }
                 }
             }

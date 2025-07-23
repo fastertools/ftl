@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::env;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 
 /// Registry components for Spin manifest generation
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,6 +40,64 @@ fn parse_image_and_tag(image_name: &str) -> (String, String) {
     } else {
         (image_name.to_string(), "latest".to_string())
     }
+}
+
+/// Check if crane CLI is available
+fn check_crane_available() -> Result<()> {
+    let output = Command::new("crane")
+        .arg("version")
+        .output()
+        .context("Failed to execute crane. Please ensure crane is installed: https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md")?;
+    
+    if !output.status.success() {
+        anyhow::bail!("crane command failed. Please ensure crane is installed and working");
+    }
+    
+    Ok(())
+}
+
+/// Use crane to check if an image exists
+async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
+    // First check if crane is available
+    check_crane_available()?;
+    
+    // Use crane manifest to check if image exists
+    // This will use the user's existing Docker/registry authentication
+    let output = Command::new("crane")
+        .arg("manifest")
+        .arg(image_ref)
+        .output()
+        .context("Failed to execute crane manifest")?;
+    
+    // If crane manifest succeeds, the image exists
+    // If it fails with exit code, the image doesn't exist or there's an auth issue
+    Ok(output.status.success())
+}
+
+/// Use crane to list tags for an image
+#[allow(dead_code)]
+async fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
+    check_crane_available()?;
+    
+    let output = Command::new("crane")
+        .arg("ls")
+        .arg(repository)
+        .output()
+        .context("Failed to execute crane ls")?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to list tags: {}", stderr);
+    }
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let tags: Vec<String> = stdout
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect();
+    
+    Ok(tags)
 }
 
 /// Validate and normalize a semantic version
@@ -127,23 +186,16 @@ impl RegistryAdapter for DockerHubAdapter {
         "Docker Hub"
     }
     
-    async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool> {
-        // Docker Hub Registry API v2
+    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
+        // Use crane to check Docker Hub images
         let repo_name = if image_name.contains('/') {
             image_name.to_string()
         } else {
             format!("library/{}", image_name)
         };
         
-        let url = format!("https://registry-1.docker.io/v2/{}/manifests/latest", repo_name);
-        
-        let response = client
-            .head(&url)
-            .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-            .send()
-            .await?;
-            
-        Ok(response.status().is_success())
+        let image_ref = format!("docker.io/{}", repo_name);
+        verify_image_with_crane(&image_ref).await
     }
 }
 
@@ -188,17 +240,10 @@ impl RegistryAdapter for GhcrAdapter {
         "GitHub Container Registry (ghcr.io)"
     }
     
-    async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool> {
-        // GHCR follows OCI Registry API v2
-        let url = format!("https://ghcr.io/v2/{}/{}/manifests/latest", self.organization, image_name);
-        
-        let response = client
-            .head(&url)
-            .header("Accept", "application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json")
-            .send()
-            .await?;
-            
-        Ok(response.status().is_success())
+    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
+        // Use crane to check GHCR images
+        let image_ref = format!("ghcr.io/{}/{}", self.organization, image_name);
+        verify_image_with_crane(&image_ref).await
     }
 }
 
@@ -267,10 +312,12 @@ impl RegistryAdapter for EcrAdapter {
         "AWS Elastic Container Registry (ECR)"
     }
     
-    async fn verify_image_exists(&self, _client: &Client, _image_name: &str) -> Result<bool> {
-        // ECR uses AWS authentication - for now, return true (assume exists)
-        // TODO: Implement proper ECR API authentication and verification
-        Ok(true)
+    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
+        // Use crane to check ECR images
+        // Crane will use AWS credentials from the environment
+        let image_ref = format!("{}.dkr.ecr.{}.amazonaws.com/{}", 
+            self.account_id, self.region, image_name);
+        verify_image_with_crane(&image_ref).await
     }
 }
 
@@ -318,34 +365,10 @@ impl RegistryAdapter for CustomAdapter {
         "Custom Registry"
     }
     
-    async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool> {
-        // For custom registries, try a HEAD request to the manifest
-        let url = self.get_registry_url(image_name);
-        
-        // Try to construct a manifest URL
-        let manifest_url = if url.contains("/manifests/") {
-            url
-        } else {
-            // Parse image and tag properly
-            let (_image_without_tag, tag) = parse_image_and_tag(image_name);
-            
-            // Convert from image URL to manifest URL
-            // Replace the tag portion with /manifests/tag
-            if let Some(tag_pos) = url.rfind(&format!(":{}", tag)) {
-                format!("{}/manifests/{}", &url[..tag_pos], tag)
-            } else {
-                // Fallback: append /manifests/tag to the URL
-                format!("{}/manifests/{}", url, tag)
-            }
-        };
-        
-        let response = client
-            .head(&manifest_url)
-            .header("Accept", "application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json")
-            .send()
-            .await?;
-            
-        Ok(response.status().is_success())
+    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
+        // Use crane to check custom registry images
+        let image_ref = self.get_registry_url(image_name);
+        verify_image_with_crane(&image_ref).await
     }
 }
 
