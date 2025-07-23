@@ -195,6 +195,7 @@ mock! {
     impl ProcessHandle for ProcessHandleMock {
         async fn wait(&mut self) -> Result<ExitStatus>;
         async fn terminate(&mut self) -> Result<()>;
+        async fn shutdown(&mut self) -> Result<ExitStatus>;
     }
 }
 

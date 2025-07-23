@@ -200,7 +200,7 @@ async fn run_with_watch(
     // Set up Ctrl+C handler
     let signal_handler = deps.signal_handler.clone();
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
-    
+
     tokio::spawn(async move {
         let _ = signal_handler.wait_for_interrupt().await;
         let _ = shutdown_tx.send(());

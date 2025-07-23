@@ -554,7 +554,9 @@ impl RealCredentialsProvider {
 
         Ok(StoredCredentials {
             access_token: token_response.access_token,
-            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            refresh_token: token_response
+                .refresh_token
+                .or_else(|| Some(refresh_token.to_string())),
             id_token: token_response.id_token,
             expires_at,
             authkit_domain: authkit_domain.to_string(),
@@ -695,9 +697,9 @@ impl ProcessHandle for RealProcessHandle {
                     // Try to kill the process group in case it created children
                     let process_group = Pid::from_raw(-pid);
                     let _ = signal::kill(process_group, Signal::SIGTERM);
-                    
+
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                    
+
                     // Force kill if still running
                     if !matches!(child.try_wait(), Ok(Some(_))) {
                         let _ = signal::kill(process_pid, Signal::SIGKILL);
@@ -718,7 +720,7 @@ impl ProcessHandle for RealProcessHandle {
     /// Terminate the process and wait for it to exit
     async fn shutdown(&mut self) -> Result<ExitStatus> {
         self.terminate().await?;
-        
+
         // Now wait for the process to fully exit
         if let Some(mut child) = self.child.take() {
             let status = child
