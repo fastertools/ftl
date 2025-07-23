@@ -1,0 +1,295 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to release'
+        required: true
+        type: choice
+        options:
+          - cli
+          - sdk-rust
+          - sdk-typescript
+          - mcp-authorizer
+          - mcp-gateway
+      version_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Custom version (overrides version_type)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Prepare Release PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Setup Node.js
+        if: inputs.component == 'sdk-typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Determine version
+        id: version
+        run: |
+          COMPONENT="${{ inputs.component }}"
+          VERSION_TYPE="${{ inputs.version_type }}"
+          CUSTOM_VERSION="${{ inputs.custom_version }}"
+          
+          # Function to bump version
+          bump_version() {
+            local current=$1
+            local type=$2
+            
+            IFS='.' read -r major minor patch <<< "$current"
+            
+            case "$type" in
+              major)
+                echo "$((major + 1)).0.0"
+                ;;
+              minor)
+                echo "$major.$((minor + 1)).0"
+                ;;
+              patch)
+                echo "$major.$minor.$((patch + 1))"
+                ;;
+            esac
+          }
+          
+          # Get current version based on component
+          case "$COMPONENT" in
+            cli)
+              CURRENT_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
+              ;;
+            sdk-rust)
+              CURRENT_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+              ;;
+            sdk-typescript)
+              CURRENT_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+              ;;
+            mcp-authorizer|mcp-gateway)
+              CURRENT_VERSION=$(grep '^version' "components/${COMPONENT}/Cargo.toml" | head -1 | cut -d'"' -f2)
+              ;;
+          esac
+          
+          # Determine new version
+          if [ -n "$CUSTOM_VERSION" ]; then
+            NEW_VERSION="$CUSTOM_VERSION"
+          else
+            NEW_VERSION=$(bump_version "$CURRENT_VERSION" "$VERSION_TYPE")
+          fi
+          
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Component: $COMPONENT"
+          echo "Current version: $CURRENT_VERSION"
+          echo "New version: $NEW_VERSION"
+      
+      - name: Create release branch
+        run: |
+          BRANCH="release/${{ inputs.component }}-v${{ steps.version.outputs.new }}"
+          git checkout -b "$BRANCH"
+          echo "RELEASE_BRANCH=$BRANCH" >> $GITHUB_ENV
+      
+      - name: Update version
+        run: |
+          COMPONENT="${{ inputs.component }}"
+          NEW_VERSION="${{ steps.version.outputs.new }}"
+          
+          case "$COMPONENT" in
+            cli)
+              sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" cli/Cargo.toml
+              ;;
+            sdk-rust)
+              sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
+              # Update macro dependency if needed
+              if [ -f sdk/rust-macros/Cargo.toml ]; then
+                MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+                echo "Current macros version: $MACROS_VERSION"
+              fi
+              ;;
+            sdk-typescript)
+              cd sdk/typescript
+              npm version "$NEW_VERSION" --no-git-tag-version
+              cd ../..
+              ;;
+            mcp-authorizer|mcp-gateway)
+              sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
+              ;;
+          esac
+      
+      - name: Generate changelog entry
+        id: changelog
+        run: |
+          COMPONENT="${{ inputs.component }}"
+          CURRENT_VERSION="${{ steps.version.outputs.current }}"
+          NEW_VERSION="${{ steps.version.outputs.new }}"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Get commit messages since last release
+          case "$COMPONENT" in
+            cli)
+              TAG_PREFIX="cli-v"
+              COMPONENT_NAME="CLI"
+              ;;
+            sdk-rust)
+              TAG_PREFIX="sdk-rust-v"
+              COMPONENT_NAME="Rust SDK"
+              ;;
+            sdk-typescript)
+              TAG_PREFIX="sdk-typescript-v"
+              COMPONENT_NAME="TypeScript SDK"
+              ;;
+            mcp-authorizer|mcp-gateway)
+              TAG_PREFIX="component-${COMPONENT}-v"
+              COMPONENT_NAME="$COMPONENT"
+              ;;
+          esac
+          
+          # Find last release tag
+          LAST_TAG=$(git tag -l "${TAG_PREFIX}*" --sort=-v:refname | head -1)
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          # Generate changelog
+          {
+            echo "## [$COMPONENT_NAME] $NEW_VERSION - $DATE"
+            echo ""
+            echo "### Changes"
+            echo ""
+            
+            # Group commits by type
+            git log "$LAST_TAG"..HEAD --pretty=format:"%s" | while read -r commit; do
+              if [[ $commit == feat:* ]] || [[ $commit == feat\(*\):* ]]; then
+                echo "- ✨ $commit"
+              elif [[ $commit == fix:* ]] || [[ $commit == fix\(*\):* ]]; then
+                echo "- 🐛 $commit"
+              elif [[ $commit == chore:* ]] || [[ $commit == chore\(*\):* ]]; then
+                echo "- 🔧 $commit"
+              elif [[ $commit == docs:* ]] || [[ $commit == docs\(*\):* ]]; then
+                echo "- 📚 $commit"
+              else
+                echo "- $commit"
+              fi
+            done | sort -u
+            
+            echo ""
+            echo "### Contributors"
+            echo ""
+            git log "$LAST_TAG"..HEAD --pretty=format:"%an" | sort -u | while read -r author; do
+              echo "- $author"
+            done
+          } > RELEASE_NOTES.md
+          
+          # Store for PR body
+          CHANGELOG=$(cat RELEASE_NOTES.md)
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      
+      - name: Update changelog file
+        run: |
+          # This would update CHANGELOG.md - for now just show what would be added
+          echo "Would add the following to CHANGELOG.md:"
+          cat RELEASE_NOTES.md
+      
+      - name: Commit changes
+        run: |
+          git add -A
+          git commit -m "chore(${{ inputs.component }}): prepare release v${{ steps.version.outputs.new }}"
+      
+      - name: Push branch
+        run: |
+          git push origin "$RELEASE_BRANCH"
+      
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMPONENT="${{ inputs.component }}"
+          NEW_VERSION="${{ steps.version.outputs.new }}"
+          
+          # Determine tag name
+          case "$COMPONENT" in
+            cli)
+              TAG="cli-v${NEW_VERSION}"
+              TITLE="Release: CLI v${NEW_VERSION}"
+              ;;
+            sdk-rust)
+              TAG="sdk-rust-v${NEW_VERSION}"
+              TITLE="Release: Rust SDK v${NEW_VERSION}"
+              ;;
+            sdk-typescript)
+              TAG="sdk-typescript-v${NEW_VERSION}"
+              TITLE="Release: TypeScript SDK v${NEW_VERSION}"
+              ;;
+            mcp-authorizer|mcp-gateway)
+              TAG="component-${COMPONENT}-v${NEW_VERSION}"
+              TITLE="Release: ${COMPONENT} v${NEW_VERSION}"
+              ;;
+          esac
+          
+          PR_BODY=$(cat <<EOF
+          ## 🚀 Release: ${TITLE}
+          
+          This PR prepares the release of **${COMPONENT} v${NEW_VERSION}**.
+          
+          ### 📋 Checklist
+          
+          - [ ] Version bumped correctly
+          - [ ] Changelog updated
+          - [ ] All tests passing
+          - [ ] Documentation updated if needed
+          
+          ### 📝 Release Notes
+          
+          $CHANGELOG
+          
+          ### 🔄 Release Process
+          
+          1. Review and merge this PR
+          2. Tag the release: \`git tag ${TAG}\`
+          3. Push the tag: \`git push origin ${TAG}\`
+          4. The release workflow will automatically:
+             - Build and publish artifacts
+             - Create GitHub release
+             - Publish to package registries
+          
+          ### ⚠️ Important
+          
+          - Ensure all CI checks pass before merging
+          - Review the changelog for accuracy
+          - Verify version numbers are correct
+          EOF
+          )
+          
+          gh pr create \
+            --title "$TITLE" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$RELEASE_BRANCH" \
+            --label "release" \
+            --label "automated"
