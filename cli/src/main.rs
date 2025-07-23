@@ -25,7 +25,7 @@ enum Commands {
     Up(UpArgs),
     /// Publish a component to the registry
     Publish(PublishArgs),
-    /// Authenticate with FTL platform
+    /// Authenticate with FTL Edge
     Auth(AuthArgs),
     /// Set up FTL dependencies
     Setup(SetupArgs),
@@ -33,9 +33,9 @@ enum Commands {
     Update(UpdateArgs),
     /// Add new components to your project
     Add(AddArgs),
-    /// Log in to FTL platform
+    /// Log in to FTL Edge
     Login(LoginArgs),
-    /// Log out from FTL platform
+    /// Log out from FTL Edge
     Logout(LogoutArgs),
     /// Run tests for your FTL project
     Test(TestArgs),

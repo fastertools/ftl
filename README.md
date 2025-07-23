@@ -49,7 +49,7 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 </details>
 
 <details>
-<summary><strong>⤵ Deploy on the FTL Platform</strong></summary>
+<summary><strong>⤵ Deploy on FTL Edge</strong></summary>
 
 Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
 
@@ -60,7 +60,7 @@ Latency and compute overhead for remote tool calls should not be something you h
 - High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
 - Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
 
-The FTL Platform is just one possible deployment target. It is currently in early alpha and free with limited capacity. Opt in with the `ftl login` command, which enables `ftl deploy`.
+FTL Edge is just one possible deployment target. It is currently in early alpha and free with limited capacity. Opt in with the `ftl login` command, which enables `ftl deploy`.
 </details>
 
 ## Quick Start
