@@ -219,7 +219,7 @@ graph TB
     Desktops -.->| | MCP
     Agents -.->| | MCP
     Realtime -.->| | MCP
-    MCP -.->| | AuthGateway
+    MCP -.->| | MCPAuth
     MCPAuth -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
     MCPGateway -.->|"In-memory call"| GitHub
