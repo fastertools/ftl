@@ -1,0 +1,164 @@
+name: Release Component
+
+on:
+  push:
+    tags:
+      - 'component-*-v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    outputs:
+      component: ${{ steps.parse.outputs.component }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Parse tag
+        id: parse
+        run: |
+          # Extract component name and version from tag
+          # Format: component-{name}-v{version}
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ ! "$TAG" =~ ^component-([a-z-]+)-v(.+)$ ]]; then
+            echo "❌ Invalid tag format: $TAG"
+            echo "Expected format: component-{name}-v{version}"
+            exit 1
+          fi
+          COMPONENT="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[2]}"
+          echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Component: $COMPONENT"
+          echo "🔢 Version: $VERSION"
+      
+      - name: Verify tag is on main branch
+        run: |
+          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
+            echo "✅ Tag is on main branch"
+          else
+            echo "❌ Error: Tag is not on main branch"
+            echo "This tag points to commit $TAG_COMMIT which is not on main"
+            exit 1
+          fi
+      
+      - name: Verify component exists
+        run: |
+          COMPONENT="${{ steps.parse.outputs.component }}"
+          if [ ! -d "components/$COMPONENT" ]; then
+            echo "❌ Component directory not found: components/$COMPONENT"
+            exit 1
+          fi
+          echo "✅ Component directory exists"
+      
+      - name: Verify version matches Cargo.toml
+        run: |
+          COMPONENT="${{ steps.parse.outputs.component }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          CARGO_VERSION=$(grep '^version' "components/$COMPONENT/Cargo.toml" | head -1 | cut -d'"' -f2)
+          if [ "$CARGO_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version matches Cargo.toml"
+
+  build-and-publish:
+    name: Build and Publish Component
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      
+      - name: Install cargo-component
+        run: cargo install cargo-component --locked
+      
+      - name: Install wkg
+        run: |
+          curl -sSL https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v0.11.0/wkg-x86_64-unknown-linux-gnu -o wkg
+          chmod +x wkg
+          sudo mv wkg /usr/local/bin/
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build component
+        run: |
+          cd "components/${{ needs.verify-tag.outputs.component }}"
+          cargo component build --target wasm32-wasip1 --release
+      
+      - name: Determine WASM file name
+        id: wasm
+        run: |
+          COMPONENT="${{ needs.verify-tag.outputs.component }}"
+          # Map component names to their library names
+          case "$COMPONENT" in
+            "mcp-authorizer")
+              WASM_NAME="mcp_authorizer.wasm"
+              ;;
+            "mcp-gateway")
+              WASM_NAME="ftl_mcp_gateway.wasm"
+              ;;
+            *)
+              # Default: replace hyphens with underscores
+              WASM_NAME="${COMPONENT//-/_}.wasm"
+              ;;
+          esac
+          echo "name=$WASM_NAME" >> $GITHUB_OUTPUT
+      
+      - name: Publish to ghcr.io
+        run: |
+          COMPONENT="${{ needs.verify-tag.outputs.component }}"
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          WASM_FILE="target/wasm32-wasip1/release/${{ steps.wasm.outputs.name }}"
+          
+          cd "components/$COMPONENT"
+          
+          # Publish versioned and latest tags
+          wkg oci push "ghcr.io/fastertools/$COMPONENT:$VERSION" "$WASM_FILE"
+          wkg oci push "ghcr.io/fastertools/$COMPONENT:latest" "$WASM_FILE"
+          
+          echo "✅ Published $COMPONENT v$VERSION to ghcr.io"
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ needs.verify-tag.outputs.component }} v${{ needs.verify-tag.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Component: ${{ needs.verify-tag.outputs.component }}
+            
+            ### Installation
+            
+            Add to your `spin.toml`:
+            ```toml
+            [component.${{ needs.verify-tag.outputs.component }}]
+            source = { registry = "ghcr.io", package = "fastertools:${{ needs.verify-tag.outputs.component }}", version = "${{ needs.verify-tag.outputs.version }}" }
+            ```
+            
+            Or use the latest version:
+            ```toml
+            [component.${{ needs.verify-tag.outputs.component }}]
+            source = { registry = "ghcr.io", package = "fastertools:${{ needs.verify-tag.outputs.component }}", version = "latest" }
+            ```

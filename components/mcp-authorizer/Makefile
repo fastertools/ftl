@@ -39,12 +39,12 @@ check: format-check lint test
 # Build optimized release
 release: clean
 	cargo build --target wasm32-wasip1 --release
-	@echo "Release build complete: target/wasm32-wasip1/release/ftl_auth_gateway.wasm"
+	@echo "Release build complete: target/wasm32-wasip1/release/mcp_authorizer.wasm"
 
 publish: build-component
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
-	wkg oci push ghcr.io/fastertools/ftl-auth-gateway:$$VERSION target/wasm32-wasip1/release/ftl_auth_gateway.wasm
-	wkg oci push ghcr.io/fastertools/ftl-auth-gateway:latest target/wasm32-wasip1/release/ftl_auth_gateway.wasm
+	wkg oci push ghcr.io/fastertools/mcp-authorizer:$$VERSION target/wasm32-wasip1/release/mcp_authorizer.wasm
+	wkg oci push ghcr.io/fastertools/mcp-authorizer:latest target/wasm32-wasip1/release/mcp_authorizer.wasm
 
 # Help
 help:

@@ -10,10 +10,34 @@ env:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify tag is on main branch
+        run: |
+          # Get the commit SHA that the tag points to
+          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+          
+          # Check if this commit exists on the main branch
+          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
+            echo "✅ Tag is on main branch"
+          else
+            echo "❌ Error: Tag is not on main branch"
+            echo "This tag points to commit $TAG_COMMIT which is not on main"
+            exit 1
+          fi
+
   build-binaries:
     name: Build Binaries
+    needs: verify-tag
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -37,15 +61,15 @@ jobs:
       
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/cli-v}" >> $GITHUB_OUTPUT
         shell: bash
       
       - name: Validate version matches Cargo.toml
         run: |
-          # Check the version in Cargo.toml
-          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if [ "$CARGO_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
-            echo "Error: Tag version (${{ steps.version.outputs.VERSION }}) does not match workspace version ($CARGO_VERSION)"
+          # Check the version in cli/Cargo.toml (the main CLI package)
+          CLI_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [ "$CLI_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "Error: Tag version (${{ steps.version.outputs.VERSION }}) does not match CLI version ($CLI_VERSION)"
             exit 1
           fi
         shell: bash
@@ -75,7 +99,7 @@ jobs:
   
   create-release:
     name: Create Release
-    needs: build-binaries
+    needs: [verify-tag, build-binaries]
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.url }}
@@ -129,12 +153,13 @@ jobs:
       - name: Publish ftl-cli
         run: |
           # Check if this version is already published
-          # Get version from Cargo.toml
-          WORKSPACE_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl-cli --limit 1 | grep -q "^ftl-cli = \"$WORKSPACE_VERSION\""; then
-            echo "ftl-cli version already published, skipping"
+          # Get version from cli/Cargo.toml
+          CLI_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
+          if cargo search ftl-cli --limit 1 | grep -q "^ftl-cli = \"$CLI_VERSION\""; then
+            echo "ftl-cli version $CLI_VERSION already published, skipping"
           else
-            cargo publish
+            cd cli && cargo publish
           fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
