@@ -225,6 +225,14 @@ jobs:
         run: |
           git push origin "$RELEASE_BRANCH"
       
+      - name: Create or verify labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Create labels if they don't exist
+          gh label create "release" --description "Release PR" --color "0E8A16" --force || true
+          gh label create "automated" --description "Automated PR" --color "0052CC" --force || true
+      
       - name: Create Pull Request
         env:
           GH_TOKEN: ${{ github.token }}
@@ -271,9 +279,8 @@ jobs:
           ### 🔄 Release Process
           
           1. Review and merge this PR
-          2. Tag the release: \`git tag ${TAG}\`
-          3. Push the tag: \`git push origin ${TAG}\`
-          4. The release workflow will automatically:
+          2. The release will be tagged automatically
+          3. The release workflow will then:
              - Build and publish artifacts
              - Create GitHub release
              - Publish to package registries
@@ -283,6 +290,7 @@ jobs:
           - Ensure all CI checks pass before merging
           - Review the changelog for accuracy
           - Verify version numbers are correct
+          - **DO NOT** manually create the tag - it will be created automatically when merged
           EOF
           )
           
