@@ -1,0 +1,67 @@
+name: Detect Changes
+
+on:
+  workflow_call:
+    outputs:
+      cli:
+        description: "CLI source files changed"
+        value: ${{ jobs.detect.outputs.cli }}
+      rust-sdk:
+        description: "Rust SDK files changed"
+        value: ${{ jobs.detect.outputs.rust-sdk }}
+      components:
+        description: "Any component files changed"
+        value: ${{ jobs.detect.outputs.components }}
+      mcp-authorizer:
+        description: "MCP authorizer component changed"
+        value: ${{ jobs.detect.outputs.mcp-authorizer }}
+      mcp-gateway:
+        description: "MCP gateway component changed"
+        value: ${{ jobs.detect.outputs.mcp-gateway }}
+      core-crates:
+        description: "Core crates changed (affects everything)"
+        value: ${{ jobs.detect.outputs.core-crates }}
+      ci:
+        description: "CI workflow files changed"
+        value: ${{ jobs.detect.outputs.ci }}
+
+jobs:
+  detect:
+    name: Detect Changed Files
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.filter.outputs.cli }}
+      rust-sdk: ${{ steps.filter.outputs.rust-sdk }}
+      components: ${{ steps.filter.outputs.components }}
+      mcp-authorizer: ${{ steps.filter.outputs.mcp-authorizer }}
+      mcp-gateway: ${{ steps.filter.outputs.mcp-gateway }}
+      core-crates: ${{ steps.filter.outputs.core-crates }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cli:
+              - 'cli/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            rust-sdk:
+              - 'sdk/rust/**'
+              - 'sdk/rust-macros/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            components:
+              - 'components/**'
+              - '.cargo/config.toml'
+            mcp-authorizer:
+              - 'components/mcp-authorizer/**'
+            mcp-gateway:
+              - 'components/mcp-gateway/**'
+            core-crates:
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            ci:
+              - '.github/workflows/**'

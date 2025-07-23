@@ -1,0 +1,148 @@
+name: Release Rust SDK
+
+on:
+  push:
+    tags:
+      - 'sdk-rust-v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Parse tag
+        id: parse
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/sdk-rust-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🔢 Version: $VERSION"
+      
+      - name: Verify tag is on main branch
+        run: |
+          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
+            echo "✅ Tag is on main branch"
+          else
+            echo "❌ Error: Tag is not on main branch"
+            echo "This tag points to commit $TAG_COMMIT which is not on main"
+            exit 1
+          fi
+      
+      - name: Verify versions match
+        run: |
+          VERSION="${{ steps.parse.outputs.version }}"
+          
+          # Check ftl-sdk version
+          SDK_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [ "$SDK_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match ftl-sdk version ($SDK_VERSION)"
+            exit 1
+          fi
+          
+          # Check ftl-sdk-macros version
+          MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "📦 ftl-sdk-macros version: $MACROS_VERSION"
+          
+          # Verify ftl-sdk depends on the correct macros version
+          MACROS_DEP=$(grep 'ftl-sdk-macros' sdk/rust/Cargo.toml | grep version | cut -d'"' -f2)
+          if [ "$MACROS_DEP" != "$MACROS_VERSION" ]; then
+            echo "❌ ftl-sdk depends on ftl-sdk-macros $MACROS_DEP but macros is at version $MACROS_VERSION"
+            exit 1
+          fi
+          
+          echo "✅ All versions are consistent"
+
+  publish:
+    name: Publish to crates.io
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Verify crates can be published
+        run: |
+          cd sdk/rust-macros
+          cargo publish --dry-run
+          cd ../rust
+          cargo publish --dry-run
+      
+      - name: Publish ftl-sdk-macros
+        run: |
+          cd sdk/rust-macros
+          MACROS_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          
+          # Check if already published
+          if cargo search ftl-sdk-macros --limit 1 | grep -q "^ftl-sdk-macros = \"$MACROS_VERSION\""; then
+            echo "⚠️  ftl-sdk-macros v$MACROS_VERSION already published"
+          else
+            cargo publish
+            echo "✅ Published ftl-sdk-macros v$MACROS_VERSION"
+          fi
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      
+      - name: Wait for crates.io to index ftl-sdk-macros
+        run: |
+          echo "⏳ Waiting for crates.io to index ftl-sdk-macros..."
+          sleep 30
+      
+      - name: Publish ftl-sdk
+        run: |
+          cd sdk/rust
+          SDK_VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          # Check if already published
+          if cargo search ftl-sdk --limit 1 | grep -q "^ftl-sdk = \"$SDK_VERSION\""; then
+            echo "⚠️  ftl-sdk v$SDK_VERSION already published"
+          else
+            cargo publish
+            echo "✅ Published ftl-sdk v$SDK_VERSION"
+          fi
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Rust SDK v${{ needs.verify-tag.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Rust SDK v${{ needs.verify-tag.outputs.version }}
+            
+            ### Installation
+            
+            Add to your `Cargo.toml`:
+            ```toml
+            [dependencies]
+            ftl-sdk = "${{ needs.verify-tag.outputs.version }}"
+            ```
+            
+            ### Features
+            
+            Enable procedural macros:
+            ```toml
+            [dependencies]
+            ftl-sdk = { version = "${{ needs.verify-tag.outputs.version }}", features = ["macros"] }
+            ```
+            
+            ### Documentation
+            
+            - [crates.io](https://crates.io/crates/ftl-sdk)
+            - [docs.rs](https://docs.rs/ftl-sdk)

@@ -1,0 +1,162 @@
+name: Release TypeScript SDK
+
+on:
+  push:
+    tags:
+      - 'sdk-typescript-v*'
+
+env:
+  NODE_VERSION: '20'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Parse tag
+        id: parse
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/sdk-typescript-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🔢 Version: $VERSION"
+      
+      - name: Verify tag is on main branch
+        run: |
+          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
+            echo "✅ Tag is on main branch"
+          else
+            echo "❌ Error: Tag is not on main branch"
+            echo "This tag points to commit $TAG_COMMIT which is not on main"
+            exit 1
+          fi
+      
+      - name: Verify version matches package.json
+        run: |
+          VERSION="${{ steps.parse.outputs.version }}"
+          PACKAGE_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match package.json version ($PACKAGE_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version matches package.json"
+
+  test:
+    name: Test
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+      
+      - name: Run checks
+        run: |
+          cd sdk/typescript
+          npm run check
+      
+      - name: Build
+        run: |
+          cd sdk/typescript
+          npm run build
+      
+      - name: Test publish
+        run: |
+          cd sdk/typescript
+          npm run publish:dry-run
+
+  publish:
+    name: Publish to NPM
+    needs: [verify-tag, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+      
+      - name: Build
+        run: |
+          cd sdk/typescript
+          npm run build
+      
+      - name: Check if version is already published
+        id: check-published
+        run: |
+          cd sdk/typescript
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          # Check if version exists on NPM
+          if npm view "$PACKAGE_NAME@$VERSION" version 2>/dev/null; then
+            echo "⚠️  Version $VERSION already published on NPM"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Version $VERSION not yet published"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Publish to NPM
+        if: steps.check-published.outputs.skip != 'true'
+        run: |
+          cd sdk/typescript
+          npm publish --access public
+          echo "✅ Published to NPM"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "TypeScript SDK v${{ needs.verify-tag.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## TypeScript SDK v${{ needs.verify-tag.outputs.version }}
+            
+            ### Installation
+            
+            ```bash
+            npm install ftl-sdk@${{ needs.verify-tag.outputs.version }}
+            # or
+            yarn add ftl-sdk@${{ needs.verify-tag.outputs.version }}
+            # or
+            pnpm add ftl-sdk@${{ needs.verify-tag.outputs.version }}
+            ```
+            
+            ### Usage
+            
+            ```typescript
+            import { createTool, ToolResponse } from 'ftl-sdk'
+            ```
+            
+            ### Links
+            
+            - [NPM Package](https://www.npmjs.com/package/ftl-sdk)
+            - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/typescript)

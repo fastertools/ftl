@@ -3,32 +3,23 @@ name: CI
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'crates/**'
-      - 'components/**'
-      - 'sdk/**'
-      - 'cli/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'crates/**'
-      - 'components/**'
-      - 'sdk/**'
-      - 'cli/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/ci.yml'
 
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
 
 jobs:
+  # First, detect what changed
+  changes:
+    name: Detect Changes
+    uses: ./.github/workflows/detect-changes.yml
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +60,8 @@ jobs:
 
   test-and-coverage:
     name: Test & Coverage
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +118,8 @@ jobs:
 
   security:
     name: Security Audit
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +136,8 @@ jobs:
 
   wasm:
     name: WebAssembly Components
+    needs: changes
+    if: needs.changes.outputs.components == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

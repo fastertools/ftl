@@ -61,7 +61,7 @@ jobs:
       
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/cli-v}" >> $GITHUB_OUTPUT
         shell: bash
       
       - name: Validate version matches Cargo.toml
@@ -163,87 +163,3 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  publish-components:
-    name: Publish WebAssembly Components
-    needs: create-release
-    runs-on: ubuntu-latest
-    if: needs.create-release.outputs.release_created
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip1
-      
-      - name: Install cargo-component
-        run: cargo install cargo-component --locked
-      
-      - name: Install wkg
-        run: |
-          curl -sSL https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v0.11.0/wkg-x86_64-unknown-linux-gnu -o wkg
-          chmod +x wkg
-          sudo mv wkg /usr/local/bin/
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build and publish mcp-authorizer
-        run: |
-          cd components/mcp-authorizer
-          cargo component build --target wasm32-wasip1 --release
-          wkg oci push ghcr.io/fastertools/mcp-authorizer:${{ steps.version.outputs.VERSION }} target/wasm32-wasip1/release/mcp_authorizer.wasm
-          wkg oci push ghcr.io/fastertools/mcp-authorizer:latest target/wasm32-wasip1/release/mcp_authorizer.wasm
-      
-      - name: Build and publish mcp-gateway
-        run: |
-          cd components/mcp-gateway
-          cargo component build --target wasm32-wasip1 --release
-          wkg oci push ghcr.io/fastertools/mcp-gateway:${{ steps.version.outputs.VERSION }} target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
-          wkg oci push ghcr.io/fastertools/mcp-gateway:latest target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
-
-  publish-sdks:
-    name: Publish SDKs to crates.io
-    needs: create-release
-    runs-on: ubuntu-latest
-    if: needs.create-release.outputs.release_created
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Publish ftl-sdk-macros
-        run: |
-          cd sdk/rust-macros
-          MACROS_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl-sdk-macros --limit 1 | grep -q "^ftl-sdk-macros = \"$MACROS_VERSION\""; then
-            echo "ftl-sdk-macros version $MACROS_VERSION already published, skipping"
-          else
-            cargo publish
-          fi
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      
-      - name: Wait for crates.io to index ftl-sdk-macros
-        run: sleep 30
-      
-      - name: Publish ftl-sdk
-        run: |
-          cd sdk/rust
-          SDK_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl-sdk --limit 1 | grep -q "^ftl-sdk = \"$SDK_VERSION\""; then
-            echo "ftl-sdk version $SDK_VERSION already published, skipping"
-          else
-            cargo publish
-          fi
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

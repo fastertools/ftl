@@ -2,8 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Component Versioning
+
+This monorepo contains multiple independently versioned components:
+
+- **CLI** (`ftl-cli`): The main command-line interface
+- **Rust SDK** (`ftl-sdk`): SDK for building MCP tools in Rust  
+- **Components**:
+  - `mcp-authorizer`: Authentication gateway for MCP servers
+  - `mcp-gateway`: MCP protocol gateway
+
+Each component maintains its own version and can be released independently.
+
+---
+
+## [CLI] ftl-cli
 
 ## [Unreleased]
 
@@ -63,3 +79,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.1] - TBD
 
 Initial public release.
+
+---
+
+## [SDK] ftl-sdk
+
+### [0.2.3] - 2024-XX-XX
+- Current stable release
+
+---
+
+## [Component] mcp-authorizer
+
+### [0.0.6] - 2024-XX-XX
+- Current stable release
+- Renamed from ftl-auth-gateway
+- Support for AuthKit and generic OIDC providers
+
+---
+
+## [Component] mcp-gateway
+
+### [0.0.3] - 2024-XX-XX
+- Current stable release
+- Dynamic tool routing based on configuration
+- JSON Schema validation for tool arguments
