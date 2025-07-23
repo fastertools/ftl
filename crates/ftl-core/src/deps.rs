@@ -579,8 +579,14 @@ pub trait ProcessHandle: Send + Sync {
     /// Wait for the process to exit
     async fn wait(&mut self) -> Result<ExitStatus>;
 
-    /// Terminate the process
+    /// Send termination signal to the process (does not wait for exit)
     async fn terminate(&mut self) -> Result<()>;
+    
+    /// Terminate the process and wait for it to exit
+    async fn shutdown(&mut self) -> Result<ExitStatus> {
+        self.terminate().await?;
+        self.wait().await
+    }
 }
 
 /// Exit status
@@ -629,6 +635,13 @@ impl ProcessManager for RealProcessManager {
             cmd.current_dir(dir);
         }
 
+        // On Unix, create a new process group so we can kill all children
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+
         let child = cmd
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn process: {}", e))?;
@@ -657,10 +670,39 @@ impl ProcessHandle for RealProcessHandle {
     }
 
     async fn terminate(&mut self) -> Result<()> {
-        if let Some(mut child) = self.child.take() {
-            child
-                .kill()
-                .map_err(|e| anyhow::anyhow!("Failed to terminate process: {}", e))?;
+        if let Some(child) = self.child.as_mut() {
+            // On Unix systems, kill the entire process group
+            #[cfg(unix)]
+            {
+                use nix::sys::signal::{self, Signal};
+                use nix::unistd::Pid;
+                
+                let pid = child.id() as i32;
+                // Kill the entire process group (negative PID)
+                let pgid = Pid::from_raw(-pid);
+                
+                // Try SIGTERM first for graceful shutdown
+                let _ = signal::kill(pgid, Signal::SIGTERM);
+                
+                // Give it a moment to terminate gracefully
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                
+                // Check if the main process is still running
+                match child.try_wait() {
+                    Ok(Some(_)) => {}, // Process already exited
+                    _ => {
+                        // Force kill the process group
+                        let _ = signal::kill(pgid, Signal::SIGKILL);
+                        // Also kill the specific process just in case
+                        let _ = child.kill();
+                    }
+                }
+            }
+            
+            #[cfg(not(unix))]
+            {
+                let _ = child.kill();
+            }
         }
         Ok(())
     }

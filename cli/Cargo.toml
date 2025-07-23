@@ -1,6 +1,6 @@
 [package]
 name = "ftl-cli"
-version = "0.0.23"
+version = "0.0.24"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -35,7 +35,7 @@ async-trait = { workspace = true }
 notify = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["signal", "process"] }
+nix = { version = "0.30.1", features = ["signal", "process"] }
 
 [dev-dependencies]
 # Most tests should be in the library crates

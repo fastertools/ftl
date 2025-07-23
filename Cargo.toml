@@ -1,26 +1,28 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/ftl-core",
-    "crates/ftl-commands",
-    "crates/ftl-common",
-    "crates/ftl-language",
-    "crates/ftl-sdk-rs",
-    "crates/ftl-sdk-rs-macros",
+    "crates/*",
+    "components/*",
     "cli",
 ]
+# Plain `cargo build` should not waste time rebuilding Wasm targets:
+default-members = [
+    "crates/*",
+    "cli",
+]
+# Exclude examples and templates
 exclude = [
-    "sdk/rust",  # Will add back when it exists
-    "crates/ftl-auth-gateway",  # WebAssembly component - build separately
-    "crates/ftl-mcp-gateway",   # WebAssembly component - build separately
+    "examples",
+    "templates",
 ]
 
-# Note: Gateway crates (ftl-auth-gateway, ftl-mcp-gateway) are WASM components
-# Build them with: cargo component build --release --target wasm32-wasip1
+# Note: WebAssembly components are in the components/ directory
+# Build them with: cargo component build -p <component-name> --release --target wasm32-wasip1
+# Build all components: cargo component build --workspace --release --target wasm32-wasip1
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 authors = ["FTL Contributors"]
 license = "Apache-2.0"
 repository = "https://github.com/fastertools/ftl-cli"

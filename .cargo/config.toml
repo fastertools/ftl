@@ -1,0 +1,5 @@
+[alias]
+i = "install --path cli"
+
+build-wasm = "component build -p ftl-auth-gateway -p ftl-mcp-gateway --target wasm32-wasip1"
+wasm = "build-wasm"

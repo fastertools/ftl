@@ -46,7 +46,7 @@ base64 = { workspace = true }
 uuid = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["signal", "process"] }
+nix = { version = "0.30.1", features = ["signal", "process"] }
 
 [dev-dependencies]
 mockall = { workspace = true }

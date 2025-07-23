@@ -223,8 +223,10 @@ async fn run_with_watch(
                     deps.ui.print("");
 
                     // Kill the current server
-                    server_process.terminate().await?;
-                    server_process.wait().await?;
+                    server_process.shutdown().await?;
+                    
+                    // Give the OS a moment to fully release the port
+                    deps.async_runtime.sleep(Duration::from_secs(1)).await;
 
                     // Rebuild
                     match run_build_command(&project_path, deps).await {
@@ -253,9 +255,8 @@ async fn run_with_watch(
                     deps.ui.print("");
                     deps.ui.print_styled("■ Stopping development server...", MessageStyle::Red);
 
-                    // Kill the server
-                    server_process.terminate().await?;
-                    server_process.wait().await?;
+                    // Shutdown the server (terminate and wait for exit)
+                    server_process.shutdown().await?;
                     break;
                 }
             }

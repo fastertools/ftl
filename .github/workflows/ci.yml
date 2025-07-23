@@ -4,18 +4,20 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/**'
+      - 'crates/**'
+      - 'components/**'
+      - 'cli/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'Makefile'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/**'
+      - 'crates/**'
+      - 'components/**'
+      - 'cli/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'Makefile'
       - '.github/workflows/ci.yml'
 
 env:
@@ -79,9 +81,6 @@ jobs:
         with:
           components: llvm-tools-preview
       
-      - name: Install wasm32-wasip1 target
-        run: rustup target add wasm32-wasip1
-      
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -137,3 +136,45 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
         run: cargo audit
+
+  wasm:
+    name: WebAssembly Components
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+          target: wasm32-wasip1
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-wasm-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-wasm-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target/wasm32-wasip1
+          key: ${{ runner.os }}-cargo-build-wasm-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install cargo-component
+        run: cargo install cargo-component --locked
+      
+      - name: Build WebAssembly components
+        run: |
+          cargo build-wasm
+          
+      - name: Verify WebAssembly artifacts
+        run: |
+          ls -la target/wasm32-wasip1/release/*.wasm
+          echo "WebAssembly components built successfully"

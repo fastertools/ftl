@@ -42,8 +42,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Rust 1.75 or later
-- Spin CLI (for testing)
+- Rust 1.86 or later (with edition 2024 support)
+- Spin CLI (for testing WebAssembly components)
 - wasm32-wasip1 target: `rustup target add wasm32-wasip1`
 
 ### Building
@@ -53,24 +53,36 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 git clone https://github.com/fastertools/ftl-cli
 cd ftl-cli
 
-# Build all components
-cargo build --all
+# Build native code (excludes WebAssembly components by default)
+cargo build
 
-# Run tests
-cargo test --all
+# Run tests for native code
+cargo test
 
-# Build for release
-cargo build --release
+# Build WebAssembly components using cargo-component
+# First install cargo-component if you haven't already:
+cargo install cargo-component --locked
+
+# Build individual components
+cargo component build -p ftl-auth-gateway --release --target wasm32-wasip1
+cargo component build -p ftl-mcp-gateway --release --target wasm32-wasip1
 ```
 
 ### Project Structure
 
 <pre>
 ftl-cli/
-├── packages/
-│   └── ftl-cli/    # Main CLI implementation
-├── templates/      # Component templates (uses ftl-mcp)
-└── examples/       # Example tools
+├── crates/              # Native Rust libraries
+│   ├── ftl-core/        # Core functionality
+│   ├── ftl-commands/    # CLI command implementations
+│   ├── ftl-common/      # Shared utilities
+│   ├── ftl-language/    # Language detection
+│   └── ftl-sdk-*/       # SDK libraries
+├── components/          # WebAssembly components (Spin apps)
+│   ├── ftl-auth-gateway/  # Authentication gateway
+│   └── ftl-mcp-gateway/   # MCP gateway
+├── cli/                 # Main CLI binary
+└── sdk/                 # Language-specific SDKs (future)
 </pre>
 
 ## Coding Guidelines
