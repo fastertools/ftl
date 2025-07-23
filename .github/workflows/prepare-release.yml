@@ -29,6 +29,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write  # Required for creating labels
 
 jobs:
   prepare:
@@ -37,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT || github.token }}
           fetch-depth: 0
       
       - name: Setup Git
@@ -247,7 +248,7 @@ jobs:
       
       - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PAT || github.token }}
         run: |
           COMPONENT="${{ inputs.component }}"
           NEW_VERSION="${{ steps.version.outputs.new }}"
