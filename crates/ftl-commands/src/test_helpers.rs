@@ -1,6 +1,6 @@
 //! Test helper utilities and mock implementations for ftl-commands
 //!
-//! This module contains mock implementations that were previously in ftl_core::test_helpers
+//! This module contains mock implementations that were previously in `ftl_core::test_helpers`
 //! but are now local to ftl-commands for better encapsulation.
 
 use std::path::{Path, PathBuf};
@@ -16,9 +16,9 @@ use ftl_core::api_client::types;
 use ftl_core::deps::*;
 
 // Re-export test utilities from ftl_common
-/// Test implementation of the UserInterface trait that captures all output and user interactions.
+/// Test implementation of the `UserInterface` trait that captures all output and user interactions.
 ///
-/// This is re-exported from ftl_common and provides a way to test CLI commands without
+/// This is re-exported from `ftl_common` and provides a way to test CLI commands without
 /// requiring actual user input or producing console output.
 ///
 /// # Example
@@ -34,27 +34,27 @@ pub use ftl_common::ui::TestUserInterface;
 
 // Mock implementations using mockall
 
-/// Mock implementation of the FileSystem trait for testing file operations.
-///
-/// This mock allows you to simulate file system operations without actually touching
-/// the disk, making tests faster and more reliable.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::MockFileSystemMock;
-///
-/// let mut mock_fs = MockFileSystemMock::new();
-/// mock_fs.expect_exists()
-///     .with(eq(Path::new("/test/path")))
-///     .times(1)
-///     .returning(|_| true);
-///
-/// mock_fs.expect_read_to_string()
-///     .with(eq(Path::new("/test/file.txt")))
-///     .times(1)
-///     .returning(|_| Ok("file content".to_string()));
-/// ```
+// Mock implementation of the FileSystem trait for testing file operations.
+//
+// This mock allows you to simulate file system operations without actually touching
+// the disk, making tests faster and more reliable.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::MockFileSystemMock;
+//
+// let mut mock_fs = MockFileSystemMock::new();
+// mock_fs.expect_exists()
+//     .with(eq(Path::new("/test/path")))
+//     .times(1)
+//     .returning(|_| true);
+//
+// mock_fs.expect_read_to_string()
+//     .with(eq(Path::new("/test/file.txt")))
+//     .times(1)
+//     .returning(|_| Ok("file content".to_string()));
+// ```
 mock! {
     pub FileSystemMock {}
 
@@ -65,29 +65,29 @@ mock! {
     }
 }
 
-/// Mock implementation of the Clock trait for controlling time in tests.
-///
-/// This mock allows you to control time-related operations in tests, making it possible
-/// to test timeout behavior, rate limiting, and other time-dependent functionality.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::MockClockMock;
-/// use std::time::{Instant, Duration};
-///
-/// let mut mock_clock = MockClockMock::new();
-/// let start_time = Instant::now();
-///
-/// mock_clock.expect_now()
-///     .times(1)
-///     .returning(move || start_time);
-///
-/// mock_clock.expect_duration_from_secs()
-///     .with(eq(5))
-///     .times(1)
-///     .returning(|secs| Duration::from_secs(secs));
-/// ```
+// Mock implementation of the Clock trait for controlling time in tests.
+//
+// This mock allows you to control time-related operations in tests, making it possible
+// to test timeout behavior, rate limiting, and other time-dependent functionality.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::MockClockMock;
+// use std::time::{Instant, Duration};
+//
+// let mut mock_clock = MockClockMock::new();
+// let start_time = Instant::now();
+//
+// mock_clock.expect_now()
+//     .times(1)
+//     .returning(move || start_time);
+//
+// mock_clock.expect_duration_from_secs()
+//     .with(eq(5))
+//     .times(1)
+//     .returning(|secs| Duration::from_secs(secs));
+// ```
 mock! {
     pub ClockMock {}
 
@@ -98,21 +98,21 @@ mock! {
     }
 }
 
-/// Mock implementation of the CredentialsProvider trait for testing authentication.
-///
-/// This mock allows you to simulate credential retrieval and refresh operations
-/// without requiring actual authentication services.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::{MockCredentialsProviderMock, test_credentials};
-///
-/// let mut mock_creds = MockCredentialsProviderMock::new();
-/// mock_creds.expect_get_or_refresh_credentials()
-///     .times(1)
-///     .returning(|| Ok(test_credentials()));
-/// ```
+// Mock implementation of the CredentialsProvider trait for testing authentication.
+//
+// This mock allows you to simulate credential retrieval and refresh operations
+// without requiring actual authentication services.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::{MockCredentialsProviderMock, test_credentials};
+//
+// let mut mock_creds = MockCredentialsProviderMock::new();
+// mock_creds.expect_get_or_refresh_credentials()
+//     .times(1)
+//     .returning(|| Ok(test_credentials()));
+// ```
 mock! {
     pub CredentialsProviderMock {}
 
@@ -122,23 +122,23 @@ mock! {
     }
 }
 
-/// Mock implementation of the AsyncRuntime trait for testing async operations.
-///
-/// This mock allows you to control async runtime behavior, particularly useful
-/// for testing code that uses delays or timeouts.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::MockAsyncRuntimeMock;
-/// use std::time::Duration;
-///
-/// let mut mock_runtime = MockAsyncRuntimeMock::new();
-/// mock_runtime.expect_sleep()
-///     .with(eq(Duration::from_secs(1)))
-///     .times(1)
-///     .returning(|_| ());
-/// ```
+// Mock implementation of the AsyncRuntime trait for testing async operations.
+//
+// This mock allows you to control async runtime behavior, particularly useful
+// for testing code that uses delays or timeouts.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::MockAsyncRuntimeMock;
+// use std::time::Duration;
+//
+// let mut mock_runtime = MockAsyncRuntimeMock::new();
+// mock_runtime.expect_sleep()
+//     .with(eq(Duration::from_secs(1)))
+//     .times(1)
+//     .returning(|_| ());
+// ```
 mock! {
     pub AsyncRuntimeMock {}
 
@@ -148,21 +148,21 @@ mock! {
     }
 }
 
-/// Mock implementation of the SpinInstaller trait for testing Spin installation.
-///
-/// This mock allows you to simulate Spin CLI installation without actually downloading
-/// or installing anything.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::MockSpinInstallerMock;
-///
-/// let mut mock_installer = MockSpinInstallerMock::new();
-/// mock_installer.expect_check_and_install()
-///     .times(1)
-///     .returning(|| Ok("/usr/local/bin/spin".to_string()));
-/// ```
+// Mock implementation of the SpinInstaller trait for testing Spin installation.
+//
+// This mock allows you to simulate Spin CLI installation without actually downloading
+// or installing anything.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::MockSpinInstallerMock;
+//
+// let mut mock_installer = MockSpinInstallerMock::new();
+// mock_installer.expect_check_and_install()
+//     .times(1)
+//     .returning(|| Ok("/usr/local/bin/spin".to_string()));
+// ```
 mock! {
     pub SpinInstallerMock {}
 
@@ -172,22 +172,22 @@ mock! {
     }
 }
 
-/// Mock implementation of the ProcessHandle trait for testing process management.
-///
-/// This mock allows you to simulate process lifecycle operations like waiting for
-/// completion and termination.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::MockProcessHandleMock;
-/// use ftl_core::deps::ExitStatus;
-///
-/// let mut mock_handle = MockProcessHandleMock::new();
-/// mock_handle.expect_wait()
-///     .times(1)
-///     .returning(|| Ok(ExitStatus { code: Some(0) }));
-/// ```
+// Mock implementation of the ProcessHandle trait for testing process management.
+//
+// This mock allows you to simulate process lifecycle operations like waiting for
+// completion and termination.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::MockProcessHandleMock;
+// use ftl_core::deps::ExitStatus;
+//
+// let mut mock_handle = MockProcessHandleMock::new();
+// mock_handle.expect_wait()
+//     .times(1)
+//     .returning(|| Ok(ExitStatus { code: Some(0) }));
+// ```
 mock! {
     pub ProcessHandleMock {}
 
@@ -200,7 +200,11 @@ mock! {
 
 // Manual mock for ProcessManager to avoid mockall lifetime issues
 
-/// Mock implementation of the ProcessManager trait for testing process spawning.
+// Type alias for the spawn function type to reduce complexity
+type SpawnFn =
+    Box<dyn Fn(&str, Vec<String>, Option<PathBuf>) -> Result<Box<dyn ProcessHandle>> + Send + Sync>;
+
+/// Mock implementation of the `ProcessManager` trait for testing process spawning.
 ///
 /// This is a manual mock implementation (not using mockall) to avoid lifetime issues
 /// with async traits. It allows you to control process spawning behavior in tests.
@@ -224,17 +228,13 @@ mock! {
 ///     });
 /// ```
 pub struct MockProcessManagerMock {
-    spawn_fn: Arc<
-        Mutex<
-            Option<
-                Box<
-                    dyn Fn(&str, Vec<String>, Option<PathBuf>) -> Result<Box<dyn ProcessHandle>>
-                        + Send
-                        + Sync,
-                >,
-            >,
-        >,
-    >,
+    spawn_fn: Arc<Mutex<Option<SpawnFn>>>,
+}
+
+impl Default for MockProcessManagerMock {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockProcessManagerMock {
@@ -255,11 +255,11 @@ impl MockProcessManagerMock {
     /// Configures the mock to return a specific result when spawn is called.
     ///
     /// The provided function will be called with the command, arguments, and working directory
-    /// passed to spawn, and should return a mock ProcessHandle.
+    /// passed to spawn, and should return a mock `ProcessHandle`.
     ///
     /// # Arguments
     ///
-    /// * `f` - A function that takes command, args, and working_dir and returns a ProcessHandle
+    /// * `f` - A function that takes command, args, and `working_dir` and returns a `ProcessHandle`
     pub fn returning<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&str, Vec<String>, Option<PathBuf>) -> Result<Box<dyn ProcessHandle>>
@@ -280,8 +280,8 @@ impl ProcessManager for MockProcessManagerMock {
         args: &[&str],
         working_dir: Option<&Path>,
     ) -> Result<Box<dyn ProcessHandle>> {
-        let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-        let working_dir_owned = working_dir.map(|p| p.to_path_buf());
+        let args_owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+        let working_dir_owned = working_dir.map(std::path::Path::to_path_buf);
 
         if let Some(ref f) = *self.spawn_fn.lock().unwrap() {
             f(command, args_owned, working_dir_owned)
@@ -291,29 +291,29 @@ impl ProcessManager for MockProcessManagerMock {
     }
 }
 
-/// Mock implementation of the FtlApiClient trait for testing API interactions.
-///
-/// This mock allows you to simulate FTL API responses without making actual network calls.
-/// Use the helper functions like `test_ecr_credentials()` and `test_deployment_response()`
-/// to create realistic test data.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::{MockFtlApiClientMock, test_ecr_credentials, test_deployment_response};
-///
-/// let mut mock_client = MockFtlApiClientMock::new();
-///
-/// // Mock ECR credentials retrieval
-/// mock_client.expect_get_ecr_credentials()
-///     .times(1)
-///     .returning(|| Ok(test_ecr_credentials()));
-///
-/// // Mock deployment creation
-/// mock_client.expect_deploy_app()
-///     .times(1)
-///     .returning(|_req| Ok(test_deployment_response("test-deployment-id")));
-/// ```
+// Mock implementation of the FtlApiClient trait for testing API interactions.
+//
+// This mock allows you to simulate FTL API responses without making actual network calls.
+// Use the helper functions like `test_ecr_credentials()` and `test_deployment_response()`
+// to create realistic test data.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::{MockFtlApiClientMock, test_ecr_credentials, test_deployment_response};
+//
+// let mut mock_client = MockFtlApiClientMock::new();
+//
+// // Mock ECR credentials retrieval
+// mock_client.expect_get_ecr_credentials()
+//     .times(1)
+//     .returning(|| Ok(test_ecr_credentials()));
+//
+// // Mock deployment creation
+// mock_client.expect_deploy_app()
+//     .times(1)
+//     .returning(|_req| Ok(test_deployment_response("test-deployment-id")));
+// ```
 mock! {
     pub FtlApiClientMock {}
 
@@ -335,7 +335,7 @@ type CommandCheckFn = dyn Fn(&str) -> Result<()> + Send + Sync;
 type CommandExecFn = dyn Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync;
 type CommandExecWithStdinFn = dyn Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync;
 
-/// Mock implementation of the CommandExecutor trait for testing command execution.
+/// Mock implementation of the `CommandExecutor` trait for testing command execution.
 ///
 /// This is a manual mock implementation that allows you to simulate command execution
 /// without actually running external processes. It supports multiple expectations
@@ -380,6 +380,12 @@ pub struct MockCommandExecutorMock {
     execute_with_stdin_call_count: Arc<Mutex<usize>>,
 }
 
+impl Default for MockCommandExecutorMock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockCommandExecutorMock {
     /// Creates a new instance of the mock command executor.
     pub fn new() -> Self {
@@ -392,7 +398,7 @@ impl MockCommandExecutorMock {
         }
     }
 
-    /// Sets up an expectation for the check_command_exists method.
+    /// Sets up an expectation for the `check_command_exists` method.
     ///
     /// Returns a builder that allows you to configure the expectation with
     /// matchers and return values.
@@ -411,7 +417,7 @@ impl MockCommandExecutorMock {
         }
     }
 
-    /// Sets up an expectation for the execute_with_stdin method.
+    /// Sets up an expectation for the `execute_with_stdin` method.
     ///
     /// Returns a builder that allows you to configure the expectation with
     /// matchers and return values. Multiple expectations are called in order.
@@ -423,7 +429,7 @@ impl MockCommandExecutorMock {
     }
 }
 
-/// Builder for configuring check_command_exists expectations.
+/// Builder for configuring `check_command_exists` expectations.
 ///
 /// This struct is returned by `MockCommandExecutorMock::expect_check_command_exists()`
 /// and provides methods to configure the expectation.
@@ -433,11 +439,13 @@ pub struct CheckCommandExistsExpectation<'a> {
 
 impl<'a> CheckCommandExistsExpectation<'a> {
     /// Adds a matcher predicate for this expectation (currently unused but kept for API compatibility).
+    #[must_use]
     pub fn with<P>(self, _p: P) -> Self {
         self
     }
 
     /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -481,6 +489,7 @@ impl<'a> ExecuteExpectation<'a> {
     /// # Arguments
     ///
     /// * `f` - A function that takes command and args and returns true if they match
+    #[must_use]
     pub fn withf<F>(mut self, f: F) -> Self
     where
         F: Fn(&str, &[&str]) -> bool + Send + Sync + 'static,
@@ -490,6 +499,7 @@ impl<'a> ExecuteExpectation<'a> {
     }
 
     /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -497,11 +507,11 @@ impl<'a> ExecuteExpectation<'a> {
     /// Configures the return value for this expectation.
     ///
     /// The provided function will be called with the command and arguments
-    /// and should return a CommandOutput with the desired stdout, stderr, and success status.
+    /// and should return a `CommandOutput` with the desired stdout, stderr, and success status.
     ///
     /// # Arguments
     ///
-    /// * `f` - A function that takes command and args and returns a CommandOutput
+    /// * `f` - A function that takes command and args and returns a `CommandOutput`
     pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
     where
         F: Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync + 'static,
@@ -511,7 +521,7 @@ impl<'a> ExecuteExpectation<'a> {
     }
 }
 
-/// Builder for configuring execute_with_stdin expectations.
+/// Builder for configuring `execute_with_stdin` expectations.
 ///
 /// This struct is returned by `MockCommandExecutorMock::expect_execute_with_stdin()`
 /// and provides methods to configure the expectation with matchers and return values.
@@ -529,6 +539,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
     /// # Arguments
     ///
     /// * `f` - A function that takes command, args, and stdin and returns true if they match
+    #[must_use]
     pub fn withf<F>(mut self, f: F) -> Self
     where
         F: Fn(&str, &[&str], &str) -> bool + Send + Sync + 'static,
@@ -538,6 +549,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
     }
 
     /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -545,11 +557,11 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
     /// Configures the return value for this expectation.
     ///
     /// The provided function will be called with the command, arguments, and stdin content
-    /// and should return a CommandOutput with the desired stdout, stderr, and success status.
+    /// and should return a `CommandOutput` with the desired stdout, stderr, and success status.
     ///
     /// # Arguments
     ///
-    /// * `f` - A function that takes command, args, and stdin and returns a CommandOutput
+    /// * `f` - A function that takes command, args, and stdin and returns a `CommandOutput`
     pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
     where
         F: Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync + 'static,
@@ -667,7 +679,7 @@ pub fn test_ecr_credentials() -> types::GetEcrCredentialsResponse {
 /// Creates a test deployment response for use in tests.
 ///
 /// This function returns a valid `DeploymentResponse` that simulates the initial
-/// response when starting a deployment. If the provided deployment_id is not a
+/// response when starting a deployment. If the provided `deployment_id` is not a
 /// valid UUID, a fixed UUID will be used instead.
 ///
 /// # Arguments

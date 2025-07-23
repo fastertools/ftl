@@ -200,6 +200,7 @@ impl TestCommandExecutor for RealTestCommandExecutor {
 }
 
 /// Execute the test command with default dependencies
+#[allow(clippy::unused_async)]
 pub async fn execute(args: TestArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
 

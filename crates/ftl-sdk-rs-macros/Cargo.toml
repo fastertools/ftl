@@ -7,6 +7,9 @@ rust-version.workspace = true
 authors.workspace = true
 description = "Procedural macros for the FTL SDK"
 repository.workspace = true
+readme = "README.md"
+keywords = ["ftl", "sdk", "macros", "proc-macro", "webassembly"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true

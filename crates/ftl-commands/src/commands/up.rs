@@ -131,21 +131,27 @@ async fn run_normal(
     let ctrlc_pressed_clone = ctrlc_pressed.clone();
     let signal_handler = deps.signal_handler.clone();
 
-    // Set up Ctrl+C handler
+    // Set up Ctrl+C handler that will terminate the process
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
     tokio::spawn(async move {
         let _ = signal_handler.wait_for_interrupt().await;
         ctrlc_pressed_clone.store(true, Ordering::SeqCst);
+        let _ = shutdown_tx.send(());
     });
 
-    // Wait for the process to exit
-    let exit_status = process.wait().await?;
+    // Wait for either the process to exit or shutdown signal
+    let exit_status = tokio::select! {
+        status = process.wait() => status?,
+        _ = &mut shutdown_rx => {
+            // Ctrl+C was pressed, terminate the process
+            deps.ui.print("");
+            deps.ui.print_styled("■ Stopping server...", MessageStyle::Red);
+            process.shutdown().await?
+        }
+    };
 
-    // Check if we should print the stopping message
-    if ctrlc_pressed.load(Ordering::SeqCst) {
-        deps.ui.print("");
-        deps.ui
-            .print_styled("■ Stopping server...", MessageStyle::Red);
-    } else if !exit_status.success() {
+    // Check exit status
+    if !ctrlc_pressed.load(Ordering::SeqCst) && !exit_status.success() {
         anyhow::bail!(
             "Spin exited with status: {}",
             exit_status.code().unwrap_or(-1)
@@ -192,13 +198,12 @@ async fn run_with_watch(
     let mut watch_handle = deps.file_watcher.watch(&project_path, true).await?;
 
     // Set up Ctrl+C handler
-    let ctrlc_pressed = Arc::new(AtomicBool::new(false));
-    let ctrlc_pressed_clone = ctrlc_pressed.clone();
     let signal_handler = deps.signal_handler.clone();
-
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
+    
     tokio::spawn(async move {
         let _ = signal_handler.wait_for_interrupt().await;
-        ctrlc_pressed_clone.store(true, Ordering::SeqCst);
+        let _ = shutdown_tx.send(());
     });
 
     // Main watch loop
@@ -248,16 +253,14 @@ async fn run_with_watch(
                 }
             }
 
-            // Check for Ctrl+C periodically
-            () = deps.async_runtime.sleep(Duration::from_millis(100)) => {
-                if ctrlc_pressed.load(Ordering::SeqCst) {
-                    deps.ui.print("");
-                    deps.ui.print_styled("■ Stopping development server...", MessageStyle::Red);
+            // Shutdown signal received
+            _ = &mut shutdown_rx => {
+                deps.ui.print("");
+                deps.ui.print_styled("■ Stopping development server...", MessageStyle::Red);
 
-                    // Shutdown the server (terminate and wait for exit)
-                    server_process.shutdown().await?;
-                    break;
-                }
+                // Shutdown the server (terminate and wait for exit)
+                server_process.shutdown().await?;
+                break;
             }
         }
     }

@@ -256,7 +256,14 @@ mod tests {
             meta: None,
         };
 
-        let json = serde_json::to_string(&metadata).unwrap();
+        let Ok(json) = serde_json::to_string(&metadata) else {
+            // In tests, we can use assert! with a condition that will fail
+            assert!(
+                serde_json::to_string(&metadata).is_ok(),
+                "Failed to serialize metadata"
+            );
+            return;
+        };
         assert!(json.contains("\"name\":\"test-tool\""));
         assert!(json.contains("\"title\":\"Test Tool\""));
         assert!(!json.contains("\"description\""));

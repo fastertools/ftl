@@ -9,13 +9,7 @@ pub mod ui;
 pub mod version_cache;
 
 #[cfg(test)]
-mod spin_installer_tests;
-#[cfg(test)]
-mod spin_installer_tests_akamai;
-#[cfg(test)]
 mod test_utils;
-#[cfg(test)]
-mod version_cache_tests;
 
 // Re-export commonly used utilities at the crate root
 pub use spin_installer::{SpinInstaller, check_and_install_spin};

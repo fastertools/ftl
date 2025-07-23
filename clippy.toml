@@ -1,0 +1,11 @@
+# Clippy configuration for FTL CLI
+msrv = "1.86.0"
+
+# Avoid breaking changes
+avoid-breaking-exported-api = true
+
+# Allow certain patterns in tests
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true

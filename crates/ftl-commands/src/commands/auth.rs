@@ -146,6 +146,7 @@ impl Clock for RealClockWrapper {
 }
 
 /// Execute the auth command with default dependencies
+#[allow(clippy::unused_async)]
 pub async fn execute(args: AuthArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
 

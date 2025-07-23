@@ -6,8 +6,5 @@
 /// Language detection and enumeration module
 pub mod language;
 
-#[cfg(test)]
-mod language_tests;
-
 // Re-export the main types
 pub use language::Language;

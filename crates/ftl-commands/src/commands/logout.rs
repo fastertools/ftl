@@ -73,6 +73,7 @@ impl CredentialsClearer for RealCredentialsClearer {
 }
 
 /// Execute the logout command with default dependencies
+#[allow(clippy::unused_async)]
 pub async fn execute(_args: LogoutArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
 

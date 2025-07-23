@@ -338,6 +338,7 @@ impl Environment for RealEnvironment {
 }
 
 /// Execute the setup command with default dependencies
+#[allow(clippy::unused_async)]
 pub async fn execute(args: SetupArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
 

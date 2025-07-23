@@ -65,8 +65,8 @@ pub async fn execute(args: AppArgs) -> Result<()> {
 impl From<OutputFormat> for ftl_commands::app::OutputFormat {
     fn from(format: OutputFormat) -> Self {
         match format {
-            OutputFormat::Table => ftl_commands::app::OutputFormat::Table,
-            OutputFormat::Json => ftl_commands::app::OutputFormat::Json,
+            OutputFormat::Table => Self::Table,
+            OutputFormat::Json => Self::Json,
         }
     }
 }

@@ -24,7 +24,7 @@ pub struct StoredCredentials {
     pub id_token: Option<String>,
     /// Expiration time of the access token
     pub expires_at: Option<DateTime<Utc>>,
-    /// AuthKit domain used for authentication
+    /// `AuthKit` domain used for authentication
     pub authkit_domain: String,
 }
 
@@ -507,14 +507,25 @@ impl RealCredentialsProvider {
         authkit_domain: &str,
         refresh_token: &str,
     ) -> Result<StoredCredentials> {
+        #[derive(Deserialize)]
+        struct TokenResponse {
+            access_token: String,
+            refresh_token: Option<String>,
+            id_token: Option<String>,
+            expires_in: Option<u64>,
+        }
+
         let client = reqwest::Client::new();
-        let token_url = format!("https://{}/oauth/token", authkit_domain);
+        let token_url = format!("https://{authkit_domain}/oauth2/token");
+        let client_id = "client_01K06E1DRP26N8A3T9CGMB1YSP"; // FTL OAuth client ID
 
         let response = client
             .post(&token_url)
+            .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
                 ("grant_type", "refresh_token"),
                 ("refresh_token", refresh_token),
+                ("client_id", client_id),
             ])
             .send()
             .await
@@ -530,26 +541,20 @@ impl RealCredentialsProvider {
             ));
         }
 
-        #[derive(Deserialize)]
-        struct TokenResponse {
-            access_token: String,
-            refresh_token: Option<String>,
-            id_token: Option<String>,
-            expires_in: Option<u64>,
-        }
-
         let token_response: TokenResponse = response
             .json()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to parse token response: {}", e))?;
 
-        let expires_at = token_response
-            .expires_in
-            .map(|seconds| Utc::now() + chrono::Duration::seconds(seconds as i64));
+        let expires_at = token_response.expires_in.and_then(|seconds| {
+            i64::try_from(seconds)
+                .ok()
+                .map(|secs| Utc::now() + chrono::Duration::seconds(secs))
+        });
 
         Ok(StoredCredentials {
             access_token: token_response.access_token,
-            refresh_token: token_response.refresh_token,
+            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
             id_token: token_response.id_token,
             expires_at,
             authkit_domain: authkit_domain.to_string(),
@@ -589,10 +594,7 @@ pub trait ProcessHandle: Send + Sync {
     async fn terminate(&mut self) -> Result<()>;
 
     /// Terminate the process and wait for it to exit
-    async fn shutdown(&mut self) -> Result<ExitStatus> {
-        self.terminate().await?;
-        self.wait().await
-    }
+    async fn shutdown(&mut self) -> Result<ExitStatus>;
 }
 
 /// Exit status
@@ -641,12 +643,8 @@ impl ProcessManager for RealProcessManager {
             cmd.current_dir(dir);
         }
 
-        // On Unix, create a new process group so we can kill all children
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            cmd.process_group(0);
-        }
+        // Don't create a new process group on spawn - let it share our process group
+        // so it receives Ctrl+C signals. We'll use process groups only for termination.
 
         let child = cmd
             .spawn()
@@ -677,29 +675,33 @@ impl ProcessHandle for RealProcessHandle {
 
     async fn terminate(&mut self) -> Result<()> {
         if let Some(child) = self.child.as_mut() {
-            // On Unix systems, kill the entire process group
+            // On Unix systems, try to terminate gracefully
             #[cfg(unix)]
             {
                 use nix::sys::signal::{self, Signal};
                 use nix::unistd::Pid;
 
-                let pid = child.id() as i32;
-                // Kill the entire process group (negative PID)
-                let pgid = Pid::from_raw(-pid);
+                let pid = i32::try_from(child.id()).unwrap_or(i32::MAX);
+                let process_pid = Pid::from_raw(pid);
 
-                // Try SIGTERM first for graceful shutdown
-                let _ = signal::kill(pgid, Signal::SIGTERM);
+                // Try SIGTERM on the process first
+                let _ = signal::kill(process_pid, Signal::SIGTERM);
 
                 // Give it a moment to terminate gracefully
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
                 // Check if the main process is still running
-                match child.try_wait() {
-                    Ok(Some(_)) => {} // Process already exited
-                    _ => {
-                        // Force kill the process group
-                        let _ = signal::kill(pgid, Signal::SIGKILL);
-                        // Also kill the specific process just in case
+                if !matches!(child.try_wait(), Ok(Some(_))) {
+                    // Try to kill the process group in case it created children
+                    let process_group = Pid::from_raw(-pid);
+                    let _ = signal::kill(process_group, Signal::SIGTERM);
+                    
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    
+                    // Force kill if still running
+                    if !matches!(child.try_wait(), Ok(Some(_))) {
+                        let _ = signal::kill(process_pid, Signal::SIGKILL);
+                        let _ = signal::kill(process_group, Signal::SIGKILL);
                         let _ = child.kill();
                     }
                 }
@@ -711,5 +713,21 @@ impl ProcessHandle for RealProcessHandle {
             }
         }
         Ok(())
+    }
+
+    /// Terminate the process and wait for it to exit
+    async fn shutdown(&mut self) -> Result<ExitStatus> {
+        self.terminate().await?;
+        
+        // Now wait for the process to fully exit
+        if let Some(mut child) = self.child.take() {
+            let status = child
+                .wait()
+                .map_err(|e| anyhow::anyhow!("Failed to wait for process: {}", e))?;
+            Ok(ExitStatus::new(status.code()))
+        } else {
+            // Process was already consumed or never started
+            Ok(ExitStatus::new(Some(0)))
+        }
     }
 }

@@ -59,9 +59,11 @@ impl<'a> CheckCommandExistsExpectation<'a> {
     }
 }
 
+type CommandMatcher = Box<dyn Fn(&str, &[&str]) -> bool + Send + Sync>;
+
 pub struct ExecuteExpectation<'a> {
     mock: &'a mut MockCommandExecutorMock,
-    matcher: Option<Box<dyn Fn(&str, &[&str]) -> bool + Send + Sync>>,
+    matcher: Option<CommandMatcher>,
 }
 
 impl<'a> ExecuteExpectation<'a> {

@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Language detection and project analysis for FTL CLI"
+readme = "README.md"
+keywords = ["ftl", "language", "detection", "analysis", "project"]
+categories = ["development-tools", "parsing"]
 
 [dependencies]
 anyhow = { workspace = true }

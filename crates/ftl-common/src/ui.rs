@@ -134,6 +134,12 @@ pub struct TestUserInterface {
     pub styled_output: Arc<Mutex<Vec<(String, MessageStyle)>>>,
 }
 
+impl Default for TestUserInterface {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestUserInterface {
     /// Create a new test user interface
     #[allow(dead_code)]

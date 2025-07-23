@@ -7,7 +7,7 @@ pub struct LoginArgs {
     #[arg(long)]
     pub no_browser: bool,
 
-    /// AuthKit domain (for testing)
+    /// `AuthKit` domain (for testing)
     #[arg(long, hide = true)]
     pub authkit_domain: Option<String>,
 

@@ -599,7 +599,7 @@ impl BuildExecutor for BuildExecutorImpl {
         use crate::commands::build;
 
         let args = build::BuildArgs {
-            path: path.map(|p| p.to_path_buf()),
+            path: path.map(std::path::Path::to_path_buf),
             release,
         };
 
@@ -624,7 +624,7 @@ pub async fn execute(_args: DeployArgs) -> Result<()> {
         file_system: Arc::new(RealFileSystem),
         command_executor: Arc::new(RealCommandExecutor),
         api_client: Arc::new(RealFtlApiClient::new_with_auth(
-            ftl_core::api_client::Client::new(&ftl_core::config::DEFAULT_API_BASE_URL),
+            ftl_core::api_client::Client::new(ftl_core::config::DEFAULT_API_BASE_URL),
             credentials.access_token.clone(),
         )),
         clock: Arc::new(RealClock),

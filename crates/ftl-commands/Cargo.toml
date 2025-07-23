@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Command implementations for FTL CLI"
+readme = "README.md"
+keywords = ["ftl", "cli", "commands", "serverless", "webassembly"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 ftl-core = { version = "0.0.23", path = "../ftl-core" }

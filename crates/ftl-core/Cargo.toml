@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Core functionality for FTL CLI"
+readme = "README.md"
+keywords = ["ftl", "cli", "core", "api", "client"]
+categories = ["development-tools", "api-bindings"]
 
 [dependencies]
 serde = { workspace = true }

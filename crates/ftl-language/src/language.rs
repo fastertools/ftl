@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Supported programming languages for FTL projects
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,14 +16,15 @@ pub enum Language {
     TypeScript,
 }
 
-impl Language {
-    /// Parse a language from a string representation
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for Language {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "rust" | "rs" => Some(Self::Rust),
-            "javascript" | "js" => Some(Self::JavaScript),
-            "typescript" | "ts" => Some(Self::TypeScript),
-            _ => None,
+            "rust" | "rs" => Ok(Self::Rust),
+            "javascript" | "js" => Ok(Self::JavaScript),
+            "typescript" | "ts" => Ok(Self::TypeScript),
+            _ => Err(format!("Unknown language: {s}")),
         }
     }
 }
@@ -38,5 +40,17 @@ impl fmt::Display for Language {
 }
 
 #[cfg(test)]
-#[path = "language_tests.rs"]
-mod tests;
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_from_str() {
+        assert_eq!(Language::from_str("rust"), Ok(Language::Rust));
+        assert_eq!(Language::from_str("rs"), Ok(Language::Rust));
+        assert_eq!(Language::from_str("javascript"), Ok(Language::JavaScript));
+        assert_eq!(Language::from_str("js"), Ok(Language::JavaScript));
+        assert_eq!(Language::from_str("typescript"), Ok(Language::TypeScript));
+        assert_eq!(Language::from_str("ts"), Ok(Language::TypeScript));
+        assert!(Language::from_str("unknown").is_err());
+    }
+}

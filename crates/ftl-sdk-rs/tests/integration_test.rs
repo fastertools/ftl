@@ -31,7 +31,12 @@ fn test_tool_metadata_serialization() {
         meta: None,
     };
 
-    let serialized = serde_json::to_value(&metadata).unwrap();
+    let serialized = serde_json::to_value(&metadata);
+    assert!(
+        serialized.is_ok(),
+        "Failed to serialize ToolMetadata to JSON"
+    );
+    let serialized = serialized.unwrap_or_else(|_| json!({}));
 
     // Check field names are properly transformed
     assert!(serialized.get("name").is_some());
@@ -39,9 +44,21 @@ fn test_tool_metadata_serialization() {
     assert!(serialized.get("outputSchema").is_some());
 
     // Check nested annotations
-    let annotations = serialized.get("annotations").unwrap();
-    assert!(annotations.get("readOnlyHint").is_some());
-    assert_eq!(annotations.get("readOnlyHint").unwrap(), &json!(true));
+    let annotations = serialized.get("annotations");
+    assert!(
+        annotations.is_some(),
+        "annotations field should be present in serialized metadata"
+    );
+
+    if let Some(annotations) = annotations {
+        assert!(annotations.get("readOnlyHint").is_some());
+        let read_only_hint = annotations.get("readOnlyHint");
+        assert!(
+            read_only_hint.is_some(),
+            "readOnlyHint should be present in annotations"
+        );
+        assert_eq!(read_only_hint.unwrap_or(&json!(null)), &json!(true));
+    }
 }
 
 #[test]
@@ -49,18 +66,41 @@ fn test_tool_response_convenience_methods() {
     // Test text response
     let text_response = ToolResponse::text("Hello, world!");
     assert_eq!(text_response.content.len(), 1);
-    match &text_response.content[0] {
-        ToolContent::Text { text, .. } => assert_eq!(text, "Hello, world!"),
-        _ => panic!("Expected text content"),
+
+    let first_content = text_response.content.first();
+    assert!(
+        first_content.is_some(),
+        "Expected at least one content item"
+    );
+
+    if let Some(ToolContent::Text { text, .. }) = first_content {
+        assert_eq!(text, "Hello, world!");
+    } else {
+        // Force test failure by asserting something that's false
+        assert!(
+            matches!(first_content, Some(ToolContent::Text { .. })),
+            "Expected text content"
+        );
     }
     assert!(text_response.is_error.is_none());
 
     // Test error response
     let error_response = ToolResponse::error("Something went wrong");
     assert_eq!(error_response.is_error, Some(true));
-    match &error_response.content[0] {
-        ToolContent::Text { text, .. } => assert_eq!(text, "Something went wrong"),
-        _ => panic!("Expected text content"),
+
+    let first_error_content = error_response.content.first();
+    assert!(
+        first_error_content.is_some(),
+        "Expected at least one content item in error response"
+    );
+
+    if let Some(ToolContent::Text { text, .. }) = first_error_content {
+        assert_eq!(text, "Something went wrong");
+    } else {
+        assert!(
+            matches!(first_error_content, Some(ToolContent::Text { .. })),
+            "Expected text content in error response"
+        );
     }
 
     // Test structured response
@@ -83,22 +123,76 @@ fn test_tool_content_serialization() {
         }),
     };
 
-    let serialized = serde_json::to_value(&text_content).unwrap();
-    assert_eq!(serialized.get("type").unwrap(), "text");
-    assert_eq!(serialized.get("text").unwrap(), "Sample text");
+    let serialized = serde_json::to_value(&text_content);
+    assert!(
+        serialized.is_ok(),
+        "Failed to serialize ToolContent to JSON"
+    );
+    let serialized = serialized.unwrap_or_else(|_| json!({}));
 
-    let annotations = serialized.get("annotations").unwrap();
-    assert_eq!(annotations.get("audience").unwrap(), &json!(["developers"]));
+    let type_field = serialized.get("type");
+    assert!(
+        type_field.is_some(),
+        "type field should be present in serialized content"
+    );
+    assert_eq!(type_field.unwrap_or(&json!(null)), "text");
+
+    let text_field = serialized.get("text");
+    assert!(
+        text_field.is_some(),
+        "text field should be present in serialized content"
+    );
+    assert_eq!(text_field.unwrap_or(&json!(null)), "Sample text");
+
+    let annotations = serialized.get("annotations");
+    assert!(
+        annotations.is_some(),
+        "annotations field should be present in serialized content"
+    );
+
+    if let Some(annotations) = annotations {
+        let audience_field = annotations.get("audience");
+        assert!(
+            audience_field.is_some(),
+            "audience field should be present in annotations"
+        );
+        assert_eq!(
+            audience_field.unwrap_or(&json!(null)),
+            &json!(["developers"])
+        );
+    }
 }
 
 #[test]
 fn test_image_content() {
     let image = ToolContent::image("base64data", "image/png");
-    let serialized = serde_json::to_value(&image).unwrap();
+    let serialized = serde_json::to_value(&image);
+    assert!(
+        serialized.is_ok(),
+        "Failed to serialize image ToolContent to JSON"
+    );
+    let serialized = serialized.unwrap_or_else(|_| json!({}));
 
-    assert_eq!(serialized.get("type").unwrap(), "image");
-    assert_eq!(serialized.get("data").unwrap(), "base64data");
-    assert_eq!(serialized.get("mimeType").unwrap(), "image/png");
+    let type_field = serialized.get("type");
+    assert!(
+        type_field.is_some(),
+        "type field should be present in serialized image content"
+    );
+    assert_eq!(type_field.unwrap_or(&json!(null)), "image");
+
+    let data_field = serialized.get("data");
+    assert!(
+        data_field.is_some(),
+        "data field should be present in serialized image content"
+    );
+    assert_eq!(data_field.unwrap_or(&json!(null)), "base64data");
+
+    let mime_type_field = serialized.get("mimeType");
+    assert!(
+        mime_type_field.is_some(),
+        "mimeType field should be present in serialized image content"
+    );
+    assert_eq!(mime_type_field.unwrap_or(&json!(null)), "image/png");
 }
 
 #[test]
@@ -113,12 +207,41 @@ fn test_resource_content() {
         annotations: None,
     };
 
-    let serialized = serde_json::to_value(&resource).unwrap();
-    assert_eq!(serialized.get("type").unwrap(), "resource");
+    let serialized = serde_json::to_value(&resource);
+    assert!(
+        serialized.is_ok(),
+        "Failed to serialize resource ToolContent to JSON"
+    );
+    let serialized = serialized.unwrap_or_else(|_| json!({}));
 
-    let resource_data = serialized.get("resource").unwrap();
-    assert_eq!(resource_data.get("uri").unwrap(), "file:///example.txt");
-    assert_eq!(resource_data.get("mimeType").unwrap(), "text/plain");
+    let type_field = serialized.get("type");
+    assert!(
+        type_field.is_some(),
+        "type field should be present in serialized resource content"
+    );
+    assert_eq!(type_field.unwrap_or(&json!(null)), "resource");
+
+    let resource_data = serialized.get("resource");
+    assert!(
+        resource_data.is_some(),
+        "resource field should be present in serialized resource content"
+    );
+
+    if let Some(resource_data) = resource_data {
+        let uri_field = resource_data.get("uri");
+        assert!(
+            uri_field.is_some(),
+            "uri field should be present in resource data"
+        );
+        assert_eq!(uri_field.unwrap_or(&json!(null)), "file:///example.txt");
+
+        let mime_type_field = resource_data.get("mimeType");
+        assert!(
+            mime_type_field.is_some(),
+            "mimeType field should be present in resource data"
+        );
+        assert_eq!(mime_type_field.unwrap_or(&json!(null)), "text/plain");
+    }
 }
 
 #[test]
@@ -133,7 +256,12 @@ fn test_optional_fields_are_excluded() {
         meta: None,
     };
 
-    let serialized = serde_json::to_value(&minimal_metadata).unwrap();
+    let serialized = serde_json::to_value(&minimal_metadata);
+    assert!(
+        serialized.is_ok(),
+        "Failed to serialize minimal ToolMetadata to JSON"
+    );
+    let serialized = serialized.unwrap_or_else(|_| json!({}));
 
     // These fields should not be present when None
     assert!(serialized.get("title").is_none());
@@ -165,13 +293,24 @@ fn test_round_trip_serialization() {
     };
 
     // Serialize to JSON
-    let json = serde_json::to_string(&original).unwrap();
+    let json = serde_json::to_string(&original);
+    assert!(
+        json.is_ok(),
+        "Failed to serialize ToolResponse to JSON string"
+    );
+    let json = json.unwrap_or_else(|_| String::new());
 
     // Deserialize back
-    let deserialized: ToolResponse = serde_json::from_str(&json).unwrap();
+    let deserialized: Result<ToolResponse, _> = serde_json::from_str(&json);
+    assert!(
+        deserialized.is_ok(),
+        "Failed to deserialize ToolResponse from JSON string"
+    );
 
-    // Compare
-    assert_eq!(original.content.len(), deserialized.content.len());
-    assert_eq!(original.structured_content, deserialized.structured_content);
-    assert_eq!(original.is_error, deserialized.is_error);
+    if let Ok(deserialized) = deserialized {
+        // Compare
+        assert_eq!(original.content.len(), deserialized.content.len());
+        assert_eq!(original.structured_content, deserialized.structured_content);
+        assert_eq!(original.is_error, deserialized.is_error);
+    }
 }

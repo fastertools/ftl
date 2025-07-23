@@ -261,8 +261,8 @@ impl OutputFormat {
     /// Parse output format from string
     pub fn from_string(s: &str) -> Result<Self> {
         match s {
-            "table" => Ok(OutputFormat::Table),
-            "json" => Ok(OutputFormat::Json),
+            "table" => Ok(Self::Table),
+            "json" => Ok(Self::Json),
             _ => anyhow::bail!("Invalid output format: {}", s),
         }
     }
@@ -281,7 +281,7 @@ pub async fn execute(args: AppArgs) -> Result<()> {
     let deps = Arc::new(AppDependencies {
         ui: ui.clone(),
         api_client: Arc::new(RealFtlApiClient::new_with_auth(
-            ftl_core::api_client::Client::new(&ftl_core::config::DEFAULT_API_BASE_URL),
+            ftl_core::api_client::Client::new(ftl_core::config::DEFAULT_API_BASE_URL),
             credentials.access_token,
         )),
     });

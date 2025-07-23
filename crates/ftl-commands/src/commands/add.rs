@@ -1,6 +1,7 @@
 //! Refactored add command with dependency injection for better testability
 
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -194,7 +195,7 @@ fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) ->
             &lang_lower
         };
 
-        Language::from_str(mapped_lang).ok_or_else(|| {
+        Language::from_str(mapped_lang).map_err(|_| {
             anyhow::anyhow!(
                 "Invalid language: {}. Valid options are: rust, typescript, javascript",
                 lang_str
@@ -204,7 +205,8 @@ fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) ->
         // Interactive language selection
         let languages = vec!["rust", "typescript"];
         let selection = ui.prompt_select("Select programming language", &languages, 0)?;
-        Ok(Language::from_str(languages[selection]).unwrap())
+        Language::from_str(languages[selection])
+            .map_err(|e| anyhow::anyhow!("Failed to parse language: {}", e))
     }
 }
 

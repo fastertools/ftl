@@ -10,7 +10,7 @@ use ftl_core::deps::{AsyncRuntime, MessageStyle, StoredCredentials, UserInterfac
 
 /// OAuth client ID for FTL authentication
 pub const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
-/// Default AuthKit domain for authentication
+/// Default `AuthKit` domain for authentication
 pub const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
 /// Maximum time to wait for login completion
 pub const LOGIN_TIMEOUT: Duration = Duration::from_secs(60 * 30); // 30 minutes
@@ -43,7 +43,7 @@ pub struct TokenResponse {
     pub expires_in: Option<u64>,
     /// Refresh token for renewing access
     pub refresh_token: Option<String>,
-    /// OpenID Connect ID token
+    /// `OpenID` Connect ID token
     pub id_token: Option<String>,
 }
 
@@ -107,7 +107,7 @@ pub trait Clock: Send + Sync {
 pub struct LoginConfig {
     /// Don't open browser automatically
     pub no_browser: bool,
-    /// Override AuthKit domain (for testing)
+    /// Override `AuthKit` domain (for testing)
     pub authkit_domain: Option<String>,
     /// Override OAuth client ID (for testing)
     pub client_id: Option<String>,
@@ -185,7 +185,7 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
 
     deps.ui.print("");
     deps.ui
-        .print_styled("✅ Success! Successfully logged in!", MessageStyle::Success);
+        .print_styled("✅ Successfully logged in!", MessageStyle::Success);
 
     Ok(())
 }
@@ -482,7 +482,7 @@ pub fn clear_stored_credentials() -> Result<()> {
 pub struct LoginArgs {
     /// Don't open browser automatically
     pub no_browser: bool,
-    /// AuthKit domain (for testing)
+    /// `AuthKit` domain (for testing)
     pub authkit_domain: Option<String>,
     /// OAuth client ID (for testing)
     pub client_id: Option<String>,

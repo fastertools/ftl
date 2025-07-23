@@ -107,6 +107,11 @@ impl ProcessHandle for MockProcessHandle {
         self.terminated.store(true, Ordering::SeqCst);
         Ok(())
     }
+
+    async fn shutdown(&mut self) -> Result<ExitStatus, anyhow::Error> {
+        self.terminate().await?;
+        self.wait().await
+    }
 }
 
 struct MockFileWatcher {

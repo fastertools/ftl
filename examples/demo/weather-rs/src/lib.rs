@@ -5,7 +5,7 @@ use spin_sdk::http::{send, Method, Request, Response};
 
 #[derive(Deserialize, JsonSchema)]
 struct WeatherInput {
-    /// City name to get weather for, bro!
+    /// City name to get weather for
     location: String,
 }
 

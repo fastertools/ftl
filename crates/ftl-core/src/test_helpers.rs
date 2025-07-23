@@ -51,31 +51,31 @@ type CommandWithStdinMatcher = Box<dyn Fn(&str, &[&str], &str) -> bool + Send + 
 
 // Mock implementations using mockall
 
-/// Mock implementation of the `FileSystem` trait for testing.
-///
-/// This mock allows you to control file system operations in tests without
-/// actually touching the disk.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_core::test_helpers::MockFileSystemMock;
-/// use std::path::Path;
-///
-/// let mut fs_mock = MockFileSystemMock::new();
-///
-/// // Mock that a file exists
-/// fs_mock
-///     .expect_exists()
-///     .with(mockall::predicate::eq(Path::new("/test/file.txt")))
-///     .returning(|_| true);
-///
-/// // Mock reading a file
-/// fs_mock
-///     .expect_read_to_string()
-///     .with(mockall::predicate::eq(Path::new("/test/file.txt")))
-///     .returning(|_| Ok("file contents".to_string()));
-/// ```
+// Mock implementation of the `FileSystem` trait for testing.
+//
+// This mock allows you to control file system operations in tests without
+// actually touching the disk.
+//
+// # Example
+//
+// ```rust
+// use ftl_core::test_helpers::MockFileSystemMock;
+// use std::path::Path;
+//
+// let mut fs_mock = MockFileSystemMock::new();
+//
+// // Mock that a file exists
+// fs_mock
+//     .expect_exists()
+//     .with(mockall::predicate::eq(Path::new("/test/file.txt")))
+//     .returning(|_| true);
+//
+// // Mock reading a file
+// fs_mock
+//     .expect_read_to_string()
+//     .with(mockall::predicate::eq(Path::new("/test/file.txt")))
+//     .returning(|_| Ok("file contents".to_string()));
+// ```
 mock! {
     pub FileSystemMock {}
 
@@ -86,36 +86,36 @@ mock! {
     }
 }
 
-/// Mock implementation of the `FtlApiClient` trait for testing.
-///
-/// This mock allows you to simulate API responses without making actual network calls.
-/// Use the helper functions like `test_ecr_credentials()` and `test_deployment_response()`
-/// to create realistic test data.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_core::test_helpers::{MockFtlApiClientMock, test_deployment_response};
-/// use ftl_core::api_client::types;
-///
-/// let mut api_mock = MockFtlApiClientMock::new();
-///
-/// // Mock listing apps
-/// api_mock
-///     .expect_list_apps()
-///     .returning(|| Ok(types::ListAppsResponse {
-///         apps: vec![types::App {
-///             name: "test-app".to_string(),
-///             display_name: "Test App".to_string(),
-///             // ... other fields
-///         }]
-///     }));
-///
-/// // Mock deploying an app
-/// api_mock
-///     .expect_deploy_app()
-///     .returning(|_| Ok(test_deployment_response("test-deployment-id")));
-/// ```
+// Mock implementation of the `FtlApiClient` trait for testing.
+//
+// This mock allows you to simulate API responses without making actual network calls.
+// Use the helper functions like `test_ecr_credentials()` and `test_deployment_response()`
+// to create realistic test data.
+//
+// # Example
+//
+// ```rust
+// use ftl_core::test_helpers::{MockFtlApiClientMock, test_deployment_response};
+// use ftl_core::api_client::types;
+//
+// let mut api_mock = MockFtlApiClientMock::new();
+//
+// // Mock listing apps
+// api_mock
+//     .expect_list_apps()
+//     .returning(|| Ok(types::ListAppsResponse {
+//         apps: vec![types::App {
+//             name: "test-app".to_string(),
+//             display_name: "Test App".to_string(),
+//             // ... other fields
+//         }]
+//     }));
+//
+// // Mock deploying an app
+// api_mock
+//     .expect_deploy_app()
+//     .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+// ```
 mock! {
     pub FtlApiClientMock {}
 
@@ -131,31 +131,31 @@ mock! {
     }
 }
 
-/// Mock implementation of the `Clock` trait for testing.
-///
-/// This mock allows you to control time-related operations in tests,
-/// making them deterministic and faster.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_core::test_helpers::MockClockMock;
-/// use std::time::{Duration, Instant};
-///
-/// let mut clock_mock = MockClockMock::new();
-///
-/// // Mock the current time
-/// let now = Instant::now();
-/// clock_mock
-///     .expect_now()
-///     .returning(move || now);
-///
-/// // Mock duration creation
-/// clock_mock
-///     .expect_duration_from_secs()
-///     .with(mockall::predicate::eq(5))
-///     .returning(|secs| Duration::from_secs(secs));
-/// ```
+// Mock implementation of the `Clock` trait for testing.
+//
+// This mock allows you to control time-related operations in tests,
+// making them deterministic and faster.
+//
+// # Example
+//
+// ```rust
+// use ftl_core::test_helpers::MockClockMock;
+// use std::time::{Duration, Instant};
+//
+// let mut clock_mock = MockClockMock::new();
+//
+// // Mock the current time
+// let now = Instant::now();
+// clock_mock
+//     .expect_now()
+//     .returning(move || now);
+//
+// // Mock duration creation
+// clock_mock
+//     .expect_duration_from_secs()
+//     .with(mockall::predicate::eq(5))
+//     .returning(|secs| Duration::from_secs(secs));
+// ```
 mock! {
     pub ClockMock {}
 
@@ -166,23 +166,23 @@ mock! {
     }
 }
 
-/// Mock implementation of the `CredentialsProvider` trait for testing.
-///
-/// This mock allows you to simulate credential retrieval without actually
-/// interacting with authentication services.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_core::test_helpers::{MockCredentialsProviderMock, test_credentials};
-///
-/// let mut creds_mock = MockCredentialsProviderMock::new();
-///
-/// // Return test credentials
-/// creds_mock
-///     .expect_get_or_refresh_credentials()
-///     .returning(|| Ok(test_credentials()));
-/// ```
+// Mock implementation of the `CredentialsProvider` trait for testing.
+//
+// This mock allows you to simulate credential retrieval without actually
+// interacting with authentication services.
+//
+// # Example
+//
+// ```rust
+// use ftl_core::test_helpers::{MockCredentialsProviderMock, test_credentials};
+//
+// let mut creds_mock = MockCredentialsProviderMock::new();
+//
+// // Return test credentials
+// creds_mock
+//     .expect_get_or_refresh_credentials()
+//     .returning(|| Ok(test_credentials()));
+// ```
 mock! {
     pub CredentialsProviderMock {}
 
@@ -192,25 +192,25 @@ mock! {
     }
 }
 
-/// Mock implementation of the `AsyncRuntime` trait for testing.
-///
-/// This mock allows you to control async operations like sleep in tests,
-/// making them run instantly instead of waiting.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_core::test_helpers::MockAsyncRuntimeMock;
-/// use std::time::Duration;
-///
-/// let mut runtime_mock = MockAsyncRuntimeMock::new();
-///
-/// // Make sleep return immediately instead of waiting
-/// runtime_mock
-///     .expect_sleep()
-///     .with(mockall::predicate::eq(Duration::from_secs(5)))
-///     .returning(|_| ());
-/// ```
+// Mock implementation of the `AsyncRuntime` trait for testing.
+//
+// This mock allows you to control async operations like sleep in tests,
+// making them run instantly instead of waiting.
+//
+// # Example
+//
+// ```rust
+// use ftl_core::test_helpers::MockAsyncRuntimeMock;
+// use std::time::Duration;
+//
+// let mut runtime_mock = MockAsyncRuntimeMock::new();
+//
+// // Make sleep return immediately instead of waiting
+// runtime_mock
+//     .expect_sleep()
+//     .with(mockall::predicate::eq(Duration::from_secs(5)))
+//     .returning(|_| ());
+// ```
 mock! {
     pub AsyncRuntimeMock {}
 
@@ -281,6 +281,12 @@ pub struct MockCommandExecutorMock {
     execute_call_count: Arc<Mutex<usize>>,
     execute_with_stdin_fns: Arc<Mutex<Vec<Box<CommandExecWithStdinFn>>>>,
     execute_with_stdin_call_count: Arc<Mutex<usize>>,
+}
+
+impl Default for MockCommandExecutorMock {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockCommandExecutorMock {
@@ -365,12 +371,14 @@ pub struct CheckCommandExistsExpectation<'a> {
 impl<'a> CheckCommandExistsExpectation<'a> {
     /// Adds a predicate to match the command parameter.
     /// Currently not implemented but kept for API compatibility.
+    #[must_use]
     pub fn with<P>(self, _p: P) -> Self {
         self
     }
 
     /// Specifies how many times this expectation should be called.
     /// Currently not implemented but kept for API compatibility.
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -399,6 +407,7 @@ impl<'a> ExecuteExpectation<'a> {
     ///
     /// # Parameters
     /// * `f` - A function that takes command and args and returns true if they match
+    #[must_use]
     pub fn withf<F>(mut self, f: F) -> Self
     where
         F: Fn(&str, &[&str]) -> bool + Send + Sync + 'static,
@@ -409,6 +418,7 @@ impl<'a> ExecuteExpectation<'a> {
 
     /// Specifies how many times this expectation should be called.
     /// Currently not implemented but kept for API compatibility.
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -416,7 +426,7 @@ impl<'a> ExecuteExpectation<'a> {
     /// Sets the function to be called when this expectation is matched.
     ///
     /// # Parameters
-    /// * `f` - A function that takes command and args and returns a CommandOutput
+    /// * `f` - A function that takes command and args and returns a `CommandOutput`
     pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
     where
         F: Fn(&str, &[&str]) -> Result<CommandOutput> + Send + Sync + 'static,
@@ -437,6 +447,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
     ///
     /// # Parameters
     /// * `f` - A function that takes command, args, and stdin and returns true if they match
+    #[must_use]
     pub fn withf<F>(mut self, f: F) -> Self
     where
         F: Fn(&str, &[&str], &str) -> bool + Send + Sync + 'static,
@@ -447,6 +458,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
 
     /// Specifies how many times this expectation should be called.
     /// Currently not implemented but kept for API compatibility.
+    #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
     }
@@ -454,7 +466,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
     /// Sets the function to be called when this expectation is matched.
     ///
     /// # Parameters
-    /// * `f` - A function that takes command, args, and stdin and returns a CommandOutput
+    /// * `f` - A function that takes command, args, and stdin and returns a `CommandOutput`
     pub fn returning<F>(self, f: F) -> &'a mut MockCommandExecutorMock
     where
         F: Fn(&str, &[&str], &str) -> Result<CommandOutput> + Send + Sync + 'static,
@@ -524,7 +536,7 @@ impl CommandExecutor for MockCommandExecutorMock {
 /// - Access token: "test-token"
 /// - Refresh token: "refresh-token"
 /// - Expiration: 1 hour from now
-/// - AuthKit domain: "test.authkit.app"
+/// - `AuthKit` domain: "test.authkit.app"
 ///
 /// # Example
 ///
@@ -615,7 +627,7 @@ pub fn test_deployment_response(deployment_id: &str) -> types::DeploymentRespons
 /// # Returns
 /// A `DeploymentStatus` with comprehensive deployment information including:
 /// - App details (name: "test-app", display name: "Test App")
-/// - Deployment URL: "https://test-app.example.com"
+/// - Deployment URL: "<https://test-app.example.com>"
 /// - Platform: "Fermyon"
 /// - Timestamps set to current time
 ///
@@ -668,7 +680,7 @@ pub fn test_deployment_status(
 /// A `CreateEcrRepositoryResponse` with:
 /// - Repository URI in the format: `123456789012.dkr.ecr.us-east-1.amazonaws.com/user/{tool_name}`
 /// - Repository name: `user/{tool_name}`
-/// - already_exists: false
+/// - `already_exists`: false
 ///
 /// # Example
 ///
