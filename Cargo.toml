@@ -3,11 +3,16 @@ resolver = "3"
 members = [
     "crates/*",
     "components/*",
+    "sdk/rust",
+    "sdk/rust-macros",
     "cli",
 ]
-# Plain `cargo build` should not waste time rebuilding Wasm targets:
+# Exclude WebAssembly components from default builds since they require
+# cargo-component and must be built with: cargo component build --target wasm32-wasip1
 default-members = [
     "crates/*",
+    "sdk/rust",
+    "sdk/rust-macros",
     "cli",
 ]
 # Exclude examples and templates

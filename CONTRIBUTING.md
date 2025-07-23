@@ -64,8 +64,8 @@ cargo test
 cargo install cargo-component --locked
 
 # Build individual components
-cargo component build -p ftl-auth-gateway --release --target wasm32-wasip1
-cargo component build -p ftl-mcp-gateway --release --target wasm32-wasip1
+cargo component build -p mcp-authorizer --release --target wasm32-wasip1
+cargo component build -p mcp-gateway --release --target wasm32-wasip1
 ```
 
 ### Project Structure
@@ -73,16 +73,17 @@ cargo component build -p ftl-mcp-gateway --release --target wasm32-wasip1
 <pre>
 ftl-cli/
 ├── crates/              # Native Rust libraries
-│   ├── ftl-core/        # Core functionality
-│   ├── ftl-commands/    # CLI command implementations
-│   ├── ftl-common/      # Shared utilities
-│   ├── ftl-language/    # Language detection
-│   └── ftl-sdk-*/       # SDK libraries
+│   ├── runtime/         # Runtime services and core functionality
+│   ├── commands/        # CLI command implementations
+│   ├── common/          # Shared utilities
+│   └── language/        # Language detection
 ├── components/          # WebAssembly components (Spin apps)
-│   ├── ftl-auth-gateway/  # Authentication gateway
-│   └── ftl-mcp-gateway/   # MCP gateway
+│   ├── mcp-authorizer/  # Authentication gateway
+│   └── mcp-gateway/     # MCP gateway
 ├── cli/                 # Main CLI binary
-└── sdk/                 # Language-specific SDKs (future)
+└── sdk/                 # Language-specific SDKs
+    ├── rust/            # Rust SDK
+    └── rust-macros/     # Rust SDK macros
 </pre>
 
 ## Coding Guidelines
@@ -151,10 +152,10 @@ mod tests {
 
 When adding a new CLI command:
 
-1. Create a new module in `ftl-cli/src/commands/`
-2. Add the command to the `Command` enum in `main.rs`
-3. Export the module in `commands/mod.rs`
-4. Implement the `execute` function
+1. Add the command to the `Commands` enum in `cli/src/main.rs`
+2. Create the corresponding wrapper struct with clap derives in `cli/src/main.rs`
+3. Implement the `From` trait to convert CLI types to command types
+4. Create the implementation in the appropriate module under `crates/commands/src/`
 5. Add tests for the command
 6. Update the README with the new command
 

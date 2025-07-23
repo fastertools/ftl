@@ -1,5 +1,5 @@
 [alias]
 i = "install --path cli"
 t = "nextest run"
-build-wasm = "component build -p ftl-auth-gateway -p ftl-mcp-gateway --target wasm32-wasip1"
+build-wasm = "component build -p ftl-mcp-authorizer -p ftl-mcp-gateway --target wasm32-wasip1"
 wasm = "build-wasm"
