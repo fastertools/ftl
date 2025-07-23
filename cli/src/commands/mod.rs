@@ -1,0 +1,16 @@
+//! CLI command wrappers that implement clap derives
+
+pub mod add;
+pub mod app;
+pub mod auth;
+pub mod build;
+pub mod deploy;
+pub mod init;
+pub mod login;
+pub mod logout;
+pub mod publish;
+pub mod registry;
+pub mod setup;
+pub mod test;
+pub mod up;
+pub mod update;

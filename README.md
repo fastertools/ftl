@@ -18,14 +18,14 @@ FTL is an open source tool framework for AI agents. It builds on the [WebAssembl
 
 FTL tools can be authored in multiple [source languages](https://component-model.bytecodealliance.org/language-support.html) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-The FTL Platform aims to be an excellent choice for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions).
+The FTL Platform aims to be a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions).
 
 ## Why?
 
 <details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
-- Tools run as individual WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
+- Tools run as individual WebAssembly components within one process to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
 - MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own JWT issuer or OIDC provider with simple configuration.
 - Allowed outbound network calls are configurable per tool. This is especially useful when including third party tool components in your MCP server (see below).
@@ -224,7 +224,7 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Each tool runs as a separate WebAssembly component in its own sandbox.
+- Each tool runs as a separate WebAssembly component in its own sandbox. Tool components are composed together with the FTL components and run as a single process while maintaining security boundaries.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
