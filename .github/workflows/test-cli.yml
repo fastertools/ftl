@@ -74,7 +74,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          ftl setup templates --force
+          ftl setup templates --force --dir .
       
       - name: Test Rust workflow
         run: |
@@ -150,7 +150,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          ftl setup templates --force
+          ftl setup templates --force --dir .
       
       - name: Test multiple tools workflow
         run: |
@@ -223,7 +223,7 @@ jobs:
       
       - name: Setup ftl templates
         run: |
-          ftl setup templates --force
+          ftl setup templates --force --dir .
       
       - name: Test TypeScript workflow
         run: |
