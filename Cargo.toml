@@ -1,27 +1,40 @@
-[package]
-name = "ftl-cli"
-version = "0.0.23"
-authors = ["FTL Contributors"]
+[workspace]
+resolver = "3"
+members = [
+    "crates/*",
+    "components/*",
+    "sdk/rust",
+    "sdk/rust-macros",
+    "cli",
+]
+# Exclude WebAssembly components from default builds since they require
+# cargo-component and must be built with: cargo component build --target wasm32-wasip1
+default-members = [
+    "crates/*",
+    "sdk/rust",
+    "sdk/rust-macros",
+    "cli",
+]
+# Exclude examples and templates
+exclude = [
+    "examples",
+    "templates",
+]
+
+# Note: WebAssembly components are in the components/ directory
+# Build them with: cargo component build -p <component-name> --release --target wasm32-wasip1
+# Build all components: cargo component build --workspace --release --target wasm32-wasip1
+
+[workspace.package]
 edition = "2024"
+rust-version = "1.86"
+authors = ["FTL Contributors"]
 license = "Apache-2.0"
 repository = "https://github.com/fastertools/ftl-cli"
 homepage = "https://github.com/fastertools/ftl-cli"
-documentation = "https://crates.io/crates/ftl-cli"
-keywords = ["wasm", "mcp", "tools", "cli", "webassembly"]
-categories = ["command-line-utilities", "development-tools", "wasm"]
-description = "CLI wrapper for Spin to build and deploy MCP tools using ftl-mcp framework"
-readme = "README.md"
-exclude = ["demo_hash", "toolkit-*"]
 
-[[bin]]
-name = "ftl"
-path = "src/main.rs"
-
-# This binary should not be built for wasm
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# Empty to prevent wasm builds
-
-[dependencies]
+[workspace.dependencies]
+# Common dependencies used across workspace
 clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -55,19 +68,13 @@ keyring = { version = "3.0", features = ["apple-native", "windows-native", "sync
 chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.22"
 num_cpus = "1.16"
-# Dependencies for the generated API client
 progenitor-client = "0.11.0"
 futures = "0.3"
 uuid = { version = "1.0", features = ["serde", "v4"] }
 regress = "0.10"
-# Dependency injection
 async-trait = "0.1"
 
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["signal", "process"] }
-
-[dev-dependencies]
-# Testing framework
+# Dev dependencies
 mockall = "0.13"
 assert_cmd = "2.0"
 predicates = "3.1"
@@ -76,19 +83,8 @@ serial_test = "3.2"
 rstest = "0.23"
 pretty_assertions = "1.4"
 wiremock = "0.6"
-tempfile = "3.8"
 insta = { version = "1.41", features = ["yaml"] }
-
-# Code coverage
 cargo-tarpaulin = "0.31"
-
-[build-dependencies]
-toml = "0.9"
-serde_json = "1.0"
-progenitor = "0.11.0"
-prettyplease = "0.2.22"
-syn = "2.0"
-openapiv3 = "2.0"
 
 # Optimization profiles
 [profile.release]
@@ -106,12 +102,12 @@ opt-level = "z"
 opt-level = 1
 debug = true
 
-# Linting configuration
-[lints.rust]
+# Workspace-wide linting configuration
+[workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 # Deny categories
 correctness = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }

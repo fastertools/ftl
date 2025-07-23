@@ -67,6 +67,11 @@ pre-push:
 	@$(MAKE) fix
 	@$(MAKE) test
 
+build:
+	cargo build
+	cargo wasm
+
 # Build release
 build-release:
 	cargo build --release
+	cargo wasm --release

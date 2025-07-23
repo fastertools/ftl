@@ -42,8 +42,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Rust 1.75 or later
-- Spin CLI (for testing)
+- Rust 1.86 or later (with edition 2024 support)
+- Spin CLI (for testing WebAssembly components)
 - wasm32-wasip1 target: `rustup target add wasm32-wasip1`
 
 ### Building
@@ -53,24 +53,37 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 git clone https://github.com/fastertools/ftl-cli
 cd ftl-cli
 
-# Build all components
-cargo build --all
+# Build native code (excludes WebAssembly components by default)
+cargo build
 
-# Run tests
-cargo test --all
+# Run tests for native code
+cargo test
 
-# Build for release
-cargo build --release
+# Build WebAssembly components using cargo-component
+# First install cargo-component if you haven't already:
+cargo install cargo-component --locked
+
+# Build individual components
+cargo component build -p mcp-authorizer --release --target wasm32-wasip1
+cargo component build -p mcp-gateway --release --target wasm32-wasip1
 ```
 
 ### Project Structure
 
 <pre>
 ftl-cli/
-├── packages/
-│   └── ftl-cli/    # Main CLI implementation
-├── templates/      # Component templates (uses ftl-mcp)
-└── examples/       # Example tools
+├── crates/              # Native Rust libraries
+│   ├── runtime/         # Runtime services and core functionality
+│   ├── commands/        # CLI command implementations
+│   ├── common/          # Shared utilities
+│   └── language/        # Language detection
+├── components/          # WebAssembly components (Spin apps)
+│   ├── mcp-authorizer/  # Authentication gateway
+│   └── mcp-gateway/     # MCP gateway
+├── cli/                 # Main CLI binary
+└── sdk/                 # Language-specific SDKs
+    ├── rust/            # Rust SDK
+    └── rust-macros/     # Rust SDK macros
 </pre>
 
 ## Coding Guidelines
@@ -139,10 +152,10 @@ mod tests {
 
 When adding a new CLI command:
 
-1. Create a new module in `ftl-cli/src/commands/`
-2. Add the command to the `Command` enum in `main.rs`
-3. Export the module in `commands/mod.rs`
-4. Implement the `execute` function
+1. Add the command to the `Commands` enum in `cli/src/main.rs`
+2. Create the corresponding wrapper struct with clap derives in `cli/src/main.rs`
+3. Implement the `From` trait to convert CLI types to command types
+4. Create the implementation in the appropriate module under `crates/commands/src/`
 5. Add tests for the command
 6. Update the README with the new command
 
