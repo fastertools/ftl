@@ -13,11 +13,11 @@ categories = ["web-programming", "wasm", "authentication"]
 publish = false
 
 [lib]
-name = "ftl_auth_gateway"
+name = "mcp_authorizer"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "ftl:auth-gateway"
+package = "ftl:mcp-authorizer"
 
 [dependencies]
 anyhow = "1"

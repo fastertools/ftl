@@ -1,7 +1,7 @@
 spin_manifest_version = 2
 
 [application]
-name = "ftl-auth-gateway"
+name = "mcp-authorizer"
 version = "0.0.1"
 authors = ["FTL Contributors"]
 description = "Authentication gateway for FTL MCP servers"
@@ -23,16 +23,16 @@ auth_provider_allowed_domains = { default = "" }
 
 [[trigger.http]]
 route = "/..."
-component = "ftl-auth-gateway"
+component = "mcp-authorizer"
 
-[component.ftl-auth-gateway]
-source = "target/wasm32-wasip1/release/ftl_auth_gateway.wasm"
+[component.mcp-authorizer]
+source = "target/wasm32-wasip1/release/mcp_authorizer.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://*.auth0.com"]
-[component.ftl-auth-gateway.build]
+[component.mcp-authorizer.build]
 command = "cargo build --target wasm32-wasip1 --release"
 workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
-[component.ftl-auth-gateway.variables]
+[component.mcp-authorizer.variables]
 # Core auth settings
 auth_enabled = "{{ auth_enabled }}"
 auth_gateway_url = "{{ auth_gateway_url }}"
@@ -52,7 +52,7 @@ auth_provider_userinfo_endpoint = "{{ auth_provider_userinfo_endpoint }}"
 auth_provider_allowed_domains = "{{ auth_provider_allowed_domains }}"
 
 # Test configuration
-[component.ftl-auth-gateway.tool.spin-test]
+[component.mcp-authorizer.tool.spin-test]
 source = "target/wasm32-wasip1/release/tests.wasm"
 build = "cargo component build --release"
 workdir = "tests"
