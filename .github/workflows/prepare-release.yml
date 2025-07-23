@@ -110,6 +110,18 @@ jobs:
       - name: Create release branch
         run: |
           BRANCH="release/${{ inputs.component }}-v${{ steps.version.outputs.new }}"
+          
+          # Check if branch exists locally or remotely
+          if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+            echo "Branch $BRANCH exists locally, deleting it"
+            git branch -D "$BRANCH"
+          fi
+          
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Branch $BRANCH exists remotely, deleting it"
+            git push origin --delete "$BRANCH" || true
+          fi
+          
           git checkout -b "$BRANCH"
           echo "RELEASE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
@@ -223,7 +235,7 @@ jobs:
       
       - name: Push branch
         run: |
-          git push origin "$RELEASE_BRANCH"
+          git push origin "$RELEASE_BRANCH" --force-with-lease
       
       - name: Create or verify labels
         env:
