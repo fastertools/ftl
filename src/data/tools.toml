@@ -79,10 +79,10 @@ image_name = "ftl-tool-url-decode"
 tags = ["encoding", "url", "web"]
 
 [[tools]]
-name = "json-format"
+name = "json-formatter"
 category = "formatters"
 description = "Format and prettify JSON data"
-image_name = "ftl-tool-json-format"
+image_name = "ftl-tool-json-formatter"
 tags = ["json", "formatting", "data"]
 
 [[tools]]
@@ -286,10 +286,10 @@ image_name = "ftl-tool-regex-match"
 tags = ["regex", "pattern", "match"]
 
 [[tools]]
-name = "json-validate"
+name = "json-validator"
 category = "validation"
 description = "Validate JSON structure"
-image_name = "ftl-tool-json-validate"
+image_name = "ftl-tool-json-validator"
 tags = ["json", "validation", "schema"]
 
 [[tools]]
