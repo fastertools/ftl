@@ -419,9 +419,7 @@ impl From<AppCommand> for ftl_commands::app::AppCommand {
                 app_name,
                 format: format.into(),
             },
-            AppCommand::Delete { app_name, force } => {
-                Self::Delete { app_name, force }
-            }
+            AppCommand::Delete { app_name, force } => Self::Delete { app_name, force },
         }
     }
 }
@@ -437,15 +435,9 @@ impl From<AppArgs> for ftl_commands::app::AppArgs {
 impl From<RegistryCommand> for ftl_commands::registry::RegistryCommand {
     fn from(cmd: RegistryCommand) -> Self {
         match cmd {
-            RegistryCommand::Search { query, registry } => {
-                Self::Search { query, registry }
-            }
-            RegistryCommand::List { registry } => {
-                Self::List { registry }
-            }
-            RegistryCommand::Info { component } => {
-                Self::Info { component }
-            }
+            RegistryCommand::Search { query, registry } => Self::Search { query, registry },
+            RegistryCommand::List { registry } => Self::List { registry },
+            RegistryCommand::Info { component } => Self::Info { component },
         }
     }
 }
