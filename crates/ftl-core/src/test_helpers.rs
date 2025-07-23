@@ -69,14 +69,6 @@ mock! {
     }
 }
 
-mock! {
-    pub SpinInstallerMock {}
-
-    #[async_trait]
-    impl SpinInstaller for SpinInstallerMock {
-        async fn check_and_install(&self) -> Result<String>;
-    }
-}
 
 // Simple manual mock implementation for CommandExecutor
 // This avoids mockall's issues with async traits containing slice references

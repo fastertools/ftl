@@ -4,10 +4,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::common::version_cache::*;
-use crate::deps::{FileSystem, UserInterface};
-use crate::test_helpers::*;
+use crate::version_cache::*;
 use crate::ui::TestUserInterface;
+use ftl_core::deps::{FileSystem, UserInterface, MessageStyle, ProgressIndicator, MultiProgressManager};
+use mockall::mock;
+
+// Mock for FileSystem
+mock! {
+    pub FileSystemMock {}
+
+    impl FileSystem for FileSystemMock {
+        fn exists(&self, path: &std::path::Path) -> bool;
+        fn read_to_string(&self, path: &std::path::Path) -> anyhow::Result<String>;
+        fn write_string(&self, path: &std::path::Path, content: &str) -> anyhow::Result<()>;
+    }
+}
 
 // Mock implementations
 struct MockHttpClient {
@@ -136,11 +147,11 @@ struct TestUIWithUpdateChoice {
 }
 
 impl UserInterface for TestUIWithUpdateChoice {
-    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+    fn create_spinner(&self) -> Box<dyn ProgressIndicator> {
         self.inner.create_spinner()
     }
 
-    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+    fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
         self.inner.create_multi_progress()
     }
 
@@ -148,7 +159,7 @@ impl UserInterface for TestUIWithUpdateChoice {
         self.inner.print(message);
     }
 
-    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+    fn print_styled(&self, message: &str, style: MessageStyle) {
         self.inner.print_styled(message, style);
     }
 
@@ -186,11 +197,11 @@ struct TestUIWithDismissChoice {
 }
 
 impl UserInterface for TestUIWithDismissChoice {
-    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+    fn create_spinner(&self) -> Box<dyn ProgressIndicator> {
         self.inner.create_spinner()
     }
 
-    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+    fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
         self.inner.create_multi_progress()
     }
 
@@ -198,7 +209,7 @@ impl UserInterface for TestUIWithDismissChoice {
         self.inner.print(message);
     }
 
-    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+    fn print_styled(&self, message: &str, style: MessageStyle) {
         self.inner.print_styled(message, style);
     }
 
@@ -237,11 +248,11 @@ struct TestUIUpdateFails {
 }
 
 impl UserInterface for TestUIUpdateFails {
-    fn create_spinner(&self) -> Box<dyn crate::deps::ProgressIndicator> {
+    fn create_spinner(&self) -> Box<dyn ProgressIndicator> {
         self.inner.create_spinner()
     }
 
-    fn create_multi_progress(&self) -> Box<dyn crate::deps::MultiProgressManager> {
+    fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
         self.inner.create_multi_progress()
     }
 
@@ -249,7 +260,7 @@ impl UserInterface for TestUIUpdateFails {
         self.inner.print(message);
     }
 
-    fn print_styled(&self, message: &str, style: crate::deps::MessageStyle) {
+    fn print_styled(&self, message: &str, style: MessageStyle) {
         self.inner.print_styled(message, style);
     }
 

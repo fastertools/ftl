@@ -1,9 +1,9 @@
 //! Additional tests for `ensure_akamai_plugin` functionality
 
-use crate::common::spin_installer::*;
-use crate::deps::*;
-use crate::test_helpers::*;
+use crate::spin_installer::*;
+use crate::test_utils::MockCommandExecutorMock;
 use crate::ui::TestUserInterface;
+use ftl_core::deps::*;
 use mockall::predicate::*;
 use std::sync::Arc;
 

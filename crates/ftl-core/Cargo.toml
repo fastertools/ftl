@@ -30,6 +30,7 @@ which = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 wiremock = { workspace = true }
+mockall = { workspace = true }
 
 [build-dependencies]
 toml = "0.9"

@@ -9,6 +9,8 @@ pub mod ui;
 pub mod version_cache;
 
 #[cfg(test)]
+mod test_utils;
+#[cfg(test)]
 mod spin_installer_tests;
 #[cfg(test)]
 mod spin_installer_tests_akamai;

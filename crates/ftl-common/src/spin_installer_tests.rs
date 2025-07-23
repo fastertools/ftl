@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use crate::common::spin_installer::*;
-use crate::deps::*;
-use crate::test_helpers::*;
+use crate::spin_installer::*;
+use crate::test_utils::MockCommandExecutorMock;
 use crate::ui::TestUserInterface;
+use ftl_core::deps::*;
 
 use mockall::predicate::*;
 
@@ -286,8 +286,6 @@ async fn test_check_and_install_plugin_list_command_fails() {
 
 #[test]
 fn test_spin_installer_creation() {
-    use crate::test_helpers::*;
-    use crate::ui::TestUserInterface;
 
     let deps = Arc::new(SpinInstallerDependencies {
         command_executor: Arc::new(MockCommandExecutorMock::new()),
