@@ -30,38 +30,104 @@ jobs:
     name: Detect Changed Files
     runs-on: ubuntu-latest
     outputs:
-      cli: ${{ steps.filter.outputs.cli }}
-      rust-sdk: ${{ steps.filter.outputs.rust-sdk }}
-      components: ${{ steps.filter.outputs.components }}
-      mcp-authorizer: ${{ steps.filter.outputs.mcp-authorizer }}
-      mcp-gateway: ${{ steps.filter.outputs.mcp-gateway }}
-      core-crates: ${{ steps.filter.outputs.core-crates }}
-      ci: ${{ steps.filter.outputs.ci }}
+      cli: ${{ steps.detect.outputs.cli }}
+      rust-sdk: ${{ steps.detect.outputs.rust-sdk }}
+      components: ${{ steps.detect.outputs.components }}
+      mcp-authorizer: ${{ steps.detect.outputs.mcp-authorizer }}
+      mcp-gateway: ${{ steps.detect.outputs.mcp-gateway }}
+      core-crates: ${{ steps.detect.outputs.core-crates }}
+      ci: ${{ steps.detect.outputs.ci }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            cli:
-              - 'cli/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            rust-sdk:
-              - 'sdk/rust/**'
-              - 'sdk/rust-macros/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            components:
-              - 'components/**'
-              - '.cargo/config.toml'
-            mcp-authorizer:
-              - 'components/mcp-authorizer/**'
-            mcp-gateway:
-              - 'components/mcp-gateway/**'
-            core-crates:
-              - 'crates/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            ci:
-              - '.github/workflows/**'
+          fetch-depth: 0
+      
+      - name: Detect changed files
+        id: detect
+        run: |
+          # Get the base and head commits
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            # For push events, compare with the previous commit
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.event.after }}"
+            
+            # If this is the first commit, compare with empty tree
+            if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              BASE_SHA=$(git hash-object -t tree /dev/null)
+            fi
+          fi
+          
+          echo "Comparing $BASE_SHA..$HEAD_SHA"
+          
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
+          
+          # Function to check if any file matches patterns
+          check_changes() {
+            local patterns="$1"
+            local changed=false
+            
+            while IFS= read -r pattern; do
+              if echo "$CHANGED_FILES" | grep -qE "$pattern"; then
+                changed=true
+                break
+              fi
+            done <<< "$patterns"
+            
+            echo "$changed"
+          }
+          
+          # Check each category
+          cli_patterns="^cli/
+          ^Cargo\.toml$
+          ^Cargo\.lock$"
+          CLI_CHANGED=$(check_changes "$cli_patterns")
+          echo "cli=$CLI_CHANGED" >> $GITHUB_OUTPUT
+          
+          rust_sdk_patterns="^sdk/rust/
+          ^sdk/rust-macros/
+          ^Cargo\.toml$
+          ^Cargo\.lock$"
+          RUST_SDK_CHANGED=$(check_changes "$rust_sdk_patterns")
+          echo "rust-sdk=$RUST_SDK_CHANGED" >> $GITHUB_OUTPUT
+          
+          components_patterns="^components/
+          ^\.cargo/config\.toml$"
+          COMPONENTS_CHANGED=$(check_changes "$components_patterns")
+          echo "components=$COMPONENTS_CHANGED" >> $GITHUB_OUTPUT
+          
+          mcp_auth_patterns="^components/mcp-authorizer/"
+          MCP_AUTH_CHANGED=$(check_changes "$mcp_auth_patterns")
+          echo "mcp-authorizer=$MCP_AUTH_CHANGED" >> $GITHUB_OUTPUT
+          
+          mcp_gw_patterns="^components/mcp-gateway/"
+          MCP_GW_CHANGED=$(check_changes "$mcp_gw_patterns")
+          echo "mcp-gateway=$MCP_GW_CHANGED" >> $GITHUB_OUTPUT
+          
+          core_patterns="^crates/
+          ^Cargo\.toml$
+          ^Cargo\.lock$"
+          CORE_CHANGED=$(check_changes "$core_patterns")
+          echo "core-crates=$CORE_CHANGED" >> $GITHUB_OUTPUT
+          
+          ci_patterns="^\.github/workflows/"
+          CI_CHANGED=$(check_changes "$ci_patterns")
+          echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
+          
+          # Debug output
+          echo "::group::Changed files"
+          echo "$CHANGED_FILES"
+          echo "::endgroup::"
+          
+          echo "::group::Detection results"
+          echo "CLI changed: $CLI_CHANGED"
+          echo "Rust SDK changed: $RUST_SDK_CHANGED"
+          echo "Components changed: $COMPONENTS_CHANGED"
+          echo "MCP Authorizer changed: $MCP_AUTH_CHANGED"
+          echo "MCP Gateway changed: $MCP_GW_CHANGED"
+          echo "Core crates changed: $CORE_CHANGED"
+          echo "CI changed: $CI_CHANGED"
+          echo "::endgroup::"
