@@ -150,6 +150,6 @@ jobs:
       - name: Verify WebAssembly artifacts
         run: |
           # Verify the expected WASM files were built
-          ls -la target/wasm32-wasip1/release/mcp_authorizer.wasm
+          ls -la target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm
           ls -la target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
           echo "WebAssembly components built successfully"
