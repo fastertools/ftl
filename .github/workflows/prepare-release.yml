@@ -141,8 +141,8 @@ jobs:
           case "$COMPONENT" in
             cli)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" cli/Cargo.toml
-              # Update Cargo.lock
-              cargo update -p ftl-cli --precise "$NEW_VERSION" || cargo update -p ftl-cli
+              # Update Cargo.lock - use workspace flag for consistency
+              cargo update --workspace -p ftl-cli --precise "$NEW_VERSION" || cargo update --workspace -p ftl-cli
               ;;
             sdk-rust)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
@@ -152,8 +152,8 @@ jobs:
                 echo "Current macros version: $MACROS_VERSION"
               fi
               
-              # Update Cargo.lock - now that examples use path deps, no ambiguity
-              cargo update -p ftl-sdk --precise "$NEW_VERSION"
+              # Update Cargo.lock - use workspace flag to avoid scanning subdirectories
+              cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION"
               
               # Update template to reference the new version (will be published)
               find templates -name "Cargo.toml" -type f | while read -r file; do
@@ -173,7 +173,7 @@ jobs:
             mcp-authorizer|mcp-gateway)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
               # Update Cargo.lock - components use ftl- prefix in package names
-              cargo update -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update -p "ftl-${COMPONENT}"
+              cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}"
               ;;
           esac
       
