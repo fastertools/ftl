@@ -1,0 +1,59 @@
+name: CI Status
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  # Import all the jobs from other workflows
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+  
+  cli-tests:
+    name: Run CLI Tests
+    uses: ./.github/workflows/test-cli.yml
+  
+  # The single required status check
+  status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [ci, cli-tests]
+    if: always()
+    steps:
+      - name: Check All Jobs
+        run: |
+          echo "CI Status Summary:"
+          echo "=================="
+          
+          # Check CI workflow status
+          if [ "${{ needs.ci.result }}" == "success" ] || [ "${{ needs.ci.result }}" == "skipped" ]; then
+            echo "✅ CI: ${{ needs.ci.result }}"
+          else
+            echo "❌ CI: ${{ needs.ci.result }}"
+          fi
+          
+          # Check CLI Tests status
+          if [ "${{ needs.cli-tests.result }}" == "success" ] || [ "${{ needs.cli-tests.result }}" == "skipped" ]; then
+            echo "✅ CLI Tests: ${{ needs.cli-tests.result }}"
+          else
+            echo "❌ CLI Tests: ${{ needs.cli-tests.result }}"
+          fi
+          
+          # Overall status
+          if [ "${{ needs.ci.result }}" != "success" ] && [ "${{ needs.ci.result }}" != "skipped" ]; then
+            echo ""
+            echo "❌ CI checks failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.cli-tests.result }}" != "success" ] && [ "${{ needs.cli-tests.result }}" != "skipped" ]; then
+            echo ""
+            echo "❌ CLI tests failed"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All checks passed!"
