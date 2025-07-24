@@ -54,8 +54,11 @@ Examples:
     # Automatic installation (no prompts)
     curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/cli-v0.0.28/install.sh | bash -s -- --yes
 
-Note: Using the version-tagged URL (e.g., cli-v0.0.28) ensures you get the exact installer
-      that was tested with that release.
+    # For private repos (automatically uses gh auth if available)
+    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+
+Note: The installer automatically uses 'gh auth token' if gh CLI is authenticated.
+      For private repos without gh CLI, set GITHUB_TOKEN environment variable.
 
 EOF
     exit 0
@@ -84,14 +87,26 @@ detect_platform() {
     echo "${arch}-${os}"
 }
 
+# Get GitHub token from gh CLI if available
+get_github_token() {
+    # First check if GITHUB_TOKEN is already set
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        echo "$GITHUB_TOKEN"
+    elif command_exists "gh" && gh auth status >/dev/null 2>&1; then
+        # If gh is available and authenticated, use it
+        gh auth token 2>/dev/null
+    fi
+}
+
 # Get the latest release version
 get_latest_version() {
     local api_response
     local curl_opts="-sL"
+    local token=$(get_github_token)
     
-    # Add authentication header if GITHUB_TOKEN is set
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        curl_opts="$curl_opts -H \"Authorization: token ${GITHUB_TOKEN}\""
+    # Add authentication header if token is available
+    if [ -n "$token" ]; then
+        curl_opts="$curl_opts -H \"Authorization: token $token\""
     fi
     
     api_response=$(eval "curl $curl_opts \"https://api.github.com/repos/${REPO}/releases/latest\"")
