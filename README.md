@@ -127,12 +127,7 @@ FTL Edge is just one possible deployment target. It is currently in early alpha 
 
 Install `ftl`
 ```bash
-cargo install ftl-cli
-```
-
-Set up templates
-```bash
-ftl setup templates
+curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
 ```
 
 Create a new project

@@ -234,16 +234,55 @@ main() {
 
     success "✓ FTL CLI v${version} downloaded successfully!"
     echo ""
-    echo "To install system-wide, run:"
-    echo "  sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
-    echo ""
-    echo "Or add to your PATH:"
-    echo "  mkdir -p ~/.local/bin"
-    echo "  mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}"
-    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-    echo ""
-    echo "Then verify installation with:"
-    echo "  ${BINARY_NAME} --version"
+    
+    # Ask user where to install (skip in auto mode)
+    if [ "$AUTO_YES" = true ]; then
+        REPLY="y"
+    else
+        read -p "Install ftl to /usr/local/bin? (requires sudo) [Y/n] " -n 1 -r
+        echo
+    fi
+    
+    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+        if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
+            INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
+            success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
+        else
+            error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
+        fi
+    else
+        # Install to user's local bin
+        mkdir -p ~/.local/bin
+        mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}
+        INSTALL_PATH="$HOME/.local/bin/${BINARY_NAME}"
+        success "✓ Installed to ~/.local/bin/${BINARY_NAME}"
+        
+        # Check if ~/.local/bin is in PATH
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            echo ""
+            info "Add ~/.local/bin to your PATH:"
+            echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        fi
+    fi
+    
+    # Verify installation
+    if command_exists "${BINARY_NAME}"; then
+        echo ""
+        success "✓ FTL CLI is ready to use!"
+        
+        # Setup templates automatically
+        echo ""
+        info "Setting up FTL templates..."
+        if ${BINARY_NAME} setup templates; then
+            success "✓ Templates installed successfully!"
+        else
+            info "⚠️  Template setup failed. You can run it manually later with: ftl setup templates"
+        fi
+    else
+        echo ""
+        info "Verify installation with:"
+        echo "  ${BINARY_NAME} --version"
+    fi
     
     # Final dependency reminder
     if ! command_exists "cargo" || ! command_exists "spin"; then
