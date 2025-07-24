@@ -135,14 +135,14 @@ Create a new project
 ftl init fast-tools && cd fast-tools
 ```
 
-Develop new tools
+Scaffold new tools
 ```bash
 ftl add
 ```
 
-Serve your tools locally
+Develop and serve your tools locally
 ```bash
-ftl up --build
+ftl up --watch
 ```
 
 Try them out with your MCP client
