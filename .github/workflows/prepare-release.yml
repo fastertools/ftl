@@ -155,13 +155,8 @@ jobs:
               # Update Cargo.lock - use workspace flag to avoid scanning subdirectories
               cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION"
               
-              # Update template to reference the new version (will be published)
-              find templates -name "Cargo.toml" -type f | while read -r file; do
-                if grep -q 'ftl-sdk.*version' "$file"; then
-                  sed -i "s/ftl-sdk = { version = \"[^\"]*\"/ftl-sdk = { version = \"$NEW_VERSION\"/" "$file"
-                  echo "Updated ftl-sdk version in template: $file"
-                fi
-              done
+              # Note: We do NOT update templates here because the new version isn't published yet
+              # Templates will be updated in a follow-up PR after the SDK is published
               ;;
             sdk-typescript)
               cd sdk/typescript

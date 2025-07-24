@@ -146,3 +146,101 @@ jobs:
             
             - [crates.io](https://crates.io/crates/ftl-sdk)
             - [docs.rs](https://docs.rs/ftl-sdk)
+
+  update-templates:
+    name: Update Templates PR
+    needs: [verify-tag, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT || github.token }}
+          fetch-depth: 0
+      
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Configure git to use the token for authentication
+          git config --global url."https://x-access-token:${{ secrets.PAT || github.token }}@github.com/".insteadOf "https://github.com/"
+      
+      - name: Create update branch
+        run: |
+          BRANCH="update-templates-sdk-v${{ needs.verify-tag.outputs.version }}"
+          git checkout -b "$BRANCH"
+          echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
+      
+      - name: Update template versions
+        run: |
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          # Update Rust templates
+          find templates -name "Cargo.toml" -type f | while read -r file; do
+            if grep -q 'ftl-sdk.*version' "$file"; then
+              sed -i "s/ftl-sdk = { version = \"[^\"]*\"/ftl-sdk = { version = \"$VERSION\"/" "$file"
+              echo "Updated ftl-sdk version to $VERSION in: $file"
+            fi
+          done
+          
+          # Also update any examples if needed
+          find examples -name "Cargo.toml" -type f | while read -r file; do
+            if grep -q 'ftl-sdk.*version' "$file"; then
+              sed -i "s/ftl-sdk = { version = \"[^\"]*\"/ftl-sdk = { version = \"$VERSION\"/" "$file"
+              echo "Updated ftl-sdk version to $VERSION in: $file"
+            fi
+          done
+      
+      - name: Commit changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: update templates to use ftl-sdk v${{ needs.verify-tag.outputs.version }}
+
+Updates project templates and examples to use the newly published SDK version.
+
+This is an automated update following the release of ftl-sdk v${{ needs.verify-tag.outputs.version }}."
+      
+      - name: Push branch
+        run: |
+          git push origin "$UPDATE_BRANCH"
+      
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.PAT || github.token }}
+        run: |
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          PR_BODY=$(cat <<EOF
+          ## 📦 Update Templates to ftl-sdk v${VERSION}
+          
+          This PR updates project templates and examples to use the newly published ftl-sdk version.
+          
+          ### Changes
+          - Updated Rust project templates to use ftl-sdk v${VERSION}
+          - Updated example projects to use ftl-sdk v${VERSION}
+          
+          ### Context
+          This is an automated PR created after successfully publishing ftl-sdk v${VERSION} to crates.io.
+          
+          ### Checklist
+          - [x] SDK v${VERSION} is published on crates.io
+          - [x] Templates updated to new version
+          - [x] Examples updated to new version
+          - [ ] CI tests pass with new version
+          
+          ---
+          *🤖 This PR was automatically created by the release workflow*
+          EOF
+          )
+          
+          gh pr create \
+            --title "chore: update templates to ftl-sdk v${VERSION}" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$UPDATE_BRANCH" \
+            --label "automated" \
+            --label "dependencies"
