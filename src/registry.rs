@@ -74,8 +74,15 @@ async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
     Ok(output.status.success())
 }
 
+/// Verify that a specific version/tag exists in the registry using crane
+async fn verify_version_exists_with_crane(registry_url: &str, version: &str) -> Result<bool> {
+    check_crane_available()?;
+    
+    let image_ref = format!("{}:{}", registry_url, version);
+    verify_image_with_crane(&image_ref).await
+}
+
 /// Use crane to list tags for an image
-#[allow(dead_code)]
 async fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
     check_crane_available()?;
     
@@ -98,6 +105,40 @@ async fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
         .collect();
     
     Ok(tags)
+}
+
+/// Resolve "latest" tag to the actual latest semantic version from registry
+async fn resolve_latest_version(registry_url: &str) -> Result<String> {
+    use semver::Version;
+    
+    // Get all tags from the registry
+    let tags = list_tags_with_crane(registry_url).await?;
+    
+    // Filter and parse semantic versions
+    let mut semver_tags: Vec<Version> = Vec::new();
+    
+    for tag in tags {
+        // Skip non-semver tags like "latest", "main", "dev", etc.
+        if tag == "latest" || tag == "main" || tag == "master" || tag == "dev" || tag == "edge" {
+            continue;
+        }
+        
+        // Try to parse as semver (with or without 'v' prefix)
+        let clean_tag = tag.strip_prefix('v').unwrap_or(&tag);
+        if let Ok(version) = Version::parse(clean_tag) {
+            semver_tags.push(version);
+        }
+    }
+    
+    if semver_tags.is_empty() {
+        anyhow::bail!("No semantic versions found for image at {}", registry_url);
+    }
+    
+    // Sort versions and get the latest
+    semver_tags.sort();
+    let latest_version = semver_tags.last().unwrap();
+    
+    Ok(latest_version.to_string())
 }
 
 /// Validate and normalize a semantic version
@@ -167,13 +208,18 @@ impl RegistryAdapter for DockerHubAdapter {
         };
         
         let version = if tag == "latest" {
-            // For Spin manifests, we need an actual semver, not "latest"
-            // In production, this should resolve to actual version from registry
-            // For now, return error to force explicit semver usage
-            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+            // Resolve "latest" to actual latest semantic version from registry
+            let registry_url = self.get_registry_url(&image_without_tag);
+            resolve_latest_version(&registry_url).await?
         } else {
             validate_and_normalize_semver(&tag)?
         };
+        
+        // Validate that the version exists in the registry
+        let registry_url = self.get_registry_url(&image_without_tag);
+        if !verify_version_exists_with_crane(&registry_url, &version).await? {
+            anyhow::bail!("Version '{}' not found for image '{}' in Docker Hub", version, image_without_tag);
+        }
         
         Ok(RegistryComponents {
             registry_domain: "docker.io".to_string(),
@@ -224,10 +270,18 @@ impl RegistryAdapter for GhcrAdapter {
         let package_name = format!("{}:{}", self.organization, image_without_tag);
         
         let version = if tag == "latest" {
-            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+            // Resolve "latest" to actual latest semantic version from registry
+            let registry_url = self.get_registry_url(&image_without_tag);
+            resolve_latest_version(&registry_url).await?
         } else {
             validate_and_normalize_semver(&tag)?
         };
+        
+        // Validate that the version exists in the registry
+        let registry_url = self.get_registry_url(&image_without_tag);
+        if !verify_version_exists_with_crane(&registry_url, &version).await? {
+            anyhow::bail!("Version '{}' not found for image '{}' in GHCR ({})", version, image_without_tag, self.organization);
+        }
         
         Ok(RegistryComponents {
             registry_domain: "ghcr.io".to_string(),
@@ -293,13 +347,21 @@ impl RegistryAdapter for EcrAdapter {
         let (image_without_tag, tag) = parse_image_and_tag(image_name);
         
         let registry_domain = format!("{}.dkr.ecr.{}.amazonaws.com", self.account_id, self.region);
-        let package_name = image_without_tag;
+        let package_name = image_without_tag.clone();
         
         let version = if tag == "latest" {
-            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+            // Resolve "latest" to actual latest semantic version from registry
+            let registry_url = self.get_registry_url(&image_without_tag);
+            resolve_latest_version(&registry_url).await?
         } else {
             validate_and_normalize_semver(&tag)?
         };
+        
+        // Validate that the version exists in the registry
+        let registry_url = self.get_registry_url(&image_without_tag);
+        if !verify_version_exists_with_crane(&registry_url, &version).await? {
+            anyhow::bail!("Version '{}' not found for image '{}' in ECR ({})", version, image_without_tag, registry_domain);
+        }
         
         Ok(RegistryComponents {
             registry_domain,
@@ -346,13 +408,21 @@ impl RegistryAdapter for CustomAdapter {
             }
         };
         
-        let package_name = image_without_tag;
+        let package_name = image_without_tag.clone();
         
         let version = if tag == "latest" {
-            anyhow::bail!("Invalid version tag '{}'. Spin manifests require explicit semantic versions (e.g., 1.0.0)", tag)
+            // Resolve "latest" to actual latest semantic version from registry
+            let registry_url = self.get_registry_url(&image_without_tag);
+            resolve_latest_version(&registry_url).await?
         } else {
             validate_and_normalize_semver(&tag)?
         };
+        
+        // Validate that the version exists in the registry
+        let registry_url = self.get_registry_url(&image_without_tag);
+        if !verify_version_exists_with_crane(&registry_url, &version).await? {
+            anyhow::bail!("Version '{}' not found for image '{}' in custom registry ({})", version, image_without_tag, registry_domain);
+        }
         
         Ok(RegistryComponents {
             registry_domain,

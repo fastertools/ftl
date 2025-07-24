@@ -1,19 +1,15 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use console::style;
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use toml_edit::{DocumentMut, Item, Table};
 use reqwest::Client;
+use serde_json;
 
 
 use crate::config::FtlConfig;
 use crate::registry::{get_registry_adapter, RegistryAdapter};
-
-// Embed the tools manifest at compile time
-const TOOLS_MANIFEST: &str = include_str!("../data/tools.toml");
 
 #[derive(Subcommand)]
 pub enum ToolsCommand {
@@ -38,6 +34,10 @@ pub enum ToolsCommand {
         /// List from all enabled registries
         #[arg(short, long)]
         all: bool,
+        
+        /// Query registry directly, skip manifest
+        #[arg(short, long)]
+        direct: bool,
     },
 
     /// Add pre-built tools to your project
@@ -87,44 +87,18 @@ pub enum ToolsCommand {
     },
 }
 
-#[derive(Debug, Deserialize)]
-struct ToolsManifest {
-    tools: Vec<Tool>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct Tool {
-    name: String,
-    category: String,
-    description: String,
-    image_name: String,
-    tags: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-struct VerifiedTool {
-    tool: Tool,
-    available_registries: Vec<String>,
-}
-
 #[derive(Debug, Clone)]
 struct ResolvedTool {
     name: String,
-    description: String,
     image_name: String,
-    #[allow(dead_code)]
-    category: String,
-    #[allow(dead_code)]
-    tags: Vec<String>,
-    from_manifest: bool,
     version: String,
 }
 
 
 pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
     match cmd {
-        ToolsCommand::List { category, filter, registry, verbose, all } => {
-            list_tools(category, filter, registry, verbose, all).await
+        ToolsCommand::List { category, filter, registry, verbose, all, direct } => {
+            list_tools(category, filter, registry, verbose, all, direct).await
         }
         ToolsCommand::Add { tools, registry, version, yes } => {
             add_tools(tools, registry, version, yes).await
@@ -138,184 +112,140 @@ pub async fn handle_command(cmd: ToolsCommand) -> Result<()> {
     }
 }
 
-async fn verify_tools_in_registries(
-    tools: &[Tool],
-    registries: &[(String, &crate::config::registry::RegistryConfig)],
-    client: &Client,
-) -> Result<Vec<VerifiedTool>> {
-    let mut verified_tools = Vec::new();
+
+async fn query_ghcr_packages(organization: &str, prefix: &str) -> Result<Vec<String>> {
+    // GitHub API to list packages
+    let client = Client::new();
     
-    println!("{} Verifying tools in registries...", style("🔍").dim());
+    // GitHub API endpoint for organization packages
+    let url = format!("https://api.github.com/orgs/{}/packages?package_type=container&per_page=100", organization);
     
-    for tool in tools {
-        let mut available_registries = Vec::new();
+    let response = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "ftl-cli")
+        .send()
+        .await?;
+    
+    if !response.status().is_success() {
+        // If GitHub API fails, fall back to using crane catalog if available
+        use std::process::Command;
         
-        for (reg_name, _reg_config) in registries {
-            if let Ok(adapter) = get_registry_adapter(Some(reg_name)) {
-                match adapter.verify_image_exists(client, &tool.image_name).await {
-                    Ok(true) => {
-                        available_registries.push(reg_name.clone());
-                    }
-                    Ok(false) => {
-                        // Tool doesn't exist in this registry - this is normal
-                    }
-                    Err(e) => {
-                        // Check if it's a crane availability issue
-                        if e.to_string().contains("crane") {
-                            // Re-return the error to propagate it up
-                            return Err(e);
-                        }
-                        // Other errors (rate limit, network, etc.) - skip this registry
-                    }
+        println!("GitHub API failed, trying alternative method...");
+        
+        // Try using GitHub CLI if available
+        let output = Command::new("gh")
+            .args(&["api", &format!("/orgs/{}/packages?package_type=container&per_page=100", organization)])
+            .output();
+        
+        if let Ok(output) = output {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // Parse JSON response
+                if let Ok(packages) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
+                    let tools: Vec<String> = packages
+                        .iter()
+                        .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                        .filter(|name| name.starts_with(prefix))
+                        .map(|s| s.to_string())
+                        .collect();
+                    return Ok(tools);
                 }
             }
         }
         
-        // Only include tools that exist in at least one registry
-        if !available_registries.is_empty() {
-            verified_tools.push(VerifiedTool {
-                tool: tool.clone(),
-                available_registries,
-            });
-        }
+        return Ok(Vec::new());
     }
     
-    Ok(verified_tools)
+    let packages: Vec<serde_json::Value> = response.json().await?;
+    
+    let tools: Vec<String> = packages
+        .iter()
+        .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+        .filter(|name| name.starts_with(prefix))
+        .map(|s| s.to_string())
+        .collect();
+    
+    Ok(tools)
 }
 
 async fn list_tools(
-    category: Option<String>, 
+    _category: Option<String>, 
     filter: Option<String>, 
     registry: Option<String>, 
     verbose: bool,
-    all: bool
+    all: bool,
+    _direct: bool
 ) -> Result<()> {
-    let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
-        .context("Failed to parse tools manifest")?;
-    
     let config = FtlConfig::load()?;
-    let client = Client::new();
     
-    // Determine which registries to list from
+    // Always use direct registry query mode now
     let registries_to_query = if all {
-        // List from all enabled registries
         config.enabled_registries()
             .into_iter()
             .map(|r| (r.name.clone(), r))
             .collect::<Vec<_>>()
     } else if let Some(reg_name) = registry {
-        // List from specific registry
         let reg = config.get_registry(&reg_name)
             .context(format!("Registry '{}' not found", reg_name))?;
         vec![(reg.name.clone(), reg)]
     } else {
-        // List from default registry
         let default_reg = config.get_registry(&config.default_registry)
             .context(format!("Default registry '{}' not found", config.default_registry))?;
         vec![(default_reg.name.clone(), default_reg)]
     };
-
-    // Apply initial filters to the manifest before verification
-    let candidate_tools: Vec<&Tool> = manifest.tools.iter()
-        .filter(|tool| {
-            if let Some(cat) = &category {
-                tool.category.to_lowercase() == cat.to_lowercase()
-            } else {
-                true
-            }
-        })
-        .filter(|tool| {
+    
+    println!("{} Querying registries for available tools", style("📦").cyan());
+    
+    for (reg_name, reg_config) in registries_to_query {
+        if reg_config.registry_type == crate::config::registry::RegistryType::Ghcr {
+            let org = reg_config.get_config_str("organization")
+                .unwrap_or_else(|| "fastertools".to_string());
+            
+            println!("\nQuerying {} packages from {}...", style(&reg_name).yellow(), org);
+            
+            // Query GitHub API for all ftl-tool-* packages
+            let mut tools = query_ghcr_packages(&org, "ftl-tool-").await?;
+            
+            // Apply filter if provided
             if let Some(f) = &filter {
                 let f_lower = f.to_lowercase();
-                tool.name.to_lowercase().contains(&f_lower)
-                    || tool.description.to_lowercase().contains(&f_lower)
-                    || tool.tags.iter().any(|tag| tag.to_lowercase().contains(&f_lower))
-            } else {
-                true
+                tools.retain(|tool| tool.to_lowercase().contains(&f_lower));
             }
-        })
-        .collect();
-
-    if candidate_tools.is_empty() {
-        println!("No tools found matching your criteria");
-        return Ok(());
+            
+            tools.sort();
+            
+            if tools.is_empty() {
+                println!("No tools found in {}", reg_name);
+            } else {
+                println!("\n{} tools found in {}:", tools.len(), style(&reg_name).green());
+                for tool in tools {
+                    let display_name = tool.strip_prefix("ftl-tool-").unwrap_or(&tool);
+                    println!("  {} {}", style("•").green(), style(display_name).bold());
+                    if verbose {
+                        let adapter = get_registry_adapter(Some(&reg_name))?;
+                        let url = adapter.get_registry_url(&tool);
+                        println!("    Registry: {}", style(&url).dim());
+                    }
+                }
+            }
+        } else {
+            println!("Direct query not implemented for {} registry type", reg_config.registry_type);
+        }
     }
-
-    // Verify which tools actually exist in the registries
-    let verified_tools = verify_tools_in_registries(&candidate_tools.into_iter().cloned().collect::<Vec<_>>(), &registries_to_query, &client).await?;
-
-    if verified_tools.is_empty() {
-        println!("No tools found in the specified registries");
-        return Ok(());
-    }
-
-    println!("{} Available FTL Tools", style("📦").dim());
     
-    if registries_to_query.len() > 1 {
-        println!();
-        println!("Showing tools from {} registries:", registries_to_query.len());
-        for (name, _) in &registries_to_query {
-            println!("  • {}", style(name).cyan());
-        }
-    }
-    println!();
-
-    // Group verified tools by category
-    let mut categories: HashMap<&str, Vec<&VerifiedTool>> = HashMap::new();
-    for verified_tool in &verified_tools {
-        categories.entry(&verified_tool.tool.category).or_default().push(verified_tool);
-    }
-
-    // Sort categories
-    let mut sorted_categories: Vec<_> = categories.into_iter().collect();
-    sorted_categories.sort_by_key(|(cat, _)| *cat);
-
-    // Display tools grouped by category
-    for (category, mut verified_tools) in sorted_categories {
-        println!("[{}]", style(category).bold().cyan());
-        
-        // Sort tools by name within category
-        verified_tools.sort_by_key(|vt| &vt.tool.name);
-        
-        for verified_tool in verified_tools {
-            let tool = &verified_tool.tool;
-            
-            println!("  {} - {}", style(&tool.name).green(), tool.description);
-            
-            if verbose {
-                println!("    Available in:");
-                for reg_name in &verified_tool.available_registries {
-                    let adapter = get_registry_adapter(Some(reg_name))?;
-                    let url = adapter.get_registry_url(&tool.image_name);
-                    println!("      {} ({})", style(reg_name).cyan(), style(&url).dim());
-                }
-                if !tool.tags.is_empty() {
-                    println!("    Tags: {}", tool.tags.join(", "));
-                }
-            } else {
-                println!("    Available in: {}", style(verified_tool.available_registries.join(", ")).dim());
-            }
-        }
-        println!();
-    }
-
-    println!();
-    println!("To add a tool to your project:");
-    println!("  {} ftl tools add <tool-name>", style("$").dim());
+    println!("\nTo add a tool to your project:");
+    println!("  {} ftl tools add <tool-name>:<version>", style("$").dim());
     
     if all {
-        println!();
         println!("To add from a specific registry:");
-        println!("  {} ftl tools add <registry>:<tool-name>", style("$").dim());
+        println!("  {} ftl tools add <registry>:<tool-name>:<version>", style("$").dim());
     }
 
     Ok(())
 }
 
 async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option<String>, yes: bool) -> Result<()> {
-    let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
-        .context("Failed to parse tools manifest")?;
-    
     let config = FtlConfig::load()?;
     
     // Check if spin.toml exists
@@ -365,30 +295,12 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
             .find(|r| r.name == reg_name)
             .context(format!("Registry '{}' not found", reg_name))?;
         
-        // Try to find tool in manifest first
-        let resolved_tool = if let Some(manifest_tool) = manifest.tools.iter().find(|t| t.name == tool_name) {
-            // Found in manifest - use manifest data, but allow version override
-            ResolvedTool {
-                name: manifest_tool.name.clone(),
-                description: manifest_tool.description.clone(),
-                image_name: manifest_tool.image_name.clone(),
-                category: manifest_tool.category.clone(),
-                tags: manifest_tool.tags.clone(),
-                from_manifest: true,
-                version: tag,
-            }
-        } else {
-            // Not in manifest - use tool name as-is
-            let image_name = tool_name.clone();
-            ResolvedTool {
-                name: tool_name.clone(),
-                description: format!("Custom tool: {}", tool_name),
-                image_name,
-                category: "custom".to_string(),
-                tags: vec!["user-defined".to_string()],
-                from_manifest: false,
-                version: tag,
-            }
+        // Create resolved tool directly from user input
+        let image_name = format!("{}:{}", tool_name, tag);
+        let resolved_tool = ResolvedTool {
+            name: tool_name.clone(),
+            image_name,
+            version: tag,
         };
         
         tools_to_add.push((reg_name, resolved_tool));
@@ -398,13 +310,10 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
     println!("{} Adding the following tools:", style("→").cyan());
     println!();
     for (reg, resolved_tool) in &tools_to_add {
-        let source_indicator = if resolved_tool.from_manifest { "" } else { " [custom]" };
-        println!("  {} {} ({}{}) - {}", 
+        println!("  {} {} ({})", 
             style("•").green(), 
             style(&resolved_tool.name).bold(),
-            style(reg).dim(),
-            style(source_indicator).dim(),
-            resolved_tool.description
+            style(reg).dim()
         );
     }
 
@@ -430,11 +339,12 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
         .context("Failed to parse spin.toml")?;
 
     // Add tools
+    let client = reqwest::Client::new();
     for (reg_name, resolved_tool) in &tools_to_add {
         let adapter = get_registry_adapter(Some(reg_name))?;
-        let registry_url = adapter.get_registry_url(&resolved_tool.image_name);
+        let registry_components = adapter.get_registry_components(&client, &resolved_tool.image_name).await?;
         
-        add_tool_to_spin(&mut doc, &resolved_tool.name, &registry_url, &resolved_tool.version)?;
+        add_tool_to_spin(&mut doc, &resolved_tool.name, &registry_components)?;
     }
 
     // Write back to spin.toml
@@ -448,7 +358,7 @@ async fn add_tools(tools: Vec<String>, registry: Option<String>, version: Option
     Ok(())
 }
 
-fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_url: &str, version: &str) -> Result<()> {
+fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_components: &crate::registry::RegistryComponents) -> Result<()> {
     // Get or create the component section
     if !doc.contains_key("component") {
         doc.insert("component", Item::Table(Table::new()));
@@ -464,22 +374,10 @@ fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_url: &str, 
     // Create source as inline table with correct Spin schema
     let mut source = toml_edit::InlineTable::new();
     
-    // Extract registry base URL and organization from the full registry URL
-    let (registry_base, org_and_tool) = if registry_url.starts_with("ghcr.io/") {
-        ("ghcr.io", registry_url.strip_prefix("ghcr.io/").unwrap())
-    } else if registry_url.starts_with("docker.io/") {
-        ("docker.io", registry_url.strip_prefix("docker.io/").unwrap())  
-    } else {
-        // For other registries, split on first slash
-        let parts: Vec<&str> = registry_url.splitn(2, '/').collect();
-        (parts[0], parts.get(1).copied().unwrap_or(tool_name))
-    };
-    
-    source.insert("registry", toml_edit::Value::String(toml_edit::Formatted::new(registry_base.to_string())));
-    // Convert package from org/tool format to org:tool format for Spin
-    let package = org_and_tool.replace('/', ":");
-    source.insert("package", toml_edit::Value::String(toml_edit::Formatted::new(package)));
-    source.insert("version", toml_edit::Value::String(toml_edit::Formatted::new(version.to_string())));
+    // Use registry components directly - they're already in the correct format
+    source.insert("registry", toml_edit::Value::String(toml_edit::Formatted::new(registry_components.registry_domain.clone())));
+    source.insert("package", toml_edit::Value::String(toml_edit::Formatted::new(registry_components.package_name.clone())));
+    source.insert("version", toml_edit::Value::String(toml_edit::Formatted::new(registry_components.version.clone())));
     
     component.insert("source", Item::Value(toml_edit::Value::InlineTable(source)));
     
@@ -511,9 +409,6 @@ fn add_tool_to_spin(doc: &mut DocumentMut, tool_name: &str, registry_url: &str, 
 }
 
 async fn update_tools(tools: Vec<String>, registry: Option<String>, version: Option<String>, yes: bool) -> Result<()> {
-    let manifest: ToolsManifest = toml::from_str(TOOLS_MANIFEST)
-        .context("Failed to parse tools manifest")?;
-    
     let config = FtlConfig::load()?;
     
     // Check if spin.toml exists
@@ -590,30 +485,12 @@ async fn update_tools(tools: Vec<String>, registry: Option<String>, version: Opt
             .find(|r| r.name == reg_name)
             .context(format!("Registry '{}' not found", reg_name))?;
         
-        // Try to find tool in manifest first
-        let resolved_tool = if let Some(manifest_tool) = manifest.tools.iter().find(|t| t.name == tool_name) {
-            // Found in manifest - use manifest data, but allow version override
-            ResolvedTool {
-                name: manifest_tool.name.clone(),
-                description: manifest_tool.description.clone(),
-                image_name: manifest_tool.image_name.clone(),
-                category: manifest_tool.category.clone(),
-                tags: manifest_tool.tags.clone(),
-                from_manifest: true,
-                version: tag,
-            }
-        } else {
-            // Not in manifest - use tool name as-is
-            let image_name = tool_name.clone();
-            ResolvedTool {
-                name: tool_name.clone(),
-                description: format!("Custom tool: {}", tool_name),
-                image_name,
-                category: "custom".to_string(),
-                tags: vec!["user-defined".to_string()],
-                from_manifest: false,
-                version: tag,
-            }
+        // Create resolved tool directly from user input
+        let image_name = format!("{}:{}", tool_name, tag);
+        let resolved_tool = ResolvedTool {
+            name: tool_name.clone(),
+            image_name,
+            version: tag,
         };
         
         tools_to_update.push((reg_name, resolved_tool));
@@ -627,14 +504,11 @@ async fn update_tools(tools: Vec<String>, registry: Option<String>, version: Opt
     // Show what will be updated
     println!("{} Updating the following tools:\n", style("→").cyan());
     for (reg, resolved_tool) in &tools_to_update {
-        let source_indicator = if resolved_tool.from_manifest { "" } else { " [custom]" };
-        println!("  {} {} ({}{}) to version {} - {}", 
+        println!("  {} {} ({}) to version {}", 
             style("•").green(), 
             style(&resolved_tool.name).bold(),
             style(reg).dim(),
-            style(source_indicator).dim(),
-            style(&resolved_tool.version).yellow(),
-            resolved_tool.description
+            style(&resolved_tool.version).yellow()
         );
     }
 
@@ -657,16 +531,17 @@ async fn update_tools(tools: Vec<String>, registry: Option<String>, version: Opt
         .context("Failed to parse spin.toml")?;
 
     // Update tools by replacing their component entries
+    let client = reqwest::Client::new();
     for (reg_name, resolved_tool) in &tools_to_update {
         let adapter = get_registry_adapter(Some(reg_name))?;
-        let registry_url = adapter.get_registry_url(&resolved_tool.image_name);
+        let registry_components = adapter.get_registry_components(&client, &resolved_tool.image_name).await?;
         
         // Remove the old component entry and add the new one
         if let Some(component_section) = doc.get_mut("component").and_then(|item| item.as_table_mut()) {
             component_section.remove(&resolved_tool.name);
         }
         
-        add_tool_to_spin(&mut doc, &resolved_tool.name, &registry_url, &resolved_tool.version)?;
+        add_tool_to_spin(&mut doc, &resolved_tool.name, &registry_components)?;
     }
 
     // Write back to spin.toml
