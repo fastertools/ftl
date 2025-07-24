@@ -159,6 +159,15 @@ check_dependencies() {
         missing_deps+=("rust")
     else
         echo "✓ found"
+        
+        # Check for wasm32-wasip1 target
+        echo -n "  Checking for wasm32-wasip1 target... "
+        if rustup target list --installed | grep -q "wasm32-wasip1"; then
+            echo "✓ installed"
+        else
+            echo "❌ not installed"
+            missing_deps+=("wasm-target")
+        fi
     fi
     
     # Check for Spin
@@ -198,6 +207,11 @@ check_dependencies() {
                     echo "  sudo mv ./spin /usr/local/bin/spin"
                     echo ""
                     ;;
+                wasm-target)
+                    echo "To install wasm32-wasip1 target:"
+                    echo "  rustup target add wasm32-wasip1"
+                    echo ""
+                    ;;
             esac
         done
         
@@ -211,7 +225,7 @@ check_dependencies() {
             fi
         fi
         echo ""
-        info "⚠️  Warning: FTL requires gh CLI, Rust, and Spin to function properly"
+        info "⚠️  Warning: FTL requires gh CLI, Rust (with wasm32-wasip1 target), and Spin to function properly"
         echo ""
     else
         success "✓ All dependencies found"
@@ -226,7 +240,7 @@ main() {
     if [ "$AUTO_YES" = false ]; then
         echo ""
         info "This script will:"
-        echo "  1. Check for required dependencies (gh CLI, Rust, Spin)"
+        echo "  1. Check for required dependencies (gh CLI, Rust with wasm target, Spin)"
         echo "  2. Verify GitHub CLI authentication"
         echo "  3. Find the latest FTL release"
         echo "  4. Download the FTL binary"
@@ -381,7 +395,7 @@ main() {
     # Final dependency reminder
     if ! command_exists "gh" || ! command_exists "cargo" || ! command_exists "spin"; then
         echo ""
-        info "Remember: FTL requires gh CLI, Rust, and Spin to be installed for full functionality"
+        info "Remember: FTL requires gh CLI, Rust (with wasm32-wasip1 target), and Spin to be installed for full functionality"
     fi
 }
 
