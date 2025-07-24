@@ -132,8 +132,7 @@ curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl-cl
 
 Create a new project
 ```bash
-ftl init my-tools
-cd my-tools
+ftl init fast-tools && cd fast-tools
 ```
 
 Develop new tools
@@ -150,7 +149,7 @@ Try them out with your MCP client
 ```json
 {
   "mcpServers": {
-    "my-tools": {
+    "fast-tools": {
       "url": "http://127.0.0.1:3000/mcp",
       "transport": "http"
     }
@@ -172,7 +171,7 @@ Plug it in
 ```json
 {
   "mcpServers": {
-    "my-tools": {
+    "fast-tools": {
       "url": "https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp",
       "transport": "https"
     }
