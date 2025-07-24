@@ -9,12 +9,12 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../backend-openapi.json");
+    println!("cargo:rerun-if-changed=./openapi.json");
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("ftl_backend_client.rs");
 
-    let spec_path = "../../backend-openapi.json";
+    let spec_path = "./openapi.json";
     let spec_content = fs::read_to_string(spec_path).expect("Failed to read OpenAPI spec");
     let spec: openapiv3::OpenAPI =
         serde_json::from_str(&spec_content).expect("Failed to parse OpenAPI spec");
