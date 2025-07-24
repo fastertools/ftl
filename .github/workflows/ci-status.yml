@@ -1,0 +1,97 @@
+name: CI Status
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  # Detect what changed using our existing workflow
+  changes:
+    name: Detect Changes
+    uses: ./.github/workflows/detect-changes.yml
+
+  # Run CI if needed
+  ci:
+    name: Run CI
+    needs: changes
+    if: |
+      needs.changes.outputs.cli == 'true' || 
+      needs.changes.outputs.rust-sdk == 'true' || 
+      needs.changes.outputs.core-crates == 'true' || 
+      needs.changes.outputs.components == 'true' || 
+      needs.changes.outputs.ci == 'true'
+    uses: ./.github/workflows/ci.yml
+  
+  # Run CLI tests if needed
+  cli-tests:
+    name: Run CLI Tests
+    needs: changes
+    if: |
+      needs.changes.outputs.cli == 'true' || 
+      needs.changes.outputs.rust-sdk == 'true' || 
+      needs.changes.outputs.core-crates == 'true' || 
+      needs.changes.outputs.components == 'true' || 
+      needs.changes.outputs.ci == 'true'
+    uses: ./.github/workflows/test-cli.yml
+  
+  # The single required status check
+  status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [changes, ci, cli-tests]
+    if: always()
+    steps:
+      - name: Check All Jobs
+        run: |
+          echo "CI Status Summary:"
+          echo "=================="
+          
+          # Determine if CI should have run
+          CI_SHOULD_RUN="false"
+          if [ "${{ needs.changes.outputs.cli }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.rust-sdk }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.core-crates }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.components }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.ci }}" == "true" ]; then
+            CI_SHOULD_RUN="true"
+          fi
+          
+          # Check CI status
+          if [ "$CI_SHOULD_RUN" == "true" ]; then
+            if [ "${{ needs.ci.result }}" == "success" ]; then
+              echo "✅ CI: passed"
+            else
+              echo "❌ CI: ${{ needs.ci.result }}"
+            fi
+          else
+            echo "⏭️  CI: skipped (no relevant changes)"
+          fi
+          
+          # Check CLI tests status (uses same conditions as CI)
+          if [ "$CI_SHOULD_RUN" == "true" ]; then
+            if [ "${{ needs.cli-tests.result }}" == "success" ]; then
+              echo "✅ CLI Tests: passed"
+            else
+              echo "❌ CLI Tests: ${{ needs.cli-tests.result }}"
+            fi
+          else
+            echo "⏭️  CLI Tests: skipped (no relevant changes)"
+          fi
+          
+          # Overall status - only fail if a job that should have run failed
+          if [ "$CI_SHOULD_RUN" == "true" ] && [ "${{ needs.ci.result }}" != "success" ]; then
+            echo ""
+            echo "❌ CI checks failed"
+            exit 1
+          fi
+          
+          if [ "$CI_SHOULD_RUN" == "true" ] && [ "${{ needs.cli-tests.result }}" != "success" ]; then
+            echo ""
+            echo "❌ CLI tests failed"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All checks passed!"
