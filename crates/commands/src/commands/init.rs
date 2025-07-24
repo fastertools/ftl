@@ -45,7 +45,6 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
 
     // Install Spin if needed
     let spin_path = deps.spin_installer.check_and_install().await?;
-    deps.ui.print(&format!("Using Spin at: {spin_path}"));
 
     // Get project name
     if name.is_none() && !here {
@@ -85,7 +84,7 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
     deps.ui.print("Next steps:");
 
     if !here {
-        deps.ui.print(&format!("  cd {target_dir} &&"));
+        deps.ui.print(&format!("  cd {target_dir}"));
     }
 
     deps.ui

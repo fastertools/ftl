@@ -347,7 +347,6 @@ async fn test_init_success() {
             .iter()
             .any(|s| s.contains("MCP project initialized!"))
     );
-    assert!(output.iter().any(|s| s.contains("cd my-project &&")));
     assert!(
         output
             .iter()

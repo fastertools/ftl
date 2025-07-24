@@ -80,7 +80,6 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
-    deps.ui.print(&format!("Using Spin at: {spin_path}"));
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
