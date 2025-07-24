@@ -146,14 +146,20 @@ jobs:
               ;;
             sdk-rust)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
-              # Update macro dependency if needed
+              
+              # Also update the macros crate version to match
               if [ -f sdk/rust-macros/Cargo.toml ]; then
-                MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-                echo "Current macros version: $MACROS_VERSION"
+                sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust-macros/Cargo.toml
+                echo "Updated ftl-sdk-macros version to $NEW_VERSION"
+                
+                # Update the ftl-sdk dependency on macros to use the new version
+                sed -i "s/ftl-sdk-macros = { version = \"[^\"]*\"/ftl-sdk-macros = { version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
+                echo "Updated ftl-sdk dependency on ftl-sdk-macros to $NEW_VERSION"
               fi
               
               # Update Cargo.lock - use workspace flag to avoid scanning subdirectories
               cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION"
+              cargo update --workspace -p ftl-sdk-macros --precise "$NEW_VERSION"
               
               # Note: We do NOT update templates here because the new version isn't published yet
               # Templates will be updated in a follow-up PR after the SDK is published
