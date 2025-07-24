@@ -67,7 +67,7 @@ route = "/.well-known/oauth-authorization-server"
 component = "mcp"
 
 [component.mcp]
-source = { registry = "ghcr.io", package = "fastertools:mcp-authorizer", version = "0.0.8" }
+source = { registry = "ghcr.io", package = "fastertools:mcp-authorizer", version = "0.0.9" }
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
 [component.mcp.variables]
 auth_enabled = "{{ auth_enabled }}"
