@@ -125,6 +125,10 @@ jobs:
           ls -la release-assets/
         shell: bash
       
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/cli-v}" >> $GITHUB_OUTPUT
+      
       - name: Create Release
         id: release
         uses: softprops/action-gh-release@v2
@@ -133,33 +137,38 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: release-assets/*
-
-  publish-cli:
-    name: Publish to crates.io
-    needs: create-release
-    runs-on: ubuntu-latest
-    if: needs.create-release.outputs.release_created
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Publish ftl-cli
-        run: |
-          # Check if this version is already published
-          # Get version from cli/Cargo.toml
-          CLI_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
-          if cargo search ftl-cli --limit 1 | grep -q "^ftl-cli = \"$CLI_VERSION\""; then
-            echo "ftl-cli version $CLI_VERSION already published, skipping"
-          else
-            cd cli && cargo publish
-          fi
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          body: |
+            ## Installation
+            
+            ### Quick Install (Linux/macOS)
+            
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/cli-v${{ steps.version.outputs.VERSION }}/install.sh | bash
+            sudo mv ./ftl /usr/local/bin/ftl
+            ```
+            
+            ### Manual Installation
+            
+            Download the appropriate binary for your platform from the assets below, then:
+            
+            ```bash
+            chmod +x ftl-*
+            sudo mv ftl-* /usr/local/bin/ftl
+            ```
+            
+            ### Build from Source
+            
+            ```bash
+            cargo install --git https://github.com/fastertools/ftl-cli
+            ```
+            
+            ### Verify Installation
+            
+            ```bash
+            ftl --version
+            ```
+            
+            ---
+            
+            **Full Changelog**: https://github.com/fastertools/ftl-cli/compare/cli-v${{ steps.version.outputs.VERSION }}...cli-v${{ steps.version.outputs.VERSION }}
 
