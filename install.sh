@@ -196,9 +196,15 @@ main() {
     
     info "Downloading from: ${download_url}"
 
-    # Download binary
-    if ! curl -fsSL "${download_url}" -o "${BINARY_NAME}"; then
-        error "Failed to download ${BINARY_NAME} binary"
+    # Download binary (with authentication if GITHUB_TOKEN is set)
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        if ! curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" "${download_url}" -o "${BINARY_NAME}"; then
+            error "Failed to download ${BINARY_NAME} binary"
+        fi
+    else
+        if ! curl -fsSL "${download_url}" -o "${BINARY_NAME}"; then
+            error "Failed to download ${BINARY_NAME} binary"
+        fi
     fi
 
     # Make executable
