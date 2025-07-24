@@ -2,7 +2,7 @@
 name = "ftl-mcp-gateway"
 authors.workspace = true
 description = "MCP gateway component"
-version = "0.0.4"
+version = "0.0.5"
 license.workspace = true
 rust-version.workspace = true
 edition.workspace = true
