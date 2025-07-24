@@ -190,20 +190,27 @@ main() {
     fi
     info "Latest version: v${version}"
 
-    # Construct download URL
+    # Construct asset name
     local asset_name="${BINARY_NAME}-${platform}"
-    local download_url="https://github.com/${REPO}/releases/download/cli-v${version}/${asset_name}"
     
-    info "Downloading from: ${download_url}"
-
-    # Download binary (with authentication if GITHUB_TOKEN is set)
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        if ! curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" "${download_url}" -o "${BINARY_NAME}"; then
+    # Check if gh CLI is available
+    if command_exists "gh"; then
+        info "Downloading ${asset_name} using gh CLI..."
+        
+        # Download using gh release download
+        if ! gh release download "cli-v${version}" \
+            --repo "${REPO}" \
+            --pattern "${asset_name}" \
+            --output "${BINARY_NAME}"; then
             error "Failed to download ${BINARY_NAME} binary"
         fi
     else
+        # Fallback to curl for public repos
+        local download_url="https://github.com/${REPO}/releases/download/cli-v${version}/${asset_name}"
+        info "Downloading from: ${download_url}"
+        
         if ! curl -fsSL "${download_url}" -o "${BINARY_NAME}"; then
-            error "Failed to download ${BINARY_NAME} binary"
+            error "Failed to download ${BINARY_NAME} binary. For private repos, please install gh CLI: https://cli.github.com"
         fi
     fi
 
