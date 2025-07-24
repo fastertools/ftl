@@ -289,7 +289,7 @@ jobs:
           esac
           
           PR_BODY=$(cat <<EOF
-          ## 🚀 Release: ${TITLE}
+          ## ${TITLE}
           
           This PR prepares the release of **${COMPONENT} v${NEW_VERSION}**.
           
