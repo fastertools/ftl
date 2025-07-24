@@ -198,11 +198,9 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "chore: update templates to use ftl-sdk v${{ needs.verify-tag.outputs.version }}
-
-Updates project templates and examples to use the newly published SDK version.
-
-This is an automated update following the release of ftl-sdk v${{ needs.verify-tag.outputs.version }}."
+          git commit -m "chore: update templates to use ftl-sdk v${{ needs.verify-tag.outputs.version }}" \
+            -m "Updates project templates and examples to use the newly published SDK version." \
+            -m "This is an automated update following the release of ftl-sdk v${{ needs.verify-tag.outputs.version }}."
       
       - name: Push branch
         run: |
