@@ -1,29 +1,7 @@
 name: CLI Tests
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'cli/**'
-      - 'crates/**'
-      - 'components/**'
-      - 'sdk/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/test-cli.yml'
-      - 'templates/**'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'cli/**'
-      - 'crates/**'
-      - 'components/**'
-      - 'sdk/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/test-cli.yml'
-      - 'templates/**'
-  workflow_call:  # Allow this workflow to be called by ci-status.yml
+  workflow_call:  # Only run when called by ci-status.yml
 
 jobs:
   test-rust-e2e:
