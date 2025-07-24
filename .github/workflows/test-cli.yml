@@ -41,27 +41,20 @@ jobs:
         with:
           targets: wasm32-wasip1
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: "test-cli"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
-      - name: Cache cargo index
-        uses: actions/cache@v4
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@v2
         with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          tool: cargo-binstall
       
       - name: Install ftl CLI
         run: |
-          cargo install --path cli
+          cargo install --path cli --locked
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -117,27 +110,20 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: "test-cli"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
-      - name: Cache cargo index
-        uses: actions/cache@v4
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@v2
         with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          tool: cargo-binstall
       
       - name: Install ftl CLI
         run: |
-          cargo install --path cli
+          cargo install --path cli --locked
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
@@ -190,27 +176,20 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: "test-cli"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       
-      - name: Cache cargo index
-        uses: actions/cache@v4
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@v2
         with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          tool: cargo-binstall
       
       - name: Install ftl CLI
         run: |
-          cargo install --path cli
+          cargo install --path cli --locked
       
       - name: Setup Spin
         uses: fermyon/actions/spin/setup@v1
