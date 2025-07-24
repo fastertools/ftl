@@ -112,28 +112,26 @@ jobs:
         id: wasm
         run: |
           COMPONENT="${{ needs.verify-tag.outputs.component }}"
-          # Map component names to their library names
-          case "$COMPONENT" in
-            "mcp-authorizer")
-              WASM_NAME="mcp_authorizer.wasm"
-              ;;
-            "mcp-gateway")
-              WASM_NAME="ftl_mcp_gateway.wasm"
-              ;;
-            *)
-              # Default: replace hyphens with underscores
-              WASM_NAME="${COMPONENT//-/_}.wasm"
-              ;;
-          esac
+          # Components use ftl_ prefix and underscores in their library names
+          # Replace hyphens with underscores and add ftl_ prefix
+          WASM_NAME="ftl_${COMPONENT//-/_}.wasm"
           echo "name=$WASM_NAME" >> $GITHUB_OUTPUT
       
       - name: Publish to ghcr.io
         run: |
           COMPONENT="${{ needs.verify-tag.outputs.component }}"
           VERSION="${{ needs.verify-tag.outputs.version }}"
-          WASM_FILE="target/wasm32-wasip1/release/${{ steps.wasm.outputs.name }}"
+          WASM_FILE="../../target/wasm32-wasip1/release/${{ steps.wasm.outputs.name }}"
           
           cd "components/$COMPONENT"
+          
+          # Debug: Check if WASM file exists
+          if [ ! -f "$WASM_FILE" ]; then
+            echo "❌ WASM file not found at: $WASM_FILE"
+            echo "Looking for files in release directory:"
+            ls -la ../../target/wasm32-wasip1/release/
+            exit 1
+          fi
           
           # Publish versioned and latest tags
           wkg oci push "ghcr.io/fastertools/$COMPONENT:$VERSION" "$WASM_FILE"
