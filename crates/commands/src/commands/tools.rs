@@ -442,7 +442,7 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
             let mut source = Table::new();
             source["registry"] = Item::Value(registry_domain.into());
             source["package"] = Item::Value(package_name.clone().into());
-            source["version"] = Item::Value(tool.version.clone().into());
+            source["version"] = Item::Value(registry_components.version.clone().into());
             source
         });
 
@@ -487,17 +487,25 @@ async fn update_tools_in_project(deps: &Arc<ToolsDependencies>, tools: &[Resolve
     let components = doc["component"].as_table_mut()
         .context("component section not found in spin.toml")?;
 
+    // Get registry adapter for version resolution
+    let adapter = get_registry_adapter(None)
+        .context("Failed to get registry adapter")?;
+
     for tool in tools {
         let component_name = format!("tool-{}", tool.name);
         
         if let Some(component) = components.get_mut(&component_name) {
             if let Some(source) = component.get_mut("source").and_then(|s| s.as_table_mut()) {
-                source["version"] = Item::Value(tool.version.clone().into());
+                // Use registry adapter to resolve version properly
+                let registry_components = adapter.get_registry_components(&deps.client, &tool.image_name).await
+                    .with_context(|| format!("Failed to get registry components for {}", tool.image_name))?;
+                    
+                source["version"] = Item::Value(registry_components.version.clone().into());
                 deps.ui.print(&format!(
                     "  {} {} → {}",
                     styled_text("✓", MessageStyle::Green),
                     styled_text(&tool.name, MessageStyle::Cyan),
-                    styled_text(&tool.version, MessageStyle::Yellow)
+                    styled_text(&registry_components.version, MessageStyle::Yellow)
                 ));
             }
         } else {
