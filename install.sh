@@ -152,15 +152,6 @@ check_dependencies() {
         fi
     fi
     
-    # Check for Rust
-    echo -n "  Checking for Rust (cargo)... "
-    if ! command_exists "cargo"; then
-        echo "❌ not found"
-        missing_deps+=("rust")
-    else
-        echo "✓ found"
-    fi
-    
     # Check for Spin
     echo -n "  Checking for Spin... "
     if ! command_exists "spin"; then
@@ -186,12 +177,6 @@ check_dependencies() {
                     echo "  After installing, run: gh auth login"
                     echo ""
                     ;;
-                rust)
-                    echo "To install Rust:"
-                    echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-                    echo "  source \$HOME/.cargo/env"
-                    echo ""
-                    ;;
                 spin)
                     echo "To install Spin:"
                     echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
@@ -211,7 +196,7 @@ check_dependencies() {
             fi
         fi
         echo ""
-        info "⚠️  Warning: FTL requires gh CLI, Rust, and Spin to function properly"
+        info "⚠️  Warning: FTL requires gh CLI and Spin to function properly"
         echo ""
     else
         success "✓ All dependencies found"
@@ -226,7 +211,7 @@ main() {
     if [ "$AUTO_YES" = false ]; then
         echo ""
         info "This script will:"
-        echo "  1. Check for required dependencies (gh CLI, Rust, Spin)"
+        echo "  1. Check for required dependencies (gh CLI, Spin)"
         echo "  2. Verify GitHub CLI authentication"
         echo "  3. Find the latest FTL release"
         echo "  4. Download the FTL binary"
@@ -262,12 +247,18 @@ main() {
     
     info "Downloading ${asset_name} using gh CLI..."
     
-    # Download using gh release download
+    # Check if binary already exists
+    if [ -f "${BINARY_NAME}" ]; then
+        info "Existing ${BINARY_NAME} binary found, will overwrite it"
+    fi
+    
+    # Download using gh release download (with --clobber to overwrite)
     if ! confirm_exec "Download ftl binary from GitHub release" \
         gh release download "cli-v${version}" \
         --repo "${REPO}" \
         --pattern "${asset_name}" \
-        --output "${BINARY_NAME}"; then
+        --output "${BINARY_NAME}" \
+        --clobber; then
         error "Failed to download ${BINARY_NAME} binary. Make sure you have gh CLI authenticated: gh auth login"
     fi
 
@@ -367,11 +358,16 @@ main() {
         # Setup templates automatically
         echo ""
         info "Setting up FTL templates..."
-        if confirm_exec "Download and install FTL templates from GitHub" ${BINARY_NAME} setup templates; then
+        if confirm_exec "Download and install FTL templates from GitHub (will update if already installed)" ${BINARY_NAME} setup templates --force; then
             success "✓ Templates installed successfully!"
         else
-            info "⚠️  Template setup failed. You can run it manually later with: ftl setup templates"
+            info "⚠️  Template setup failed. You can run it manually later with: ftl setup templates --force"
         fi
+        
+        echo ""
+        info "Note: To develop MCP tools, you'll need language-specific dependencies:"
+        echo "  • For Rust tools: Install Rust and run 'rustup target add wasm32-wasip1'"
+        echo "  • For TypeScript/JavaScript tools: Install Node.js and npm"
     else
         echo ""
         info "Verify installation with:"
@@ -379,9 +375,9 @@ main() {
     fi
     
     # Final dependency reminder
-    if ! command_exists "gh" || ! command_exists "cargo" || ! command_exists "spin"; then
+    if ! command_exists "gh" || ! command_exists "spin"; then
         echo ""
-        info "Remember: FTL requires gh CLI, Rust, and Spin to be installed for full functionality"
+        info "Remember: FTL requires gh CLI and Spin to be installed for full functionality"
     fi
 }
 
