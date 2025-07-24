@@ -434,3 +434,106 @@ async fn test_mixed_success_and_failure() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Tests failed"));
 }
+
+#[tokio::test]
+async fn test_makefile_without_test_target() {
+    let mut fixture = TestFixture::new();
+
+    fixture.file_checker = Arc::new(MockFileChecker::new().with_existing_file("./Makefile"));
+
+    // Make command fails because no test target
+    fixture.command_executor = Arc::new(MockTestCommandExecutor::new().expect_execute(
+        "make",
+        &["test"],
+        Some("."),
+        MockTestCommandExecutor::failed_output("make: *** No rule to make target 'test'. Stop."),
+    ));
+
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(None, &deps);
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_make_command_success() {
+    let mut fixture = TestFixture::new();
+
+    fixture.file_checker = Arc::new(MockFileChecker::new().with_existing_file("./Makefile"));
+
+    fixture.command_executor = Arc::new(MockTestCommandExecutor::new().expect_execute(
+        "make",
+        &["test"],
+        Some("."),
+        MockTestCommandExecutor::successful_output("make test\nRunning tests...\nAll tests passed"),
+    ));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(None, &deps);
+    assert!(result.is_ok());
+
+    // Verify output
+    let output = ui.get_output();
+    assert!(output.iter().any(|s| s.contains("make test")));
+}
+
+#[tokio::test]
+#[ignore = "This test creates real dependencies"]
+async fn test_execute_function() {
+    use crate::commands::test::TestArgs;
+    use crate::commands::test::execute;
+
+    // Test the main execute function
+    let args = TestArgs {
+        path: Some(PathBuf::from("/tmp/nonexistent")),
+    };
+
+    // This will fail because the path doesn't exist, but we're testing
+    // that the function creates all the right dependencies
+    let result = execute(args).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_no_test_framework_found() {
+    let fixture = TestFixture::new();
+    // No test files found - no Cargo.toml, package.json, or Makefile
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(None, &deps);
+    assert!(result.is_ok());
+
+    // Verify output
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("No test configuration found"))
+    );
+}
+
+#[tokio::test]
+async fn test_run_tool_tests_npm_error_output() {
+    let mut fixture = TestFixture::new();
+
+    fixture.file_checker = Arc::new(MockFileChecker::new().with_existing_file("./package.json"));
+
+    fixture.command_executor = Arc::new(MockTestCommandExecutor::new().expect_execute(
+        "npm",
+        &["test"],
+        Some("."),
+        MockTestCommandExecutor::failed_output(
+            "npm ERR! Missing script: test\nnpm ERR! See npm help scripts",
+        ),
+    ));
+
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(None, &deps);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Tests failed"));
+}

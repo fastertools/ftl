@@ -280,7 +280,6 @@ route = "/mcp/..."
             .any(|s| s.contains("Rust tool added successfully"))
     );
     assert!(output.iter().any(|s| s.contains("my-tool/src/lib.rs")));
-    assert!(output.iter().any(|s| s.contains("/my-tool")));
 }
 
 #[tokio::test]

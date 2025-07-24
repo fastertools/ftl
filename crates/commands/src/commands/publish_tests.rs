@@ -528,3 +528,165 @@ async fn test_publish_registry_push_fails() {
     assert!(error_msg.contains("Authentication failed"));
     assert!(error_msg.contains("Please login first"));
 }
+
+#[tokio::test]
+async fn test_publish_with_custom_tag() {
+    let mut fixture = TestFixture::new();
+    let build_executor = Arc::new(MockBuildExecutor::new());
+    fixture.build_executor = build_executor.clone();
+
+    // Mock: spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path == Path::new("./spin.toml"))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: spin registry push with tag
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push", "--tag", "v1.0.0"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: "Published with tag v1.0.0".to_string(),
+            stderr: String::new(),
+        },
+    ));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let config = PublishConfig {
+        path: None,
+        registry: None,
+        tag: Some("v1.0.0".to_string()),
+    };
+
+    let result = execute_with_deps(config, deps).await;
+    assert!(result.is_ok());
+
+    // Verify output
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Published with tag v1.0.0"))
+    );
+}
+
+#[tokio::test]
+async fn test_publish_with_custom_registry_and_tag() {
+    let mut fixture = TestFixture::new();
+    let build_executor = Arc::new(MockBuildExecutor::new());
+    fixture.build_executor = build_executor.clone();
+
+    // Mock: spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path == Path::new("./spin.toml"))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: spin registry push with registry and tag
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &[
+            "registry",
+            "push",
+            "--registry",
+            "https://my-registry.com",
+            "--tag",
+            "latest",
+        ],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: "Published to custom registry".to_string(),
+            stderr: String::new(),
+        },
+    ));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let config = PublishConfig {
+        path: None,
+        registry: Some("https://my-registry.com".to_string()),
+        tag: Some("latest".to_string()),
+    };
+
+    let result = execute_with_deps(config, deps).await;
+    assert!(result.is_ok());
+
+    // Verify output includes stdout
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Published to custom registry"))
+    );
+}
+
+#[tokio::test]
+async fn test_publish_empty_stdout() {
+    let mut fixture = TestFixture::new();
+    let build_executor = Arc::new(MockBuildExecutor::new());
+    fixture.build_executor = build_executor.clone();
+
+    // Mock: spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path == Path::new("./spin.toml"))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: spin registry push with empty stdout
+    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
+        "/usr/local/bin/spin",
+        &["registry", "push"],
+        Some(PathBuf::from(".")),
+        ProcessOutput {
+            success: true,
+            stdout: "   \n  \t  ".to_string(), // Whitespace only
+            stderr: String::new(),
+        },
+    ));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let config = PublishConfig {
+        path: None,
+        registry: None,
+        tag: None,
+    };
+
+    let result = execute_with_deps(config, deps).await;
+    assert!(result.is_ok());
+
+    // Verify empty stdout is not printed
+    let output = ui.get_output();
+    assert!(!output.iter().any(|s| s.trim().is_empty() && !s.is_empty()));
+}
+
+#[tokio::test]
+#[ignore = "This test creates real dependencies"]
+async fn test_execute_function() {
+    use crate::commands::publish::{PublishArgs, execute};
+
+    // Test the main execute function
+    let args = PublishArgs {
+        path: Some(PathBuf::from("/tmp/nonexistent")),
+        registry: None,
+        tag: None,
+    };
+
+    // This will fail because the path doesn't exist, but we're testing
+    // that the function creates all the right dependencies
+    let result = execute(args).await;
+    assert!(result.is_err());
+}

@@ -80,7 +80,6 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
-    deps.ui.print(&format!("Using Spin at: {spin_path}"));
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
@@ -295,7 +294,6 @@ where
 
 /// Print success message
 fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, language: Language) {
-    let route = format!("/{}", component_name.replace('_', "-"));
     let main_file = match language {
         Language::Rust => format!("{component_name}/src/lib.rs"),
         Language::JavaScript | Language::TypeScript => format!("{component_name}/src/index.ts"),
@@ -317,8 +315,6 @@ fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, lang
     ui.print("🔨 Build and run:");
     ui.print("  ftl build       # Build all tools");
     ui.print("  ftl up          # Start the MCP server");
-    ui.print("");
-    ui.print(&format!("🚀 Your tool will be available at route: {route}"));
     ui.print("");
 }
 
