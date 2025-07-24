@@ -23,6 +23,12 @@ jobs:
       needs.changes.outputs.components == 'true' || 
       needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/ci.yml
+    with:
+      cli-changed: ${{ needs.changes.outputs.cli }}
+      rust-sdk-changed: ${{ needs.changes.outputs.rust-sdk }}
+      core-crates-changed: ${{ needs.changes.outputs.core-crates }}
+      components-changed: ${{ needs.changes.outputs.components }}
+      ci-changed: ${{ needs.changes.outputs.ci }}
   
   # Run CLI tests if needed
   cli-tests:

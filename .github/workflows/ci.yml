@@ -2,20 +2,31 @@ name: CI
 
 on:
   workflow_call:  # Only run when called by ci-status.yml
+    inputs:
+      cli-changed:
+        required: true
+        type: string
+      rust-sdk-changed:
+        required: true
+        type: string
+      core-crates-changed:
+        required: true
+        type: string
+      components-changed:
+        required: true
+        type: string
+      ci-changed:
+        required: true
+        type: string
 
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
 
 jobs:
-  changes:
-    name: Detect Changes
-    uses: ./.github/workflows/detect-changes.yml
-
   lint:
     name: Lint
-    needs: changes
-    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
+    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +57,7 @@ jobs:
 
   test-and-coverage:
     name: Test & Coverage
-    needs: changes
-    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
+    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,8 +102,7 @@ jobs:
 
   security:
     name: Security Audit
-    needs: changes
-    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.rust-sdk == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
+    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,8 +124,7 @@ jobs:
 
   wasm:
     name: WebAssembly Components
-    needs: changes
-    if: needs.changes.outputs.components == 'true' || needs.changes.outputs.ci == 'true'
+    if: inputs.components-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
