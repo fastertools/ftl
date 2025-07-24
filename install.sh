@@ -41,7 +41,7 @@ confirm_exec() {
         echo ""
         info "About to: $description"
         echo "Command: $*"
-        read -p "Continue? [Y/n] " -n 1 -r
+        read -p "Continue? [Y/n] " -n 1 -r </dev/tty
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             error "Operation cancelled by user"
@@ -129,27 +129,48 @@ command_exists() {
 
 # Check dependencies
 check_dependencies() {
+    info "Checking dependencies..."
+    echo ""
+    
     local missing_deps=()
     
     # Check for gh CLI
+    echo -n "  Checking for GitHub CLI (gh)... "
     if ! command_exists "gh"; then
+        echo "❌ not found"
         missing_deps+=("gh")
-    fi
-    
-    # Check gh authentication
-    if command_exists "gh" && ! confirm_exec "Check GitHub CLI authentication status" gh auth status >/dev/null 2>&1; then
-        error "GitHub CLI is not authenticated. Please run: gh auth login"
+    else
+        echo "✓ found"
+        
+        # Check gh authentication
+        echo -n "  Checking GitHub CLI authentication... "
+        if gh auth status >/dev/null 2>&1; then
+            echo "✓ authenticated"
+        else
+            echo "❌ not authenticated"
+            error "GitHub CLI is not authenticated. Please run: gh auth login"
+        fi
     fi
     
     # Check for Rust
+    echo -n "  Checking for Rust (cargo)... "
     if ! command_exists "cargo"; then
+        echo "❌ not found"
         missing_deps+=("rust")
+    else
+        echo "✓ found"
     fi
     
     # Check for Spin
+    echo -n "  Checking for Spin... "
     if ! command_exists "spin"; then
+        echo "❌ not found"
         missing_deps+=("spin")
+    else
+        echo "✓ found"
     fi
+    
+    echo ""
     
     if [ ${#missing_deps[@]} -ne 0 ]; then
         echo ""
@@ -183,7 +204,7 @@ check_dependencies() {
         if [ "$AUTO_YES" = true ]; then
             info "Continuing installation (--yes flag provided)"
         else
-            read -p "Would you like to continue anyway? (y/N) " -n 1 -r
+            read -p "Would you like to continue anyway? (y/N) " -n 1 -r </dev/tty
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 error "Installation cancelled. Please install missing dependencies first."
@@ -209,10 +230,10 @@ main() {
         echo "  2. Verify GitHub CLI authentication"
         echo "  3. Find the latest FTL release"
         echo "  4. Download the FTL binary"
-        echo "  5. Install it to /usr/local/bin or ~/.local/bin"
+        echo "  5. Install it to ~/.local/bin or /usr/local/bin"
         echo "  6. Set up FTL templates"
         echo ""
-        read -p "Continue? [Y/n] " -n 1 -r
+        read -p "Continue? [Y/n] " -n 1 -r </dev/tty
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             error "Installation cancelled"
@@ -256,35 +277,87 @@ main() {
     success "✓ FTL CLI v${version} downloaded successfully!"
     echo ""
     
-    # Ask user where to install (skip in auto mode)
+    # Ask user where to install
     if [ "$AUTO_YES" = true ]; then
-        REPLY="y"
+        # Default to ~/.local/bin in auto mode
+        INSTALL_CHOICE="1"
     else
-        read -p "Install ftl to /usr/local/bin? (requires sudo) [Y/n] " -n 1 -r
+        info "Where would you like to install ftl?"
+        echo ""
+        echo "  1) ~/.local/bin (user directory) - Recommended"
+        echo "  2) /usr/local/bin (requires sudo)"
+        echo "  3) Skip installation (manual setup)"
+        echo ""
+        read -p "Select an option [1-3]: " -n 1 -r INSTALL_CHOICE </dev/tty
         echo
     fi
     
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-        if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
-            INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
-            success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
-        else
-            error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
-        fi
-    else
-        # Install to user's local bin
-        mkdir -p ~/.local/bin
-        mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}
-        INSTALL_PATH="$HOME/.local/bin/${BINARY_NAME}"
-        success "✓ Installed to ~/.local/bin/${BINARY_NAME}"
-        
-        # Check if ~/.local/bin is in PATH
-        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    case "$INSTALL_CHOICE" in
+        1|"")
+            # Install to ~/.local/bin
+            info "Installing to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}
+            INSTALL_PATH="$HOME/.local/bin/${BINARY_NAME}"
+            success "✓ Installed to ~/.local/bin/${BINARY_NAME}"
+            
+            # Check if ~/.local/bin is in PATH
+            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+                echo ""
+                info "⚠️  ~/.local/bin is not in your PATH"
+                echo ""
+                echo "Add this line to your shell configuration file:"
+                echo ""
+                # Detect shell
+                if [[ "$SHELL" == *"zsh"* ]]; then
+                    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+                    echo ""
+                    echo "Then reload your shell configuration:"
+                    echo "  source ~/.zshrc"
+                elif [[ "$SHELL" == *"bash"* ]]; then
+                    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+                    echo ""
+                    echo "Then reload your shell configuration:"
+                    echo "  source ~/.bashrc"
+                else
+                    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+                    echo ""
+                    echo "Add the above line to your shell's configuration file"
+                fi
+            fi
+            ;;
+        2)
+            # Install to /usr/local/bin
+            info "Installing to /usr/local/bin..."
+            if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
+                INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
+                success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
+            else
+                error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
+            fi
+            ;;
+        3)
+            # Skip installation
+            info "Installation skipped. To install manually:"
             echo ""
-            info "Add ~/.local/bin to your PATH:"
-            echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-        fi
-    fi
+            echo "  # Move the binary to your preferred location:"
+            echo "  mv ./${BINARY_NAME} /path/to/destination/"
+            echo ""
+            echo "  # Make it executable (if needed):"
+            echo "  chmod +x /path/to/destination/${BINARY_NAME}"
+            echo ""
+            echo "  # Add the directory to your PATH if needed"
+            echo ""
+            info "To continue with template setup:"
+            echo "  ./${BINARY_NAME} setup templates"
+            echo ""
+            # Exit early since we're not installing
+            exit 0
+            ;;
+        *)
+            error "Invalid option selected"
+            ;;
+    esac
     
     # Verify installation
     if command_exists "${BINARY_NAME}"; then
