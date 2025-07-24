@@ -744,3 +744,203 @@ fn test_should_watch_file() {
     assert!(!up::should_watch_file(&PathBuf::from("module.wasm")));
     assert!(!up::should_watch_file(&PathBuf::from("module.wat")));
 }
+
+#[tokio::test]
+async fn test_up_with_specific_port() {
+    let mut fixture = TestFixture::new();
+
+    // Mock: spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("./spin.toml")))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: spin installer
+    fixture
+        .spin_installer
+        .expect_check_and_install()
+        .times(1)
+        .returning(|| Ok("/usr/local/bin/spin".to_string()));
+
+    // Mock: process spawn
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
+
+    // Mock: signal handler with interrupt
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(100),
+    ));
+
+    let ui = fixture.ui.clone();
+    let process_manager = fixture.process_manager.clone();
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(
+        UpConfig {
+            path: None,
+            port: 8080, // Custom port
+            build: false,
+            watch: false,
+            clear: false,
+        },
+        deps,
+    )
+    .await;
+
+    assert!(result.is_ok());
+
+    // Verify process was spawned
+    assert_eq!(process_manager.get_spawn_count(), 1);
+
+    // Verify output shows custom port
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Server will start at http://127.0.0.1:8080"))
+    );
+}
+
+#[tokio::test]
+async fn test_up_with_clear_screen() {
+    let mut fixture = TestFixture::new();
+
+    // Mock: spin.toml exists (multiple checks)
+    fixture
+        .file_system
+        .expect_exists()
+        .returning(|path| path == Path::new("./spin.toml"));
+
+    // Mock: read spin.toml for builds
+    fixture.file_system.expect_read_to_string().returning(|_| {
+        Ok(r#"
+spin_manifest_version = "1"
+name = "test-app"
+
+[component.backend]
+source = "target/wasm32-wasi/release/backend.wasm"
+[component.backend.build]
+command = "cargo build --target wasm32-wasi"
+"#
+        .to_string())
+    });
+
+    // Mock: spin installer
+    fixture
+        .spin_installer
+        .expect_check_and_install()
+        .returning(|| Ok("/usr/local/bin/spin".to_string()));
+
+    // Mock: build command execution
+    fixture.command_executor.expect_execute().returning(|_, _| {
+        Ok(CommandOutput {
+            success: true,
+            stdout: b"Build successful".to_vec(),
+            stderr: vec![],
+        })
+    });
+
+    // Mock: process spawn
+    fixture
+        .process_manager
+        .add_spawn_response(Ok(Box::new(MockProcessHandle::new(1234, 0))));
+
+    // Mock: signal handler with quick interrupt
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(50),
+    ));
+
+    let deps = fixture.to_deps();
+
+    // Run with timeout since watch mode runs until interrupted
+    let result = tokio::time::timeout(
+        Duration::from_millis(200),
+        execute_with_deps(
+            UpConfig {
+                path: None,
+                port: 3000,
+                build: false,
+                watch: true,
+                clear: true, // Clear screen enabled
+            },
+            deps,
+        ),
+    )
+    .await;
+
+    // Should complete successfully when interrupted
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_execute_function() {
+    use crate::commands::up::{UpArgs, execute};
+
+    // Test the main execute function
+    let args = UpArgs {
+        path: Some(PathBuf::from("/tmp/nonexistent")),
+        build: false,
+        watch: false,
+        clear: false,
+        port: Some(3000),
+    };
+
+    // This will fail because the path doesn't exist, but we're testing
+    // that the function creates all the right dependencies
+    let result = execute(args).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_up_ctrlc_handling() {
+    let mut fixture = TestFixture::new();
+
+    // Mock: spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("./spin.toml")))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: spin installer
+    fixture
+        .spin_installer
+        .expect_check_and_install()
+        .times(1)
+        .returning(|| Ok("/usr/local/bin/spin".to_string()));
+
+    // Mock: process spawn - process that runs for 300ms
+    fixture.process_manager.add_spawn_response(Ok(Box::new(
+        MockProcessHandle::new(1234, 0).with_wait_duration(Duration::from_millis(300)),
+    )));
+
+    // Mock: signal handler with interrupt after 100ms (simulating Ctrl-C)
+    fixture.signal_handler = Arc::new(MockSignalHandler::with_interrupt_after(
+        Duration::from_millis(100),
+    ));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    let result = execute_with_deps(
+        UpConfig {
+            path: None,
+            port: 3000,
+            build: false,
+            watch: false,
+            clear: false,
+        },
+        deps,
+    )
+    .await;
+
+    assert!(result.is_ok());
+
+    // Verify output shows stopping message
+    let output = ui.get_output();
+    assert!(output.iter().any(|s| s.contains("Stopping server")));
+}

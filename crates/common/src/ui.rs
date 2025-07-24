@@ -235,3 +235,7 @@ impl MultiProgressManager for TestMultiProgressManager {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "ui_tests.rs"]
+mod tests;
