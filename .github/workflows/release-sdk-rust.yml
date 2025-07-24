@@ -76,10 +76,15 @@ jobs:
       
       - name: Verify crates can be published
         run: |
+          # Verify macros crate first
           cd sdk/rust-macros
           cargo publish --dry-run
+          
+          # For the SDK, we can't do a full dry-run because it depends on the 
+          # not-yet-published macros version. Just verify it builds.
           cd ../rust
-          cargo publish --dry-run
+          cargo build
+          cargo package --list
       
       - name: Publish ftl-sdk-macros
         run: |
