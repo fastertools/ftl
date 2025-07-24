@@ -127,18 +127,69 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Install Spin if not present
+install_spin() {
+    info "Spin is required for FTL to work properly."
+    echo ""
+    
+    if [ "$AUTO_YES" = false ]; then
+        read -p "Would you like to install Spin automatically? [Y/n] " -n 1 -r </dev/tty
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            info "Skipping Spin installation. You can install it manually later:"
+            echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
+            echo "  sudo mv ./spin /usr/local/bin/spin"
+            return 1
+        fi
+    fi
+    
+    info "Installing Spin..."
+    
+    # Determine the correct Spin installer URL based on OS
+    local spin_installer_url
+    case "$(uname -s)" in
+        Darwin*)
+            spin_installer_url="https://wasm-functions.fermyon.app/downloads/install.sh"
+            ;;
+        Linux*)
+            spin_installer_url="https://developer.fermyon.com/downloads/fwf_install.sh"
+            ;;
+        *)
+            error "Unsupported OS for automatic Spin installation. Please install Spin manually."
+            ;;
+    esac
+    
+    # Download and run Spin installer
+    if confirm_exec "Download and run Spin installer" bash -c "curl -fsSL $spin_installer_url | bash"; then
+        # Move spin to /usr/local/bin
+        if [ -f "./spin" ]; then
+            info "Moving Spin to /usr/local/bin..."
+            if sudo mv ./spin /usr/local/bin/spin; then
+                success "✓ Spin installed successfully!"
+                return 0
+            else
+                error "Failed to move Spin to /usr/local/bin. Please run: sudo mv ./spin /usr/local/bin/spin"
+            fi
+        else
+            error "Spin binary not found after installation"
+        fi
+    else
+        error "Failed to install Spin"
+    fi
+    
+    return 1
+}
+
 # Check dependencies
 check_dependencies() {
     info "Checking dependencies..."
     echo ""
     
-    local missing_deps=()
-    
-    # Check for gh CLI
+    # Check for gh CLI (temporary requirement)
     echo -n "  Checking for GitHub CLI (gh)... "
     if ! command_exists "gh"; then
         echo "❌ not found"
-        missing_deps+=("gh")
+        error "GitHub CLI is required (temporarily, until repo is public). Please install from: https://cli.github.com"
     else
         echo "✓ found"
         
@@ -156,51 +207,18 @@ check_dependencies() {
     echo -n "  Checking for Spin... "
     if ! command_exists "spin"; then
         echo "❌ not found"
-        missing_deps+=("spin")
+        echo ""
+        # Offer to install Spin automatically
+        if ! install_spin; then
+            echo ""
+            info "⚠️  Warning: Spin is required for FTL to function properly"
+            echo ""
+        fi
     else
         echo "✓ found"
     fi
     
     echo ""
-    
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        echo ""
-        info "Missing required dependencies: ${missing_deps[*]}"
-        echo ""
-        
-        # Provide installation instructions
-        for dep in "${missing_deps[@]}"; do
-            case "$dep" in
-                gh)
-                    echo "To install GitHub CLI:"
-                    echo "  Visit: https://cli.github.com"
-                    echo "  After installing, run: gh auth login"
-                    echo ""
-                    ;;
-                spin)
-                    echo "To install Spin:"
-                    echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
-                    echo "  sudo mv ./spin /usr/local/bin/spin"
-                    echo ""
-                    ;;
-            esac
-        done
-        
-        if [ "$AUTO_YES" = true ]; then
-            info "Continuing installation (--yes flag provided)"
-        else
-            read -p "Would you like to continue anyway? (y/N) " -n 1 -r </dev/tty
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                error "Installation cancelled. Please install missing dependencies first."
-            fi
-        fi
-        echo ""
-        info "⚠️  Warning: FTL requires gh CLI and Spin to function properly"
-        echo ""
-    else
-        success "✓ All dependencies found"
-    fi
 }
 
 # Download and install
@@ -211,8 +229,8 @@ main() {
     if [ "$AUTO_YES" = false ]; then
         echo ""
         info "This script will:"
-        echo "  1. Check for required dependencies (gh CLI, Spin)"
-        echo "  2. Verify GitHub CLI authentication"
+        echo "  1. Check dependencies (gh CLI temporarily required)"
+        echo "  2. Install Spin if not present (with your permission)"
         echo "  3. Find the latest FTL release"
         echo "  4. Download the FTL binary"
         echo "  5. Install it to ~/.local/bin or /usr/local/bin"
@@ -374,10 +392,12 @@ main() {
         echo "  ${BINARY_NAME} --version"
     fi
     
-    # Final dependency reminder
-    if ! command_exists "gh" || ! command_exists "spin"; then
+    # Final reminder about Spin if not installed
+    if ! command_exists "spin"; then
         echo ""
-        info "Remember: FTL requires gh CLI and Spin to be installed for full functionality"
+        info "Remember: Spin is required for FTL to function. Install it with:"
+        echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
+        echo "  sudo mv ./spin /usr/local/bin/spin"
     fi
 }
 
