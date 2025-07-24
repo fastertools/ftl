@@ -7,15 +7,18 @@ use crate::commands::registry::{
 };
 use ftl_common::ui::TestUserInterface;
 use ftl_runtime::deps::UserInterface;
+use reqwest::Client;
 
 struct TestFixture {
     ui: Arc<TestUserInterface>,
+    client: Client,
 }
 
 impl TestFixture {
     fn new() -> Self {
         Self {
             ui: Arc::new(TestUserInterface::new()),
+            client: Client::new(),
         }
     }
 
@@ -23,6 +26,7 @@ impl TestFixture {
     fn to_deps(self) -> Arc<RegistryDependencies> {
         Arc::new(RegistryDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
+            client: self.client,
         })
     }
 }

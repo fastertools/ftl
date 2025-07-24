@@ -292,7 +292,7 @@ async fn resolve_tools(
 }
 
 /// Parse tool specification (name or name:version)
-fn parse_tool_spec(spec: &str) -> (String, String) {
+pub fn parse_tool_spec(spec: &str) -> (String, String) {
     if let Some(colon_pos) = spec.find(':') {
         let name = spec[..colon_pos].to_string();
         let version = spec[colon_pos + 1..].to_string();
@@ -617,3 +617,7 @@ mod tests {
         assert!(!encoding_tools.is_empty());
     }
 }
+
+#[cfg(test)]
+#[path = "tools_tests.rs"]
+mod tools_tests;
