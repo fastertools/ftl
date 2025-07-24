@@ -86,9 +86,28 @@ detect_platform() {
 
 # Get the latest release version
 get_latest_version() {
-    curl -sL "https://api.github.com/repos/${REPO}/releases/latest" | \
-        grep '"tag_name":' | \
-        sed -E 's/.*"cli-v([^"]+)".*/\1/'
+    local api_response
+    local curl_opts="-sL"
+    
+    # Add authentication header if GITHUB_TOKEN is set
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl_opts="$curl_opts -H \"Authorization: token ${GITHUB_TOKEN}\""
+    fi
+    
+    api_response=$(eval "curl $curl_opts \"https://api.github.com/repos/${REPO}/releases/latest\"")
+    
+    # Debug: Show first 200 chars of response if it looks like an error
+    if echo "$api_response" | grep -q '"message"'; then
+        info "API Response: $(echo "$api_response" | head -c 200)..."
+    fi
+    
+    # Check if we got a valid response
+    if [ -z "$api_response" ] || echo "$api_response" | grep -q "Not Found"; then
+        return 1
+    fi
+    
+    # Extract version from tag_name (format: cli-vX.Y.Z)
+    echo "$api_response" | grep -o '"tag_name":\s*"cli-v[^"]*"' | sed -E 's/.*"cli-v([^"]+)".*/\1/'
 }
 
 # Check if command exists
@@ -164,7 +183,10 @@ main() {
     # Get latest version
     local version=$(get_latest_version)
     if [ -z "$version" ]; then
-        error "Failed to determine latest version"
+        error "Failed to determine latest version. Please check:
+  - Is the repository public or are you authenticated?
+  - Are there any releases published?
+  - API URL: https://api.github.com/repos/${REPO}/releases/latest"
     fi
     info "Latest version: v${version}"
 
