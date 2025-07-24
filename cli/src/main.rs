@@ -432,7 +432,7 @@ impl From<AppArgs> for ftl_commands::app::AppArgs {
     }
 }
 
-impl From<RegistryCommand> for ftl_commands::registry::RegistryCommand {
+impl From<RegistryCommand> for ftl_commands::registry_command::RegistryCommand {
     fn from(cmd: RegistryCommand) -> Self {
         match cmd {
             RegistryCommand::Search { query, registry } => Self::Search { query, registry },
@@ -442,7 +442,7 @@ impl From<RegistryCommand> for ftl_commands::registry::RegistryCommand {
     }
 }
 
-impl From<RegistryArgs> for ftl_commands::registry::RegistryArgs {
+impl From<RegistryArgs> for ftl_commands::registry_command::RegistryArgs {
     fn from(args: RegistryArgs) -> Self {
         Self {
             command: args.command.into(),
@@ -475,6 +475,6 @@ async fn main() -> Result<()> {
         Commands::Logout(args) => ftl_commands::logout::execute(args.into()).await,
         Commands::Test(args) => ftl_commands::test::execute(args.into()).await,
         Commands::App(args) => ftl_commands::app::execute(args.into()).await,
-        Commands::Registry(args) => ftl_commands::registry::execute(args.into()).await,
+        Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
     }
 }
