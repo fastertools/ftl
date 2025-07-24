@@ -31,6 +31,27 @@ info() {
     echo -e "${YELLOW}$1${NC}"
 }
 
+# Execute command with optional confirmation
+# Usage: confirm_exec "description" command args...
+confirm_exec() {
+    local description="$1"
+    shift
+    
+    if [ "$AUTO_YES" = false ]; then
+        echo ""
+        info "About to: $description"
+        echo "Command: $*"
+        read -p "Continue? [Y/n] " -n 1 -r </dev/tty
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            error "Operation cancelled by user"
+        fi
+    fi
+    
+    # Execute the command
+    "$@"
+}
+
 # Show help message
 show_help() {
     cat << EOF
@@ -54,11 +75,12 @@ Examples:
     # Automatic installation (no prompts)
     curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/cli-v0.0.28/install.sh | bash -s -- --yes
 
-    # For private repos (automatically uses gh auth if available)
-    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+    # For private repos (requires gh CLI to be authenticated)
+    gh auth login  # If not already authenticated
+    curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
 
-Note: The installer automatically uses 'gh auth token' if gh CLI is authenticated.
-      For private repos without gh CLI, set GITHUB_TOKEN environment variable.
+Note: This installer requires GitHub CLI (gh) to be installed and authenticated.
+      Install gh from: https://cli.github.com
 
 EOF
     exit 0
@@ -87,42 +109,17 @@ detect_platform() {
     echo "${arch}-${os}"
 }
 
-# Get GitHub token from gh CLI if available
-get_github_token() {
-    # First check if GITHUB_TOKEN is already set
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        echo "$GITHUB_TOKEN"
-    elif command_exists "gh" && gh auth status >/dev/null 2>&1; then
-        # If gh is available and authenticated, use it
-        gh auth token 2>/dev/null
-    fi
-}
 
 # Get the latest release version
 get_latest_version() {
-    local api_response
-    local curl_opts="-sL"
-    local token=$(get_github_token)
-    
-    # Add authentication header if token is available
-    if [ -n "$token" ]; then
-        curl_opts="$curl_opts -H \"Authorization: token $token\""
-    fi
-    
-    api_response=$(eval "curl $curl_opts \"https://api.github.com/repos/${REPO}/releases/latest\"")
-    
-    # Debug: Show first 200 chars of response if it looks like an error
-    if echo "$api_response" | grep -q '"message"'; then
-        info "API Response: $(echo "$api_response" | head -c 200)..."
-    fi
-    
-    # Check if we got a valid response
-    if [ -z "$api_response" ] || echo "$api_response" | grep -q "Not Found"; then
+    # Get the latest release tag that starts with cli-v
+    local latest_tag=$(confirm_exec "List GitHub releases to find latest version" gh release list --repo "${REPO}" --limit 10 | grep -E "^cli-v[0-9]" | head -1 | awk '{print $1}')
+    if [ -n "$latest_tag" ]; then
+        # Extract version from tag (format: cli-vX.Y.Z)
+        echo "$latest_tag" | sed 's/^cli-v//'
+    else
         return 1
     fi
-    
-    # Extract version from tag_name (format: cli-vX.Y.Z)
-    echo "$api_response" | grep -o '"tag_name":\s*"cli-v[^"]*"' | sed -E 's/.*"cli-v([^"]+)".*/\1/'
 }
 
 # Check if command exists
@@ -132,17 +129,48 @@ command_exists() {
 
 # Check dependencies
 check_dependencies() {
+    info "Checking dependencies..."
+    echo ""
+    
     local missing_deps=()
     
+    # Check for gh CLI
+    echo -n "  Checking for GitHub CLI (gh)... "
+    if ! command_exists "gh"; then
+        echo "❌ not found"
+        missing_deps+=("gh")
+    else
+        echo "✓ found"
+        
+        # Check gh authentication
+        echo -n "  Checking GitHub CLI authentication... "
+        if gh auth status >/dev/null 2>&1; then
+            echo "✓ authenticated"
+        else
+            echo "❌ not authenticated"
+            error "GitHub CLI is not authenticated. Please run: gh auth login"
+        fi
+    fi
+    
     # Check for Rust
+    echo -n "  Checking for Rust (cargo)... "
     if ! command_exists "cargo"; then
+        echo "❌ not found"
         missing_deps+=("rust")
+    else
+        echo "✓ found"
     fi
     
     # Check for Spin
+    echo -n "  Checking for Spin... "
     if ! command_exists "spin"; then
+        echo "❌ not found"
         missing_deps+=("spin")
+    else
+        echo "✓ found"
     fi
+    
+    echo ""
     
     if [ ${#missing_deps[@]} -ne 0 ]; then
         echo ""
@@ -152,6 +180,12 @@ check_dependencies() {
         # Provide installation instructions
         for dep in "${missing_deps[@]}"; do
             case "$dep" in
+                gh)
+                    echo "To install GitHub CLI:"
+                    echo "  Visit: https://cli.github.com"
+                    echo "  After installing, run: gh auth login"
+                    echo ""
+                    ;;
                 rust)
                     echo "To install Rust:"
                     echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
@@ -170,14 +204,14 @@ check_dependencies() {
         if [ "$AUTO_YES" = true ]; then
             info "Continuing installation (--yes flag provided)"
         else
-            read -p "Would you like to continue anyway? (y/N) " -n 1 -r
+            read -p "Would you like to continue anyway? (y/N) " -n 1 -r </dev/tty
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 error "Installation cancelled. Please install missing dependencies first."
             fi
         fi
         echo ""
-        info "⚠️  Warning: FTL requires Rust and Spin to function properly"
+        info "⚠️  Warning: FTL requires gh CLI, Rust, and Spin to function properly"
         echo ""
     else
         success "✓ All dependencies found"
@@ -187,6 +221,24 @@ check_dependencies() {
 # Download and install
 main() {
     info "Installing FTL CLI..."
+    
+    # Show what we'll do (unless in auto mode)
+    if [ "$AUTO_YES" = false ]; then
+        echo ""
+        info "This script will:"
+        echo "  1. Check for required dependencies (gh CLI, Rust, Spin)"
+        echo "  2. Verify GitHub CLI authentication"
+        echo "  3. Find the latest FTL release"
+        echo "  4. Download the FTL binary"
+        echo "  5. Install it to ~/.local/bin or /usr/local/bin"
+        echo "  6. Set up FTL templates"
+        echo ""
+        read -p "Continue? [Y/n] " -n 1 -r </dev/tty
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            error "Installation cancelled"
+        fi
+    fi
 
     # Check dependencies first
     check_dependencies
@@ -208,25 +260,15 @@ main() {
     # Construct asset name
     local asset_name="${BINARY_NAME}-${platform}"
     
-    # Check if gh CLI is available
-    if command_exists "gh"; then
-        info "Downloading ${asset_name} using gh CLI..."
-        
-        # Download using gh release download
-        if ! gh release download "cli-v${version}" \
-            --repo "${REPO}" \
-            --pattern "${asset_name}" \
-            --output "${BINARY_NAME}"; then
-            error "Failed to download ${BINARY_NAME} binary"
-        fi
-    else
-        # Fallback to curl for public repos
-        local download_url="https://github.com/${REPO}/releases/download/cli-v${version}/${asset_name}"
-        info "Downloading from: ${download_url}"
-        
-        if ! curl -fsSL "${download_url}" -o "${BINARY_NAME}"; then
-            error "Failed to download ${BINARY_NAME} binary. For private repos, please install gh CLI: https://cli.github.com"
-        fi
+    info "Downloading ${asset_name} using gh CLI..."
+    
+    # Download using gh release download
+    if ! confirm_exec "Download ftl binary from GitHub release" \
+        gh release download "cli-v${version}" \
+        --repo "${REPO}" \
+        --pattern "${asset_name}" \
+        --output "${BINARY_NAME}"; then
+        error "Failed to download ${BINARY_NAME} binary. Make sure you have gh CLI authenticated: gh auth login"
     fi
 
     # Make executable
@@ -234,21 +276,112 @@ main() {
 
     success "✓ FTL CLI v${version} downloaded successfully!"
     echo ""
-    echo "To install system-wide, run:"
-    echo "  sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
-    echo ""
-    echo "Or add to your PATH:"
-    echo "  mkdir -p ~/.local/bin"
-    echo "  mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}"
-    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-    echo ""
-    echo "Then verify installation with:"
-    echo "  ${BINARY_NAME} --version"
+    
+    # Ask user where to install
+    if [ "$AUTO_YES" = true ]; then
+        # Default to ~/.local/bin in auto mode
+        INSTALL_CHOICE="1"
+    else
+        info "Where would you like to install ftl?"
+        echo ""
+        echo "  1) ~/.local/bin (user directory) - Recommended"
+        echo "  2) /usr/local/bin (requires sudo)"
+        echo "  3) Skip installation (manual setup)"
+        echo ""
+        read -p "Select an option [1-3]: " -n 1 -r INSTALL_CHOICE </dev/tty
+        echo
+    fi
+    
+    case "$INSTALL_CHOICE" in
+        1|"")
+            # Install to ~/.local/bin
+            info "Installing to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            mv ./${BINARY_NAME} ~/.local/bin/${BINARY_NAME}
+            INSTALL_PATH="$HOME/.local/bin/${BINARY_NAME}"
+            success "✓ Installed to ~/.local/bin/${BINARY_NAME}"
+            
+            # Check if ~/.local/bin is in PATH
+            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+                echo ""
+                info "⚠️  ~/.local/bin is not in your PATH"
+                echo ""
+                echo "Add this line to your shell configuration file:"
+                echo ""
+                # Detect shell
+                if [[ "$SHELL" == *"zsh"* ]]; then
+                    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+                    echo ""
+                    echo "Then reload your shell configuration:"
+                    echo "  source ~/.zshrc"
+                elif [[ "$SHELL" == *"bash"* ]]; then
+                    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+                    echo ""
+                    echo "Then reload your shell configuration:"
+                    echo "  source ~/.bashrc"
+                else
+                    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+                    echo ""
+                    echo "Add the above line to your shell's configuration file"
+                fi
+            fi
+            ;;
+        2)
+            # Install to /usr/local/bin
+            info "Installing to /usr/local/bin..."
+            if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
+                INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
+                success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
+            else
+                error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
+            fi
+            ;;
+        3)
+            # Skip installation
+            info "Installation skipped. To install manually:"
+            echo ""
+            echo "  # Move the binary to your preferred location:"
+            echo "  mv ./${BINARY_NAME} /path/to/destination/"
+            echo ""
+            echo "  # Make it executable (if needed):"
+            echo "  chmod +x /path/to/destination/${BINARY_NAME}"
+            echo ""
+            echo "  # Add the directory to your PATH if needed"
+            echo ""
+            info "To continue with template setup:"
+            echo "  ./${BINARY_NAME} setup templates"
+            echo ""
+            # Exit early since we're not installing
+            exit 0
+            ;;
+        *)
+            error "Invalid option selected"
+            ;;
+    esac
+    
+    # Verify installation
+    if command_exists "${BINARY_NAME}"; then
+        echo ""
+        success "✓ FTL CLI is ready to use!"
+        
+        # Setup templates automatically
+        echo ""
+        info "Setting up FTL templates..."
+        if confirm_exec "Download and install FTL templates from GitHub" ${BINARY_NAME} setup templates; then
+            success "✓ Templates installed successfully!"
+        else
+            info "⚠️  Template setup failed. You can run it manually later with: ftl setup templates"
+        fi
+    else
+        echo ""
+        info "Verify installation with:"
+        echo "  ${BINARY_NAME} --version"
+    fi
     
     # Final dependency reminder
-    if ! command_exists "cargo" || ! command_exists "spin"; then
+    if ! command_exists "gh" || ! command_exists "cargo" || ! command_exists "spin"; then
         echo ""
-        info "Remember: FTL requires Rust and Spin to be installed for full functionality"
+        info "Remember: FTL requires gh CLI, Rust, and Spin to be installed for full functionality"
     fi
 }
 
