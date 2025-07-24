@@ -163,8 +163,8 @@ jobs:
               ;;
             mcp-authorizer|mcp-gateway)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
-              # Update Cargo.lock
-              cargo update -p "${COMPONENT//-/_}" --precise "$NEW_VERSION" || cargo update -p "${COMPONENT//-/_}"
+              # Update Cargo.lock - components use ftl- prefix in package names
+              cargo update -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update -p "ftl-${COMPONENT}"
               ;;
           esac
       
