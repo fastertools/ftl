@@ -27,7 +27,7 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["macros", "rt"] }
 futures = "0.3"
 jsonschema = { version = "0.26", default-features = false }
-ftl-sdk = "0.2.1"
+ftl-sdk = { path = "../../sdk/rust" }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -1127,7 +1127,7 @@ name = "ftl-mcp-gateway"
 version = "0.0.4"
 dependencies = [
  "anyhow",
- "ftl-sdk 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ftl-sdk",
  "futures",
  "jsonschema",
  "serde",
@@ -1174,16 +1174,6 @@ version = "0.2.3"
 dependencies = [
  "ftl-sdk-macros",
  "pretty_assertions",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "ftl-sdk"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e159c294026ff4a5206f2f7191abe2ba4aae2d8a2b2d7cc98024acd8215ade6"
-dependencies = [
  "serde",
  "serde_json",
 ]
