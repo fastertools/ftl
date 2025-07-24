@@ -151,8 +151,16 @@ jobs:
                 MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
                 echo "Current macros version: $MACROS_VERSION"
               fi
-              # Update Cargo.lock
-              cargo update -p ftl-sdk --precise "$NEW_VERSION" || cargo update -p ftl-sdk
+              # Update Cargo.lock for the local package using manifest path
+              cargo update --manifest-path sdk/rust/Cargo.toml -p ftl-sdk --precise "$NEW_VERSION"
+              
+              # Also update examples and templates to use the new version
+              find examples templates -name "Cargo.toml" -type f | while read -r file; do
+                if grep -q 'ftl-sdk.*version' "$file"; then
+                  sed -i "s/ftl-sdk = { version = \"[^\"]*\"/ftl-sdk = { version = \"$NEW_VERSION\"/" "$file"
+                  echo "Updated ftl-sdk version in $file"
+                fi
+              done
               ;;
             sdk-typescript)
               cd sdk/typescript
