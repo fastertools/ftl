@@ -26,8 +26,8 @@ jobs:
           PR_TITLE="${{ github.event.pull_request.title }}"
           
           # Extract component and version from PR title
-          # Expected format: "Release: {Component} v{version}"
-          if [[ "$PR_TITLE" =~ Release:\ (.+)\ v(.+) ]]; then
+          # Expected format: "release: {Component} v{version}"
+          if [[ "$PR_TITLE" =~ release:\ (.+)\ v(.+) ]]; then
             COMPONENT="${BASH_REMATCH[1]}"
             VERSION="${BASH_REMATCH[2]}"
             

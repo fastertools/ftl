@@ -272,19 +272,19 @@ jobs:
           case "$COMPONENT" in
             cli)
               TAG="cli-v${NEW_VERSION}"
-              TITLE="Release: CLI v${NEW_VERSION}"
+              TITLE="release: CLI v${NEW_VERSION}"
               ;;
             sdk-rust)
               TAG="sdk-rust-v${NEW_VERSION}"
-              TITLE="Release: Rust SDK v${NEW_VERSION}"
+              TITLE="release: Rust SDK v${NEW_VERSION}"
               ;;
             sdk-typescript)
               TAG="sdk-typescript-v${NEW_VERSION}"
-              TITLE="Release: TypeScript SDK v${NEW_VERSION}"
+              TITLE="release: TypeScript SDK v${NEW_VERSION}"
               ;;
             mcp-authorizer|mcp-gateway)
               TAG="component-${COMPONENT}-v${NEW_VERSION}"
-              TITLE="Release: ${COMPONENT} v${NEW_VERSION}"
+              TITLE="release: ${COMPONENT} v${NEW_VERSION}"
               ;;
           esac
           
