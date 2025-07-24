@@ -7,50 +7,33 @@ on:
     branches: [ main ]
 
 jobs:
-  # First, detect what changed
+  # Detect what changed using our existing workflow
   changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
-    outputs:
-      ci: ${{ steps.filter.outputs.ci }}
-      cli: ${{ steps.filter.outputs.cli }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            ci:
-              - 'cli/**'
-              - 'crates/**'
-              - 'components/**'
-              - 'sdk/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/detect-changes.yml'
-            cli:
-              - 'cli/**'
-              - 'crates/**'
-              - 'components/**'
-              - 'sdk/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - '.github/workflows/test-cli.yml'
-              - 'templates/**'
+    uses: ./.github/workflows/detect-changes.yml
 
   # Run CI if needed
   ci:
     name: Run CI
     needs: changes
-    if: needs.changes.outputs.ci == 'true'
+    if: |
+      needs.changes.outputs.cli == 'true' || 
+      needs.changes.outputs.rust-sdk == 'true' || 
+      needs.changes.outputs.core-crates == 'true' || 
+      needs.changes.outputs.components == 'true' || 
+      needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/ci.yml
   
   # Run CLI tests if needed
   cli-tests:
     name: Run CLI Tests
     needs: changes
-    if: needs.changes.outputs.cli == 'true'
+    if: |
+      needs.changes.outputs.cli == 'true' || 
+      needs.changes.outputs.rust-sdk == 'true' || 
+      needs.changes.outputs.core-crates == 'true' || 
+      needs.changes.outputs.components == 'true' || 
+      needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/test-cli.yml
   
   # The single required status check
@@ -65,8 +48,18 @@ jobs:
           echo "CI Status Summary:"
           echo "=================="
           
-          # Check if any changes require CI
-          if [ "${{ needs.changes.outputs.ci }}" == "true" ]; then
+          # Determine if CI should have run
+          CI_SHOULD_RUN="false"
+          if [ "${{ needs.changes.outputs.cli }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.rust-sdk }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.core-crates }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.components }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.ci }}" == "true" ]; then
+            CI_SHOULD_RUN="true"
+          fi
+          
+          # Check CI status
+          if [ "$CI_SHOULD_RUN" == "true" ]; then
             if [ "${{ needs.ci.result }}" == "success" ]; then
               echo "✅ CI: passed"
             else
@@ -76,8 +69,8 @@ jobs:
             echo "⏭️  CI: skipped (no relevant changes)"
           fi
           
-          # Check if any changes require CLI tests
-          if [ "${{ needs.changes.outputs.cli }}" == "true" ]; then
+          # Check CLI tests status (uses same conditions as CI)
+          if [ "$CI_SHOULD_RUN" == "true" ]; then
             if [ "${{ needs.cli-tests.result }}" == "success" ]; then
               echo "✅ CLI Tests: passed"
             else
@@ -88,13 +81,13 @@ jobs:
           fi
           
           # Overall status - only fail if a job that should have run failed
-          if [ "${{ needs.changes.outputs.ci }}" == "true" ] && [ "${{ needs.ci.result }}" != "success" ]; then
+          if [ "$CI_SHOULD_RUN" == "true" ] && [ "${{ needs.ci.result }}" != "success" ]; then
             echo ""
             echo "❌ CI checks failed"
             exit 1
           fi
           
-          if [ "${{ needs.changes.outputs.cli }}" == "true" ] && [ "${{ needs.cli-tests.result }}" != "success" ]; then
+          if [ "$CI_SHOULD_RUN" == "true" ] && [ "${{ needs.cli-tests.result }}" != "success" ]; then
             echo ""
             echo "❌ CLI tests failed"
             exit 1
