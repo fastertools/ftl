@@ -152,24 +152,6 @@ check_dependencies() {
         fi
     fi
     
-    # Check for Rust
-    echo -n "  Checking for Rust (cargo)... "
-    if ! command_exists "cargo"; then
-        echo "❌ not found"
-        missing_deps+=("rust")
-    else
-        echo "✓ found"
-        
-        # Check for wasm32-wasip1 target
-        echo -n "  Checking for wasm32-wasip1 target... "
-        if rustup target list --installed | grep -q "wasm32-wasip1"; then
-            echo "✓ installed"
-        else
-            echo "❌ not installed"
-            missing_deps+=("wasm-target")
-        fi
-    fi
-    
     # Check for Spin
     echo -n "  Checking for Spin... "
     if ! command_exists "spin"; then
@@ -195,21 +177,10 @@ check_dependencies() {
                     echo "  After installing, run: gh auth login"
                     echo ""
                     ;;
-                rust)
-                    echo "To install Rust:"
-                    echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-                    echo "  source \$HOME/.cargo/env"
-                    echo ""
-                    ;;
                 spin)
                     echo "To install Spin:"
                     echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
                     echo "  sudo mv ./spin /usr/local/bin/spin"
-                    echo ""
-                    ;;
-                wasm-target)
-                    echo "To install wasm32-wasip1 target:"
-                    echo "  rustup target add wasm32-wasip1"
                     echo ""
                     ;;
             esac
@@ -225,7 +196,7 @@ check_dependencies() {
             fi
         fi
         echo ""
-        info "⚠️  Warning: FTL requires gh CLI, Rust (with wasm32-wasip1 target), and Spin to function properly"
+        info "⚠️  Warning: FTL requires gh CLI and Spin to function properly"
         echo ""
     else
         success "✓ All dependencies found"
@@ -240,7 +211,7 @@ main() {
     if [ "$AUTO_YES" = false ]; then
         echo ""
         info "This script will:"
-        echo "  1. Check for required dependencies (gh CLI, Rust with wasm target, Spin)"
+        echo "  1. Check for required dependencies (gh CLI, Spin)"
         echo "  2. Verify GitHub CLI authentication"
         echo "  3. Find the latest FTL release"
         echo "  4. Download the FTL binary"
@@ -392,6 +363,11 @@ main() {
         else
             info "⚠️  Template setup failed. You can run it manually later with: ftl setup templates --force"
         fi
+        
+        echo ""
+        info "Note: To develop MCP tools, you'll need language-specific dependencies:"
+        echo "  • For Rust tools: Install Rust and run 'rustup target add wasm32-wasip1'"
+        echo "  • For TypeScript/JavaScript tools: Install Node.js and npm"
     else
         echo ""
         info "Verify installation with:"
@@ -399,9 +375,9 @@ main() {
     fi
     
     # Final dependency reminder
-    if ! command_exists "gh" || ! command_exists "cargo" || ! command_exists "spin"; then
+    if ! command_exists "gh" || ! command_exists "spin"; then
         echo ""
-        info "Remember: FTL requires gh CLI, Rust (with wasm32-wasip1 target), and Spin to be installed for full functionality"
+        info "Remember: FTL requires gh CLI and Spin to be installed for full functionality"
     fi
 }
 
