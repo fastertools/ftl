@@ -6,7 +6,7 @@
 
 // Re-export macros when the feature is enabled
 #[cfg(feature = "macros")]
-pub use ftl_sdk_macros::tool;
+pub use ftl_sdk_macros::ftl_tools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

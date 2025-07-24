@@ -292,7 +292,161 @@ export interface CreateToolOptions<T = unknown> {
 }
 
 /**
+ * Tool definition for createTools
+ */
+export interface ToolDefinition<T = unknown> {
+  /** Optional explicit tool name (overrides the property key) */
+  name?: string
+
+  /** Optional human-readable title for the tool */
+  title?: string
+
+  /** Optional description of what the tool does */
+  description?: string
+
+  /** JSON Schema describing the expected input parameters */
+  inputSchema: JSONSchema
+
+  /** Optional JSON Schema describing the output format */
+  outputSchema?: JSONSchema
+
+  /** Optional annotations providing hints about tool behavior */
+  annotations?: ToolAnnotations
+
+  /** Optional metadata for tool-specific extensions */
+  _meta?: Record<string, unknown>
+
+  /** Handler function for tool execution */
+  handler: ToolHandler<T>
+}
+
+/**
+ * Converts camelCase to snake_case
+ */
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).replace(/^_/, '')
+}
+
+/**
+ * Creates a request handler for multiple MCP tools in a single component.
+ *
+ * This helper provides a clean way to create a multi-tool component that:
+ * - Returns all tool metadata on GET / requests
+ * - Routes to specific tools based on the path for POST requests
+ * - Handles errors gracefully
+ *
+ * @example
+ * ```typescript
+ * import { createTools, ToolResponse } from 'ftl-sdk'
+ * import { z } from 'zod'
+ *
+ * const EchoSchema = z.object({
+ *   message: z.string().describe('The message to echo')
+ * })
+ *
+ * const ReverseSchema = z.object({
+ *   text: z.string().describe('The text to reverse')
+ * })
+ *
+ * const handle = createTools({
+ *   echo: {
+ *     description: 'Echo back the input',
+ *     inputSchema: zodToJsonSchema(EchoSchema),
+ *     handler: async (input) => {
+ *       const typedInput = input as z.infer<typeof EchoSchema>
+ *       return ToolResponse.text(`Echo: ${typedInput.message}`)
+ *     }
+ *   },
+ *
+ *   reverse: {
+ *     description: 'Reverse the input text',
+ *     inputSchema: zodToJsonSchema(ReverseSchema),
+ *     handler: async (input) => {
+ *       const typedInput = input as z.infer<typeof ReverseSchema>
+ *       return ToolResponse.text(typedInput.text.split('').reverse().join(''))
+ *     }
+ *   }
+ * })
+ *
+ * addEventListener('fetch', (event) => {
+ *   event.respondWith(handle(event.request))
+ * })
+ * ```
+ */
+export function createTools<T extends Record<string, ToolDefinition>>(
+  tools: T,
+): (request: Request) => Promise<Response> {
+  return async function handleRequest(request: Request): Promise<Response> {
+    const url = new URL(request.url)
+    const path = url.pathname
+    const { method } = request
+
+    // Handle metadata request
+    if (method === 'GET' && path === '/') {
+      const metadata = Object.entries(tools).map(([key, tool]) => ({
+        name: tool.name ?? camelToSnake(key),
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        outputSchema: tool.outputSchema,
+        annotations: tool.annotations,
+        _meta: tool._meta,
+      }))
+      return new Response(JSON.stringify(metadata), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle tool execution
+    if (method === 'POST') {
+      const toolName = path.slice(1) // Remove leading slash
+
+      // Find the tool by checking both explicit names and converted property keys
+      const toolEntry = Object.entries(tools).find(([key, tool]) => {
+        const effectiveName = tool.name ?? camelToSnake(key)
+        return effectiveName === toolName
+      })
+
+      if (toolEntry === undefined) {
+        const errorResponse = ToolResponse.error(`Tool '${toolName}' not found`)
+        return new Response(JSON.stringify(errorResponse), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      const [, tool] = toolEntry
+
+      try {
+        const input = await request.json()
+        const response = await tool.handler(input)
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        const errorResponse = ToolResponse.error(`Tool execution failed: ${errorMessage}`)
+        return new Response(JSON.stringify(errorResponse), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Method not allowed
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: { Allow: 'GET, POST' },
+    })
+  }
+}
+
+/**
  * Creates a request handler configured to handle MCP tool requests.
+ *
+ * @deprecated Use createTools instead for consistency with multi-tool pattern
  *
  * This helper provides a zero-dependency way to create a tool component that:
  * - Returns metadata on GET requests
@@ -334,37 +488,30 @@ export interface CreateToolOptions<T = unknown> {
 export function createTool<T = unknown>(
   options: CreateToolOptions<T>,
 ): (request: Request) => Promise<Response> {
-  const { metadata, handler } = options
-
+  // For backward compatibility, createTool maintains the original single-tool API
   return async function handleRequest(request: Request): Promise<Response> {
     const { method } = request
 
+    // Handle metadata request
     if (method === 'GET') {
-      // Return tool metadata
-      return new Response(JSON.stringify(metadata), {
+      return new Response(JSON.stringify(options.metadata), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
+    // Handle tool execution
     if (method === 'POST') {
       try {
-        // Parse request body
-        const input = (await request.json()) as T
-
-        // Execute handler
-        const response = await handler(input)
-
-        // Return response
+        const input = await request.json()
+        const response = await options.handler(input as T)
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
       } catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         const errorResponse = ToolResponse.error(`Tool execution failed: ${errorMessage}`)
-
         return new Response(JSON.stringify(errorResponse), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
