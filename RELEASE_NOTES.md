@@ -1,10 +1,109 @@
-## [mcp-authorizer] 0.0.8 - 2025-07-24
+## [mcp-gateway] 0.0.4 - 2025-07-24
 
 ### Changes
 
+- Fix additional nightly references (#4)
+- Release: CLI v0.0.25 (#38)
+- fix/prepare-release-access-bug
+- refactor: ftl-core -> ftl-sdk
+- refactor: name
+- refactor: use wasmcp and remove SDKs and templates (#13)
+- release: CLI v0.0.26 (#40)
+- release: CLI v0.0.27 (#41)
+- release: CLI v0.0.28 (#42)
+- release: CLI v0.0.29 (#43)
+- release: CLI v0.0.30 (#44)
+- release: mcp-authorizer v0.0.7 (#45)
+- release: mcp-authorizer v0.0.8 (#47)
+- release: v0.0.17
+- release: v0.0.20 (#16)
+- release: v0.0.21 (#20)
+- ✨ feat: Add JS tool support
+- ✨ feat: Add app commands and other improvements (#27)
+- ✨ feat: Add auto release workflows (#33)
+- ✨ feat: Add ftl login and related commands. (#19)
+- ✨ feat: Add gateway component (#1)
+- ✨ feat: Add parallel builds and pushes (#22)
+- ✨ feat: Allow updating the CLI. Adds version check functionality (#12)
+- ✨ feat: Big change to component model (#9)
+- ✨ feat: Clean up dead code and add automatic spin dependency management (#7)
+- ✨ feat: Exports working
+- ✨ feat: Fix syntax incompatibilities with stable toolchain (#6)
+- ✨ feat: Integrate ftl-mcp code into this repo. (#29)
+- ✨ feat: Replace wasmcp with ftl-mcp (#15)
+- ✨ feat: Speedup installs in gha (#32)
+- ✨ feat: TS support
+- ✨ feat: Update backend API calls and add tests. (#23)
+- ✨ feat: gateway/mcp -> mcp
+- ✨ feat: js wip
+- ✨ feat: prepare-release nit
+- ✨ feat: release
+- ✨ feat: update release workflow to stable (#3)
+- ✨ feat: use stable rust toolchain (#2)
+- ✨ feat: wip get deploys working (#21)
+- ✨ feat: working js deploys
+- 🐛 fix: CLI releases
+- 🐛 fix: Deploys (#24)
+- 🐛 fix: Fix rust tool unit tests (#8)
+- 🐛 fix: GHA access for creating PRs in prepare-release.yml (#36)
+- 🐛 fix: OpenAPI spec (#28)
+- 🐛 fix: README path
+- 🐛 fix: Release workflow (#31)
+- 🐛 fix: Use new working backend for deploys (#26)
+- 🐛 fix: allocator
+- 🐛 fix: audit
+- 🐛 fix: auto-tag-release
+- 🐛 fix: ci
+- 🐛 fix: clippy
+- 🐛 fix: clippy and old ftl_sdk refs
 - 🐛 fix: component releases
+- 🐛 fix: deps
+- 🐛 fix: finish refactor
+- 🐛 fix: fmt
+- 🐛 fix: fmt and lint
+- 🐛 fix: formatting
+- 🐛 fix: formatting and nightly
+- 🐛 fix: install.sh
+- 🐛 fix: js tests
+- 🐛 fix: links
+- 🐛 fix: more gha permissions
+- 🐛 fix: names
+- 🐛 fix: old ftl_sdk ref
+- 🐛 fix: pre-release lockfile handling
+- 🐛 fix: prepare-release label handling (#34)
+- 🐛 fix: prepeare-release git push (#35)
+- 🐛 fix: release
+- 🐛 fix: release-cli
+- 🐛 fix: rm macos test in ci.yml
+- 🐛 fix: spin.toml location for JS tools
+- 🐛 fix: template dependency versions
+- 🐛 fix: ts tests
+- 🐛 fix: use gh commands in install.sh
+- 🐛 fix: version
+- 🐛 fix: versions
 - 🐛 fix: wasm ci
+- 📚 docs: Readme clarification
+- 📚 docs: Readme diagram clarification
+- 📚 docs: Update (#18)
+- 📚 docs: Update diagrams
+- 📚 docs: Update diagrams and bump Cargo.toml version
+- 📚 docs: clarification
+- 📚 docs: cleanup
+- 📚 docs: diagram
+- 📚 docs: examples
+- 📚 docs: fix commands
+- 📚 docs: fix diagram
+- 📚 docs: nit
+- 📚 docs: nit readme
+- 📚 docs: readme nit
+- 📚 docs: toolkits
+- 📚 docs: update
+- 🔧 chore(deps): bump the cargo-dependencies group across 1 directory with 10 updates (#17)
+- 🔧 chore: rm unused file
 
 ### Contributors
 
+- Corey Ryan
+- Ian McDonald
 - bowlofarugula
+- dependabot[bot]
