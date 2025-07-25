@@ -570,7 +570,7 @@ fn setup_successful_push(fixture: &mut TestFixture) {
         .returning(|_, _| {
             Ok(CommandOutput {
                 success: true,
-                stdout: b"Pushed successfully".to_vec(),
+                stdout: b"Pushed".to_vec(),
                 stderr: vec![],
             })
         });

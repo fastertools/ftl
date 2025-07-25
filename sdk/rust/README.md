@@ -83,21 +83,37 @@ use spin_sdk::http_component;
 fn handle_tool(req: Request) -> anyhow::Result<impl IntoResponse> {
     match *req.method() {
         Method::Get => {
-            let metadata = ToolMetadata {
-                name: "my-tool".to_string(),
-                title: Some("My Tool".to_string()),
-                description: Some("Does something useful".to_string()),
-                input_schema: json!({
-                    "type": "object",
-                    "properties": {
-                        "input": { "type": "string" }
-                    },
-                    "required": ["input"]
-                }),
-                output_schema: None,
-                annotations: None,
-                meta: None,
-            };
+            // Return array of tool metadata for multiple tools
+            let metadata = vec![
+                ToolMetadata {
+                    name: "echo".to_string(),
+                    description: Some("Echo tool".to_string()),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "message": { "type": "string" }
+                        },
+                        "required": ["message"]
+                    }),
+                    output_schema: None,
+                    annotations: None,
+                    meta: None,
+                },
+                ToolMetadata {
+                    name: "reverse".to_string(),
+                    description: Some("Reverse text".to_string()),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "text": { "type": "string" }
+                        },
+                        "required": ["text"]
+                    }),
+                    output_schema: None,
+                    annotations: None,
+                    meta: None,
+                },
+            ];
             
             Ok(Response::builder()
                 .status(200)
@@ -106,8 +122,23 @@ fn handle_tool(req: Request) -> anyhow::Result<impl IntoResponse> {
                 .build())
         }
         Method::Post => {
-            // Parse input and execute tool logic
-            let response = ToolResponse::text("Tool executed successfully!");
+            // Route based on path (e.g., /echo or /reverse)
+            let path = req.path();
+            let body_bytes = req.body();
+            let input: serde_json::Value = serde_json::from_slice(body_bytes)?;
+            
+            let response = match path {
+                "/echo" => {
+                    let message = input["message"].as_str().unwrap_or("");
+                    ToolResponse::text(format!("Echo: {}", message))
+                }
+                "/reverse" => {
+                    let text = input["text"].as_str().unwrap_or("");
+                    let reversed: String = text.chars().rev().collect();
+                    ToolResponse::text(reversed)
+                }
+                _ => ToolResponse::error(format!("Unknown tool: {}", path))
+            };
             
             Ok(Response::builder()
                 .status(200)
@@ -148,6 +179,9 @@ cargo build --target wasm32-wasip1 --release
 ## Response Helpers
 
 ```rust
+use ftl_sdk::{text, error, structured, ToolResponse, ToolContent};
+use serde_json::json;
+
 // Simple text response with macros
 let response = text!("Hello, world!");
 
@@ -187,6 +221,20 @@ let response = ToolResponse {
 The `tools!` macro supports async functions:
 
 ```rust
+use ftl_sdk::{tools, text, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
+
+#[derive(Deserialize, JsonSchema)]
+struct WeatherInput {
+    location: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct StatusInput {
+    service: String,
+}
+
 tools! {
     /// Fetch weather data
     async fn fetch_weather(input: WeatherInput) -> ToolResponse {
@@ -207,6 +255,26 @@ tools! {
 Define as many tools as needed in one component:
 
 ```rust
+use ftl_sdk::{tools, text, structured, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
+use serde_json::json;
+
+#[derive(Deserialize, JsonSchema)]
+struct TextInput {
+    text: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct DataInput {
+    data: serde_json::Value,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct ReportInput {
+    topic: String,
+}
+
 tools! {
     /// Process text
     fn process_text(input: TextInput) -> ToolResponse {

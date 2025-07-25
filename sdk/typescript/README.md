@@ -12,40 +12,49 @@ npm install ftl-sdk
 
 This SDK provides:
 - TypeScript type definitions for the MCP protocol
-- Zero-dependency `createTool` helper for building tools
-- Seamless integration with Zod v4 for schema validation
+- Zero-dependency `createTools` helper for building multiple tools per component
+- Seamless integration with Zod for schema validation
 - Full compatibility with Spin WebAssembly components
 
 ## Quick Start
 
-### Using the `createTool` Helper (Recommended)
+### Using the `createTools` Helper (Recommended)
 
-The SDK includes a `createTool` helper that handles the MCP protocol for you:
+The SDK includes a `createTools` helper that handles the MCP protocol for you:
 
 ```typescript
-import { createTool, ToolResponse } from 'ftl-sdk'
+import { createTools, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
-// Define your input schema using Zod
-const InputSchema = z.object({
-  message: z.string().describe('The message to process')
+// Define your input schemas using Zod
+const EchoSchema = z.object({
+  message: z.string().describe('The message to echo')
 })
 
-// Create the tool handler
-const handle = createTool<z.infer<typeof InputSchema>>({
-  metadata: {
-    name: 'my-tool',
-    title: 'My Tool',
-    description: 'A simple tool example',
-    inputSchema: z.toJSONSchema(InputSchema) as Record<string, unknown>
+const ReverseSchema = z.object({
+  text: z.string().describe('The text to reverse')
+})
+
+// Create the tools handler
+const handle = createTools({
+  echo: {
+    description: 'Echo back the input',
+    inputSchema: z.toJSONSchema(EchoSchema),
+    handler: async (input: z.infer<typeof EchoSchema>) => {
+      return ToolResponse.text(`Echo: ${input.message}`)
+    }
   },
-  handler: async (input) => {
-    // Input is already validated by the gateway
-    return ToolResponse.text(`Processed: ${input.message}`)
+  reverse: {
+    description: 'Reverse the input text',
+    inputSchema: z.toJSONSchema(ReverseSchema),
+    handler: async (input: z.infer<typeof ReverseSchema>) => {
+      return ToolResponse.text(input.text.split('').reverse().join(''))
+    }
   }
 })
 
 // For Spin components
+//@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
   event.respondWith(handle(event.request))
 })
@@ -63,27 +72,47 @@ const router = AutoRouter();
 
 router
   .get('/', async () => {
-    // Return tool metadata
-    const metadata: ToolMetadata = {
-      name: 'my-tool',
-      title: 'My Tool',
-      description: 'Does something useful',
+    // Return array of tool metadata
+    const metadata: ToolMetadata[] = [{
+      name: 'echo',
+      description: 'Echo tool',
       inputSchema: {
         type: 'object',
         properties: {
-          input: { type: 'string' }
+          message: { type: 'string' }
         },
-        required: ['input']
+        required: ['message']
       }
-    };
+    }, {
+      name: 'reverse',
+      description: 'Reverse text',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string' }
+        },
+        required: ['text']
+      }
+    }];
     
     return new Response(JSON.stringify(metadata), {
       headers: { 'Content-Type': 'application/json' }
     });
   })
-  .post('/', async (request) => {
-    // Parse input, do work...
-    const response = ToolResponse.text('Tool executed successfully!');
+  .post('/:tool', async (request, { params }) => {
+    const input = await request.json();
+    let response: ToolResponse;
+    
+    switch (params.tool) {
+      case 'echo':
+        response = ToolResponse.text(`Echo: ${input.message}`);
+        break;
+      case 'reverse':
+        response = ToolResponse.text(input.text.split('').reverse().join(''));
+        break;
+      default:
+        response = ToolResponse.error(`Tool '${params.tool}' not found`);
+    }
     
     return new Response(JSON.stringify(response), {
       headers: { 'Content-Type': 'application/json' }
@@ -132,19 +161,19 @@ const CalculatorSchema = z.object({
 // Convert to JSON Schema - validation rules are preserved
 const jsonSchema = z.toJSONSchema(CalculatorSchema)
 
-// Use with createTool
-const handle = createTool<z.infer<typeof CalculatorSchema>>({
-  metadata: {
-    name: 'calculator',
-    inputSchema: jsonSchema as Record<string, unknown>
-  },
-  handler: async (input) => {
-    // input is fully typed and validated by the gateway
-    switch (input.operation) {
-      case 'add': return ToolResponse.text(`Result: ${input.a + input.b}`)
-      case 'subtract': return ToolResponse.text(`Result: ${input.a - input.b}`)
-      case 'multiply': return ToolResponse.text(`Result: ${input.a * input.b}`)
-      case 'divide': return ToolResponse.text(`Result: ${input.a / input.b}`)
+// Use with createTools
+const handle = createTools({
+  calculator: {
+    description: 'Perform calculations',
+    inputSchema: jsonSchema,
+    handler: async (input: z.infer<typeof CalculatorSchema>) => {
+      // input is fully typed and validated by the gateway
+      switch (input.operation) {
+        case 'add': return ToolResponse.text(`Result: ${input.a + input.b}`)
+        case 'subtract': return ToolResponse.text(`Result: ${input.a - input.b}`)
+        case 'multiply': return ToolResponse.text(`Result: ${input.a * input.b}`)
+        case 'divide': return ToolResponse.text(`Result: ${input.a / input.b}`)
+      }
     }
   }
 })
@@ -161,20 +190,28 @@ const handle = createTool<z.infer<typeof CalculatorSchema>>({
 
 ## API Reference
 
-### `createTool<T>(options)`
+### `createTools(tools)`
 
-Creates a request handler for MCP tool requests.
+Creates a request handler for multiple MCP tools in a single component.
 
 ```typescript
-interface CreateToolOptions<T> {
-  metadata: ToolMetadata
-  handler: (input: T) => ToolResponse | Promise<ToolResponse>
+interface ToolDefinition {
+  name?: string // Optional explicit name (defaults to property key converted to snake_case)
+  description?: string
+  inputSchema: JSONSchema
+  outputSchema?: JSONSchema
+  handler: (input: any) => ToolResponse | Promise<ToolResponse>
 }
+
+const handle = createTools({
+  [toolName: string]: ToolDefinition
+})
 ```
 
 The returned handler:
-- Returns tool metadata on GET requests
-- Executes your handler on POST requests with validated input
+- Returns array of tool metadata on GET / requests
+- Routes to specific tools on POST /{tool_name} requests
+- Automatically converts camelCase property keys to snake_case tool names
 - Handles errors gracefully
 
 ### `ToolResponse` Helper Methods
@@ -225,10 +262,12 @@ if (isTextContent(content)) {
 
 3. **Keep It Simple**: The SDK is intentionally minimal. Use it for types and basic helpers, not complex abstractions.
 
-4. **Type Safety**: Always provide the input type to `createTool<T>()` for full type safety:
+4. **Type Safety**: Type your handler parameters directly for full type safety:
    ```typescript
-   type MyInput = z.infer<typeof MySchema>
-   const handle = createTool<MyInput>({ ... })
+   handler: async (input: z.infer<typeof MySchema>) => {
+     // Full type safety for input
+     return ToolResponse.text(input.message)
+   }
    ```
 
 5. **Error Handling**: Return `ToolResponse.error()` for business logic errors. The SDK handles exceptions automatically.
@@ -237,8 +276,8 @@ if (isTextContent(content)) {
 
 See the [examples directory](https://github.com/fastertools/ftl-cli/tree/main/examples/demo) for complete examples:
 
-- `echo-simplified-ts`: Minimal echo tool using Zod
-- `calculator-ts`: Complex validation with Zod refinements
+- `echo-ts`: Simple echo tool
+- `multi-tools-ts`: Multiple tools in one component
 - `weather-ts`: External API integration
 
 ## License
