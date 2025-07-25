@@ -7,7 +7,7 @@ const {{project-name | pascal_case}}Schema = z.object({
 })
 
 const handle = createTools({
-  {{project-name | camel_case}}: {
+  {{project-name | camelize}}: {
     title: '{{project-name}}',
     description: '{{tool-description}}',
     inputSchema: z.toJSONSchema({{project-name | pascal_case}}Schema),
