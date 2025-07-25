@@ -135,7 +135,7 @@ impl RegistryConfig {
         self.config
             .get(key)
             .and_then(|v| v.as_str())
-            .map(std::string::ToString::to_string)
+            .map(ToString::to_string)
     }
 
     /// Check if this registry requires authentication
