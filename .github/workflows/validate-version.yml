@@ -1,0 +1,85 @@
+name: Validate Version
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        description: 'Component to validate (cli, sdk-rust, sdk-typescript, component-name)'
+        required: true
+        type: string
+      version:
+        description: 'Version to validate'
+        required: true
+        type: string
+    outputs:
+      valid:
+        description: 'Whether the version is valid'
+        value: ${{ jobs.validate.outputs.valid }}
+
+jobs:
+  validate:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.validate.outputs.valid }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate version
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+          COMPONENT="${{ inputs.component }}"
+          VALID=true
+          
+          case "$COMPONENT" in
+            cli)
+              CLI_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
+              if [ "$CLI_VERSION" != "$VERSION" ]; then
+                echo "❌ Tag version ($VERSION) does not match CLI version ($CLI_VERSION)"
+                VALID=false
+              fi
+              ;;
+            sdk-rust)
+              SDK_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+              if [ "$SDK_VERSION" != "$VERSION" ]; then
+                echo "❌ Tag version ($VERSION) does not match ftl-sdk version ($SDK_VERSION)"
+                VALID=false
+              fi
+              
+              # Also check macros version dependency
+              MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+              MACROS_DEP=$(grep 'ftl-sdk-macros' sdk/rust/Cargo.toml | grep version | cut -d'"' -f2)
+              if [ "$MACROS_DEP" != "$MACROS_VERSION" ]; then
+                echo "❌ ftl-sdk depends on ftl-sdk-macros $MACROS_DEP but macros is at version $MACROS_VERSION"
+                VALID=false
+              fi
+              ;;
+            sdk-typescript)
+              TS_VERSION=$(cd sdk/typescript && node -p "require('./package.json').version")
+              if [ "$TS_VERSION" != "$VERSION" ]; then
+                echo "❌ Tag version ($VERSION) does not match TypeScript SDK version ($TS_VERSION)"
+                VALID=false
+              fi
+              ;;
+            component-*)
+              COMP_NAME=${COMPONENT#component-}
+              COMP_VERSION=$(grep '^version' components/$COMP_NAME/Cargo.toml | head -1 | cut -d'"' -f2)
+              if [ "$COMP_VERSION" != "$VERSION" ]; then
+                echo "❌ Tag version ($VERSION) does not match $COMP_NAME version ($COMP_VERSION)"
+                VALID=false
+              fi
+              ;;
+            *)
+              echo "❌ Unknown component: $COMPONENT"
+              VALID=false
+              ;;
+          esac
+          
+          echo "valid=$VALID" >> $GITHUB_OUTPUT
+          
+          if [ "$VALID" = "false" ]; then
+            exit 1
+          else
+            echo "✅ Version $VERSION is valid for $COMPONENT"
+          fi

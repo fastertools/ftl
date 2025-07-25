@@ -1,0 +1,50 @@
+name: 'Setup Rust Environment'
+description: 'Install Rust toolchain with caching'
+inputs:
+  components:
+    description: 'Rust components to install (comma-separated)'
+    required: false
+    default: ''
+  targets:
+    description: 'Rust targets to install (comma-separated)'
+    required: false
+    default: ''
+  toolchain:
+    description: 'Rust toolchain version'
+    required: false
+    default: 'stable'
+  cache-key:
+    description: 'Cache key suffix for rust-cache'
+    required: true
+  cache-targets:
+    description: 'Whether to cache compilation targets'
+    required: false
+    default: 'false'
+  install-system-deps:
+    description: 'Whether to install system dependencies (libdbus-1-dev on Linux)'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install system dependencies (Linux)
+      if: inputs.install-system-deps == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libdbus-1-dev
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+    
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.cache-key }}
+        cache-targets: ${{ inputs.cache-targets }}
+        save-if: ${{ github.ref == 'refs/heads/main' }}
