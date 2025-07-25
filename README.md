@@ -216,7 +216,7 @@ graph TB
                   end
                   
                   subgraph "User Tool Components"
-                      Weather["Weather Tools<br/>(TypeScript/Javascript)"]
+                      Weather["Weather Tools<br/>(TS/JS)"]
                       Physics["Physics Tools<br/>(Rust)"]
                       Data["Data Tools<br/>(Python)"]
                       Custom["Fun Tools<br/>(Go)"]
@@ -231,17 +231,15 @@ graph TB
     MCP -.->| | MCPAuth
     MCPAuth -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
-    MCPGateway -.->|"In-memory call"| Pysics
+    MCPGateway -.->|"In-memory call"| Physics
     MCPGateway -.->|"In-memory call"| Data
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Each tool runs as a separate WebAssembly component in its own sandbox. Tool components are composed together with the FTL components and run as a single process while maintaining security boundaries.
+- Tools run as WebAssembly components in their own sandboxes. Tool components are composed together with the FTL components and run as a single process while maintaining security boundaries.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
-- Individual components are composed onto a single worker that exposes a secure, protocol-compliant MCP server.
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
-- The FTL Wasm components and language SDKs are managed in this repository.
 
 ## Contributing
 
