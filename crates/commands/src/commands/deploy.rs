@@ -422,7 +422,7 @@ async fn create_repositories_and_push_with_progress(
 
             let duration = start.elapsed();
             pb.finish_with_message(format!(
-                "✓ Pushed successfully in {:.1}s",
+                "✓ Pushed in {:.1}s",
                 duration.as_secs_f64()
             ));
 

@@ -174,7 +174,7 @@ async fn build_components_parallel(
                 Ok(()) => {
                     let duration = start.elapsed();
                     pb.finish_with_message(format!(
-                        "✓ Built successfully in {:.1}s",
+                        "✓ Built in {:.1}s",
                         duration.as_secs_f64()
                     ));
                     Ok(())

@@ -2,10 +2,6 @@
 
 Language detection and project analysis for FTL CLI.
 
-This crate provides language detection and project analysis functionality, including:
-
-- Automatic detection of project programming languages
-- Project structure analysis
 - Language-specific configuration handling
 - Support for multiple language ecosystems (Rust, TypeScript, JavaScript, etc.)
 

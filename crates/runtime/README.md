@@ -1,8 +1,8 @@
-# ftl-core
+# ftl-runtime
 
-Core functionality and API client for the FTL CLI.
+Core runtime functionality and API client for the FTL CLI.
 
-This crate provides the core functionality for FTL CLI, including:
+This crate provides the core runtime functionality for FTL CLI, including:
 
 - API client for interacting with FTL services
 - Configuration management

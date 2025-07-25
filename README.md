@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source tool framework for AI agents. It builds on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
+FTL is an open source tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
 
 FTL tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
@@ -24,7 +24,15 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 ## Why?
 
 <details>
-<summary><strong>⤵ Simple API</strong></summary>
+
+
+- Mix and serve tool components written in different source languages, each with multiple tools, all exposed on one `/mcp` endpoint.
+- Write tools in TypeScript, Rust, Python, Go, and [more](https://component-model.bytecodealliance.org/language-support.html).
+- Tool components can be distributed on and imported from OCI registries. See below.
+- High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in supported languages like Rust and C.
+- Tool component binary size and performance are influenced by source language.
+
+<summary><strong>⤵ Simple in multiple languages</strong></summary>
 
 <details>
 <summary><strong>🦀 Rust</strong></summary>
@@ -112,15 +120,6 @@ addEventListener('fetch', (event: FetchEvent) => {
 - Tools are compiled to self-contained Wasm binaries that are often < 1MB.
 - Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
 - Mix and match individual tools in your MCP server by registry URI. Allowed outbound network calls are configurable per tool.
-</details>
-
-<details>
-<summary><strong>⤵ Write tools in the best source language for the job</strong></summary>
-
-- Combine tools written in different source languages within one MCP server.
-- Use Rust, TypeScript, Python, Go, C, and [more](https://component-model.bytecodealliance.org/language-support.html).
-- High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C.
-- Tool binary size and performance are influenced by the tool's source language.
 </details>
 
 <details>
