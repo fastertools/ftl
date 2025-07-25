@@ -1,7 +1,11 @@
 [package]
 name = "{{project-name | snake_case}}"
 version = "0.1.0"
-edition = "2021"
+authors = ["{{authors}}"]
+edition = "2024"
+rust-version = "1.86"
+license = "Apache-2.0"
+description = "{{tool-description}}"
 
 [dependencies]
 ftl-sdk = { version = "0.2.9", features = ["macros"] }
@@ -12,3 +16,17 @@ spin-sdk = "3.0"
 
 [lib]
 crate-type = ["cdylib"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Deny categories
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+
+# Warn categories  
+complexity = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

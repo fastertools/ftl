@@ -8,7 +8,6 @@ const EchoSchema = z.object({
 
 const handle = createTools({
   echoTs: {
-    title: 'echo-ts',
     description: 'An MCP tool written in TypeScript',
     inputSchema: z.toJSONSchema(EchoSchema),
     handler: async (input) => {
