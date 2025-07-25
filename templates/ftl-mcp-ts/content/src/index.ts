@@ -2,17 +2,18 @@ import { createTools, ToolResponse } from 'ftl-sdk'
 import * as z from 'zod'
 
 // Define the schema using Zod
-const {{project-name | pascal_case}}Schema = z.object({
+const ExampleToolSchema = z.object({
   message: z.string().describe('The input message to process')
 })
 
 const handle = createTools({
-  {{project-name | camelize}}: {
-    title: '{{project-name}}',
-    description: '{{tool-description}}',
-    inputSchema: z.toJSONSchema({{project-name | pascal_case}}Schema),
+  // Replace 'exampleTool' with your actual tool name
+  exampleTool: {
+    title: 'Example Tool',
+    description: 'An example tool that processes messages',
+    inputSchema: z.toJSONSchema(ExampleToolSchema),
     handler: async (input) => {
-      const typedInput = input as z.infer<typeof {{project-name | pascal_case}}Schema>
+      const typedInput = input as z.infer<typeof ExampleToolSchema>
       // TODO: Implement your tool logic here
       return ToolResponse.text(`Processed: ${typedInput.message}`)
     }
