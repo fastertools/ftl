@@ -697,10 +697,7 @@ version = "0.1.0"
         // But at minimum, it should not fail with "Invalid version tag 'latest'" immediately
         // It will either succeed (if crane works) or fail with a different error (network/auth)
         match result {
-            Ok(_) => {
-                // Success - the version resolution worked
-                assert!(true);
-            }
+            Ok(()) => {}
             Err(e) => {
                 let error_msg = e.to_string();
                 // Should not fail with the original "Invalid version tag 'latest'" error
