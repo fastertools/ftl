@@ -1,4 +1,4 @@
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{ftl_tools, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -8,9 +8,10 @@ struct EchoRsInput {
     message: String,
 }
 
-/// An MCP tool written in Rust
-#[tool]
-fn echo_rs(input: EchoRsInput) -> ToolResponse {
-    // TODO: Implement your tool logic here
-    ToolResponse::text(format!("Processed: {}", input.message))
+ftl_tools! {
+    /// An MCP tool written in Rust
+    fn echo_rs(input: EchoRsInput) -> ToolResponse {
+        // TODO: Implement your tool logic here
+        ToolResponse::text(format!("Processed: {}", input.message))
+    }
 }

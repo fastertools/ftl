@@ -1,4 +1,4 @@
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{ftl_tools, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 use spin_sdk::http::{send, Method, Request, Response};
@@ -70,12 +70,13 @@ fn get_weather_condition(code: i32) -> &'static str {
     }
 }
 
-/// Get current weather for a location using Open-Meteo API
-#[tool]
-async fn weather_rs(input: WeatherInput) -> ToolResponse {
-    match fetch_weather(&input.location).await {
-        Ok(weather_info) => ToolResponse::text(weather_info),
-        Err(e) => ToolResponse::text(format!("Error fetching weather: {}", e)),
+ftl_tools! {
+    /// Get current weather for a location using Open-Meteo API
+    async fn weather_rs(input: WeatherInput) -> ToolResponse {
+        match fetch_weather(&input.location).await {
+            Ok(weather_info) => ToolResponse::text(weather_info),
+            Err(e) => ToolResponse::text(format!("Error fetching weather: {}", e)),
+        }
     }
 }
 

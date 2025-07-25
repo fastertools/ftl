@@ -1,5 +1,5 @@
-import { createTool, ToolResponse } from 'ftl-sdk'
-import { z } from 'zod'
+import { createTools, ToolResponse } from 'ftl-sdk'
+import * as z from 'zod'
 
 const WeatherInputSchema = z.object({
   location: z.string().describe('City name, my dude!')
@@ -61,21 +61,20 @@ const getWeatherCondition = (code: number): string => {
   return conditions[code] || 'Unknown';
 }
 
-const weather = createTool<WeatherInput>({
-  metadata: {
-    name: 'weather_ts',
+const handle = createTools({
+  weatherTs: {
     title: 'Weather Tool (TypeScript)',
     description: 'Get current weather for a location using Open-Meteo API',
-    inputSchema: z.toJSONSchema(WeatherInputSchema)
-  },
-  handler: async (input) => {
+    inputSchema: z.toJSONSchema(WeatherInputSchema),
+    handler: async (input) => {
+      const typedInput = input as WeatherInput
     try {
-      const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(input.location)}&count=1`;
+      const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(typedInput.location)}&count=1`;
       const geocodingResponse = await fetch(geocodingUrl);
       const geocodingData = (await geocodingResponse.json()) as GeocodingResponse;
 
       if (!geocodingData.results?.[0]) {
-        return ToolResponse.text(`Location '${input.location}' not found`);
+        return ToolResponse.text(`Location '${typedInput.location}' not found`);
       }
 
       const { latitude, longitude, name } = geocodingData.results[0];
@@ -104,9 +103,10 @@ Wind: ${result.windSpeed} km/h (gusts up to ${result.windGust} km/h)`);
       return ToolResponse.text(`Error fetching weather: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+  }
 })
 
 //@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(weather(event.request))
+  event.respondWith(handle(event.request))
 })

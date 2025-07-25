@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source tool framework for AI agents. It builds on the [WebAssembly Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
+FTL is an open source tool framework for AI agents. It builds on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
 
 FTL tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
@@ -115,7 +115,7 @@ Latency and compute overhead for remote tool calls should not be something you h
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
-- The FTL [gateway components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
+- The FTL [components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
 - Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
 - High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
 - Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.

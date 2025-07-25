@@ -1,0 +1,21 @@
+{
+  "name": "multi-tools-ts",
+  "version": "0.1.0",
+  "description": "Multi-tool TypeScript example for FTL",
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && mkdir -p dist && j2w -i build/bundle.js -o dist/multi-tools-ts.wasm",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@spinframework/build-tools": "^1.0.1",
+    "@spinframework/wasi-http-proxy": "^1.0.0",
+    "ftl-sdk": "file:../../../sdk/typescript",
+    "zod": "^4.0.3"
+  }
+}
