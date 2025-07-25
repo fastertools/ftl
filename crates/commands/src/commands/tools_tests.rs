@@ -538,7 +538,7 @@ mod version_resolution_tests {
     #[test]
     fn test_resolve_tools_constructs_correct_image_reference() {
         // Test that resolve_tools properly constructs image reference with version tag
-        
+
         // This test verifies that resolve_tools creates the full image reference
         // The actual function call is tested in integration tests
         let tool_spec = crate::commands::tools::parse_tool_spec("proximity-search", None);
@@ -578,13 +578,13 @@ mod version_resolution_tests {
         // Test that tools without "ftl-tool-" prefix get it added
         let tool_name = "proximity-search";
         let version = "latest";
-        
+
         let base_image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.to_string()
         } else {
             format!("ftl-tool-{tool_name}")
         };
-        
+
         let image_name_with_version = format!("{base_image_name}:{version}");
         assert_eq!(image_name_with_version, "ftl-tool-proximity-search:latest");
     }
@@ -594,13 +594,13 @@ mod version_resolution_tests {
         // Test that tools with "ftl-tool-" prefix don't get it added again
         let tool_name = "ftl-tool-proximity-search";
         let version = "1.0.0";
-        
+
         let base_image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.to_string()
         } else {
             format!("ftl-tool-{tool_name}")
         };
-        
+
         let image_name_with_version = format!("{base_image_name}:{version}");
         assert_eq!(image_name_with_version, "ftl-tool-proximity-search:1.0.0");
     }
@@ -638,16 +638,16 @@ mod registry_integration_tests {
     fn test_semver_validation_logic() {
         // Test semver validation through public APIs if available
         // This tests the behavior we expect from the registry components
-        
+
         // Valid versions should work
         assert!(semver::Version::parse("1.0.0").is_ok());
         assert!(semver::Version::parse("2.1.3-alpha").is_ok());
-        
+
         // Invalid versions should fail
         assert!(semver::Version::parse("latest").is_err());
         assert!(semver::Version::parse("main").is_err());
         assert!(semver::Version::parse("dev").is_err());
-        
+
         // Auto-completion logic test
         assert!(semver::Version::parse("1.0.0").is_ok());
         assert!(semver::Version::parse("1.2.0").is_ok());
@@ -657,16 +657,16 @@ mod registry_integration_tests {
 #[cfg(test)]
 mod add_tools_integration_tests {
     use super::*;
+    use crate::commands::tools::{ResolvedTool, add_tools_to_project};
     use std::fs;
     use tempfile::TempDir;
-    use crate::commands::tools::{add_tools_to_project, ResolvedTool};
 
     #[tokio::test]
     async fn test_add_tools_with_latest_version_should_fail_without_registry_resolution() {
         // This test documents the exact bug that was fixed
         let fixture = TestFixture::new();
         let deps = fixture.to_deps();
-        
+
         // Create temporary directory with spin.toml
         let temp_dir = TempDir::new().unwrap();
         let original_dir = std::env::current_dir().unwrap();
@@ -707,9 +707,9 @@ version = "0.1.0"
                 assert!(!error_msg.contains("Invalid version tag 'latest'"));
                 // It might fail with crane-related errors, which is expected in test environment
                 assert!(
-                    error_msg.contains("crane") || 
-                    error_msg.contains("Failed to get registry components") ||
-                    error_msg.contains("No semantic versions found")
+                    error_msg.contains("crane")
+                        || error_msg.contains("Failed to get registry components")
+                        || error_msg.contains("No semantic versions found")
                 );
             }
         }
@@ -722,16 +722,16 @@ version = "0.1.0"
         // Test that demonstrates the fix - ResolvedTool.image_name now includes version
         let tool_name = "proximity-search";
         let version = "latest";
-        
+
         // Simulate the logic from resolve_tools function
         let base_image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.to_string()
         } else {
             format!("ftl-tool-{tool_name}")
         };
-        
+
         let image_name_with_version = format!("{base_image_name}:{version}");
-        
+
         let resolved_tool = ResolvedTool {
             name: tool_name.to_string(),
             image_name: image_name_with_version.clone(),
@@ -740,14 +740,17 @@ version = "0.1.0"
 
         // Verify the fix: image_name should include the version tag
         assert_eq!(resolved_tool.image_name, "ftl-tool-proximity-search:latest");
-        
+
         // This allows the registry adapter to parse it correctly
         let (parsed_image, parsed_tag) = if let Some(pos) = resolved_tool.image_name.rfind(':') {
-            (resolved_tool.image_name[..pos].to_string(), resolved_tool.image_name[pos + 1..].to_string())
+            (
+                resolved_tool.image_name[..pos].to_string(),
+                resolved_tool.image_name[pos + 1..].to_string(),
+            )
         } else {
             (resolved_tool.image_name.clone(), "latest".to_string())
         };
-        
+
         assert_eq!(parsed_image, "ftl-tool-proximity-search");
         assert_eq!(parsed_tag, "latest");
     }
@@ -755,16 +758,17 @@ version = "0.1.0"
     #[test]
     fn test_version_parsing_regression_test() {
         // Regression test for the specific case that was failing
-        
+
         // Input: User runs "ftl tools add ftl-tool-proximity-search"
         let user_input = "ftl-tool-proximity-search";
-        
+
         // 1. Parse tool spec
-        let (registry, tool_name, tool_version) = crate::commands::tools::parse_tool_spec(user_input, None);
+        let (registry, tool_name, tool_version) =
+            crate::commands::tools::parse_tool_spec(user_input, None);
         assert_eq!(registry, "ghcr");
         assert_eq!(tool_name, "ftl-tool-proximity-search");
         assert_eq!(tool_version, "latest");
-        
+
         // 2. Construct base image name (this part was working)
         let base_image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.clone()
@@ -772,26 +776,29 @@ version = "0.1.0"
             format!("ftl-tool-{tool_name}")
         };
         assert_eq!(base_image_name, "ftl-tool-proximity-search");
-        
+
         // 3. THE FIX: Construct full image reference with version tag
         let image_name_with_version = format!("{base_image_name}:{tool_version}");
         assert_eq!(image_name_with_version, "ftl-tool-proximity-search:latest");
-        
+
         // 4. This gets passed to registry adapter's get_registry_components
         // The adapter can now parse it correctly and resolve "latest" to actual version
-        
+
         // Simulate registry adapter parsing
         let (parsed_base, parsed_tag) = if let Some(pos) = image_name_with_version.rfind(':') {
-            (image_name_with_version[..pos].to_string(), image_name_with_version[pos + 1..].to_string())
+            (
+                image_name_with_version[..pos].to_string(),
+                image_name_with_version[pos + 1..].to_string(),
+            )
         } else {
             (image_name_with_version, "latest".to_string())
         };
-        
+
         assert_eq!(parsed_base, "ftl-tool-proximity-search");
         assert_eq!(parsed_tag, "latest");
-        
+
         // Registry adapter would then resolve "latest" to actual version like "1.2.3"
-        // This is where the original bug was - it was getting just "ftl-tool-proximity-search" 
+        // This is where the original bug was - it was getting just "ftl-tool-proximity-search"
         // without the ":latest" tag, so couldn't resolve the version
     }
 }
