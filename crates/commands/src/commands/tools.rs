@@ -12,7 +12,7 @@ use serde_json;
 use toml_edit::{DocumentMut, Item, Table};
 
 use crate::data::{Tool, ToolsManifest};
-use crate::registry::{get_registry_adapter, RegistryAdapter};
+use crate::registry::{RegistryAdapter, get_registry_adapter};
 
 /// Dependencies for the tools command
 pub struct ToolsDependencies {
@@ -32,7 +32,7 @@ struct ResolvedTool {
 }
 
 /// Lists available tools from either the embedded manifest or directly from registries
-/// 
+///
 /// # Arguments
 /// * `deps` - Dependency injection container with UI and HTTP client
 /// * `category` - Optional category filter (e.g., "basic_math", "text_processing")
@@ -65,14 +65,14 @@ pub async fn list_with_deps(
 }
 
 /// Adds one or more tools to the current project's spin.toml
-/// 
+///
 /// # Arguments
 /// * `deps` - Dependency injection container
 /// * `tools` - Tool specifications (name, name:version, registry:name:version)
 /// * `registry` - Optional registry override
 /// * `version` - Optional version override (applies to all tools)
 /// * `yes` - Skip confirmation prompt
-/// 
+///
 /// # Tool Specification Formats
 /// * `toolname` - Latest version from default registry
 /// * `toolname:1.0.0` - Specific version from default registry  
@@ -86,10 +86,11 @@ pub async fn add_with_deps(
     yes: bool,
 ) -> Result<()> {
     let resolved_tools = resolve_tools(deps, tools, registry, version).await?;
-    
+
     if !yes {
         if !confirm_tool_changes(deps, &resolved_tools, "add")? {
-            deps.ui.print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+            deps.ui
+                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
             return Ok(());
         }
     }
@@ -98,14 +99,14 @@ pub async fn add_with_deps(
 }
 
 /// Updates existing tools in the project to new versions
-/// 
+///
 /// # Arguments
 /// * `deps` - Dependency injection container
 /// * `tools` - Tool specifications to update
 /// * `registry` - Optional registry override
 /// * `version` - Optional version override ("latest" resolved to actual version)
 /// * `yes` - Skip confirmation prompt
-/// 
+///
 /// # Note
 /// Only updates tools that are already installed. Use `add` for new tools.
 pub async fn update_with_deps(
@@ -118,10 +119,10 @@ pub async fn update_with_deps(
     // Check if tools are currently installed
     let installed_tools = get_installed_tools()?;
     let mut valid_tools = Vec::new();
-    
+
     for tool_spec in tools {
         let (_registry_name, tool_name, _tool_version) = parse_tool_spec(tool_spec, registry);
-        
+
         if !installed_tools.contains(&tool_name) {
             deps.ui.print(&format!(
                 "{} Tool '{}' is not currently installed",
@@ -135,20 +136,24 @@ pub async fn update_with_deps(
             ));
             continue;
         }
-        
+
         valid_tools.push(tool_spec.clone());
     }
-    
+
     if valid_tools.is_empty() {
-        deps.ui.print(&styled_text("No valid tools to update", MessageStyle::Yellow));
+        deps.ui.print(&styled_text(
+            "No valid tools to update",
+            MessageStyle::Yellow,
+        ));
         return Ok(());
     }
-    
+
     let resolved_tools = resolve_tools(deps, &valid_tools, registry, version).await?;
-    
+
     if !yes {
         if !confirm_tool_changes(deps, &resolved_tools, "update")? {
-            deps.ui.print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+            deps.ui
+                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
             return Ok(());
         }
     }
@@ -157,12 +162,12 @@ pub async fn update_with_deps(
 }
 
 /// Removes tools from the project's spin.toml
-/// 
+///
 /// # Arguments
 /// * `deps` - Dependency injection container
 /// * `tools` - Names of tools to remove
 /// * `yes` - Skip confirmation prompt
-/// 
+///
 /// # Note
 /// Updates both the component section and tool_components variable
 pub async fn remove_with_deps(
@@ -173,7 +178,7 @@ pub async fn remove_with_deps(
     // Check if tools are currently installed
     let installed_tools = get_installed_tools()?;
     let mut valid_tools = Vec::new();
-    
+
     for tool_name in tools {
         if installed_tools.contains(tool_name) {
             valid_tools.push(tool_name.clone());
@@ -185,15 +190,19 @@ pub async fn remove_with_deps(
             ));
         }
     }
-    
+
     if valid_tools.is_empty() {
-        deps.ui.print(&styled_text("No valid tools to remove", MessageStyle::Yellow));
+        deps.ui.print(&styled_text(
+            "No valid tools to remove",
+            MessageStyle::Yellow,
+        ));
         return Ok(());
     }
-    
+
     if !yes {
         if !confirm_tool_removal(deps, &valid_tools)? {
-            deps.ui.print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+            deps.ui
+                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
             return Ok(());
         }
     }
@@ -210,8 +219,8 @@ async fn list_tools_from_manifest(
 ) -> Result<()> {
     // Load tools manifest from embedded data
     let manifest_content = include_str!("../data/tools.toml");
-    let manifest = ToolsManifest::from_toml(manifest_content)
-        .context("Failed to parse tools manifest")?;
+    let manifest =
+        ToolsManifest::from_toml(manifest_content).context("Failed to parse tools manifest")?;
 
     let mut tools = manifest.get_tools().to_vec();
 
@@ -223,14 +232,17 @@ async fn list_tools_from_manifest(
     // Apply keyword filter
     if let Some(keyword) = filter {
         tools.retain(|tool| {
-            tool.name.contains(keyword) 
+            tool.name.contains(keyword)
                 || tool.description.contains(keyword)
                 || tool.tags.iter().any(|tag| tag.contains(keyword))
         });
     }
 
     if tools.is_empty() {
-        deps.ui.print(&styled_text("No tools found matching the specified criteria.", MessageStyle::Yellow));
+        deps.ui.print(&styled_text(
+            "No tools found matching the specified criteria.",
+            MessageStyle::Yellow,
+        ));
         return Ok(());
     }
 
@@ -245,7 +257,7 @@ async fn list_tools_from_manifest(
 }
 
 /// Queries multiple registries in parallel to list available tools
-/// 
+///
 /// Currently queries GHCR, Docker Hub, and ECR registries.
 /// Falls back gracefully if individual registries fail.
 async fn list_tools_from_all_registries(
@@ -255,7 +267,7 @@ async fn list_tools_from_all_registries(
     verbose: bool,
 ) -> Result<()> {
     let registries = ["ghcr", "docker", "ecr"];
-    
+
     deps.ui.print(&format!(
         "{} Querying all registries for available tools...",
         styled_text("→", MessageStyle::Cyan)
@@ -278,8 +290,9 @@ async fn list_tools_from_all_registries(
 
     deps.ui.print("");
     deps.ui.print("To add from a specific registry:");
-    deps.ui.print("  ftl tools add <registry>:<tool-name>:<version>");
-    
+    deps.ui
+        .print("  ftl tools add <registry>:<tool-name>:<version>");
+
     Ok(())
 }
 
@@ -302,7 +315,7 @@ async fn list_tools_from_single_registry(
     verbose: bool,
 ) -> Result<()> {
     let registry_name = registry.unwrap_or("ghcr");
-    
+
     deps.ui.print(&format!(
         "{} Querying {} registry for available tools...",
         styled_text("→", MessageStyle::Cyan),
@@ -327,7 +340,10 @@ async fn list_tools_from_single_registry(
     }
 
     if resolved_tools.is_empty() {
-        deps.ui.print(&styled_text("No tools found in registry matching the specified criteria.", MessageStyle::Yellow));
+        deps.ui.print(&styled_text(
+            "No tools found in registry matching the specified criteria.",
+            MessageStyle::Yellow,
+        ));
         return Ok(());
     }
 
@@ -357,7 +373,8 @@ async fn list_tools_from_single_registry(
     }
 
     deps.ui.print("");
-    deps.ui.print(&format!("Total: {} tools", resolved_tools.len()));
+    deps.ui
+        .print(&format!("Total: {} tools", resolved_tools.len()));
 
     Ok(())
 }
@@ -365,7 +382,7 @@ async fn list_tools_from_single_registry(
 /// Query GitHub API for tool repositories
 async fn query_github_tools(client: &Client, org: &str, prefix: &str) -> Result<Vec<String>> {
     let url = format!("https://api.github.com/orgs/{}/repos?per_page=100", org);
-    
+
     let response = client
         .get(&url)
         .header("User-Agent", "ftl-cli")
@@ -377,7 +394,9 @@ async fn query_github_tools(client: &Client, org: &str, prefix: &str) -> Result<
         anyhow::bail!("GitHub API request failed: {}", response.status());
     }
 
-    let repos: serde_json::Value = response.json().await
+    let repos: serde_json::Value = response
+        .json()
+        .await
         .context("Failed to parse GitHub API response")?;
 
     let mut tools = Vec::new();
@@ -411,7 +430,7 @@ async fn resolve_tools(
     for tool in tools {
         let (_registry_name, tool_name, tool_version) = parse_tool_spec(tool, registry);
         let final_version = version.unwrap_or(&tool_version);
-        
+
         // Resolve full image name based on registry
         let image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.clone()
@@ -478,7 +497,10 @@ fn display_tools_compact(deps: &Arc<ToolsDependencies>, tools: &[Tool]) {
     // Group by category
     let mut by_category = HashMap::new();
     for tool in tools {
-        by_category.entry(&tool.category).or_insert_with(Vec::new).push(tool);
+        by_category
+            .entry(&tool.category)
+            .or_insert_with(Vec::new)
+            .push(tool);
     }
 
     let mut categories: Vec<_> = by_category.keys().collect();
@@ -491,10 +513,10 @@ fn display_tools_compact(deps: &Arc<ToolsDependencies>, tools: &[Tool]) {
             styled_text("●", MessageStyle::Green),
             styled_text(category, MessageStyle::Bold)
         ));
-        
+
         let mut category_tools = by_category[category].clone();
         category_tools.sort_by(|a, b| a.name.cmp(&b.name));
-        
+
         for tool in category_tools {
             deps.ui.print(&format!(
                 "  {} - {}",
@@ -518,7 +540,8 @@ fn display_tools_verbose(deps: &Arc<ToolsDependencies>, tools: &[Tool]) {
             styled_text(&tool.name, MessageStyle::Cyan)
         ));
         deps.ui.print(&format!("  Category: {}", tool.category));
-        deps.ui.print(&format!("  Description: {}", tool.description));
+        deps.ui
+            .print(&format!("  Description: {}", tool.description));
         deps.ui.print(&format!("  Image: {}", tool.image_name));
         deps.ui.print(&format!("  Tags: {}", tool.tags.join(", ")));
     }
@@ -533,8 +556,9 @@ fn confirm_tool_changes(
     tools: &[ResolvedTool],
     action: &str,
 ) -> Result<bool> {
-    deps.ui.print(&format!("The following tools will be {}ed:", action));
-    
+    deps.ui
+        .print(&format!("The following tools will be {}ed:", action));
+
     for tool in tools {
         deps.ui.print(&format!(
             "  {} ({}:{})",
@@ -545,35 +569,38 @@ fn confirm_tool_changes(
     }
 
     deps.ui.print("");
-    deps.ui.prompt_input("Continue? [y/N]: ", None)
+    deps.ui
+        .prompt_input("Continue? [y/N]: ", None)
         .map(|input| input.trim().to_lowercase() == "y" || input.trim().to_lowercase() == "yes")
 }
 
 /// Confirm tool removal with user
 fn confirm_tool_removal(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Result<bool> {
     deps.ui.print("The following tools will be removed:");
-    
+
     for tool in tools {
-        deps.ui.print(&format!("  {}", styled_text(tool, MessageStyle::Cyan)));
+        deps.ui
+            .print(&format!("  {}", styled_text(tool, MessageStyle::Cyan)));
     }
 
     deps.ui.print("");
-    deps.ui.prompt_input("Continue? [y/N]: ", None)
+    deps.ui
+        .prompt_input("Continue? [y/N]: ", None)
         .map(|input| input.trim().to_lowercase() == "y" || input.trim().to_lowercase() == "yes")
 }
 
 /// Add tools to project spin manifest using registry infrastructure
 async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
-    
+
     if !manifest_path.exists() {
         anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
     }
 
-    let content = fs::read_to_string(manifest_path)
-        .context("Failed to read spin.toml")?;
-    
-    let mut doc = content.parse::<DocumentMut>()
+    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+
+    let mut doc = content
+        .parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
 
     // Ensure component section exists
@@ -582,16 +609,17 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
     }
 
     // Get default registry adapter for spin format generation
-    let adapter = get_registry_adapter(Some("ghcr"))
-        .context("Failed to get GHCR registry adapter")?;
+    let adapter =
+        get_registry_adapter(Some("ghcr")).context("Failed to get GHCR registry adapter")?;
 
     for tool in tools {
         let component_name = format!("tool-{}", tool.name);
-        
+
         // Check if component already exists
-        let components = doc["component"].as_table_mut()
+        let components = doc["component"]
+            .as_table_mut()
             .context("component section is not a table")?;
-        
+
         if components.contains_key(&component_name) {
             deps.ui.print(&format!(
                 "  {} {} (already exists, skipping)",
@@ -602,13 +630,17 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
         }
 
         // Use registry adapter to get components for Spin format
-        let registry_components = adapter.get_registry_components(&deps.client, &tool.image_name).await
-            .with_context(|| format!("Failed to get registry components for {}", tool.image_name))?;
+        let registry_components = adapter
+            .get_registry_components(&deps.client, &tool.image_name)
+            .await
+            .with_context(|| {
+                format!("Failed to get registry components for {}", tool.image_name)
+            })?;
 
         // Create component entry using registry infrastructure
         let registry_domain = registry_components.registry_domain.clone();
         let package_name = registry_components.package_name.clone();
-        
+
         let mut component = Table::new();
         component["source"] = Item::Table({
             let mut source = Table::new();
@@ -619,7 +651,8 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
         });
 
         // Add component to components table
-        let components = doc["component"].as_table_mut()
+        let components = doc["component"]
+            .as_table_mut()
             .context("component section is not a table")?;
         components[&component_name] = Item::Table(component);
 
@@ -636,49 +669,55 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string())
-        .context("Failed to write spin.toml")?;
+    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
         "{} tools added successfully!",
         styled_text("✓", MessageStyle::Green)
     ));
-    
+
     Ok(())
 }
 
 /// Update tools in project spin manifest
-async fn update_tools_in_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
+async fn update_tools_in_project(
+    deps: &Arc<ToolsDependencies>,
+    tools: &[ResolvedTool],
+) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
-    
+
     if !manifest_path.exists() {
         anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
     }
 
-    let content = fs::read_to_string(manifest_path)
-        .context("Failed to read spin.toml")?;
-    
-    let mut doc = content.parse::<DocumentMut>()
+    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+
+    let mut doc = content
+        .parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
 
-    let components = doc["component"].as_table_mut()
+    let components = doc["component"]
+        .as_table_mut()
         .context("component section not found in spin.toml")?;
 
     // Get registry adapter for version resolution
-    let adapter = get_registry_adapter(None)
-        .context("Failed to get registry adapter")?;
+    let adapter = get_registry_adapter(None).context("Failed to get registry adapter")?;
 
     for tool in tools {
         let component_name = format!("tool-{}", tool.name);
-        
+
         if let Some(component) = components.get_mut(&component_name) {
             if let Some(source_item) = component.get_mut("source") {
                 if let Some(source_table) = source_item.as_inline_table_mut() {
-                // Use registry adapter to resolve version properly
-                let registry_components = adapter.get_registry_components(&deps.client, &tool.image_name).await
-                    .with_context(|| format!("Failed to get registry components for {}", tool.image_name))?;
-                    
+                    // Use registry adapter to resolve version properly
+                    let registry_components = adapter
+                        .get_registry_components(&deps.client, &tool.image_name)
+                        .await
+                        .with_context(|| {
+                            format!("Failed to get registry components for {}", tool.image_name)
+                        })?;
+
                     source_table.insert("version", registry_components.version.clone().into());
                     deps.ui.print(&format!(
                         "  {} {} → {}",
@@ -698,43 +737,43 @@ async fn update_tools_in_project(deps: &Arc<ToolsDependencies>, tools: &[Resolve
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string())
-        .context("Failed to write spin.toml")?;
+    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
         "{} tools updated successfully!",
         styled_text("✓", MessageStyle::Green)
     ));
-    
+
     Ok(())
 }
 
 /// Remove tools from project spin manifest
 async fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
-    
+
     if !manifest_path.exists() {
         anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
     }
 
-    let content = fs::read_to_string(manifest_path)
-        .context("Failed to read spin.toml")?;
-    
-    let mut doc = content.parse::<DocumentMut>()
+    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+
+    let mut doc = content
+        .parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
 
     for tool in tools {
         let component_name = format!("tool-{}", tool);
-        
+
         // Try to remove the component
-        let components = doc["component"].as_table_mut()
+        let components = doc["component"]
+            .as_table_mut()
             .context("component section not found in spin.toml")?;
-        
+
         if components.remove(&component_name).is_some() {
             // Update tool_components variable by removing the tool
             update_tool_components_variable(&mut doc, tool, false)?;
-            
+
             deps.ui.print(&format!(
                 "  {} {}",
                 styled_text("✓", MessageStyle::Green),
@@ -750,20 +789,19 @@ async fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[Strin
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string())
-        .context("Failed to write spin.toml")?;
+    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
         "{} tools removed successfully!",
         styled_text("✓", MessageStyle::Green)
     ));
-    
+
     Ok(())
 }
 
 /// Retrieves the list of currently installed tools from spin.toml
-/// 
+///
 /// Reads the component section and extracts tool names (removing "tool-" prefix).
 /// Returns an empty set if no spin.toml exists or no tools are installed.
 #[cfg(test)]
@@ -778,20 +816,20 @@ fn get_installed_tools() -> Result<std::collections::HashSet<String>> {
 
 fn get_installed_tools_impl() -> Result<std::collections::HashSet<String>> {
     let manifest_path = std::path::Path::new("spin.toml");
-    
+
     if !manifest_path.exists() {
         return Ok(std::collections::HashSet::new());
     }
 
-    let content = std::fs::read_to_string(manifest_path)
-        .context("Failed to read spin.toml")?;
-    
-    let doc = content.parse::<DocumentMut>()
+    let content = std::fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+
+    let doc = content
+        .parse::<DocumentMut>()
         .context("Failed to parse spin.toml")?;
 
     // Look for tool components in the component section
     let mut tools = std::collections::HashSet::new();
-    
+
     if let Some(components) = doc.get("component").and_then(|v| v.as_table()) {
         for (key, _) in components.iter() {
             if key.starts_with("tool-") {
@@ -808,22 +846,35 @@ fn get_installed_tools_impl() -> Result<std::collections::HashSet<String>> {
 /// Update tool_components variable in spin.toml
 /// If add=true, adds the tool. If add=false, removes the tool.
 #[cfg(test)]
-pub fn update_tool_components_variable(doc: &mut DocumentMut, tool_name: &str, add: bool) -> Result<()> {
+pub fn update_tool_components_variable(
+    doc: &mut DocumentMut,
+    tool_name: &str,
+    add: bool,
+) -> Result<()> {
     update_tool_components_variable_impl(doc, tool_name, add)
 }
 
 #[cfg(not(test))]
-fn update_tool_components_variable(doc: &mut DocumentMut, tool_name: &str, add: bool) -> Result<()> {
+fn update_tool_components_variable(
+    doc: &mut DocumentMut,
+    tool_name: &str,
+    add: bool,
+) -> Result<()> {
     update_tool_components_variable_impl(doc, tool_name, add)
 }
 
-fn update_tool_components_variable_impl(doc: &mut DocumentMut, tool_name: &str, add: bool) -> Result<()> {
+fn update_tool_components_variable_impl(
+    doc: &mut DocumentMut,
+    tool_name: &str,
+    add: bool,
+) -> Result<()> {
     // Ensure variables section exists
     if !doc.contains_key("variables") {
         doc["variables"] = Item::Table(Table::new());
     }
 
-    let variables = doc["variables"].as_table_mut()
+    let variables = doc["variables"]
+        .as_table_mut()
         .context("variables section is not a table")?;
 
     // Ensure tool_components variable exists as an inline table
@@ -835,10 +886,12 @@ fn update_tool_components_variable_impl(doc: &mut DocumentMut, tool_name: &str, 
         }));
     }
 
-    let tool_components = variables["tool_components"].as_inline_table_mut()
+    let tool_components = variables["tool_components"]
+        .as_inline_table_mut()
         .context("tool_components is not an inline table")?;
 
-    let current_value = tool_components.get("default")
+    let current_value = tool_components
+        .get("default")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
@@ -884,39 +937,62 @@ mod tests {
     #[test]
     fn test_parse_tool_spec() {
         // Simple tool name
-        assert_eq!(parse_tool_spec("add", None), ("ghcr".to_string(), "add".to_string(), "latest".to_string()));
-        
+        assert_eq!(
+            parse_tool_spec("add", None),
+            ("ghcr".to_string(), "add".to_string(), "latest".to_string())
+        );
+
         // Tool with version
-        assert_eq!(parse_tool_spec("add:1.0", None), ("ghcr".to_string(), "add".to_string(), "1.0".to_string()));
-        
+        assert_eq!(
+            parse_tool_spec("add:1.0", None),
+            ("ghcr".to_string(), "add".to_string(), "1.0".to_string())
+        );
+
         // Registry with tool
-        assert_eq!(parse_tool_spec("docker:add", None), ("docker".to_string(), "add".to_string(), "latest".to_string()));
-        
+        assert_eq!(
+            parse_tool_spec("docker:add", None),
+            (
+                "docker".to_string(),
+                "add".to_string(),
+                "latest".to_string()
+            )
+        );
+
         // Full registry:tool:version
-        assert_eq!(parse_tool_spec("docker:add:1.0", None), ("docker".to_string(), "add".to_string(), "1.0".to_string()));
-        
+        assert_eq!(
+            parse_tool_spec("docker:add:1.0", None),
+            ("docker".to_string(), "add".to_string(), "1.0".to_string())
+        );
+
         // Registry override
-        assert_eq!(parse_tool_spec("add", Some("ecr")), ("ecr".to_string(), "add".to_string(), "latest".to_string()));
+        assert_eq!(
+            parse_tool_spec("add", Some("ecr")),
+            ("ecr".to_string(), "add".to_string(), "latest".to_string())
+        );
     }
 
     #[test]
     fn test_tools_manifest_loading() {
         let manifest_content = include_str!("../data/tools.toml");
         let manifest = ToolsManifest::from_toml(manifest_content).unwrap();
-        
+
         assert!(manifest.count() > 80); // Should have ~84 tools
         assert!(manifest.find_tool("add").is_some());
-        assert!(manifest.get_categories().contains(&"basic_math".to_string()));
+        assert!(
+            manifest
+                .get_categories()
+                .contains(&"basic_math".to_string())
+        );
     }
 
     #[test]
     fn test_tool_filtering() {
         let manifest_content = include_str!("../data/tools.toml");
         let manifest = ToolsManifest::from_toml(manifest_content).unwrap();
-        
+
         let math_tools = manifest.get_tools_by_category("basic_math");
         assert!(!math_tools.is_empty());
-        
+
         let encoding_tools = manifest.search_by_tag("encoding");
         assert!(!encoding_tools.is_empty());
     }

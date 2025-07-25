@@ -522,18 +522,44 @@ impl From<RegistryArgs> for ftl_commands::registry_command::RegistryArgs {
 impl From<ToolsCommand> for ftl_commands::tools::ToolsCommand {
     fn from(cmd: ToolsCommand) -> Self {
         match cmd {
-            ToolsCommand::List { category, filter, registry, verbose, all, direct } => {
-                Self::List { category, filter, registry, verbose, all, direct }
-            }
-            ToolsCommand::Add { tools, registry, version, yes } => {
-                Self::Add { tools, registry, version, yes }
-            }
-            ToolsCommand::Update { tools, registry, version, yes } => {
-                Self::Update { tools, registry, version, yes }
-            }
-            ToolsCommand::Remove { tools, yes } => {
-                Self::Remove { tools, yes }
-            }
+            ToolsCommand::List {
+                category,
+                filter,
+                registry,
+                verbose,
+                all,
+                direct,
+            } => Self::List {
+                category,
+                filter,
+                registry,
+                verbose,
+                all,
+                direct,
+            },
+            ToolsCommand::Add {
+                tools,
+                registry,
+                version,
+                yes,
+            } => Self::Add {
+                tools,
+                registry,
+                version,
+                yes,
+            },
+            ToolsCommand::Update {
+                tools,
+                registry,
+                version,
+                yes,
+            } => Self::Update {
+                tools,
+                registry,
+                version,
+                yes,
+            },
+            ToolsCommand::Remove { tools, yes } => Self::Remove { tools, yes },
         }
     }
 }

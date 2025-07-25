@@ -1,12 +1,14 @@
 //! CLI interface for tools command
 
 use anyhow::Result;
-use ftl_runtime::deps::{UserInterface, ProgressIndicator, MultiProgressManager, MessageStyle};
+use ftl_runtime::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::commands::tools::{ToolsDependencies, add_with_deps, list_with_deps, remove_with_deps, update_with_deps};
+use crate::commands::tools::{
+    ToolsDependencies, add_with_deps, list_with_deps, remove_with_deps, update_with_deps,
+};
 
 /// Commands for managing pre-built FTL tools in your project
 #[derive(Debug, Clone)]
@@ -69,14 +71,18 @@ pub async fn execute(args: ToolsArgs) -> Result<()> {
     // Create dependencies
     let ui: Arc<dyn UserInterface> = Arc::new(ConsoleUserInterface);
     let client = Client::new();
-    
-    let deps = Arc::new(ToolsDependencies {
-        ui,
-        client,
-    });
+
+    let deps = Arc::new(ToolsDependencies { ui, client });
 
     match args.command {
-        ToolsCommand::List { category, filter, registry, verbose, all, direct } => {
+        ToolsCommand::List {
+            category,
+            filter,
+            registry,
+            verbose,
+            all,
+            direct,
+        } => {
             list_with_deps(
                 &deps,
                 category.as_deref(),
@@ -85,33 +91,22 @@ pub async fn execute(args: ToolsArgs) -> Result<()> {
                 verbose,
                 all,
                 direct,
-            ).await
+            )
+            .await
         }
-        ToolsCommand::Add { tools, registry, version, yes } => {
-            add_with_deps(
-                &deps,
-                &tools,
-                registry.as_deref(),
-                version.as_deref(),
-                yes,
-            ).await
-        }
-        ToolsCommand::Update { tools, registry, version, yes } => {
-            update_with_deps(
-                &deps,
-                &tools,
-                registry.as_deref(),
-                version.as_deref(),
-                yes,
-            ).await
-        }
-        ToolsCommand::Remove { tools, yes } => {
-            remove_with_deps(
-                &deps,
-                &tools,
-                yes,
-            ).await
-        }
+        ToolsCommand::Add {
+            tools,
+            registry,
+            version,
+            yes,
+        } => add_with_deps(&deps, &tools, registry.as_deref(), version.as_deref(), yes).await,
+        ToolsCommand::Update {
+            tools,
+            registry,
+            version,
+            yes,
+        } => update_with_deps(&deps, &tools, registry.as_deref(), version.as_deref(), yes).await,
+        ToolsCommand::Remove { tools, yes } => remove_with_deps(&deps, &tools, yes).await,
     }
 }
 
@@ -146,7 +141,7 @@ impl UserInterface for ConsoleUserInterface {
         print!("{}", prompt);
         use std::io::{self, Write};
         io::stdout().flush()?;
-        
+
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         Ok(input.trim().to_string())
@@ -158,18 +153,21 @@ impl UserInterface for ConsoleUserInterface {
             let marker = if i == default { "*" } else { " " };
             println!("{} {}: {}", marker, i, item);
         }
-        
+
         print!("Selection [{}]: ", default);
         use std::io::{self, Write};
         io::stdout().flush()?;
-        
+
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        
+
         if input.trim().is_empty() {
             Ok(default)
         } else {
-            input.trim().parse().map_err(|e| anyhow::anyhow!("Invalid selection: {}", e))
+            input
+                .trim()
+                .parse()
+                .map_err(|e| anyhow::anyhow!("Invalid selection: {}", e))
         }
     }
 
@@ -186,13 +184,13 @@ struct SimpleSpinner;
 
 impl ProgressIndicator for SimpleSpinner {
     fn set_message(&self, _message: &str) {}
-    
+
     fn finish_and_clear(&self) {}
-    
+
     fn enable_steady_tick(&self, _duration: Duration) {}
-    
+
     fn finish_with_message(&self, _message: String) {}
-    
+
     fn set_prefix(&self, _prefix: String) {}
 }
 

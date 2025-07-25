@@ -6,7 +6,7 @@ use anyhow::Result;
 use ftl_runtime::deps::{MessageStyle, UserInterface};
 use reqwest::Client;
 
-use crate::registry::{get_registry_adapter, RegistryAdapter};
+use crate::registry::{RegistryAdapter, get_registry_adapter};
 
 /// Dependencies for the registry command
 pub struct RegistryDependencies {
@@ -17,9 +17,12 @@ pub struct RegistryDependencies {
 }
 
 /// Execute the list subcommand with injected dependencies
-pub async fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) -> Result<()> {
+pub async fn list_with_deps(
+    registry: Option<&str>,
+    deps: &Arc<RegistryDependencies>,
+) -> Result<()> {
     let registry_name = registry.unwrap_or("ghcr");
-    
+
     deps.ui.print(&format!(
         "{} Listing components from {}",
         styled_text("→", MessageStyle::Cyan),
@@ -36,7 +39,7 @@ pub async fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependenc
                 adapter.name()
             ));
             deps.ui.print("");
-            
+
             // For now, show guidance since crane ls needs specific image names
             deps.ui.print(&format!(
                 "{} Registry listing requires crane CLI and specific image names",
@@ -44,10 +47,13 @@ pub async fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependenc
             ));
             deps.ui.print("");
             deps.ui.print("To list tags for a specific image, use:");
-            deps.ui.print(&format!("  crane ls {}", adapter.get_registry_url("IMAGE_NAME")));
+            deps.ui.print(&format!(
+                "  crane ls {}",
+                adapter.get_registry_url("IMAGE_NAME")
+            ));
             deps.ui.print("");
             deps.ui.print("Browse components at:");
-            
+
             match registry_name {
                 "ghcr" => {
                     deps.ui.print("  - GitHub Container Registry: https://github.com/orgs/fastertools/packages");
@@ -69,12 +75,16 @@ pub async fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependenc
             return Err(e);
         }
     }
-    
+
     Ok(())
 }
 
 /// Execute the search subcommand with injected dependencies
-pub async fn search_with_deps(query: &str, registry: Option<&str>, deps: &Arc<RegistryDependencies>) -> Result<()> {
+pub async fn search_with_deps(
+    query: &str,
+    registry: Option<&str>,
+    deps: &Arc<RegistryDependencies>,
+) -> Result<()> {
     let registry_name = registry.unwrap_or("ghcr");
 
     deps.ui.print(&format!(
@@ -94,27 +104,32 @@ pub async fn search_with_deps(query: &str, registry: Option<&str>, deps: &Arc<Re
                 adapter.name()
             ));
             deps.ui.print("");
-            
+
             deps.ui.print(&format!(
                 "{} Registry search not yet implemented via crane",
                 styled_text("!", MessageStyle::Yellow)
             ));
             deps.ui.print("");
             deps.ui.print("For now, you can search at:");
-            
+
             match registry_name {
                 "ghcr" => {
                     deps.ui.print(&format!(
-                        "  - GitHub Packages: https://github.com/search?q={}&type=registrypackages"
-                    , query));
+                        "  - GitHub Packages: https://github.com/search?q={}&type=registrypackages",
+                        query
+                    ));
                 }
                 "docker" => {
                     deps.ui.print(&format!(
-                        "  - Docker Hub: https://hub.docker.com/search?q={}"
-                    , query));
+                        "  - Docker Hub: https://hub.docker.com/search?q={}",
+                        query
+                    ));
                 }
                 _ => {
-                    deps.ui.print(&format!("  - Search manually in {} registry", registry_name));
+                    deps.ui.print(&format!(
+                        "  - Search manually in {} registry",
+                        registry_name
+                    ));
                 }
             }
         }
@@ -127,7 +142,7 @@ pub async fn search_with_deps(query: &str, registry: Option<&str>, deps: &Arc<Re
             return Err(e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -157,28 +172,34 @@ pub async fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) -
                 adapter.name()
             ));
             deps.ui.print("");
-            
+
             // Check if component exists
             deps.ui.print(&format!(
                 "{} Checking if component exists...",
                 styled_text("→", MessageStyle::Cyan)
             ));
-            
+
             match adapter.verify_image_exists(&deps.client, component).await {
                 Ok(true) => {
                     deps.ui.print(&format!(
                         "{} Component exists in registry",
                         styled_text("✓", MessageStyle::Green)
                     ));
-                    
+
                     // Try to get registry components for more info
-                    match adapter.get_registry_components(&deps.client, component).await {
+                    match adapter
+                        .get_registry_components(&deps.client, component)
+                        .await
+                    {
                         Ok(components) => {
                             deps.ui.print("");
                             deps.ui.print("Component details:");
-                            deps.ui.print(&format!("  Registry: {}", components.registry_domain));
-                            deps.ui.print(&format!("  Package:  {}", components.package_name));
-                            deps.ui.print(&format!("  Version:  {}", components.version));
+                            deps.ui
+                                .print(&format!("  Registry: {}", components.registry_domain));
+                            deps.ui
+                                .print(&format!("  Package:  {}", components.package_name));
+                            deps.ui
+                                .print(&format!("  Version:  {}", components.version));
                         }
                         Err(e) => {
                             deps.ui.print(&format!(
@@ -203,12 +224,13 @@ pub async fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) -
                     ));
                 }
             }
-            
+
             deps.ui.print("");
             deps.ui.print("Component reference formats:");
             deps.ui.print("  - ghcr.io/username/component:version");
             deps.ui.print("  - docker.io/username/component:version");
-            deps.ui.print("  - component-name (searches default registry)");
+            deps.ui
+                .print("  - component-name (searches default registry)");
         }
         Err(e) => {
             deps.ui.print(&format!(
@@ -219,7 +241,7 @@ pub async fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) -
             return Err(e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -263,18 +285,17 @@ pub async fn execute(args: RegistryArgs) -> Result<()> {
 
     let ui = Arc::new(RealUserInterface);
     let client = Client::new();
-    let deps = Arc::new(RegistryDependencies { ui: ui.clone(), client });
+    let deps = Arc::new(RegistryDependencies {
+        ui: ui.clone(),
+        client,
+    });
 
     match args.command {
-        RegistryCommand::List { registry } => {
-            list_with_deps(registry.as_deref(), &deps).await
-        }
+        RegistryCommand::List { registry } => list_with_deps(registry.as_deref(), &deps).await,
         RegistryCommand::Search { query, registry } => {
             search_with_deps(&query, registry.as_deref(), &deps).await
         }
-        RegistryCommand::Info { component } => {
-            info_with_deps(&component, &deps).await
-        }
+        RegistryCommand::Info { component } => info_with_deps(&component, &deps).await,
     }
 }
 

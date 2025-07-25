@@ -79,15 +79,15 @@ impl RegistryConfig {
     /// Create a new ECR registry configuration
     pub fn new_ecr(name: String, account_id: Option<String>, region: Option<String>) -> Self {
         let mut config = serde_json::json!({});
-        
+
         if let Some(account) = account_id {
             config["account_id"] = serde_json::Value::String(account);
         }
-        
+
         if let Some(region) = region {
             config["region"] = serde_json::Value::String(region);
         }
-        
+
         Self {
             name,
             registry_type: RegistryType::Ecr,
@@ -103,11 +103,11 @@ impl RegistryConfig {
         let mut config = serde_json::json!({
             "url_pattern": url_pattern
         });
-        
+
         if let Some(auth) = auth_type {
             config["auth_type"] = serde_json::Value::String(auth);
         }
-        
+
         Self {
             name,
             registry_type: RegistryType::Custom,
@@ -120,7 +120,8 @@ impl RegistryConfig {
 
     /// Get a configuration value as a string
     pub fn get_config_str(&self, key: &str) -> Option<String> {
-        self.config.get(key)
+        self.config
+            .get(key)
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
     }
@@ -129,9 +130,9 @@ impl RegistryConfig {
     #[allow(dead_code)]
     pub fn requires_auth(&self) -> bool {
         match self.registry_type {
-            RegistryType::Ghcr => false, // Public GHCR repos don't require auth
+            RegistryType::Ghcr => false,   // Public GHCR repos don't require auth
             RegistryType::Docker => false, // Public Docker Hub doesn't require auth
-            RegistryType::Ecr => true, // ECR always requires auth
+            RegistryType::Ecr => true,     // ECR always requires auth
             RegistryType::Custom => {
                 // Check auth_type field
                 self.get_config_str("auth_type")
@@ -149,10 +150,16 @@ mod tests {
     #[test]
     fn test_registry_type_parsing() {
         assert_eq!("ghcr".parse::<RegistryType>().unwrap(), RegistryType::Ghcr);
-        assert_eq!("docker".parse::<RegistryType>().unwrap(), RegistryType::Docker);
+        assert_eq!(
+            "docker".parse::<RegistryType>().unwrap(),
+            RegistryType::Docker
+        );
         assert_eq!("ecr".parse::<RegistryType>().unwrap(), RegistryType::Ecr);
-        assert_eq!("custom".parse::<RegistryType>().unwrap(), RegistryType::Custom);
-        
+        assert_eq!(
+            "custom".parse::<RegistryType>().unwrap(),
+            RegistryType::Custom
+        );
+
         assert!("unknown".parse::<RegistryType>().is_err());
     }
 
@@ -169,7 +176,10 @@ mod tests {
         let ghcr = RegistryConfig::new_ghcr("my-ghcr".to_string(), "myorg".to_string());
         assert_eq!(ghcr.name, "my-ghcr");
         assert_eq!(ghcr.registry_type, RegistryType::Ghcr);
-        assert_eq!(ghcr.get_config_str("organization"), Some("myorg".to_string()));
+        assert_eq!(
+            ghcr.get_config_str("organization"),
+            Some("myorg".to_string())
+        );
 
         let docker = RegistryConfig::new_docker("my-docker".to_string());
         assert_eq!(docker.name, "my-docker");
@@ -178,7 +188,7 @@ mod tests {
         let ecr = RegistryConfig::new_ecr(
             "my-ecr".to_string(),
             Some("123456".to_string()),
-            Some("us-west-2".to_string())
+            Some("us-west-2".to_string()),
         );
         assert_eq!(ecr.name, "my-ecr");
         assert_eq!(ecr.registry_type, RegistryType::Ecr);
@@ -188,7 +198,7 @@ mod tests {
         let custom = RegistryConfig::new_custom(
             "my-custom".to_string(),
             "registry.example.com/{image_name}:latest".to_string(),
-            Some("bearer".to_string())
+            Some("bearer".to_string()),
         );
         assert_eq!(custom.name, "my-custom");
         assert_eq!(custom.registry_type, RegistryType::Custom);
@@ -196,7 +206,10 @@ mod tests {
             custom.get_config_str("url_pattern"),
             Some("registry.example.com/{image_name}:latest".to_string())
         );
-        assert_eq!(custom.get_config_str("auth_type"), Some("bearer".to_string()));
+        assert_eq!(
+            custom.get_config_str("auth_type"),
+            Some("bearer".to_string())
+        );
     }
 
     #[test]
@@ -213,14 +226,14 @@ mod tests {
         let custom_no_auth = RegistryConfig::new_custom(
             "custom".to_string(),
             "registry.example.com/{image_name}".to_string(),
-            Some("none".to_string())
+            Some("none".to_string()),
         );
         assert!(!custom_no_auth.requires_auth());
 
         let custom_with_auth = RegistryConfig::new_custom(
             "custom".to_string(),
             "registry.example.com/{image_name}".to_string(),
-            Some("bearer".to_string())
+            Some("bearer".to_string()),
         );
         assert!(custom_with_auth.requires_auth());
     }

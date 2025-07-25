@@ -20,7 +20,8 @@ pub mod test_helpers;
 
 // Re-export all commands at the crate root for easier access
 pub use commands::{
-    add, app, auth, build, deploy, init, login, logout, publish, setup, test, tools_cli as tools, up, update,
+    add, app, auth, build, deploy, init, login, logout, publish, setup, test, tools_cli as tools,
+    up, update,
 };
 
 // Re-export registry command separately to avoid naming conflict with registry module

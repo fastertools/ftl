@@ -20,12 +20,12 @@ impl ToolsManifest {
         let manifest: ToolsManifest = toml::from_str(content)?;
         Ok(manifest)
     }
-    
+
     /// Get all tools
     pub fn get_tools(&self) -> &[Tool] {
         &self.tools
     }
-    
+
     /// Get tools by category
     pub fn get_tools_by_category(&self, category: &str) -> Vec<&Tool> {
         self.tools
@@ -33,10 +33,11 @@ impl ToolsManifest {
             .filter(|tool| tool.category == category)
             .collect()
     }
-    
+
     /// Get all categories
     pub fn get_categories(&self) -> Vec<String> {
-        let mut categories: Vec<String> = self.tools
+        let mut categories: Vec<String> = self
+            .tools
             .iter()
             .map(|tool| tool.category.clone())
             .collect::<std::collections::HashSet<_>>()
@@ -45,12 +46,12 @@ impl ToolsManifest {
         categories.sort();
         categories
     }
-    
+
     /// Find tool by name
     pub fn find_tool(&self, name: &str) -> Option<&Tool> {
         self.tools.iter().find(|tool| tool.name == name)
     }
-    
+
     /// Search tools by tag
     pub fn search_by_tag(&self, tag: &str) -> Vec<&Tool> {
         self.tools
@@ -58,7 +59,7 @@ impl ToolsManifest {
             .filter(|tool| tool.tags.contains(&tag.to_string()))
             .collect()
     }
-    
+
     /// Get tools count
     pub fn count(&self) -> usize {
         self.tools.len()
@@ -70,7 +71,7 @@ impl Tool {
     pub fn get_image_ref(&self, registry: &str) -> String {
         format!("{}/{}", registry, self.image_name)
     }
-    
+
     /// Check if tool has specific tag
     pub fn has_tag(&self, tag: &str) -> bool {
         self.tags.contains(&tag.to_string())
@@ -101,16 +102,16 @@ tags = ["text", "string", "formatting"]
 
         let manifest = ToolsManifest::from_toml(toml_content).unwrap();
         assert_eq!(manifest.count(), 2);
-        
+
         let add_tool = manifest.find_tool("add").unwrap();
         assert_eq!(add_tool.category, "basic_math");
         assert_eq!(add_tool.description, "Add two numbers together");
         assert!(add_tool.has_tag("math"));
-        
+
         let categories = manifest.get_categories();
         assert!(categories.contains(&"basic_math".to_string()));
         assert!(categories.contains(&"text_processing".to_string()));
-        
+
         let math_tools = manifest.get_tools_by_category("basic_math");
         assert_eq!(math_tools.len(), 1);
         assert_eq!(math_tools[0].name, "add");
@@ -125,9 +126,12 @@ tags = ["text", "string", "formatting"]
             image_name: "ftl-tool-add".to_string(),
             tags: vec!["math".to_string()],
         };
-        
+
         assert_eq!(tool.get_image_ref("docker.io"), "docker.io/ftl-tool-add");
-        assert_eq!(tool.get_image_ref("ghcr.io/fastertools"), "ghcr.io/fastertools/ftl-tool-add");
+        assert_eq!(
+            tool.get_image_ref("ghcr.io/fastertools"),
+            "ghcr.io/fastertools/ftl-tool-add"
+        );
     }
 
     #[test]
@@ -158,7 +162,7 @@ tags = ["text", "string", "formatting"]
         let manifest = ToolsManifest::from_toml(toml_content).unwrap();
         let math_tools = manifest.search_by_tag("math");
         assert_eq!(math_tools.len(), 2);
-        
+
         let text_tools = manifest.search_by_tag("text");
         assert_eq!(text_tools.len(), 1);
         assert_eq!(text_tools[0].name, "uppercase");
