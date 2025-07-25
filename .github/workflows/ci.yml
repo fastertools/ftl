@@ -95,7 +95,7 @@ jobs:
       - name: Run CLI tests with coverage
         run: |
           # Run CLI tests with coverage
-          cargo llvm-cov nextest --package ftl-cli --package 'ftl-*' --all-features --profile ci
+          cargo llvm-cov nextest --package ftl-cli --all-features --profile ci
           
       - name: Check coverage threshold
         uses: ./.github/actions/check-coverage

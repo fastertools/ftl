@@ -1,0 +1,16 @@
+[package]
+name = "multi-tools-rs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ftl-sdk = { path = "../../../sdk/rust", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+schemars = "0.8"
+spin-sdk = "3"
+serde_json = "1.0"
+
+[workspace]

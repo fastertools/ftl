@@ -1,4 +1,4 @@
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{ftl_tools, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -8,9 +8,15 @@ struct {{project-name | pascal_case}}Input {
     message: String,
 }
 
-/// {{tool-description}}
-#[tool]
-fn {{project-name | snake_case}}(input: {{project-name | pascal_case}}Input) -> ToolResponse {
-    // TODO: Implement your tool logic here
-    ToolResponse::text(format!("Processed: {}", input.message))
+ftl_tools! {
+    /// {{tool-description}}
+    fn {{project-name | snake_case}}(input: {{project-name | pascal_case}}Input) -> ToolResponse {
+        // TODO: Implement your tool logic here
+        ToolResponse::text(format!("Processed: {}", input.message))
+    }
+    
+    // Add more tools here as needed:
+    // fn another_tool(input: AnotherInput) -> ToolResponse {
+    //     ToolResponse::text("Another tool response")
+    // }
 }
