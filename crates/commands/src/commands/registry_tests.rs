@@ -58,7 +58,6 @@ async fn test_list_default_registry() {
             .iter()
             .any(|s| s.contains("GitHub Container Registry"))
     );
-    assert!(output.iter().any(|s| s.contains("GitHub Container Registry")));
 }
 
 #[tokio::test]
@@ -241,10 +240,22 @@ async fn test_list_output_completeness() {
 
     // Verify all expected output lines are present
     let output = ui.get_output();
-    
+
     // Just verify key content is present rather than exact line count
     // since the new implementation has different formatting
-    assert!(output.iter().any(|s| s.contains("Listing components from ghcr")));
-    assert!(output.iter().any(|s| s.contains("GitHub Container Registry")));
-    assert!(output.iter().any(|s| s.contains("Registry listing requires crane CLI")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Listing components from ghcr"))
+    );
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("GitHub Container Registry"))
+    );
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Registry listing requires crane CLI"))
+    );
 }

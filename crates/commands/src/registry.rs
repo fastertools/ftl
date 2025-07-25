@@ -721,7 +721,7 @@ mod tests {
             package_name: "user/app".to_string(),
             version: "1.2.0".to_string(),
         };
-        
+
         assert_eq!(components.registry_domain, "docker.io");
         assert_eq!(components.package_name, "user/app");
         assert_eq!(components.version, "1.2.0");
