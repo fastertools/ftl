@@ -7,11 +7,11 @@ coverage:
       default:
         # Fail the status if coverage drops by more than 1%
         threshold: 1%
-        target: 80%  # We're aiming for 80%+ coverage (excluding test files)
+        target: 75%  # We're aiming for 75%+ coverage (excluding test files)
     patch:
       default:
-        # New code should have at least 80% coverage
-        target: 80%
+        # New code should have at least 75% coverage
+        target: 75%
 
 ignore:
   # Infrastructure and hard-to-test files

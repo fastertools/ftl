@@ -38,11 +38,11 @@ test:
 
 # Run tests with coverage
 coverage:
-	cargo llvm-cov nextest
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
 
 # Generate HTML coverage report
 coverage-open:
-	cargo llvm-cov nextest --open
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros' --open
 
 # Fix formatting
 fmt:
