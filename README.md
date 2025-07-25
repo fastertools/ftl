@@ -15,94 +15,92 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* DX for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
+FTL is an open source tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) with [Spin](https://github.com/spinframework/spin) to present a *just works* story for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
 
 FTL tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Edge is an early platform that aims to be a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). Access is currently limited. Run `ftl login` to join the waitlist.
+FTL Edge is an early platform that aims to be a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). Run `ftl login` to join the waitlist.
 
 ## Why?
 
 <details>
+<summary><strong>⤵ Simple across languages</strong></summary>
 
+* <details>
+  <summary><strong>🦀 Rust</strong></summary>
+
+  ```rust
+  use ftl_sdk::{tools, text, ToolResponse};
+  use serde::Deserialize;
+  use schemars::JsonSchema;
+
+  #[derive(Deserialize, JsonSchema)]
+  struct ProcessInput {
+      /// The message to process
+      message: String,
+  }
+
+  tools! {
+      /// Process a message
+      fn process_message(input: ProcessInput) -> ToolResponse {
+          text!("Processed: {}", input.message)
+      }
+      
+      /// Reverse a string
+      fn reverse_text(input: ProcessInput) -> ToolResponse {
+          let reversed: String = input.message.chars().rev().collect();
+          text!("{}", reversed)
+      }
+  }
+  ```
+  </details>
+
+* <details>
+  <summary><strong>🟦 TypeScript</strong></summary>
+
+  ```typescript
+  import { createTools, ToolResponse } from 'ftl-sdk'
+  import { z } from 'zod'
+
+  // Define schemas using Zod
+  const ProcessSchema = z.object({
+    message: z.string().describe('The message to process')
+  })
+
+  const ReverseSchema = z.object({
+    text: z.string().describe('The text to reverse')
+  })
+
+  const handle = createTools({
+    processMessage: {
+      description: 'Process a message',
+      inputSchema: z.toJSONSchema(ProcessSchema),
+      handler: async (input: z.infer<typeof ProcessSchema>) => {
+        return ToolResponse.text(`Processed: ${input.message}`)
+      }
+    },
+    reverseText: {
+      description: 'Reverse a string',
+      inputSchema: z.toJSONSchema(ReverseSchema),
+      handler: async (input: z.infer<typeof ReverseSchema>) => {
+        const reversed = input.text.split('').reverse().join('')
+        return ToolResponse.text(reversed)
+      }
+    }
+  })
+
+  //@ts-ignore
+  addEventListener('fetch', (event: FetchEvent) => {
+    event.respondWith(handle(event.request))
+  })
+  ```
+  </details>
 
 - Mix and serve tool components written in different source languages, each with multiple tools, all exposed on one `/mcp` endpoint.
 - Write tools in TypeScript, Rust, Python, Go, and [more](https://component-model.bytecodealliance.org/language-support.html).
 - Tool components can be distributed on and imported from OCI registries. See below.
 - High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in supported languages like Rust and C.
 - Tool component binary size and performance are influenced by source language.
-
-<summary><strong>⤵ Simple in multiple languages</strong></summary>
-
-<details>
-<summary><strong>🦀 Rust</strong></summary>
-
-```rust
-use ftl_sdk::{tools, text, ToolResponse};
-use serde::Deserialize;
-use schemars::JsonSchema;
-
-#[derive(Deserialize, JsonSchema)]
-struct ProcessInput {
-    /// The message to process
-    message: String,
-}
-
-tools! {
-    /// Process a message
-    fn process_message(input: ProcessInput) -> ToolResponse {
-        text!("Processed: {}", input.message)
-    }
-    
-    /// Reverse a string
-    fn reverse_text(input: ProcessInput) -> ToolResponse {
-        let reversed: String = input.message.chars().rev().collect();
-        text!("{}", reversed)
-    }
-}
-```
-</details>
-
-<details>
-<summary><strong>🟦 TypeScript</strong></summary>
-
-```typescript
-import { createTools, ToolResponse } from 'ftl-sdk'
-import { z } from 'zod'
-
-// Define schemas using Zod
-const ProcessSchema = z.object({
-  message: z.string().describe('The message to process')
-})
-
-const ReverseSchema = z.object({
-  text: z.string().describe('The text to reverse')
-})
-
-const handle = createTools({
-  processMessage: {
-    description: 'Process a message',
-    inputSchema: z.toJSONSchema(ProcessSchema),
-    handler: async (input: z.infer<typeof ProcessSchema>) => {
-      return ToolResponse.text(`Processed: ${input.message}`)
-    }
-  },
-  reverseText: {
-    description: 'Reverse a string',
-    inputSchema: z.toJSONSchema(ReverseSchema),
-    handler: async (input: z.infer<typeof ReverseSchema>) => {
-      const reversed = input.text.split('').reverse().join('')
-      return ToolResponse.text(reversed)
-    }
-  }
-})
-
-//@ts-ignore
-addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(handle(event.request))
-})
-```
-</details>
 </details>
 
 <details>
@@ -125,7 +123,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 <details>
 <summary><strong>⤵ Deploy on FTL Edge</strong></summary>
 
-Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
+Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables you to do more with MCP than just proxy to a REST API.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - FTL tools run as sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
