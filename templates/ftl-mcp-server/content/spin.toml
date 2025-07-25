@@ -89,7 +89,7 @@ route = { private = true }
 component = "ftl-mcp-gateway"
 
 [component.ftl-mcp-gateway]
-source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.8" }
+source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.9" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.ftl-mcp-gateway.variables]
 tool_components = "{% raw %}{{ tool_components }}{% endraw %}"
