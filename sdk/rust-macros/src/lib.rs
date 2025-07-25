@@ -2,99 +2,150 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{FnArg, ItemFn, parse_macro_input};
 
-/// Create a tool that can be used with the MCP Gateway.
+/// Define multiple tools in a single component.
 ///
-/// The macro will:
-/// - Use the function name as the tool name (unless overridden)
-/// - Extract the first line of the doc comment as the description (unless overridden)
-/// - Generate the title from the function name (unless overridden)
-#[proc_macro_attribute]
-pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(input as ItemFn);
+/// This macro allows you to define all your tools in one place, automatically
+/// generating the HTTP handler and metadata for each tool.
+///
+/// # Example
+/// ```ignore
+/// ftl_tools! {
+///     /// Echo back the input message
+///     fn echo(input: EchoInput) -> ToolResponse {
+///         ToolResponse::text(format!("Echo: {}", input.message))
+///     }
+///
+///     /// Reverse the input text
+///     fn reverse(input: ReverseInput) -> ToolResponse {
+///         ToolResponse::text(input.text.chars().rev().collect::<String>())
+///     }
+/// }
+/// ```
+#[proc_macro]
+pub fn ftl_tools(input: TokenStream) -> TokenStream {
+    let tools = parse_macro_input!(input as ToolsDefinition);
 
-    // Parse the arguments to extract name, title, description
-    let args_parsed = match syn::parse::<ToolArgs>(args) {
-        Ok(args) => args,
-        Err(e) => return e.to_compile_error().into(),
-    };
+    // Collect all tool functions
+    let tool_fns: Vec<_> = tools.functions.iter().collect();
 
-    // Get the input type to derive the schema
-    let input_type = match input_fn.sig.inputs.first() {
-        Some(FnArg::Typed(pat_type)) => &pat_type.ty,
-        _ => {
-            return syn::Error::new_spanned(
-                &input_fn.sig,
-                "Function must have exactly one argument",
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
+    // Generate metadata for each tool
+    let metadata_items: Vec<_> = tool_fns.iter().map(|func| {
+        let name = &func.sig.ident;
+        let name_str = name.to_string();
 
-    let fn_name = &input_fn.sig.ident;
-    let fn_visibility = &input_fn.vis;
-    let is_async = input_fn.sig.asyncness.is_some();
+        // Extract doc comment
+        let description = extract_doc_comment(&func.attrs)
+            .map(|d| quote!(Some(#d.to_string())))
+            .unwrap_or(quote!(None));
 
-    // Extract doc comments from the function
-    let doc_comment = extract_doc_comment(&input_fn.attrs);
+        // Get input type
+        let input_type = match func.sig.inputs.first() {
+            Some(FnArg::Typed(pat_type)) => &pat_type.ty,
+            _ => panic!("Tool function must have exactly one typed argument"),
+        };
 
-    // Use provided values or fall back to defaults
-    let name = args_parsed.name.unwrap_or_else(|| fn_name.to_string());
-    let title = args_parsed
-        .title
-        .map(|s| quote!(Some(#s.to_string())))
-        .unwrap_or_else(|| {
-            let title = generate_title(&fn_name.to_string());
-            quote!(Some(#title.to_string()))
-        });
-    let description = args_parsed
-        .description
-        .map(|s| quote!(Some(#s.to_string())))
-        .unwrap_or_else(|| {
-            if let Some(doc) = doc_comment {
-                quote!(Some(#doc.to_string()))
-            } else {
-                quote!(None)
-            }
-        });
-    // Generate input schema - either from provided value or derive from type
-    let input_schema = match args_parsed.input_schema {
-        Some(schema) => schema,
-        None => {
-            // Automatically derive schema from the input type
-            quote!(::serde_json::to_value(::schemars::schema_for!(#input_type)).unwrap())
-        }
-    };
-
-    // Generate the function call with or without await
-    let fn_call = if is_async {
-        quote!(#fn_name(input).await)
-    } else {
-        quote!(#fn_name(input))
-    };
-
-    let output = quote! {
-        #input_fn
-
-        #[::spin_sdk::http_component]
-        #fn_visibility async fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
-            use ::spin_sdk::http::{Method, Response};
-
-            // Build metadata
-            let metadata = ::ftl_sdk::ToolMetadata {
-                name: #name.to_string(),
-                title: #title,
+        quote! {
+            ::ftl_sdk::ToolMetadata {
+                name: #name_str.to_string(),
+                title: Some(generate_title(#name_str)),
                 description: #description,
-                input_schema: #input_schema,
+                input_schema: ::serde_json::to_value(::schemars::schema_for!(#input_type)).unwrap(),
                 output_schema: None,
                 annotations: None,
                 meta: None,
-            };
+            }
+        }
+    }).collect();
+
+    // Generate routing cases for POST requests
+    let routing_cases: Vec<_> = tool_fns.iter().map(|func| {
+        let name = &func.sig.ident;
+        let name_str = name.to_string();
+        let is_async = func.sig.asyncness.is_some();
+
+        // Get input type
+        let input_type = match func.sig.inputs.first() {
+            Some(FnArg::Typed(pat_type)) => &pat_type.ty,
+            _ => panic!("Tool function must have exactly one typed argument"),
+        };
+
+        let fn_call = if is_async {
+            quote!(#name(input).await)
+        } else {
+            quote!(#name(input))
+        };
+
+        quote! {
+            #name_str => {
+                match ::serde_json::from_slice::<#input_type>(body) {
+                    Ok(input) => {
+                        let response = #fn_call;
+                        match ::serde_json::to_vec(&response) {
+                            Ok(body) => Response::builder()
+                                .status(200)
+                                .header("Content-Type", "application/json")
+                                .body(body)
+                                .build(),
+                            Err(e) => {
+                                let error_response = ::ftl_sdk::ToolResponse::error(
+                                    format!("Failed to serialize response: {}", e)
+                                );
+                                Response::builder()
+                                    .status(500)
+                                    .header("Content-Type", "application/json")
+                                    .body(::serde_json::to_vec(&error_response).unwrap_or_default())
+                                    .build()
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let error_response = ::ftl_sdk::ToolResponse::error(
+                            format!("Invalid request body: {}", e)
+                        );
+                        Response::builder()
+                            .status(400)
+                            .header("Content-Type", "application/json")
+                            .body(::serde_json::to_vec(&error_response).unwrap_or_default())
+                            .build()
+                    }
+                }
+            }
+        }
+    }).collect();
+
+    let output = quote! {
+        // Define all tool functions
+        #(#tool_fns)*
+
+        // Generate the HTTP component handler
+        #[::spin_sdk::http_component]
+        async fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
+            use ::spin_sdk::http::{Method, Response};
+
+            // Helper function to generate title from name
+            fn generate_title(name: &str) -> String {
+                name.split('_')
+                    .map(|word| {
+                        let mut chars = word.chars();
+                        match chars.next() {
+                            None => String::new(),
+                            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+
+            let path = req.path();
 
             match req.method() {
-                &Method::Get => {
-                    // Return tool metadata
-                    match ::serde_json::to_vec(&metadata) {
+                &Method::Get if path == "/" => {
+                    // Return metadata for all tools
+                    let tools = vec![
+                        #(#metadata_items),*
+                    ];
+
+                    match ::serde_json::to_vec(&tools) {
                         Ok(body) => Response::builder()
                             .status(200)
                             .header("Content-Type", "application/json")
@@ -107,35 +158,18 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                 }
                 &Method::Post => {
-                    // Parse request body and execute tool
+                    // Get the tool name from the path
+                    let tool_name = path.trim_start_matches('/');
                     let body = req.body();
-                    match ::serde_json::from_slice::<#input_type>(body) {
-                        Ok(input) => {
-                            let response = #fn_call;
-                            match ::serde_json::to_vec(&response) {
-                                Ok(body) => Response::builder()
-                                    .status(200)
-                                    .header("Content-Type", "application/json")
-                                    .body(body)
-                                    .build(),
-                                Err(e) => {
-                                    let error_response = ::ftl_sdk::ToolResponse::error(
-                                        format!("Failed to serialize response: {}", e)
-                                    );
-                                    Response::builder()
-                                        .status(500)
-                                        .header("Content-Type", "application/json")
-                                        .body(::serde_json::to_vec(&error_response).unwrap_or_default())
-                                        .build()
-                                }
-                            }
-                        }
-                        Err(e) => {
+
+                    match tool_name {
+                        #(#routing_cases)*
+                        _ => {
                             let error_response = ::ftl_sdk::ToolResponse::error(
-                                format!("Invalid request body: {}", e)
+                                format!("Tool '{}' not found", tool_name)
                             );
                             Response::builder()
-                                .status(400)
+                                .status(404)
                                 .header("Content-Type", "application/json")
                                 .body(::serde_json::to_vec(&error_response).unwrap_or_default())
                                 .build()
@@ -154,12 +188,28 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     output.into()
 }
 
-// Helper struct to parse tool macro arguments
-struct ToolArgs {
-    name: Option<String>,
-    title: Option<String>,
-    description: Option<String>,
-    input_schema: Option<proc_macro2::TokenStream>,
+// Parse multiple function definitions
+struct ToolsDefinition {
+    functions: Vec<ItemFn>,
+}
+
+impl syn::parse::Parse for ToolsDefinition {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut functions = Vec::new();
+
+        while !input.is_empty() {
+            functions.push(input.parse::<ItemFn>()?);
+        }
+
+        if functions.is_empty() {
+            return Err(syn::Error::new(
+                input.span(),
+                "At least one tool function must be defined",
+            ));
+        }
+
+        Ok(ToolsDefinition { functions })
+    }
 }
 
 // Extract the first line of doc comments from attributes
@@ -181,70 +231,4 @@ fn extract_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
             None
         })
         .next()
-}
-
-// Generate a title from a function name (e.g., "calculate_sum" -> "Calculate Sum")
-fn generate_title(name: &str) -> String {
-    name.split('_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-impl syn::parse::Parse for ToolArgs {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut name = None;
-        let mut title = None;
-        let mut description = None;
-        let mut input_schema = None;
-
-        while !input.is_empty() {
-            let ident: syn::Ident = input.parse()?;
-            input.parse::<syn::Token![=]>()?;
-
-            match ident.to_string().as_str() {
-                "name" => {
-                    let lit: syn::LitStr = input.parse()?;
-                    name = Some(lit.value());
-                }
-                "title" => {
-                    let lit: syn::LitStr = input.parse()?;
-                    title = Some(lit.value());
-                }
-                "description" => {
-                    let lit: syn::LitStr = input.parse()?;
-                    description = Some(lit.value());
-                }
-                "input_schema" => {
-                    let expr: syn::Expr = input.parse()?;
-                    input_schema = Some(quote!(#expr));
-                }
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        ident,
-                        "Unknown attribute. Expected: name, title, description, or input_schema",
-                    ));
-                }
-            }
-
-            if !input.is_empty() {
-                input.parse::<syn::Token![,]>()?;
-            }
-        }
-
-        // input_schema is now optional
-
-        Ok(ToolArgs {
-            name,
-            title,
-            description,
-            input_schema,
-        })
-    }
 }
