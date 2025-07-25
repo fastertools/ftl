@@ -426,11 +426,14 @@ fn resolve_tools(
         let final_version = version.unwrap_or(&tool_version);
 
         // Resolve full image name based on registry
-        let image_name = if tool_name.starts_with("ftl-tool-") {
+        let base_image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.clone()
         } else {
             format!("ftl-tool-{tool_name}")
         };
+
+        // Create full image reference with version tag for registry resolution
+        let image_name_with_version = format!("{}:{}", base_image_name, final_version);
 
         deps.ui.print(&format!(
             "{} Verifying tool {} in registry...",
@@ -442,7 +445,7 @@ fn resolve_tools(
         // we would use the crane CLI to verify image existence via adapter.get_registry_url()
         resolved.push(ResolvedTool {
             name: tool_name,
-            image_name,
+            image_name: image_name_with_version,
             version: final_version.to_string(),
         });
     }
