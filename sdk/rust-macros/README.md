@@ -19,7 +19,7 @@ This crate provides the `tools!` macro for defining multiple tool handler functi
 The `tools!` macro simplifies creating tool handlers:
 
 ```rust
-use ftl_sdk::{tools, text};
+use ftl_sdk::{tools, text, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -131,7 +131,7 @@ Just like with the TypeScript SDK, **tools should NOT validate inputs themselves
 The `tools!` macro automatically generates the Spin HTTP component handler:
 
 ```rust
-use ftl_sdk::{tools, text};
+use ftl_sdk::{tools, text, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
