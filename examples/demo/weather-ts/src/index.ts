@@ -65,15 +65,14 @@ const handle = createTools({
   weatherTs: {
     description: 'Get current weather for a location using Open-Meteo API',
     inputSchema: z.toJSONSchema(WeatherInputSchema),
-    handler: async (input) => {
-      const typedInput = input as WeatherInput
+    handler: async (input: WeatherInput) => {
     try {
-      const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(typedInput.location)}&count=1`;
+      const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(input.location)}&count=1`;
       const geocodingResponse = await fetch(geocodingUrl);
       const geocodingData = (await geocodingResponse.json()) as GeocodingResponse;
 
       if (!geocodingData.results?.[0]) {
-        return ToolResponse.text(`Location '${typedInput.location}' not found`);
+        return ToolResponse.text(`Location '${input.location}' not found`);
       }
 
       const { latitude, longitude, name } = geocodingData.results[0];

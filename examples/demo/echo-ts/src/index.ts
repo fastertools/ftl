@@ -10,10 +10,9 @@ const handle = createTools({
   echoTs: {
     description: 'An MCP tool written in TypeScript',
     inputSchema: z.toJSONSchema(EchoSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof EchoSchema>
+    handler: async (input: z.infer<typeof EchoSchema>) => {
       // TODO: Implement your tool logic here
-      return ToolResponse.text(`Processed: ${typedInput.message}`)
+      return ToolResponse.text(`Processed: ${input.message}`)
     }
   }
 })

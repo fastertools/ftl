@@ -1,4 +1,4 @@
-use ftl_sdk::{ftl_tools, ToolResponse};
+use ftl_sdk::{tools, text};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -8,15 +8,15 @@ struct ExampleToolInput {
     message: String,
 }
 
-ftl_tools! {
+tools! {
     /// An example tool that processes messages
     fn example_tool(input: ExampleToolInput) -> ToolResponse {
         // TODO: Implement your tool logic here
-        ToolResponse::text(format!("Processed: {}", input.message))
+        text!("Processed: {}", input.message)
     }
     
     // Add more tools here as needed:
     // fn another_tool(input: AnotherInput) -> ToolResponse {
-    //     ToolResponse::text("Another tool response")
+    //     text!("Another tool response")
     // }
 }

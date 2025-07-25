@@ -6,6 +6,8 @@ const EchoSchema = z.object({
   message: z.string().describe('The message to echo back')
 })
 
+type EchoInput = z.infer<typeof EchoSchema>
+
 const ReverseSchema = z.object({
   text: z.string().describe('The text to reverse')
 })
@@ -23,9 +25,8 @@ const handle = createTools({
   echo: {
     description: 'Echo back the input message',
     inputSchema: z.toJSONSchema(EchoSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof EchoSchema>
-      return ToolResponse.text(`Echo: ${typedInput.message}`)
+    handler: (input: EchoInput) => {
+      return ToolResponse.text(`Echo: ${input.message}`)
     }
   },
   
@@ -33,27 +34,24 @@ const handle = createTools({
     name: 'reverse',  // Explicit override to keep it as 'reverse'
     description: 'Reverse the input text',
     inputSchema: z.toJSONSchema(ReverseSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof ReverseSchema>
-      return ToolResponse.text(typedInput.text.split('').reverse().join(''))
+    handler: async (input: z.infer<typeof ReverseSchema>) => {
+      return ToolResponse.text(input.text.split('').reverse().join(''))
     }
   },
   
   uppercase: {
     description: 'Convert text to uppercase',
     inputSchema: z.toJSONSchema(UppercaseSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof UppercaseSchema>
-      return ToolResponse.text(typedInput.text.toUpperCase())
+    handler: async (input: z.infer<typeof UppercaseSchema>) => {
+      return ToolResponse.text(input.text.toUpperCase())
     }
   },
   
   wordCount: {
     description: 'Count the number of words in the input text',
     inputSchema: z.toJSONSchema(WordCountSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof WordCountSchema>
-      const wordCount = typedInput.text.trim().split(/\s+/).filter(word => word.length > 0).length
+    handler: async (input: z.infer<typeof WordCountSchema>) => {
+      const wordCount = input.text.trim().split(/\s+/).filter(word => word.length > 0).length
       return ToolResponse.text(`Word count: ${wordCount}`)
     }
   }

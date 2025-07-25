@@ -277,24 +277,18 @@ export function isResourceContent(content: ToolContent): content is ResourceCont
 }
 
 /**
- * Handler function type for tool execution
+ * Tool definition for createTools.
+ *
+ * The handler accepts `any` to allow maximum flexibility in typing.
+ * Users should type their handler parameters for type safety:
+ *
+ * ```typescript
+ * handler: async (input: MyInputType) => {
+ *   return ToolResponse.text(input.message)
+ * }
+ * ```
  */
-export type ToolHandler<T = unknown> = (input: T) => ToolResponse | Promise<ToolResponse>
-
-/**
- * Options for creating a tool with metadata
- */
-export interface CreateToolOptions<T = unknown> {
-  /** Tool metadata */
-  metadata: ToolMetadata
-  /** Handler function for tool execution */
-  handler: ToolHandler<T>
-}
-
-/**
- * Tool definition for createTools
- */
-export interface ToolDefinition<T = unknown> {
+export interface ToolDefinition {
   /** Optional explicit tool name (overrides the property key) */
   name?: string
 
@@ -316,8 +310,11 @@ export interface ToolDefinition<T = unknown> {
   /** Optional metadata for tool-specific extensions */
   _meta?: Record<string, unknown>
 
-  /** Handler function for tool execution */
-  handler: ToolHandler<T>
+  /**
+   * Handler function for tool execution.
+   * Uses `any` to allow users to specify their own input types for better DX.
+   */
+  handler: (input: any) => ToolResponse | Promise<ToolResponse> // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 /**
@@ -351,7 +348,7 @@ function camelToSnake(str: string): string {
  * const handle = createTools({
  *   echo: {
  *     description: 'Echo back the input',
- *     inputSchema: zodToJsonSchema(EchoSchema),
+ *     inputSchema: z.toJSONSchema(EchoSchema),
  *     handler: async (input: z.infer<typeof EchoSchema>) => {
  *       return ToolResponse.text(`Echo: ${input.message}`)
  *     }
@@ -359,14 +356,15 @@ function camelToSnake(str: string): string {
  *
  *   reverse: {
  *     description: 'Reverse the input text',
- *     inputSchema: zodToJsonSchema(ReverseSchema),
+ *     inputSchema: z.toJSONSchema(ReverseSchema),
  *     handler: async (input: z.infer<typeof ReverseSchema>) => {
  *       return ToolResponse.text(input.text.split('').reverse().join(''))
  *     }
  *   }
  * })
  *
- * addEventListener('fetch', (event) => {
+ * //@ts-ignore
+ * addEventListener('fetch', (event: FetchEvent) => {
  *   event.respondWith(handle(event.request))
  * })
  * ```
@@ -419,90 +417,6 @@ export function createTools<T extends Record<string, ToolDefinition>>(
       try {
         const input = await request.json()
         const response = await tool.handler(input)
-        return new Response(JSON.stringify(response), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        const errorResponse = ToolResponse.error(`Tool execution failed: ${errorMessage}`)
-        return new Response(JSON.stringify(errorResponse), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-    }
-
-    // Method not allowed
-    return new Response('Method not allowed', {
-      status: 405,
-      headers: { Allow: 'GET, POST' },
-    })
-  }
-}
-
-/**
- * Creates a request handler configured to handle MCP tool requests.
- *
- * @deprecated Use createTools instead for consistency with multi-tool pattern
- *
- * This helper provides a zero-dependency way to create a tool component that:
- * - Returns metadata on GET requests
- * - Executes the handler on POST requests
- * - Handles errors gracefully
- *
- * @example
- * ```typescript
- * import { createTool, ToolResponse } from 'ftl-sdk'
- *
- * interface EchoRequest {
- *   message: string
- * }
- *
- * const handle = createTool({
- *   metadata: {
- *     name: 'echo',
- *     title: 'Echo Tool',
- *     description: 'Echoes back the input message',
- *     inputSchema: {
- *       type: 'object',
- *       properties: {
- *         message: { type: 'string' }
- *       },
- *       required: ['message']
- *     }
- *   },
- *   handler: async (input: EchoRequest) => {
- *     return ToolResponse.text(`Echo: ${input.message}`)
- *   }
- * })
- *
- * addEventListener('fetch', (event) => {
- *   event.respondWith(handle(event.request))
- * })
- * ```
- *
- */
-export function createTool<T = unknown>(
-  options: CreateToolOptions<T>,
-): (request: Request) => Promise<Response> {
-  // For backward compatibility, createTool maintains the original single-tool API
-  return async function handleRequest(request: Request): Promise<Response> {
-    const { method } = request
-
-    // Handle metadata request
-    if (method === 'GET') {
-      return new Response(JSON.stringify(options.metadata), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Handle tool execution
-    if (method === 'POST') {
-      try {
-        const input = await request.json()
-        const response = await options.handler(input as T)
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

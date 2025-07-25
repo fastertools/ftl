@@ -1,4 +1,4 @@
-use ftl_sdk::{ftl_tools, ToolResponse};
+use ftl_sdk::{tools, text};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -26,26 +26,26 @@ struct WordCountInput {
     text: String,
 }
 
-ftl_tools! {
+tools! {
     /// Echo back the input message
     fn echo(input: EchoInput) -> ToolResponse {
-        ToolResponse::text(format!("Echo: {}", input.message))
+        text!("Echo: {}", input.message)
     }
     
     /// Reverse the input text
     fn reverse(input: ReverseInput) -> ToolResponse {
         let reversed: String = input.text.chars().rev().collect();
-        ToolResponse::text(reversed)
+        text!("{}", reversed)
     }
     
     /// Convert text to uppercase
     fn uppercase(input: UppercaseInput) -> ToolResponse {
-        ToolResponse::text(input.text.to_uppercase())
+        text!("{}", input.text.to_uppercase())
     }
     
     /// Count the number of words in the input text
     fn word_count(input: WordCountInput) -> ToolResponse {
         let count = input.text.split_whitespace().count();
-        ToolResponse::text(format!("Word count: {}", count))
+        text!("Word count: {}", count)
     }
 }
