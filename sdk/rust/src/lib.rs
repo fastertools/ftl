@@ -6,7 +6,7 @@
 
 // Re-export macros when the feature is enabled
 #[cfg(feature = "macros")]
-pub use ftl_sdk_macros::ftl_tools;
+pub use ftl_sdk_macros::tools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -220,6 +220,31 @@ impl ToolContent {
     }
 }
 
+// Response macros for ergonomic tool responses
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! text {
+    ($($arg:tt)*) => {
+        $crate::ToolResponse::text(format!($($arg)*))
+    };
+}
+
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! error {
+    ($($arg:tt)*) => {
+        $crate::ToolResponse::error(format!($($arg)*))
+    };
+}
+
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! structured {
+    ($data:expr, $($text:tt)*) => {
+        $crate::ToolResponse::with_structured(format!($($text)*), $data)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -267,5 +292,31 @@ mod tests {
         assert!(json.contains("\"name\":\"test-tool\""));
         assert!(!json.contains("\"title\""));
         assert!(json.contains("\"description\":\"A test tool\""));
+    }
+
+    #[cfg(all(test, feature = "macros"))]
+    #[test]
+    fn test_response_macros() {
+        // Test text! macro
+        let response = text!("Hello, {}", "world");
+        assert_eq!(response.content.len(), 1);
+        if let Some(ToolContent::Text { text, .. }) = response.content.first() {
+            assert_eq!(text, "Hello, world");
+        } else {
+            // This assertion will fail and provide a clear error message
+            assert!(
+                matches!(response.content.first(), Some(ToolContent::Text { .. })),
+                "Expected text content"
+            );
+        }
+
+        // Test error! macro
+        let response = error!("Error: {}", 42);
+        assert_eq!(response.is_error, Some(true));
+
+        // Test structured! macro
+        let data = json!({"status": "ok"});
+        let response = structured!(data.clone(), "Operation {}", "successful");
+        assert_eq!(response.structured_content, Some(data));
     }
 }

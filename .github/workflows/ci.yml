@@ -9,6 +9,9 @@ on:
       rust-sdk-changed:
         required: true
         type: string
+      typescript-sdk-changed:
+        required: true
+        type: string
       core-crates-changed:
         required: true
         type: string
@@ -54,7 +57,7 @@ jobs:
             cargo clippy --package $pkg --all-targets --all-features -- -D warnings
           done
 
-  lint-sdk:
+  lint-rust-sdk:
     name: Lint Rust SDK
     if: inputs.rust-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
@@ -65,7 +68,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-          cache-key: ci-lint-sdk
+          cache-key: ci-lint-rust-sdk
       
       - name: Check formatting (SDK)
         run: |
@@ -74,6 +77,38 @@ jobs:
       - name: Run clippy (SDK)
         run: |
           cargo clippy --package ftl-sdk --package ftl-sdk-macros --all-targets --all-features -- -D warnings
+
+  lint-typescript-sdk:
+    name: Lint TypeScript SDK
+    if: inputs.typescript-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+      
+      - name: Check formatting
+        run: |
+          cd sdk/typescript
+          npm run format:check
+      
+      - name: Run linter
+        run: |
+          cd sdk/typescript
+          npm run lint
+      
+      - name: Run tests
+        run: |
+          cd sdk/typescript
+          npm test
 
 
   test-sdk:

@@ -352,18 +352,16 @@ function camelToSnake(str: string): string {
  *   echo: {
  *     description: 'Echo back the input',
  *     inputSchema: zodToJsonSchema(EchoSchema),
- *     handler: async (input) => {
- *       const typedInput = input as z.infer<typeof EchoSchema>
- *       return ToolResponse.text(`Echo: ${typedInput.message}`)
+ *     handler: async (input: z.infer<typeof EchoSchema>) => {
+ *       return ToolResponse.text(`Echo: ${input.message}`)
  *     }
  *   },
  *
  *   reverse: {
  *     description: 'Reverse the input text',
  *     inputSchema: zodToJsonSchema(ReverseSchema),
- *     handler: async (input) => {
- *       const typedInput = input as z.infer<typeof ReverseSchema>
- *       return ToolResponse.text(typedInput.text.split('').reverse().join(''))
+ *     handler: async (input: z.infer<typeof ReverseSchema>) => {
+ *       return ToolResponse.text(input.text.split('').reverse().join(''))
  *     }
  *   }
  * })
@@ -373,7 +371,7 @@ function camelToSnake(str: string): string {
  * })
  * ```
  */
-export function createTools<T extends Record<string, ToolDefinition>>(
+export function createTools<T extends Record<string, ToolDefinition<unknown>>>(
   tools: T,
 ): (request: Request) => Promise<Response> {
   return async function handleRequest(request: Request): Promise<Response> {

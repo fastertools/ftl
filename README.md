@@ -30,20 +30,27 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 <summary><strong>🦀 Rust</strong></summary>
 
 ```rust
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{tools, text, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
 #[derive(Deserialize, JsonSchema)]
-struct MyToolInput {
+struct ProcessInput {
     /// The message to process
     message: String,
 }
 
-/// A simple MCP tool
-#[tool]
-fn my_tool(input: MyToolInput) -> ToolResponse {
-    ToolResponse::text(format!("Processed: {}", input.message))
+tools! {
+    /// Process a message
+    fn process_message(input: ProcessInput) -> ToolResponse {
+        text!("Processed: {}", input.message)
+    }
+    
+    /// Reverse a string
+    fn reverse_text(input: ProcessInput) -> ToolResponse {
+        let reversed: String = input.message.chars().rev().collect();
+        text!("{}", reversed)
+    }
 }
 ```
 </details>
@@ -52,31 +59,39 @@ fn my_tool(input: MyToolInput) -> ToolResponse {
 <summary><strong>🟦 TypeScript</strong></summary>
 
 ```typescript
-import { createTool, ToolResponse } from 'ftl-sdk'
+import { createTools, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
-// Define the schema using Zod
-const ToolSchema = z.object({
+// Define schemas using Zod
+const ProcessSchema = z.object({
   message: z.string().describe('The message to process')
 })
 
-type ToolInput = z.infer<typeof ToolSchema>
+const ReverseSchema = z.object({
+  text: z.string().describe('The text to reverse')
+})
 
-const tool = createTool<ToolInput>({
-  metadata: {
-    name: 'my_tool',
-    title: 'My Tool',
-    description: 'A simple MCP tool',
-    inputSchema: z.toJSONSchema(ToolSchema)
+const handle = createTools({
+  processMessage: {
+    description: 'Process a message',
+    inputSchema: z.toJSONSchema(ProcessSchema),
+    handler: async (input: z.infer<typeof ProcessSchema>) => {
+      return ToolResponse.text(`Processed: ${input.message}`)
+    }
   },
-  handler: async (input) => {
-    return ToolResponse.text(`Processed: ${input.message}`)
+  reverseText: {
+    description: 'Reverse a string',
+    inputSchema: z.toJSONSchema(ReverseSchema),
+    handler: async (input: z.infer<typeof ReverseSchema>) => {
+      const reversed = input.text.split('').reverse().join('')
+      return ToolResponse.text(reversed)
+    }
   }
 })
 
 //@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(tool(event.request))
+  event.respondWith(handle(event.request))
 })
 ```
 </details>
@@ -149,7 +164,7 @@ Try them out with your MCP client
 ```json
 {
   "mcpServers": {
-    "fast-tools": {
+    "fastTools": {
       "url": "http://127.0.0.1:3000/mcp",
       "transport": "http"
     }
@@ -171,7 +186,7 @@ Plug it in
 ```json
 {
   "mcpServers": {
-    "fast-tools": {
+    "fastTools": {
       "url": "https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp",
       "transport": "https"
     }
