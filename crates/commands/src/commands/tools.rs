@@ -433,7 +433,7 @@ fn resolve_tools(
         };
 
         // Create full image reference with version tag for registry resolution
-        let image_name_with_version = format!("{}:{}", base_image_name, final_version);
+        let image_name_with_version = format!("{base_image_name}:{final_version}");
 
         deps.ui.print(&format!(
             "{} Verifying tool {} in registry...",
