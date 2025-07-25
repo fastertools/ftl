@@ -35,9 +35,9 @@ struct ResolvedTool {
 ///
 /// # Arguments
 /// * `deps` - Dependency injection container with UI and HTTP client
-/// * `category` - Optional category filter (e.g., "basic_math", "text_processing")
+/// * `category` - Optional category filter (e.g., `"basic_math"`, `"text_processing"`)
 /// * `filter` - Optional keyword filter for name/description/tags
-/// * `registry` - Optional registry override (defaults to "ghcr")
+/// * `registry` - Optional registry override (defaults to `"ghcr"`)
 /// * `verbose` - Show additional tool details
 /// * `all` - Query all known registries (only with --direct)
 /// * `direct` - Query registries directly instead of using embedded manifest
@@ -60,7 +60,7 @@ pub async fn list_with_deps(
         }
     } else {
         // Use embedded tools.toml manifest
-        list_tools_from_manifest(deps, category, filter, verbose).await
+        list_tools_from_manifest(deps, category, filter, verbose)
     }
 }
 
@@ -85,14 +85,12 @@ pub async fn add_with_deps(
     version: Option<&str>,
     yes: bool,
 ) -> Result<()> {
-    let resolved_tools = resolve_tools(deps, tools, registry, version).await?;
+    let resolved_tools = resolve_tools(deps, tools, registry, version)?;
 
-    if !yes {
-        if !confirm_tool_changes(deps, &resolved_tools, "add")? {
-            deps.ui
-                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
-            return Ok(());
-        }
+    if !yes && !confirm_tool_changes(deps, &resolved_tools, "add")? {
+        deps.ui
+            .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+        return Ok(());
     }
 
     add_tools_to_project(deps, &resolved_tools).await
@@ -104,7 +102,7 @@ pub async fn add_with_deps(
 /// * `deps` - Dependency injection container
 /// * `tools` - Tool specifications to update
 /// * `registry` - Optional registry override
-/// * `version` - Optional version override ("latest" resolved to actual version)
+/// * `version` - Optional version override (`"latest"` resolved to actual version)
 /// * `yes` - Skip confirmation prompt
 ///
 /// # Note
@@ -148,14 +146,12 @@ pub async fn update_with_deps(
         return Ok(());
     }
 
-    let resolved_tools = resolve_tools(deps, &valid_tools, registry, version).await?;
+    let resolved_tools = resolve_tools(deps, &valid_tools, registry, version)?;
 
-    if !yes {
-        if !confirm_tool_changes(deps, &resolved_tools, "update")? {
-            deps.ui
-                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
-            return Ok(());
-        }
+    if !yes && !confirm_tool_changes(deps, &resolved_tools, "update")? {
+        deps.ui
+            .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+        return Ok(());
     }
 
     update_tools_in_project(deps, &resolved_tools).await
@@ -169,7 +165,7 @@ pub async fn update_with_deps(
 /// * `yes` - Skip confirmation prompt
 ///
 /// # Note
-/// Updates both the component section and tool_components variable
+/// Updates both the component section and `tool_components` variable
 pub async fn remove_with_deps(
     deps: &Arc<ToolsDependencies>,
     tools: &[String],
@@ -199,19 +195,17 @@ pub async fn remove_with_deps(
         return Ok(());
     }
 
-    if !yes {
-        if !confirm_tool_removal(deps, &valid_tools)? {
-            deps.ui
-                .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
-            return Ok(());
-        }
+    if !yes && !confirm_tool_removal(deps, &valid_tools)? {
+        deps.ui
+            .print(&styled_text("Operation cancelled.", MessageStyle::Yellow));
+        return Ok(());
     }
 
-    remove_tools_from_project(deps, &valid_tools).await
+    remove_tools_from_project(deps, &valid_tools)
 }
 
 /// List tools from embedded manifest
-async fn list_tools_from_manifest(
+fn list_tools_from_manifest(
     deps: &Arc<ToolsDependencies>,
     category: Option<&str>,
     filter: Option<&str>,
@@ -276,7 +270,7 @@ async fn list_tools_from_all_registries(
     for registry_name in &registries {
         deps.ui.print("");
         match list_tools_from_single_registry(deps, Some(registry_name), filter, verbose).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
                 deps.ui.print(&format!(
                     "{} Failed to query {} registry: {}",
@@ -381,7 +375,7 @@ async fn list_tools_from_single_registry(
 
 /// Query GitHub API for tool repositories
 async fn query_github_tools(client: &Client, org: &str, prefix: &str) -> Result<Vec<String>> {
-    let url = format!("https://api.github.com/orgs/{}/repos?per_page=100", org);
+    let url = format!("https://api.github.com/orgs/{org}/repos?per_page=100");
 
     let response = client
         .get(&url)
@@ -415,7 +409,7 @@ async fn query_github_tools(client: &Client, org: &str, prefix: &str) -> Result<
 }
 
 /// Resolve tool names to full image references using registry adapters
-async fn resolve_tools(
+fn resolve_tools(
     deps: &Arc<ToolsDependencies>,
     tools: &[String],
     registry: Option<&str>,
@@ -425,7 +419,7 @@ async fn resolve_tools(
 
     // Get registry adapter for image verification (for future crane integration)
     let _adapter = get_registry_adapter(registry)
-        .with_context(|| format!("Failed to get registry adapter for: {:?}", registry))?;
+        .with_context(|| format!("Failed to get registry adapter for: {registry:?}"))?;
 
     for tool in tools {
         let (_registry_name, tool_name, tool_version) = parse_tool_spec(tool, registry);
@@ -435,7 +429,7 @@ async fn resolve_tools(
         let image_name = if tool_name.starts_with("ftl-tool-") {
             tool_name.clone()
         } else {
-            format!("ftl-tool-{}", tool_name)
+            format!("ftl-tool-{tool_name}")
         };
 
         deps.ui.print(&format!(
@@ -457,7 +451,7 @@ async fn resolve_tools(
 }
 
 /// Parse tool specification supporting registry:tool:version format
-/// Returns (registry_name, tool_name, version)
+/// Returns (`registry_name`, `tool_name`, `version`)
 pub fn parse_tool_spec(spec: &str, registry_override: Option<&str>) -> (String, String, String) {
     let parts: Vec<&str> = spec.splitn(3, ':').collect();
     let known_registries = ["ghcr", "docker", "ecr"]; // Basic registry support
@@ -466,23 +460,27 @@ pub fn parse_tool_spec(spec: &str, registry_override: Option<&str>) -> (String, 
         [single] => {
             // Just tool name, use default/override registry and latest tag
             let reg = registry_override.unwrap_or("ghcr").to_string();
-            (reg, single.to_string(), "latest".to_string())
+            (reg, (*single).to_string(), "latest".to_string())
         }
         [first, second] => {
             // Could be "registry:tool" or "tool:version"
             // Check if first part is a known registry
             if known_registries.contains(first) {
                 // It's "registry:tool"
-                (first.to_string(), second.to_string(), "latest".to_string())
+                (
+                    (*first).to_string(),
+                    (*second).to_string(),
+                    "latest".to_string(),
+                )
             } else {
                 // It's "tool:version"
                 let reg = registry_override.unwrap_or("ghcr").to_string();
-                (reg, first.to_string(), second.to_string())
+                (reg, (*first).to_string(), (*second).to_string())
             }
         }
         [reg, tool, tag] => {
             // Full "registry:tool:version"
-            (reg.to_string(), tool.to_string(), tag.to_string())
+            ((*reg).to_string(), (*tool).to_string(), (*tag).to_string())
         }
         _ => {
             // Fallback for malformed input
@@ -557,7 +555,7 @@ fn confirm_tool_changes(
     action: &str,
 ) -> Result<bool> {
     deps.ui
-        .print(&format!("The following tools will be {}ed:", action));
+        .print(&format!("The following tools will be {action}ed:"));
 
     for tool in tools {
         deps.ui.print(&format!(
@@ -749,7 +747,7 @@ async fn update_tools_in_project(
 }
 
 /// Remove tools from project spin manifest
-async fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Result<()> {
+fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
 
     if !manifest_path.exists() {
@@ -763,7 +761,7 @@ async fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[Strin
         .context("Failed to parse spin.toml")?;
 
     for tool in tools {
-        let component_name = format!("tool-{}", tool);
+        let component_name = format!("tool-{tool}");
 
         // Try to remove the component
         let components = doc["component"]
@@ -831,7 +829,7 @@ fn get_installed_tools_impl() -> Result<std::collections::HashSet<String>> {
     let mut tools = std::collections::HashSet::new();
 
     if let Some(components) = doc.get("component").and_then(|v| v.as_table()) {
-        for (key, _) in components.iter() {
+        for (key, _) in components {
             if key.starts_with("tool-") {
                 // Remove "tool-" prefix
                 let tool_name = key.strip_prefix("tool-").unwrap().to_string();
@@ -843,7 +841,7 @@ fn get_installed_tools_impl() -> Result<std::collections::HashSet<String>> {
     Ok(tools)
 }
 
-/// Update tool_components variable in spin.toml
+/// Update `tool_components` variable in spin.toml
 /// If add=true, adds the tool. If add=false, removes the tool.
 #[cfg(test)]
 pub fn update_tool_components_variable(
@@ -900,13 +898,13 @@ fn update_tool_components_variable_impl(
         if current_value.is_empty() {
             tool_name.to_string()
         } else {
-            format!("{},{}", current_value, tool_name)
+            format!("{current_value},{tool_name}")
         }
     } else {
         // Remove tool from comma-separated list
         current_value
             .split(',')
-            .map(|s| s.trim())
+            .map(str::trim)
             .filter(|s| !s.is_empty() && *s != tool_name)
             .collect::<Vec<_>>()
             .join(",")
@@ -921,11 +919,11 @@ fn styled_text(text: &str, style: MessageStyle) -> String {
     // For now, return plain text. In a real implementation,
     // this would apply console styling based on MessageStyle
     match style {
-        MessageStyle::Green => format!("\x1b[32m{}\x1b[0m", text),
-        MessageStyle::Yellow => format!("\x1b[33m{}\x1b[0m", text),
-        MessageStyle::Cyan => format!("\x1b[36m{}\x1b[0m", text),
-        MessageStyle::Bold => format!("\x1b[1m{}\x1b[0m", text),
-        MessageStyle::Red => format!("\x1b[31m{}\x1b[0m", text),
+        MessageStyle::Green => format!("\x1b[32m{text}\x1b[0m"),
+        MessageStyle::Yellow => format!("\x1b[33m{text}\x1b[0m"),
+        MessageStyle::Cyan => format!("\x1b[36m{text}\x1b[0m"),
+        MessageStyle::Bold => format!("\x1b[1m{text}\x1b[0m"),
+        MessageStyle::Red => format!("\x1b[31m{text}\x1b[0m"),
         _ => text.to_string(),
     }
 }

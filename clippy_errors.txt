@@ -1,0 +1,645 @@
+    Checking ftl-commands v0.0.23 (/Users/coreyryan/data/mashh/ftl-cli/crates/commands)
+error: this argument is passed by value, but not consumed in the function body
+  --> crates/commands/src/config/registry.rs:54:49
+   |
+54 |     pub fn new_ghcr(name: String, organization: String) -> Self {
+   |                                                 ^^^^^^ help: consider changing the type to: `&str`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+   = note: `-D clippy::needless-pass-by-value` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::needless_pass_by_value)]`
+
+error: variables can be used directly in the `format!` string
+  --> crates/commands/src/config/registry.rs:63:31
+   |
+63 |             display_url: Some(format!("https://github.com/orgs/{}/packages", organization)),
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+   = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+help: change this to
+   |
+63 -             display_url: Some(format!("https://github.com/orgs/{}/packages", organization)),
+63 +             display_url: Some(format!("https://github.com/orgs/{organization}/packages")),
+   |
+
+error: this argument is passed by value, but not consumed in the function body
+   --> crates/commands/src/config/registry.rs:102:50
+    |
+102 |     pub fn new_custom(name: String, url_pattern: String, auth_type: Option<String>) -> Self {
+    |                                                  ^^^^^^ help: consider changing the type to: `&str`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+error: redundant closure
+   --> crates/commands/src/config/registry.rs:126:18
+    |
+126 |             .map(|s| s.to_string())
+    |                  ^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::string::ToString::to_string`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+    = note: `-D clippy::redundant-closure-for-method-calls` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+error: this match arm has an identical body to another arm
+   --> crates/commands/src/config/registry.rs:134:13
+    |
+134 |             RegistryType::Docker => false, // Public Docker Hub doesn't require auth
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `-D clippy::match-same-arms` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_same_arms)]`
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+133 ~             // Public GHCR repos don't require auth
+134 ~             RegistryType::Docker | RegistryType::Ghcr => false, // Public Docker Hub doesn't require auth
+    |
+
+error: called `map(<f>).unwrap_or(false)` on an `Option` value
+   --> crates/commands/src/config/registry.rs:138:17
+    |
+138 | /                 self.get_config_str("auth_type")
+139 | |                     .map(|auth| auth != "none")
+140 | |                     .unwrap_or(false)
+    | |_____________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_unwrap_or
+    = note: `-D clippy::map-unwrap-or` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::map_unwrap_or)]`
+help: use `is_some_and(<f>)` instead
+    |
+139 -                     .map(|auth| auth != "none")
+139 +                     .is_some_and(|auth| auth != "none")
+    |
+
+error: unnecessary structure name repetition
+  --> crates/commands/src/data/mod.rs:20:23
+   |
+20 |         let manifest: ToolsManifest = toml::from_str(content)?;
+   |                       ^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+   = note: `-D clippy::use-self` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::use_self)]`
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:206:24
+    |
+206 |                     Ok(format!("{}.0.0", clean_version))
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+206 -                     Ok(format!("{}.0.0", clean_version))
+206 +                     Ok(format!("{clean_version}.0.0"))
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:209:24
+    |
+209 |                     Ok(format!("{}.0", clean_version))
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+209 -                     Ok(format!("{}.0", clean_version))
+209 +                     Ok(format!("{clean_version}.0"))
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:238:13
+    |
+238 |             format!("docker.io/{}", image_name)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+238 -             format!("docker.io/{}", image_name)
+238 +             format!("docker.io/{image_name}")
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:241:13
+    |
+241 |             format!("docker.io/library/{}", image_name)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+241 -             format!("docker.io/library/{}", image_name)
+241 +             format!("docker.io/library/{image_name}")
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:255:13
+    |
+255 |             format!("library/{}", image_without_tag)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+255 -             format!("library/{}", image_without_tag)
+255 +             format!("library/{image_without_tag}")
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:292:13
+    |
+292 |             format!("library/{}", image_name)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+292 -             format!("library/{}", image_name)
+292 +             format!("library/{image_name}")
+    |
+
+error: variables can be used directly in the `format!` string
+   --> crates/commands/src/registry.rs:295:25
+    |
+295 |         let image_ref = format!("docker.io/{}", repo_name);
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+295 -         let image_ref = format!("docker.io/{}", repo_name);
+295 +         let image_ref = format!("docker.io/{repo_name}");
+    |
+
+error: you should consider adding a `Default` implementation for `GhcrAdapter`
+   --> crates/commands/src/registry.rs:306:5
+    |
+306 | /     pub fn new() -> Self {
+307 | |         Self {
+308 | |             organization: "fastertools".to_string(),
+309 | |         }
+310 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#new_without_default
+    = note: `-D clippy::new-without-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::new_without_default)]`
+help: try adding this
+    |
+305 + impl Default for GhcrAdapter {
+306 +     fn default() -> Self {
+307 +         Self::new()
+308 +     }
+309 + }
+    |
+
+error: this could be a `const fn`
+   --> crates/commands/src/registry.rs:312:5
+    |
+312 | /     pub fn with_organization(organization: String) -> Self {
+313 | |         Self { organization }
+314 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+    = note: `-D clippy::missing-const-for-fn` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::missing_const_for_fn)]`
+help: make the function `const`
+    |
+312 |     pub const fn with_organization(organization: String) -> Self {
+    |         +++++
+
+error: this could be a `const fn`
+   --> crates/commands/src/registry.rs:387:5
+    |
+387 | /     pub fn new(account_id: String, region: String) -> Self {
+388 | |         Self { account_id, region }
+389 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+387 |     pub const fn new(account_id: String, region: String) -> Self {
+    |         +++++
+
+error: this could be a `const fn`
+   --> crates/commands/src/registry.rs:458:5
+    |
+458 | /     pub fn new(url_pattern: String) -> Self {
+459 | |         Self { url_pattern }
+460 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+458 |     pub const fn new(url_pattern: String) -> Self {
+    |         +++++
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:544:13
+    |
+544 |             ConcreteRegistryAdapter::DockerHub(adapter) => adapter.get_registry_url(image_name),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:545:13
+    |
+545 |             ConcreteRegistryAdapter::Ghcr(adapter) => adapter.get_registry_url(image_name),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:546:13
+    |
+546 |             ConcreteRegistryAdapter::Ecr(adapter) => adapter.get_registry_url(image_name),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:547:13
+    |
+547 |             ConcreteRegistryAdapter::Custom(adapter) => adapter.get_registry_url(image_name),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:557:13
+    |
+557 |             ConcreteRegistryAdapter::DockerHub(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:560:13
+    |
+560 |             ConcreteRegistryAdapter::Ghcr(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:563:13
+    |
+563 |             ConcreteRegistryAdapter::Ecr(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:566:13
+    |
+566 |             ConcreteRegistryAdapter::Custom(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:574:13
+    |
+574 |             ConcreteRegistryAdapter::DockerHub(adapter) => adapter.name(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:575:13
+    |
+575 |             ConcreteRegistryAdapter::Ghcr(adapter) => adapter.name(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:576:13
+    |
+576 |             ConcreteRegistryAdapter::Ecr(adapter) => adapter.name(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:577:13
+    |
+577 |             ConcreteRegistryAdapter::Custom(adapter) => adapter.name(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:583:13
+    |
+583 |             ConcreteRegistryAdapter::DockerHub(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:586:13
+    |
+586 |             ConcreteRegistryAdapter::Ghcr(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:589:13
+    |
+589 |             ConcreteRegistryAdapter::Ecr(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unnecessary structure name repetition
+   --> crates/commands/src/registry.rs:592:13
+    |
+592 |             ConcreteRegistryAdapter::Custom(adapter) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ help: use the applicable keyword: `Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#use_self
+
+error: unused `async` for function with no await statements
+  --> crates/commands/src/commands/registry.rs:20:1
+   |
+20 | / pub async fn list_with_deps(
+21 | |     registry: Option<&str>,
+22 | |     deps: &Arc<RegistryDependencies>,
+23 | | ) -> Result<()> {
+...  |
+79 | |     Ok(())
+80 | | }
+   | |_^
+   |
+   = help: consider removing the `async` from this function
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+   = note: `-D clippy::unused-async` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::unused_async)]`
+
+error: unused `async` for function with no await statements
+   --> crates/commands/src/commands/registry.rs:83:1
+    |
+83  | / pub async fn search_with_deps(
+84  | |     query: &str,
+85  | |     registry: Option<&str>,
+86  | |     deps: &Arc<RegistryDependencies>,
+...   |
+142 | |     Ok(())
+143 | | }
+    | |_^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+error: unused `async` for function with no await statements
+  --> crates/commands/src/registry.rs:76:1
+   |
+76 | / async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
+77 | |     // First check if crane is available
+78 | |     check_crane_available()?;
+...  |
+90 | |     Ok(output.status.success())
+91 | | }
+   | |_^
+   |
+   = help: consider removing the `async` from this function
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+error: unused `async` for function with no await statements
+   --> crates/commands/src/registry.rs:122:1
+    |
+122 | / async fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
+123 | |     check_crane_available()?;
+124 | |
+125 | |     let output = Command::new("crane")
+...   |
+143 | |     Ok(tags)
+144 | | }
+    | |_^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+error: missing documentation for a module
+ --> crates/commands/src/config/mod.rs:1:1
+  |
+1 | pub mod registry;
+  | ^^^^^^^^^^^^^^^^
+  |
+  = note: `-D missing-docs` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(missing_docs)]`
+
+error: missing documentation for an enum
+ --> crates/commands/src/config/registry.rs:7:1
+  |
+7 | pub enum RegistryType {
+  | ^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a variant
+ --> crates/commands/src/config/registry.rs:8:5
+  |
+8 |     Ghcr,
+  |     ^^^^
+
+error: missing documentation for a variant
+ --> crates/commands/src/config/registry.rs:9:5
+  |
+9 |     Docker,
+  |     ^^^^^^
+
+error: missing documentation for a variant
+  --> crates/commands/src/config/registry.rs:10:5
+   |
+10 |     Ecr,
+   |     ^^^
+
+error: missing documentation for a variant
+  --> crates/commands/src/config/registry.rs:11:5
+   |
+11 |     Custom,
+   |     ^^^^^^
+
+error: missing documentation for a struct
+  --> crates/commands/src/config/registry.rs:40:1
+   |
+40 | pub struct RegistryConfig {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:41:5
+   |
+41 |     pub name: String,
+   |     ^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:43:5
+   |
+43 |     pub registry_type: RegistryType,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:44:5
+   |
+44 |     pub enabled: bool,
+   |     ^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:45:5
+   |
+45 |     pub priority: u32,
+   |     ^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:47:5
+   |
+47 |     pub config: JsonValue,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/config/registry.rs:49:5
+   |
+49 |     pub display_url: Option<String>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct
+ --> crates/commands/src/data/mod.rs:4:1
+  |
+4 | pub struct Tool {
+  | ^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+ --> crates/commands/src/data/mod.rs:5:5
+  |
+5 |     pub name: String,
+  |     ^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+ --> crates/commands/src/data/mod.rs:6:5
+  |
+6 |     pub category: String,
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+ --> crates/commands/src/data/mod.rs:7:5
+  |
+7 |     pub description: String,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+ --> crates/commands/src/data/mod.rs:8:5
+  |
+8 |     pub image_name: String,
+  |     ^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+ --> crates/commands/src/data/mod.rs:9:5
+  |
+9 |     pub tags: Vec<String>,
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct
+  --> crates/commands/src/data/mod.rs:13:1
+   |
+13 | pub struct ToolsManifest {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a struct field
+  --> crates/commands/src/data/mod.rs:14:5
+   |
+14 |     pub tools: Vec<Tool>,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for an associated function
+   --> crates/commands/src/registry.rs:306:5
+    |
+306 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for an associated function
+   --> crates/commands/src/registry.rs:312:5
+    |
+312 |     pub fn with_organization(organization: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for an associated function
+   --> crates/commands/src/registry.rs:377:5
+    |
+377 |     pub fn from_env() -> Result<Self> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for an associated function
+   --> crates/commands/src/registry.rs:387:5
+    |
+387 |     pub fn new(account_id: String, region: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for an associated function
+   --> crates/commands/src/registry.rs:458:5
+    |
+458 |     pub fn new(url_pattern: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: missing documentation for a variant
+   --> crates/commands/src/registry.rs:534:5
+    |
+534 |     DockerHub(DockerHubAdapter),
+    |     ^^^^^^^^^
+
+error: missing documentation for a variant
+   --> crates/commands/src/registry.rs:535:5
+    |
+535 |     Ghcr(GhcrAdapter),
+    |     ^^^^
+
+error: missing documentation for a variant
+   --> crates/commands/src/registry.rs:536:5
+    |
+536 |     Ecr(EcrAdapter),
+    |     ^^^
+
+error: missing documentation for a variant
+   --> crates/commands/src/registry.rs:537:5
+    |
+537 |     Custom(CustomAdapter),
+    |     ^^^^^^
+
+error: could not compile `ftl-commands` (lib) due to 68 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: binding to `_` prefixed variable with no side-effect
+   --> crates/commands/src/registry.rs:714:13
+    |
+714 |         let _adapter = DockerHubAdapter;
+    |             ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#no_effect_underscore_binding
+    = note: `-D clippy::no-effect-underscore-binding` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::no_effect_underscore_binding)]`
+
+error: unused `async` for function with no await statements
+  --> crates/commands/src/registry.rs:76:1
+   |
+76 | / async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
+77 | |     // First check if crane is available
+78 | |     check_crane_available()?;
+...  |
+90 | |     Ok(output.status.success())
+91 | | }
+   | |_^
+   |
+   = help: consider removing the `async` from this function
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+   = note: `-D clippy::unused-async` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::unused_async)]`
+
+error: could not compile `ftl-commands` (lib test) due to 67 previous errors

@@ -17,10 +17,7 @@ pub struct RegistryDependencies {
 }
 
 /// Execute the list subcommand with injected dependencies
-pub async fn list_with_deps(
-    registry: Option<&str>,
-    deps: &Arc<RegistryDependencies>,
-) -> Result<()> {
+pub fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) -> Result<()> {
     let registry_name = registry.unwrap_or("ghcr");
 
     deps.ui.print(&format!(
@@ -62,7 +59,7 @@ pub async fn list_with_deps(
                     deps.ui.print("  - Docker Hub: https://hub.docker.com/");
                 }
                 _ => {
-                    deps.ui.print(&format!("  - Registry: {}", registry_name));
+                    deps.ui.print(&format!("  - Registry: {registry_name}"));
                 }
             }
         }
@@ -80,7 +77,7 @@ pub async fn list_with_deps(
 }
 
 /// Execute the search subcommand with injected dependencies
-pub async fn search_with_deps(
+pub fn search_with_deps(
     query: &str,
     registry: Option<&str>,
     deps: &Arc<RegistryDependencies>,
@@ -115,21 +112,17 @@ pub async fn search_with_deps(
             match registry_name {
                 "ghcr" => {
                     deps.ui.print(&format!(
-                        "  - GitHub Packages: https://github.com/search?q={}&type=registrypackages",
-                        query
+                        "  - GitHub Packages: https://github.com/search?q={query}&type=registrypackages"
                     ));
                 }
                 "docker" => {
                     deps.ui.print(&format!(
-                        "  - Docker Hub: https://hub.docker.com/search?q={}",
-                        query
+                        "  - Docker Hub: https://hub.docker.com/search?q={query}"
                     ));
                 }
                 _ => {
-                    deps.ui.print(&format!(
-                        "  - Search manually in {} registry",
-                        registry_name
-                    ));
+                    deps.ui
+                        .print(&format!("  - Search manually in {registry_name} registry"));
                 }
             }
         }
@@ -291,9 +284,9 @@ pub async fn execute(args: RegistryArgs) -> Result<()> {
     });
 
     match args.command {
-        RegistryCommand::List { registry } => list_with_deps(registry.as_deref(), &deps).await,
+        RegistryCommand::List { registry } => list_with_deps(registry.as_deref(), &deps),
         RegistryCommand::Search { query, registry } => {
-            search_with_deps(&query, registry.as_deref(), &deps).await
+            search_with_deps(&query, registry.as_deref(), &deps)
         }
         RegistryCommand::Info { component } => info_with_deps(&component, &deps).await,
     }

@@ -34,7 +34,7 @@ impl TestFixture {
 #[tokio::test]
 async fn test_list_tools_from_manifest() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Test listing all tools from manifest
@@ -43,7 +43,7 @@ async fn test_list_tools_from_manifest() {
         .expect("Failed to list tools");
 
     // Verify output contains tools
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("basic_math")));
     // The actual manifest has 82 tools after loading (some might be filtered or deduplicated)
     assert!(
@@ -56,7 +56,7 @@ async fn test_list_tools_from_manifest() {
 #[tokio::test]
 async fn test_list_tools_with_category_filter() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Test listing tools filtered by category
@@ -65,7 +65,7 @@ async fn test_list_tools_with_category_filter() {
         .expect("Failed to list tools with category filter");
 
     // Verify output contains only basic_math tools
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("basic_math")));
     assert!(output.iter().any(|s| s.contains("add")));
     assert!(output.iter().any(|s| s.contains("subtract")));
@@ -75,7 +75,7 @@ async fn test_list_tools_with_category_filter() {
 #[tokio::test]
 async fn test_list_tools_with_keyword_filter() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Test listing tools filtered by keyword
@@ -84,7 +84,7 @@ async fn test_list_tools_with_keyword_filter() {
         .expect("Failed to list tools with keyword filter");
 
     // Verify output contains encoding-related tools
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("url-encode")));
     assert!(output.iter().any(|s| s.contains("base64-encode")));
 }
@@ -92,7 +92,7 @@ async fn test_list_tools_with_keyword_filter() {
 #[tokio::test]
 async fn test_list_tools_verbose() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Test verbose listing
@@ -101,7 +101,7 @@ async fn test_list_tools_verbose() {
         .expect("Failed to list tools in verbose mode");
 
     // Verify verbose output contains additional details
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Category:")));
     assert!(output.iter().any(|s| s.contains("Description:")));
     assert!(output.iter().any(|s| s.contains("Image:")));
@@ -111,7 +111,7 @@ async fn test_list_tools_verbose() {
 #[tokio::test]
 async fn test_list_tools_direct_from_registry() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Test direct registry listing
@@ -121,7 +121,7 @@ async fn test_list_tools_direct_from_registry() {
 
     // We expect this might fail due to network or API limits, but it shouldn't panic
     if result.is_ok() {
-        let output = _ui.get_output();
+        let output = ui.get_output();
         // The actual output uses the word "registry" in various forms
         assert!(
             output
@@ -284,7 +284,7 @@ source = { registry = "ghcr.io", package = "some-other-component", version = "1.
 #[tokio::test]
 async fn test_update_without_existing_tool() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Try to update a tool that's not installed
@@ -294,7 +294,7 @@ async fn test_update_without_existing_tool() {
     // Should succeed but with warning
     assert!(result.is_ok());
 
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("not currently installed")));
     assert!(
         output
@@ -306,7 +306,7 @@ async fn test_update_without_existing_tool() {
 #[tokio::test]
 async fn test_remove_without_existing_tool() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // Try to remove a tool that's not installed
@@ -315,7 +315,7 @@ async fn test_remove_without_existing_tool() {
     // Should succeed but with warning
     assert!(result.is_ok());
 
-    let output = _ui.get_output();
+    let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("not currently installed")));
     assert!(
         output
@@ -493,7 +493,7 @@ mod tool_components_tests {
 #[tokio::test]
 async fn test_list_with_category_filter() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // List tools filtered by category
@@ -501,7 +501,7 @@ async fn test_list_with_category_filter() {
         .await
         .expect("Failed to list tools with category filter");
 
-    let output = _ui.get_output();
+    let output = ui.get_output();
     // Should only show basic_math tools
     assert!(output.iter().any(|s| s.contains("basic_math")));
     // Total should be less than full 82/84
@@ -515,7 +515,7 @@ async fn test_list_with_category_filter() {
 #[tokio::test]
 async fn test_list_with_keyword_filter() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // List tools filtered by keyword
@@ -523,7 +523,7 @@ async fn test_list_with_keyword_filter() {
         .await
         .expect("Failed to list tools with keyword filter");
 
-    let output = _ui.get_output();
+    let output = ui.get_output();
     // Should show tools with "json" in name/description/tags
     assert!(
         output
@@ -535,7 +535,7 @@ async fn test_list_with_keyword_filter() {
 #[tokio::test]
 async fn test_list_verbose_output() {
     let fixture = TestFixture::new();
-    let _ui = fixture.ui.clone();
+    let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
     // List tools with verbose output
@@ -543,7 +543,7 @@ async fn test_list_verbose_output() {
         .await
         .expect("Failed to list tools with verbose output");
 
-    let output = _ui.get_output();
+    let output = ui.get_output();
     // Verbose output should include descriptions
     assert!(
         output

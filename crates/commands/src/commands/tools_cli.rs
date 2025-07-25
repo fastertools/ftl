@@ -3,6 +3,7 @@
 use anyhow::Result;
 use ftl_runtime::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
 use reqwest::Client;
+use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -110,7 +111,7 @@ pub async fn execute(args: ToolsArgs) -> Result<()> {
     }
 }
 
-/// Console-based implementation of the UserInterface trait
+/// Console-based implementation of the `UserInterface` trait
 /// Provides basic terminal I/O functionality for the tools command
 struct ConsoleUserInterface;
 
@@ -126,11 +127,11 @@ impl UserInterface for ConsoleUserInterface {
     }
 
     fn print(&self, message: &str) {
-        println!("{}", message);
+        println!("{message}");
     }
 
     fn print_styled(&self, message: &str, _style: MessageStyle) {
-        println!("{}", message);
+        println!("{message}");
     }
 
     fn is_interactive(&self) -> bool {
@@ -138,8 +139,7 @@ impl UserInterface for ConsoleUserInterface {
     }
 
     fn prompt_input(&self, prompt: &str, _default: Option<&str>) -> Result<String> {
-        print!("{}", prompt);
-        use std::io::{self, Write};
+        print!("{prompt}");
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -148,14 +148,13 @@ impl UserInterface for ConsoleUserInterface {
     }
 
     fn prompt_select(&self, prompt: &str, items: &[&str], default: usize) -> Result<usize> {
-        println!("{}", prompt);
+        println!("{prompt}");
         for (i, item) in items.iter().enumerate() {
             let marker = if i == default { "*" } else { " " };
-            println!("{} {}: {}", marker, i, item);
+            println!("{marker} {i}: {item}");
         }
 
-        print!("Selection [{}]: ", default);
-        use std::io::{self, Write};
+        print!("Selection [{default}]: ");
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -173,7 +172,6 @@ impl UserInterface for ConsoleUserInterface {
 
     fn clear_screen(&self) {
         print!("\x1B[2J\x1B[1;1H");
-        use std::io::{self, Write};
         let _ = io::stdout().flush();
     }
 }
@@ -195,7 +193,7 @@ impl ProgressIndicator for SimpleSpinner {
 }
 
 /// Multi-progress manager implementation
-/// Currently a placeholder that creates SimpleSpinner instances
+/// Currently a placeholder that creates `SimpleSpinner` instances
 struct SimpleMultiProgress;
 
 impl MultiProgressManager for SimpleMultiProgress {

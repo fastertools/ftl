@@ -1,23 +1,31 @@
 use serde::{Deserialize, Serialize};
 
+/// Represents a pre-built FTL tool with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
+    /// Unique name identifier for the tool
     pub name: String,
+    /// Category this tool belongs to (e.g., `basic_math`, `text_processing`)
     pub category: String,
+    /// Human-readable description of what the tool does
     pub description: String,
+    /// Container image name (without registry prefix)
     pub image_name: String,
+    /// Searchable tags for tool discovery
     pub tags: Vec<String>,
 }
 
+/// Container for the complete tools manifest with all available tools
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolsManifest {
+    /// List of all available tools
     pub tools: Vec<Tool>,
 }
 
 impl ToolsManifest {
     /// Load tools manifest from TOML content
     pub fn from_toml(content: &str) -> anyhow::Result<Self> {
-        let manifest: ToolsManifest = toml::from_str(content)?;
+        let manifest: Self = toml::from_str(content)?;
         Ok(manifest)
     }
 

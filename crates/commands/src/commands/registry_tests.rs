@@ -37,9 +37,7 @@ async fn test_list_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(None, &deps)
-        .await
-        .expect("Failed to list registry");
+    list_with_deps(None, &deps).expect("Failed to list registry");
 
     // Verify output
     let output = ui.get_output();
@@ -66,9 +64,7 @@ async fn test_list_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(Some("docker"), &deps)
-        .await
-        .expect("Failed to list registry");
+    list_with_deps(Some("docker"), &deps).expect("Failed to list registry");
 
     // Verify output
     let output = ui.get_output();
@@ -85,9 +81,7 @@ async fn test_search_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component", None, &deps)
-        .await
-        .expect("Failed to search registry");
+    search_with_deps("my-component", None, &deps).expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -114,9 +108,7 @@ async fn test_search_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("test-tool", Some("docker"), &deps)
-        .await
-        .expect("Failed to search registry");
+    search_with_deps("test-tool", Some("docker"), &deps).expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -133,9 +125,7 @@ async fn test_search_with_special_characters() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component@v2.0", None, &deps)
-        .await
-        .expect("Failed to search registry");
+    search_with_deps("my-component@v2.0", None, &deps).expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -234,9 +224,7 @@ async fn test_list_output_completeness() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(None, &deps)
-        .await
-        .expect("Failed to list registry");
+    list_with_deps(None, &deps).expect("Failed to list registry");
 
     // Verify all expected output lines are present
     let output = ui.get_output();

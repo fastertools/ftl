@@ -2,22 +2,27 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::fmt;
 
+/// Registry type enumeration for different container registries
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum RegistryType {
+    /// GitHub Container Registry (ghcr.io)
     Ghcr,
+    /// Docker Hub registry (docker.io)
     Docker,
+    /// AWS Elastic Container Registry
     Ecr,
+    /// Custom registry with user-defined URL pattern
     Custom,
 }
 
 impl fmt::Display for RegistryType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RegistryType::Ghcr => write!(f, "ghcr"),
-            RegistryType::Docker => write!(f, "docker"),
-            RegistryType::Ecr => write!(f, "ecr"),
-            RegistryType::Custom => write!(f, "custom"),
+            Self::Ghcr => write!(f, "ghcr"),
+            Self::Docker => write!(f, "docker"),
+            Self::Ecr => write!(f, "ecr"),
+            Self::Custom => write!(f, "custom"),
         }
     }
 }
@@ -27,31 +32,38 @@ impl std::str::FromStr for RegistryType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "ghcr" => Ok(RegistryType::Ghcr),
-            "docker" => Ok(RegistryType::Docker),
-            "ecr" => Ok(RegistryType::Ecr),
-            "custom" => Ok(RegistryType::Custom),
+            "ghcr" => Ok(Self::Ghcr),
+            "docker" => Ok(Self::Docker),
+            "ecr" => Ok(Self::Ecr),
+            "custom" => Ok(Self::Custom),
             _ => anyhow::bail!("Unknown registry type: {}", s),
         }
     }
 }
 
+/// Configuration for a container registry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistryConfig {
+    /// Human-readable name for this registry configuration
     pub name: String,
     #[serde(rename = "type")]
+    /// Type of registry (GHCR, Docker Hub, ECR, or Custom)
     pub registry_type: RegistryType,
+    /// Whether this registry is enabled for use
     pub enabled: bool,
+    /// Priority order for registry selection (lower = higher priority)
     pub priority: u32,
     #[serde(default)]
+    /// Registry-specific configuration as JSON
     pub config: JsonValue,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional display URL for this registry
     pub display_url: Option<String>,
 }
 
 impl RegistryConfig {
     /// Create a new GHCR registry configuration
-    pub fn new_ghcr(name: String, organization: String) -> Self {
+    pub fn new_ghcr(name: String, organization: &str) -> Self {
         Self {
             name,
             registry_type: RegistryType::Ghcr,
@@ -60,7 +72,7 @@ impl RegistryConfig {
             config: serde_json::json!({
                 "organization": organization
             }),
-            display_url: Some(format!("https://github.com/orgs/{}/packages", organization)),
+            display_url: Some(format!("https://github.com/orgs/{organization}/packages")),
         }
     }
 
@@ -99,7 +111,7 @@ impl RegistryConfig {
     }
 
     /// Create a new custom registry configuration
-    pub fn new_custom(name: String, url_pattern: String, auth_type: Option<String>) -> Self {
+    pub fn new_custom(name: String, url_pattern: &str, auth_type: Option<String>) -> Self {
         let mut config = serde_json::json!({
             "url_pattern": url_pattern
         });
@@ -123,21 +135,19 @@ impl RegistryConfig {
         self.config
             .get(key)
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
     }
 
     /// Check if this registry requires authentication
     #[allow(dead_code)]
     pub fn requires_auth(&self) -> bool {
         match self.registry_type {
-            RegistryType::Ghcr => false,   // Public GHCR repos don't require auth
-            RegistryType::Docker => false, // Public Docker Hub doesn't require auth
-            RegistryType::Ecr => true,     // ECR always requires auth
+            RegistryType::Ghcr | RegistryType::Docker => false, // Public repos don't require auth
+            RegistryType::Ecr => true,                          // ECR always requires auth
             RegistryType::Custom => {
                 // Check auth_type field
                 self.get_config_str("auth_type")
-                    .map(|auth| auth != "none")
-                    .unwrap_or(false)
+                    .is_some_and(|auth| auth != "none")
             }
         }
     }
@@ -173,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_new_registry_configs() {
-        let ghcr = RegistryConfig::new_ghcr("my-ghcr".to_string(), "myorg".to_string());
+        let ghcr = RegistryConfig::new_ghcr("my-ghcr".to_string(), "myorg");
         assert_eq!(ghcr.name, "my-ghcr");
         assert_eq!(ghcr.registry_type, RegistryType::Ghcr);
         assert_eq!(
@@ -197,7 +207,7 @@ mod tests {
 
         let custom = RegistryConfig::new_custom(
             "my-custom".to_string(),
-            "registry.example.com/{image_name}:latest".to_string(),
+            "registry.example.com/{image_name}:latest",
             Some("bearer".to_string()),
         );
         assert_eq!(custom.name, "my-custom");
@@ -214,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_requires_auth() {
-        let ghcr = RegistryConfig::new_ghcr("ghcr".to_string(), "org".to_string());
+        let ghcr = RegistryConfig::new_ghcr("ghcr".to_string(), "org");
         assert!(!ghcr.requires_auth());
 
         let docker = RegistryConfig::new_docker("docker".to_string());
@@ -225,14 +235,14 @@ mod tests {
 
         let custom_no_auth = RegistryConfig::new_custom(
             "custom".to_string(),
-            "registry.example.com/{image_name}".to_string(),
+            "registry.example.com/{image_name}",
             Some("none".to_string()),
         );
         assert!(!custom_no_auth.requires_auth());
 
         let custom_with_auth = RegistryConfig::new_custom(
             "custom".to_string(),
-            "registry.example.com/{image_name}".to_string(),
+            "registry.example.com/{image_name}",
             Some("bearer".to_string()),
         );
         assert!(custom_with_auth.requires_auth());
