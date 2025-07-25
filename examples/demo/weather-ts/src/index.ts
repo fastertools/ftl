@@ -63,7 +63,6 @@ const getWeatherCondition = (code: number): string => {
 
 const handle = createTools({
   weatherTs: {
-    title: 'Weather Tool (TypeScript)',
     description: 'Get current weather for a location using Open-Meteo API',
     inputSchema: z.toJSONSchema(WeatherInputSchema),
     handler: async (input) => {

@@ -47,7 +47,7 @@ pub fn ftl_tools(input: TokenStream) -> TokenStream {
         quote! {
             ::ftl_sdk::ToolMetadata {
                 name: #name_str.to_string(),
-                title: Some(generate_title(#name_str)),
+                title: None,
                 description: #description,
                 input_schema: ::serde_json::to_value(::schemars::schema_for!(#input_type)).unwrap(),
                 output_schema: None,
@@ -121,20 +121,6 @@ pub fn ftl_tools(input: TokenStream) -> TokenStream {
         #[::spin_sdk::http_component]
         async fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
             use ::spin_sdk::http::{Method, Response};
-
-            // Helper function to generate title from name
-            fn generate_title(name: &str) -> String {
-                name.split('_')
-                    .map(|word| {
-                        let mut chars = word.chars();
-                        match chars.next() {
-                            None => String::new(),
-                            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            }
 
             let path = req.path();
 

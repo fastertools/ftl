@@ -9,7 +9,6 @@ const ExampleToolSchema = z.object({
 const handle = createTools({
   // Replace 'exampleTool' with your actual tool name
   exampleTool: {
-    title: 'Example Tool',
     description: 'An example tool that processes messages',
     inputSchema: z.toJSONSchema(ExampleToolSchema),
     handler: async (input) => {

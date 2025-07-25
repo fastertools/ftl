@@ -243,8 +243,8 @@ mod tests {
     fn test_serialization() {
         let metadata = ToolMetadata {
             name: "test-tool".to_string(),
-            title: Some("Test Tool".to_string()),
-            description: None,
+            title: None,
+            description: Some("A test tool".to_string()),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -265,7 +265,7 @@ mod tests {
             return;
         };
         assert!(json.contains("\"name\":\"test-tool\""));
-        assert!(json.contains("\"title\":\"Test Tool\""));
-        assert!(!json.contains("\"description\""));
+        assert!(!json.contains("\"title\""));
+        assert!(json.contains("\"description\":\"A test tool\""));
     }
 }
