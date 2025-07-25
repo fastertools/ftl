@@ -105,6 +105,11 @@ jobs:
           cd sdk/typescript
           npm run lint
       
+      - name: Run type checking
+        run: |
+          cd sdk/typescript
+          npm run typecheck
+      
       - name: Run tests
         run: |
           cd sdk/typescript
