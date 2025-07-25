@@ -85,16 +85,12 @@ jobs:
           }
           
           # Check each category
-          cli_patterns="^cli/
-          ^Cargo\.toml$
-          ^Cargo\.lock$"
+          cli_patterns="^cli/"
           CLI_CHANGED=$(check_changes "$cli_patterns")
           echo "cli=$CLI_CHANGED" >> $GITHUB_OUTPUT
           
           rust_sdk_patterns="^sdk/rust/
-          ^sdk/rust-macros/
-          ^Cargo\.toml$
-          ^Cargo\.lock$"
+          ^sdk/rust-macros/"
           RUST_SDK_CHANGED=$(check_changes "$rust_sdk_patterns")
           echo "rust-sdk=$RUST_SDK_CHANGED" >> $GITHUB_OUTPUT
           
@@ -115,9 +111,7 @@ jobs:
           MCP_GW_CHANGED=$(check_changes "$mcp_gw_patterns")
           echo "mcp-gateway=$MCP_GW_CHANGED" >> $GITHUB_OUTPUT
           
-          core_patterns="^crates/
-          ^Cargo\.toml$
-          ^Cargo\.lock$"
+          core_patterns="^crates/"
           CORE_CHANGED=$(check_changes "$core_patterns")
           echo "core-crates=$CORE_CHANGED" >> $GITHUB_OUTPUT
           
