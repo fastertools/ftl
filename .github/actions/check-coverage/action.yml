@@ -1,0 +1,26 @@
+name: 'Check Coverage'
+description: 'Check if code coverage meets the minimum threshold'
+inputs:
+  threshold:
+    description: 'Minimum coverage percentage required'
+    required: false
+    default: '80'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check coverage threshold
+      shell: bash
+      run: |
+        # Generate coverage report and extract percentage
+        COVERAGE=$(cargo llvm-cov report | tail -1 | awk '{print $4}' | sed 's/%//')
+        echo "Coverage: ${COVERAGE}%"
+        
+        # Fail if coverage drops below threshold
+        THRESHOLD=${{ inputs.threshold }}
+        if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+          echo "::error::Coverage ${COVERAGE}% is below required ${THRESHOLD}%"
+          exit 1
+        else
+          echo "::notice::Coverage ${COVERAGE}% meets the ${THRESHOLD}% requirement"
+        fi

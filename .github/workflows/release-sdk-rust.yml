@@ -30,15 +30,7 @@ jobs:
           echo "🔢 Version: $VERSION"
       
       - name: Verify tag is on main branch
-        run: |
-          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
-          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
-            echo "✅ Tag is on main branch"
-          else
-            echo "❌ Error: Tag is not on main branch"
-            echo "This tag points to commit $TAG_COMMIT which is not on main"
-            exit 1
-          fi
+        uses: ./.github/actions/verify-tag
       
       - name: Verify versions match
         run: |
@@ -71,8 +63,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: release-sdk-rust
       
       - name: Verify crates can be published
         run: |
@@ -163,12 +157,9 @@ jobs:
           fetch-depth: 0
       
       - name: Setup Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Configure git to use the token for authentication
-          git config --global url."https://x-access-token:${{ secrets.PAT || github.token }}@github.com/".insteadOf "https://github.com/"
+        uses: ./.github/actions/setup-git
+        with:
+          token: ${{ secrets.PAT || github.token }}
       
       - name: Create update branch
         run: |

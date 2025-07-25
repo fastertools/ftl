@@ -24,81 +24,124 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    name: Lint
-    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
+  lint-cli:
+    name: Lint CLI
+    if: inputs.cli-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust with linting tools
+        uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
+          cache-key: ci-lint
+          install-system-deps: 'true'
       
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          # Use a shared cache key for better reuse across branches
-          shared-key: "ci-lint"
-          # Only save caches from the main branch to avoid PR pollution
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Check formatting (CLI)
+        run: |
+          cargo fmt --package ftl-cli -- --check
+          cargo fmt --package ftl-* -- --check
       
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run clippy (CLI)
+        run: |
+          cargo clippy --package ftl-cli --all-targets --all-features -- -D warnings
+          cargo clippy --package ftl-* --all-targets --all-features -- -D warnings
 
-  test-and-coverage:
-    name: Test & Coverage
-    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
+  lint-sdk:
+    name: Lint Rust SDK
+    if: inputs.rust-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev
+      - name: Setup Rust with linting tools
+        uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt, clippy
+          cache-key: ci-lint-sdk
       
-      - name: Install Rust with llvm-tools
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting (SDK)
+        run: |
+          cargo fmt --package ftl-sdk --package ftl-sdk-macros -- --check
+      
+      - name: Run clippy (SDK)
+        run: |
+          cargo clippy --package ftl-sdk --package ftl-sdk-macros --all-targets --all-features -- -D warnings
+
+  test-cli:
+    name: Test CLI
+    if: inputs.cli-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust with test tools
+        uses: ./.github/actions/setup-rust
         with:
           components: llvm-tools-preview
+          cache-key: ci-test
+          install-system-deps: 'true'
       
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "ci-test"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Setup test tools
+        uses: ./.github/actions/setup-test-tools
       
-      - name: Install cargo-llvm-cov and nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov,nextest
-      
-      - name: Run tests with coverage
+      - name: Run CLI tests with coverage
         run: |
-          # Run tests with coverage in one command
-          cargo llvm-cov nextest --all-features --profile ci
+          # Run CLI tests with coverage
+          cargo llvm-cov nextest --package ftl-cli --package 'ftl-*' --all-features --profile ci
           
-          # Generate coverage report and extract percentage
-          COVERAGE=$(cargo llvm-cov report | tail -1 | awk '{print $4}' | sed 's/%//')
-          echo "Coverage: ${COVERAGE}%"
+      - name: Check coverage threshold
+        uses: ./.github/actions/check-coverage
+
+  test-sdk:
+    name: Test Rust SDK
+    if: inputs.rust-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust with test tools
+        uses: ./.github/actions/setup-rust
+        with:
+          components: llvm-tools-preview
+          cache-key: ci-test-sdk
+      
+      - name: Setup test tools
+        uses: ./.github/actions/setup-test-tools
+      
+      - name: Run SDK tests with coverage
+        run: |
+          # Run SDK tests with coverage
+          cargo llvm-cov nextest --package ftl-sdk --package ftl-sdk-macros --all-features --profile ci
           
-          # Fail if coverage drops below 80%
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below required 80%"
-            exit 1
-          else
-            echo "::notice::Coverage ${COVERAGE}% meets the 80% requirement"
-          fi
+          # Generate coverage report
+          cargo llvm-cov report --package ftl-sdk --package ftl-sdk-macros
+
+  test-core:
+    name: Test Core Crates
+    if: inputs.core-crates-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust with test tools
+        uses: ./.github/actions/setup-rust
+        with:
+          components: llvm-tools-preview
+          cache-key: ci-test-core
+          install-system-deps: 'true'
+      
+      - name: Setup test tools
+        uses: ./.github/actions/setup-test-tools
+      
+      - name: Run core crate tests with coverage
+        run: |
+          # Run only core crate tests
+          cargo llvm-cov nextest --package 'ftl-*' --all-features --profile ci
+          
+      - name: Check coverage threshold
+        uses: ./.github/actions/check-coverage
 
   security:
     name: Security Audit
@@ -106,17 +149,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          shared-key: "ci-security"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-key: ci-security
+          install-system-deps: 'true'
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
       - name: Run security audit
@@ -129,19 +167,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust for WASM
+        uses: ./.github/actions/setup-rust
         with:
-          toolchain: 1.86.0
-          target: wasm32-wasip1
-      
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "ci-wasm"
-          cache-targets: true
-          cache-on-failure: true
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          toolchain: '1.86.0'
+          targets: wasm32-wasip1
+          cache-key: ci-wasm
+          cache-targets: 'true'
       
       - name: Install cargo-component
         uses: taiki-e/install-action@v2

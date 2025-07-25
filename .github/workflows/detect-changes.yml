@@ -9,6 +9,9 @@ on:
       rust-sdk:
         description: "Rust SDK files changed"
         value: ${{ jobs.detect.outputs.rust-sdk }}
+      typescript-sdk:
+        description: "TypeScript SDK files changed"
+        value: ${{ jobs.detect.outputs.typescript-sdk }}
       components:
         description: "Any component files changed"
         value: ${{ jobs.detect.outputs.components }}
@@ -32,6 +35,7 @@ jobs:
     outputs:
       cli: ${{ steps.detect.outputs.cli }}
       rust-sdk: ${{ steps.detect.outputs.rust-sdk }}
+      typescript-sdk: ${{ steps.detect.outputs.typescript-sdk }}
       components: ${{ steps.detect.outputs.components }}
       mcp-authorizer: ${{ steps.detect.outputs.mcp-authorizer }}
       mcp-gateway: ${{ steps.detect.outputs.mcp-gateway }}
@@ -94,6 +98,10 @@ jobs:
           RUST_SDK_CHANGED=$(check_changes "$rust_sdk_patterns")
           echo "rust-sdk=$RUST_SDK_CHANGED" >> $GITHUB_OUTPUT
           
+          typescript_sdk_patterns="^sdk/typescript/"
+          TYPESCRIPT_SDK_CHANGED=$(check_changes "$typescript_sdk_patterns")
+          echo "typescript-sdk=$TYPESCRIPT_SDK_CHANGED" >> $GITHUB_OUTPUT
+          
           components_patterns="^components/
           ^\.cargo/config\.toml$"
           COMPONENTS_CHANGED=$(check_changes "$components_patterns")
@@ -125,6 +133,7 @@ jobs:
           echo "::group::Detection results"
           echo "CLI changed: $CLI_CHANGED"
           echo "Rust SDK changed: $RUST_SDK_CHANGED"
+          echo "TypeScript SDK changed: $TYPESCRIPT_SDK_CHANGED"
           echo "Components changed: $COMPONENTS_CHANGED"
           echo "MCP Authorizer changed: $MCP_AUTH_CHANGED"
           echo "MCP Gateway changed: $MCP_GW_CHANGED"

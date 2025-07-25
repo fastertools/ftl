@@ -43,15 +43,7 @@ jobs:
           echo "🔢 Version: $VERSION"
       
       - name: Verify tag is on main branch
-        run: |
-          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
-          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
-            echo "✅ Tag is on main branch"
-          else
-            echo "❌ Error: Tag is not on main branch"
-            echo "This tag points to commit $TAG_COMMIT which is not on main"
-            exit 1
-          fi
+        uses: ./.github/actions/verify-tag
       
       - name: Verify component exists
         run: |
@@ -80,10 +72,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust for WASM
+        uses: ./.github/actions/setup-rust
         with:
           targets: wasm32-wasip1
+          cache-key: release-component-${{ matrix.component }}
       
       - name: Install cargo-component
         uses: taiki-e/install-action@v2
