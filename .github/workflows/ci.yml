@@ -41,12 +41,18 @@ jobs:
       - name: Check formatting (CLI)
         run: |
           cargo fmt --package ftl-cli -- --check
-          cargo fmt --package ftl-* -- --check
+          # Check formatting for all ftl-* crates
+          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
+            cargo fmt --package $pkg -- --check
+          done
       
       - name: Run clippy (CLI)
         run: |
           cargo clippy --package ftl-cli --all-targets --all-features -- -D warnings
-          cargo clippy --package ftl-* --all-targets --all-features -- -D warnings
+          # Run clippy for all ftl-* crates
+          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
+            cargo clippy --package $pkg --all-targets --all-features -- -D warnings
+          done
 
   lint-sdk:
     name: Lint Rust SDK
