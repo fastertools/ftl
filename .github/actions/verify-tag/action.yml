@@ -1,0 +1,26 @@
+name: 'Verify Tag on Main'
+description: 'Verify that a tag is on the main branch'
+outputs:
+  commit:
+    description: 'The commit SHA that the tag points to'
+    value: ${{ steps.verify.outputs.commit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Verify tag is on main branch
+      id: verify
+      shell: bash
+      run: |
+        # Get the commit SHA that the tag points to
+        TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+        echo "commit=$TAG_COMMIT" >> $GITHUB_OUTPUT
+        
+        # Check if this commit exists on the main branch
+        if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
+          echo "✅ Tag is on main branch"
+        else
+          echo "❌ Error: Tag is not on main branch"
+          echo "This tag points to commit $TAG_COMMIT which is not on main"
+          exit 1
+        fi

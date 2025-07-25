@@ -1,0 +1,15 @@
+name: 'Setup Test Tools'
+description: 'Install testing tools like cargo-llvm-cov and nextest'
+inputs:
+  tools:
+    description: 'Comma-separated list of tools to install'
+    required: false
+    default: 'cargo-llvm-cov,nextest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install test tools
+      uses: taiki-e/install-action@v2
+      with:
+        tool: ${{ inputs.tools }}

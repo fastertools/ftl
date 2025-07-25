@@ -30,15 +30,7 @@ jobs:
           echo "🔢 Version: $VERSION"
       
       - name: Verify tag is on main branch
-        run: |
-          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
-          if git merge-base --is-ancestor $TAG_COMMIT origin/main; then
-            echo "✅ Tag is on main branch"
-          else
-            echo "❌ Error: Tag is not on main branch"
-            echo "This tag points to commit $TAG_COMMIT which is not on main"
-            exit 1
-          fi
+        uses: ./.github/actions/verify-tag
       
       - name: Verify version matches package.json
         run: |

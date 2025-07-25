@@ -42,12 +42,9 @@ jobs:
           fetch-depth: 0
       
       - name: Setup Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Configure git to use the token for authentication
-          git config --global url."https://x-access-token:${{ secrets.PAT || github.token }}@github.com/".insteadOf "https://github.com/"
+        uses: ./.github/actions/setup-git
+        with:
+          token: ${{ secrets.PAT || github.token }}
       
       - name: Setup Node.js
         if: inputs.component == 'sdk-typescript'
