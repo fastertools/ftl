@@ -9,7 +9,7 @@ use syn::{FnArg, ItemFn, parse_macro_input};
 ///
 /// # Example
 /// ```ignore
-/// ftl_tools! {
+/// tools! {
 ///     /// Echo back the input message
 ///     fn echo(input: EchoInput) -> ToolResponse {
 ///         ToolResponse::text(format!("Echo: {}", input.message))
@@ -22,7 +22,7 @@ use syn::{FnArg, ItemFn, parse_macro_input};
 /// }
 /// ```
 #[proc_macro]
-pub fn ftl_tools(input: TokenStream) -> TokenStream {
+pub fn tools(input: TokenStream) -> TokenStream {
     let tools = parse_macro_input!(input as ToolsDefinition);
 
     // Collect all tool functions

@@ -30,20 +30,27 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 <summary><strong>🦀 Rust</strong></summary>
 
 ```rust
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{tools, text, ToolResponse};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
 #[derive(Deserialize, JsonSchema)]
-struct MyToolInput {
+struct ProcessInput {
     /// The message to process
     message: String,
 }
 
-/// A simple MCP tool
-#[tool]
-fn my_tool(input: MyToolInput) -> ToolResponse {
-    ToolResponse::text(format!("Processed: {}", input.message))
+tools! {
+    /// Process a message
+    fn process_message(input: ProcessInput) -> ToolResponse {
+        text!("Processed: {}", input.message)
+    }
+    
+    /// Reverse a string
+    fn reverse_text(input: ProcessInput) -> ToolResponse {
+        let reversed: String = input.message.chars().rev().collect();
+        text!("{}", reversed)
+    }
 }
 ```
 </details>
@@ -52,31 +59,39 @@ fn my_tool(input: MyToolInput) -> ToolResponse {
 <summary><strong>🟦 TypeScript</strong></summary>
 
 ```typescript
-import { createTool, ToolResponse } from 'ftl-sdk'
+import { createTools, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
-// Define the schema using Zod
-const ToolSchema = z.object({
+// Define schemas using Zod
+const ProcessSchema = z.object({
   message: z.string().describe('The message to process')
 })
 
-type ToolInput = z.infer<typeof ToolSchema>
+const ReverseSchema = z.object({
+  text: z.string().describe('The text to reverse')
+})
 
-const tool = createTool<ToolInput>({
-  metadata: {
-    name: 'my_tool',
-    title: 'My Tool',
-    description: 'A simple MCP tool',
-    inputSchema: z.toJSONSchema(ToolSchema)
+const handle = createTools({
+  processMessage: {
+    description: 'Process a message',
+    inputSchema: z.toJSONSchema(ProcessSchema),
+    handler: async (input: z.infer<typeof ProcessSchema>) => {
+      return ToolResponse.text(`Processed: ${input.message}`)
+    }
   },
-  handler: async (input) => {
-    return ToolResponse.text(`Processed: ${input.message}`)
+  reverseText: {
+    description: 'Reverse a string',
+    inputSchema: z.toJSONSchema(ReverseSchema),
+    handler: async (input: z.infer<typeof ReverseSchema>) => {
+      const reversed = input.text.split('').reverse().join('')
+      return ToolResponse.text(reversed)
+    }
   }
 })
 
 //@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(tool(event.request))
+  event.respondWith(handle(event.request))
 })
 ```
 </details>
@@ -85,7 +100,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 <details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
-- Tools run as individual WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
+- Tools run in WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
 - MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own JWT issuer or OIDC provider with simple configuration.
 - Allowed outbound network calls are configurable per tool. This is especially useful when including third party tool components in your MCP server (see below).
@@ -114,7 +129,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
-- FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
+- FTL tools run as sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - The FTL [components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
 - Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
 - High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
@@ -149,7 +164,7 @@ Try them out with your MCP client
 ```json
 {
   "mcpServers": {
-    "fast-tools": {
+    "fastTools": {
       "url": "http://127.0.0.1:3000/mcp",
       "transport": "http"
     }
@@ -171,7 +186,7 @@ Plug it in
 ```json
 {
   "mcpServers": {
-    "fast-tools": {
+    "fastTools": {
       "url": "https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp",
       "transport": "https"
     }
@@ -201,10 +216,10 @@ graph TB
                   end
                   
                   subgraph "User Tool Components"
-                      Weather["Weather Tool<br/>(TypeScript)"]
-                      GitHub["GitHub Tool<br/>(Rust)"]
-                      Database["Database Tool<br/>(JavaScript)"]
-                      Custom["Custom Tool<br/>(Another Language)"]
+                      Weather["Weather Tools<br/>(TypeScript/Javascript)"]
+                      Physics["Physics Tools<br/>(Rust)"]
+                      Data["Data Tools<br/>(Python)"]
+                      Custom["Fun Tools<br/>(Go)"]
                   end
               end
           end
@@ -216,8 +231,8 @@ graph TB
     MCP -.->| | MCPAuth
     MCPAuth -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
-    MCPGateway -.->|"In-memory call"| GitHub
-    MCPGateway -.->|"In-memory call"| Database
+    MCPGateway -.->|"In-memory call"| Pysics
+    MCPGateway -.->|"In-memory call"| Data
     MCPGateway -.->|"In-memory call"| Custom
 ```
 

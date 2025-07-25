@@ -15,18 +15,19 @@ serde = { version = "1.0", features = ["derive"] }
 
 This SDK provides:
 - MCP protocol type definitions
-- `#[tool]` procedural macro for minimal boilerplate
+- `tools!` macro for defining multiple tools with minimal boilerplate
+- Response macros (`text!`, `error!`, `structured!`) for ergonomic responses
 - Automatic JSON schema generation using schemars
 - Convenience methods for creating responses
 
 ## Quick Start
 
-### Using the `#[tool]` Macro
+### Using the `tools!` Macro
 
-The simplest way to create a tool:
+The simplest way to create tools:
 
 ```rust
-use ftl_sdk::{tool, ToolResponse};
+use ftl_sdk::{tools, text};
 use serde::Deserialize;
 use schemars::JsonSchema;
 
@@ -38,19 +39,35 @@ struct AddInput {
     b: i32,
 }
 
-/// Adds two numbers together
-#[tool]
-fn add(input: AddInput) -> ToolResponse {
-    let result = input.a + input.b;
-    ToolResponse::text(format!("{} + {} = {}", input.a, input.b, result))
+#[derive(Deserialize, JsonSchema)]
+struct SubtractInput {
+    /// Number to subtract from
+    a: i32,
+    /// Number to subtract
+    b: i32,
+}
+
+tools! {
+    /// Adds two numbers together
+    fn add(input: AddInput) -> ToolResponse {
+        let result = input.a + input.b;
+        text!("{} + {} = {}", input.a, input.b, result)
+    }
+    
+    /// Subtracts two numbers
+    fn subtract(input: SubtractInput) -> ToolResponse {
+        let result = input.a - input.b;
+        text!("{} - {} = {}", input.a, input.b, result)
+    }
 }
 ```
 
-The `#[tool]` macro automatically:
-- Generates the HTTP handler
-- Creates metadata from the function name and doc comments
-- Derives JSON schema from your input type using schemars
-- Handles GET/POST requests appropriately
+The `tools!` macro automatically:
+- Generates the HTTP handler for all tools
+- Creates metadata from function names and doc comments
+- Derives JSON schema from your input types using schemars
+- Routes GET/POST requests appropriately
+- Supports multiple tools in one component
 
 ### Manual Implementation
 
@@ -131,13 +148,22 @@ cargo build --target wasm32-wasip1 --release
 ## Response Helpers
 
 ```rust
-// Simple text response
-let response = ToolResponse::text("Hello, world!");
+// Simple text response with macros
+let response = text!("Hello, world!");
+
+// With formatting
+let response = text!("Hello, {}!", name);
 
 // Error response
-let response = ToolResponse::error("Something went wrong");
+let response = error!("Something went wrong: {}", reason);
 
 // Response with structured content
+let data = json!({ "result": 42 });
+let response = structured!(data, "Calculation complete");
+
+// Or use the builder methods directly
+let response = ToolResponse::text("Hello, world!");
+let response = ToolResponse::error("Something went wrong");
 let response = ToolResponse::with_structured(
     "Calculation complete",
     json!({ "result": 42 })
@@ -158,41 +184,45 @@ let response = ToolResponse {
 
 ### Async Tools
 
-The `#[tool]` macro supports async functions:
+The `tools!` macro supports async functions:
 
 ```rust
-#[tool]
-async fn fetch_weather(input: WeatherInput) -> ToolResponse {
-    let weather = fetch_from_api(&input.location).await?;
-    ToolResponse::text(format!("Weather: {}", weather))
+tools! {
+    /// Fetch weather data
+    async fn fetch_weather(input: WeatherInput) -> ToolResponse {
+        let weather = fetch_from_api(&input.location).await;
+        text!("Weather in {}: {}", input.location, weather)
+    }
+    
+    /// Another async tool
+    async fn check_status(input: StatusInput) -> ToolResponse {
+        let status = get_status(&input.service).await;
+        text!("Status: {}", status)
+    }
 }
 ```
 
-### Custom Metadata
+### Multiple Tools Per Component
 
-Override automatic metadata generation:
-
-```rust
-#[tool(
-    name = "custom_name",
-    title = "Custom Title",
-    description = "Custom description"
-)]
-fn my_tool(input: MyInput) -> ToolResponse {
-    // Implementation
-}
-```
-
-### Tool Annotations
-
-Add hints about tool behavior:
+Define as many tools as needed in one component:
 
 ```rust
-#[tool(
-    read_only_hint = true,
-    idempotent_hint = true
-)]
-fn query_data(input: QueryInput) -> ToolResponse {
-    // Read-only, idempotent operation
+tools! {
+    /// Process text
+    fn process_text(input: TextInput) -> ToolResponse {
+        text!("Processed: {}", input.text)
+    }
+    
+    /// Analyze data
+    fn analyze_data(input: DataInput) -> ToolResponse {
+        let result = analyze(&input.data);
+        structured!(result, "Analysis complete")
+    }
+    
+    /// Generate report
+    async fn generate_report(input: ReportInput) -> ToolResponse {
+        let report = create_report(&input).await;
+        text!("{}", report)
+    }
 }
 ```
