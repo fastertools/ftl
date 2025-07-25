@@ -3,14 +3,14 @@ use serde::Deserialize;
 use schemars::JsonSchema;
 
 #[derive(Deserialize, JsonSchema)]
-struct {{project-name | pascal_case}}Input {
+struct ExampleToolInput {
     /// The input message to process
     message: String,
 }
 
 ftl_tools! {
-    /// {{tool-description}}
-    fn {{project-name | snake_case}}(input: {{project-name | pascal_case}}Input) -> ToolResponse {
+    /// An example tool that processes messages
+    fn example_tool(input: ExampleToolInput) -> ToolResponse {
         // TODO: Implement your tool logic here
         ToolResponse::text(format!("Processed: {}", input.message))
     }
