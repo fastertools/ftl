@@ -100,7 +100,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 <details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
-- Tools run as individual WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
+- Tools run in WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
 - MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own JWT issuer or OIDC provider with simple configuration.
 - Allowed outbound network calls are configurable per tool. This is especially useful when including third party tool components in your MCP server (see below).
@@ -129,7 +129,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables powerful patterns for crafting optimal agent interactions and tool responses beyond just proxying to third party APIs.
 
 - Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
-- FTL tools run as individually sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
+- FTL tools run as sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
 - The FTL [components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
 - Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
 - High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
@@ -216,10 +216,10 @@ graph TB
                   end
                   
                   subgraph "User Tool Components"
-                      Weather["Weather Tool<br/>(TypeScript)"]
-                      GitHub["GitHub Tool<br/>(Rust)"]
-                      Database["Database Tool<br/>(JavaScript)"]
-                      Custom["Custom Tool<br/>(Another Language)"]
+                      Weather["Weather Tools<br/>(TypeScript/Javascript)"]
+                      Physics["Physics Tools<br/>(Rust)"]
+                      Data["Data Tools<br/>(Python)"]
+                      Custom["Fun Tools<br/>(Go)"]
                   end
               end
           end
@@ -231,8 +231,8 @@ graph TB
     MCP -.->| | MCPAuth
     MCPAuth -.->|"Authorized requests (in-memory call)"| MCPGateway
     MCPGateway -.->|"In-memory call"| Weather
-    MCPGateway -.->|"In-memory call"| GitHub
-    MCPGateway -.->|"In-memory call"| Database
+    MCPGateway -.->|"In-memory call"| Pysics
+    MCPGateway -.->|"In-memory call"| Data
     MCPGateway -.->|"In-memory call"| Custom
 ```
 

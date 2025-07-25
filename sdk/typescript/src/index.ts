@@ -371,7 +371,7 @@ function camelToSnake(str: string): string {
  * })
  * ```
  */
-export function createTools<T extends Record<string, ToolDefinition<unknown>>>(
+export function createTools<T extends Record<string, ToolDefinition>>(
   tools: T,
 ): (request: Request) => Promise<Response> {
   return async function handleRequest(request: Request): Promise<Response> {
