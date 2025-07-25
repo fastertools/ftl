@@ -43,6 +43,8 @@ enum Commands {
     App(AppArgs),
     /// Manage FTL component registry
     Registry(RegistryArgs),
+    /// Manage pre-built tools
+    Tools(ToolsArgs),
 }
 
 // Simple command wrappers - just forward arguments
@@ -265,6 +267,73 @@ enum RegistryCommand {
     },
 }
 
+#[derive(Debug, Args)]
+struct ToolsArgs {
+    #[command(subcommand)]
+    command: ToolsCommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum ToolsCommand {
+    /// List available pre-built tools
+    List {
+        /// Filter by category
+        #[arg(short, long)]
+        category: Option<String>,
+        /// Filter by keyword in name or description
+        #[arg(short, long)]
+        filter: Option<String>,
+        /// Registry to use (overrides config)
+        #[arg(short, long)]
+        registry: Option<String>,
+        /// Show additional details
+        #[arg(short, long)]
+        verbose: bool,
+        /// List from all enabled registries
+        #[arg(short, long)]
+        all: bool,
+        /// Query registry directly, skip manifest
+        #[arg(short, long)]
+        direct: bool,
+    },
+    /// Add pre-built tools to your project
+    Add {
+        /// Tool names to add (can include registry prefix like docker:tool-name)
+        tools: Vec<String>,
+        /// Registry to use (overrides config and tool prefix)
+        #[arg(short, long)]
+        registry: Option<String>,
+        /// Version/tag to use (overrides tool:version syntax)
+        #[arg(short, long)]
+        version: Option<String>,
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    /// Update existing tools in your project
+    Update {
+        /// Tool names to update (can include registry prefix like docker:tool-name)
+        tools: Vec<String>,
+        /// Registry to use (overrides config and tool prefix)
+        #[arg(short, long)]
+        registry: Option<String>,
+        /// Version/tag to update to (overrides tool:version syntax)
+        #[arg(short, long)]
+        version: Option<String>,
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    /// Remove tools from your project
+    Remove {
+        /// Tool names to remove
+        tools: Vec<String>,
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+}
+
 // Conversion implementations
 
 impl From<InitArgs> for ftl_commands::init::InitArgs {
@@ -432,7 +501,7 @@ impl From<AppArgs> for ftl_commands::app::AppArgs {
     }
 }
 
-impl From<RegistryCommand> for ftl_commands::registry::RegistryCommand {
+impl From<RegistryCommand> for ftl_commands::registry_command::RegistryCommand {
     fn from(cmd: RegistryCommand) -> Self {
         match cmd {
             RegistryCommand::Search { query, registry } => Self::Search { query, registry },
@@ -442,8 +511,61 @@ impl From<RegistryCommand> for ftl_commands::registry::RegistryCommand {
     }
 }
 
-impl From<RegistryArgs> for ftl_commands::registry::RegistryArgs {
+impl From<RegistryArgs> for ftl_commands::registry_command::RegistryArgs {
     fn from(args: RegistryArgs) -> Self {
+        Self {
+            command: args.command.into(),
+        }
+    }
+}
+
+impl From<ToolsCommand> for ftl_commands::tools::ToolsCommand {
+    fn from(cmd: ToolsCommand) -> Self {
+        match cmd {
+            ToolsCommand::List {
+                category,
+                filter,
+                registry,
+                verbose,
+                all,
+                direct,
+            } => Self::List {
+                category,
+                filter,
+                registry,
+                verbose,
+                all,
+                direct,
+            },
+            ToolsCommand::Add {
+                tools,
+                registry,
+                version,
+                yes,
+            } => Self::Add {
+                tools,
+                registry,
+                version,
+                yes,
+            },
+            ToolsCommand::Update {
+                tools,
+                registry,
+                version,
+                yes,
+            } => Self::Update {
+                tools,
+                registry,
+                version,
+                yes,
+            },
+            ToolsCommand::Remove { tools, yes } => Self::Remove { tools, yes },
+        }
+    }
+}
+
+impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
+    fn from(args: ToolsArgs) -> Self {
         Self {
             command: args.command.into(),
         }
@@ -475,6 +597,7 @@ async fn main() -> Result<()> {
         Commands::Logout(args) => ftl_commands::logout::execute(args.into()).await,
         Commands::Test(args) => ftl_commands::test::execute(args.into()).await,
         Commands::App(args) => ftl_commands::app::execute(args.into()).await,
-        Commands::Registry(args) => ftl_commands::registry::execute(args.into()).await,
+        Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
+        Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
     }
 }

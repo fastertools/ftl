@@ -173,10 +173,7 @@ async fn build_components_parallel(
             match result {
                 Ok(()) => {
                     let duration = start.elapsed();
-                    pb.finish_with_message(format!(
-                        "✓ Built in {:.1}s",
-                        duration.as_secs_f64()
-                    ));
+                    pb.finish_with_message(format!("✓ Built in {:.1}s", duration.as_secs_f64()));
                     Ok(())
                 }
                 Err(e) => {

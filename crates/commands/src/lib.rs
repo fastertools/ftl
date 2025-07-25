@@ -6,10 +6,23 @@
 /// Command implementations module
 pub mod commands;
 
+/// Configuration types and utilities
+pub mod config;
+
+/// Data structures and manifests
+pub mod data;
+
+/// Registry infrastructure and adapters
+pub mod registry;
+
 #[cfg(test)]
 pub mod test_helpers;
 
 // Re-export all commands at the crate root for easier access
 pub use commands::{
-    add, app, auth, build, deploy, init, login, logout, publish, registry, setup, test, up, update,
+    add, app, auth, build, deploy, init, login, logout, publish, setup, test, tools_cli as tools,
+    up, update,
 };
+
+// Re-export registry command separately to avoid naming conflict with registry module
+pub use commands::registry as registry_command;
