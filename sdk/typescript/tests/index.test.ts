@@ -268,7 +268,7 @@ describe('createTools helper', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('application/json')
 
-    const body = await response.json() as ToolMetadata[]
+    const body = (await response.json()) as ToolMetadata[]
     expect(body).toHaveLength(2)
     expect(body[0].name).toBe('test_tool') // camelCase converted to snake_case
     expect(body[0].title).toBe('Test Tool')

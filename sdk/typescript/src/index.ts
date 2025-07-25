@@ -278,10 +278,10 @@ export function isResourceContent(content: ToolContent): content is ResourceCont
 
 /**
  * Tool definition for createTools.
- * 
+ *
  * The handler accepts `any` to allow maximum flexibility in typing.
  * Users should type their handler parameters for type safety:
- * 
+ *
  * ```typescript
  * handler: async (input: MyInputType) => {
  *   return ToolResponse.text(input.message)
@@ -310,11 +310,11 @@ export interface ToolDefinition {
   /** Optional metadata for tool-specific extensions */
   _meta?: Record<string, unknown>
 
-  /** 
+  /**
    * Handler function for tool execution.
    * Uses `any` to allow users to specify their own input types for better DX.
    */
-  handler: (input: any) => ToolResponse | Promise<ToolResponse>  // eslint-disable-line @typescript-eslint/no-explicit-any
+  handler: (input: any) => ToolResponse | Promise<ToolResponse> // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 /**
