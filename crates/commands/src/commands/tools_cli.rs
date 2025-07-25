@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use crate::commands::tools::{ToolsDependencies, add_with_deps, list_with_deps, remove_with_deps, update_with_deps};
 
+/// Commands for managing pre-built FTL tools in your project
 #[derive(Debug, Clone)]
 pub enum ToolsCommand {
     /// List available pre-built tools
@@ -56,8 +57,10 @@ pub enum ToolsCommand {
     },
 }
 
+/// Command-line arguments for the tools command
 #[derive(Debug)]
 pub struct ToolsArgs {
+    /// The specific tools subcommand to execute
     pub command: ToolsCommand,
 }
 
@@ -112,7 +115,8 @@ pub async fn execute(args: ToolsArgs) -> Result<()> {
     }
 }
 
-/// Simple console user interface implementation
+/// Console-based implementation of the UserInterface trait
+/// Provides basic terminal I/O functionality for the tools command
 struct ConsoleUserInterface;
 
 impl UserInterface for ConsoleUserInterface {
@@ -176,7 +180,8 @@ impl UserInterface for ConsoleUserInterface {
     }
 }
 
-/// Simple spinner implementation
+/// Basic progress indicator implementation
+/// Currently a placeholder that doesn't show visual progress
 struct SimpleSpinner;
 
 impl ProgressIndicator for SimpleSpinner {
@@ -191,7 +196,8 @@ impl ProgressIndicator for SimpleSpinner {
     fn set_prefix(&self, _prefix: String) {}
 }
 
-/// Simple multi-progress implementation
+/// Multi-progress manager implementation
+/// Currently a placeholder that creates SimpleSpinner instances
 struct SimpleMultiProgress;
 
 impl MultiProgressManager for SimpleMultiProgress {

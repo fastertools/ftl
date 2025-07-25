@@ -44,7 +44,11 @@ fn parse_image_and_tag(image_name: &str) -> (String, String) {
     }
 }
 
-/// Check if crane CLI is available
+/// Verifies that the crane CLI tool is installed and available
+/// 
+/// Crane is required for registry operations like checking image existence
+/// and listing available tags. Returns an error with installation instructions
+/// if crane is not found.
 fn check_crane_available() -> Result<()> {
     let output = Command::new("crane")
         .arg("version")
@@ -58,7 +62,13 @@ fn check_crane_available() -> Result<()> {
     Ok(())
 }
 
-/// Use crane to check if an image exists
+/// Checks if a container image exists in a registry using crane
+/// 
+/// Uses the crane manifest command to verify image existence.
+/// Leverages the user's existing Docker/registry authentication.
+/// 
+/// # Arguments
+/// * `image_ref` - Full image reference (e.g., "ghcr.io/org/image:tag")
 async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
     // First check if crane is available
     check_crane_available()?;
@@ -76,15 +86,35 @@ async fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
     Ok(output.status.success())
 }
 
-/// Verify that a specific version/tag exists in the registry using crane
+/// Verifies that a specific version exists, trying both with and without 'v' prefix
+/// 
+/// Many tools use version tags with 'v' prefix (e.g., "v1.0.0") while others don't.
+/// This function tries both formats to handle either convention.
+/// 
+/// # Arguments  
+/// * `registry_url` - Base registry URL without tag
+/// * `version` - Version to check (without 'v' prefix)
 async fn verify_version_exists_with_crane(registry_url: &str, version: &str) -> Result<bool> {
     check_crane_available()?;
     
-    let image_ref = format!("{}:{}", registry_url, version);
-    verify_image_with_crane(&image_ref).await
+    // Try with 'v' prefix first, then without
+    let image_ref_with_v = format!("{}:v{}", registry_url, version);
+    let image_ref_without_v = format!("{}:{}", registry_url, version);
+    
+    if verify_image_with_crane(&image_ref_with_v).await? {
+        return Ok(true);
+    }
+    
+    verify_image_with_crane(&image_ref_without_v).await
 }
 
-/// Use crane to list tags for an image
+/// Lists all available tags for a container image using crane
+/// 
+/// Executes `crane ls` to retrieve all tags from the registry.
+/// Filters out non-semver tags and sorts by version.
+/// 
+/// # Arguments
+/// * `repository` - Full repository path (e.g., "ghcr.io/org/image")
 async fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
     check_crane_available()?;
     
@@ -642,5 +672,33 @@ mod tests {
         assert_eq!(components.registry_domain, "registry.company.com:5000");
         assert_eq!(components.package_name, "myapp");
         assert_eq!(components.version, "1.2.3");
+    }
+    
+    #[test]
+    fn test_version_tag_variations() {
+        use super::{validate_and_normalize_semver};
+        
+        // Test v-prefix handling
+        assert_eq!(validate_and_normalize_semver("v1.0.0").unwrap(), "1.0.0");
+        assert_eq!(validate_and_normalize_semver("1.0.0").unwrap(), "1.0.0");
+        assert_eq!(validate_and_normalize_semver("v1.2").unwrap(), "1.2.0");
+        assert_eq!(validate_and_normalize_semver("1.2").unwrap(), "1.2.0");
+        
+        // Test invalid versions
+        assert!(validate_and_normalize_semver("latest").is_err());
+        assert!(validate_and_normalize_semver("main").is_err());
+        assert!(validate_and_normalize_semver("dev").is_err());
+    }
+    
+    #[test]
+    fn test_parse_image_and_tag_variations() {
+        use super::parse_image_and_tag;
+        
+        // Test various image:tag formats
+        assert_eq!(parse_image_and_tag("nginx"), ("nginx".to_string(), "latest".to_string()));
+        assert_eq!(parse_image_and_tag("nginx:1.0.0"), ("nginx".to_string(), "1.0.0".to_string()));
+        assert_eq!(parse_image_and_tag("nginx:v1.0.0"), ("nginx".to_string(), "v1.0.0".to_string()));
+        assert_eq!(parse_image_and_tag("org/repo:latest"), ("org/repo".to_string(), "latest".to_string()));
+        assert_eq!(parse_image_and_tag("org/repo"), ("org/repo".to_string(), "latest".to_string()));
     }
 }

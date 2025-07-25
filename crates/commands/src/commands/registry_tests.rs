@@ -37,7 +37,7 @@ async fn test_list_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(None, &deps);
+    list_with_deps(None, &deps).await.expect("Failed to list registry");
 
     // Verify output
     let output = ui.get_output();
@@ -65,7 +65,7 @@ async fn test_list_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(Some("docker.io"), &deps);
+    list_with_deps(Some("docker.io"), &deps).await.expect("Failed to list registry");
 
     // Verify output
     let output = ui.get_output();
@@ -82,7 +82,7 @@ async fn test_search_default_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component", None, &deps);
+    search_with_deps("my-component", None, &deps).await.expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -109,7 +109,7 @@ async fn test_search_custom_registry() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("test-tool", Some("quay.io"), &deps);
+    search_with_deps("test-tool", Some("quay.io"), &deps).await.expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -126,7 +126,7 @@ async fn test_search_with_special_characters() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    search_with_deps("my-component@v2.0", None, &deps);
+    search_with_deps("my-component@v2.0", None, &deps).await.expect("Failed to search registry");
 
     // Verify output
     let output = ui.get_output();
@@ -148,7 +148,7 @@ async fn test_info_simple_component() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("my-component", &deps);
+    info_with_deps("my-component", &deps).await.expect("Failed to get info");
 
     // Verify output
     let output = ui.get_output();
@@ -180,7 +180,7 @@ async fn test_info_full_component_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("ghcr.io/ftl/my-tool:v1.0.0", &deps);
+    info_with_deps("ghcr.io/ftl/my-tool:v1.0.0", &deps).await.expect("Failed to get info");
 
     // Verify output
     let output = ui.get_output();
@@ -197,7 +197,7 @@ async fn test_info_docker_hub_reference() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    info_with_deps("docker.io/library/nginx:latest", &deps);
+    info_with_deps("docker.io/library/nginx:latest", &deps).await.expect("Failed to get info");
 
     // Verify output
     let output = ui.get_output();
@@ -219,7 +219,7 @@ async fn test_list_output_completeness() {
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
-    list_with_deps(None, &deps);
+    list_with_deps(None, &deps).await.expect("Failed to list registry");
 
     // Verify all expected output lines are present
     let output = ui.get_output();
