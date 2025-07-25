@@ -11,10 +11,9 @@ const handle = createTools({
   exampleTool: {
     description: 'An example tool that processes messages',
     inputSchema: z.toJSONSchema(ExampleToolSchema),
-    handler: async (input) => {
-      const typedInput = input as z.infer<typeof ExampleToolSchema>
+    handler: async (input: z.infer<typeof ExampleToolSchema>) => {
       // TODO: Implement your tool logic here
-      return ToolResponse.text(`Processed: ${typedInput.message}`)
+      return ToolResponse.text(`Processed: ${input.message}`)
     }
   }
   
@@ -22,7 +21,9 @@ const handle = createTools({
   // anotherTool: {
   //   description: 'Another tool description',
   //   inputSchema: z.toJSONSchema(AnotherSchema),
-  //   handler: async (input) => { ... }
+  //   handler: async (input: z.infer<typeof AnotherSchema>) => {
+  //     return ToolResponse.text('Another response')
+  //   }
   // }
 })
 
