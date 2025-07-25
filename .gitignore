@@ -1,3 +1,7 @@
+# Local Deps
+.memory
+.mnemic
+
 # Rust build artifacts
 target/
 Cargo.lock
