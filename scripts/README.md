@@ -52,17 +52,13 @@ The script will:
 ./scripts/check-versions.sh
 ```
 
-### 2. Update CHANGELOG.md
-
-Before releasing, update the CHANGELOG.md with release notes for your component.
-
-### 3. Run Release Script
+### 2. Run Release Script
 
 ```bash
 ./scripts/release.sh <type> [component] <version>
 ```
 
-### 4. Push Changes
+### 3. Push Changes
 
 After reviewing the changes:
 
@@ -74,7 +70,7 @@ git push origin main
 git push origin <tag-name>
 ```
 
-### 5. Monitor Release
+### 4. Monitor Release
 
 Check GitHub Actions to ensure the release workflow completes successfully.
 

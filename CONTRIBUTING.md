@@ -137,7 +137,7 @@ mod tests {
 - Add inline documentation for all public items
 - Include examples in documentation
 - Update README.md if adding new features
-- Add entries to CHANGELOG.md for notable changes
+- Notable changes will be tracked in GitHub releases
 
 ## Architecture Decisions
 
@@ -171,10 +171,9 @@ FTL uses the ftl-mcp SDK for component development:
 ## Release Process
 
 1. Update version numbers in all `Cargo.toml` files
-2. Update CHANGELOG.md with release notes
-3. Create a git tag: `git tag -a v0.x.x -m "Release v0.x.x"`
-4. Push the tag: `git push origin v0.x.x`
-5. GitHub Actions will automatically create releases and publish to crates.io
+2. Create a git tag: `git tag -a v0.x.x -m "Release v0.x.x"`
+3. Push the tag: `git push origin v0.x.x`
+4. GitHub Actions will automatically create releases and publish to crates.io
 
 ## Getting Help
 

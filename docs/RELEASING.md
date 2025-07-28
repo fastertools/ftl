@@ -23,7 +23,7 @@ The easiest way to create a release is using the automated workflow:
 This will:
 - Create a release branch
 - Bump versions automatically
-- Generate changelog from commits
+- Generate release notes on GitHub
 - Create a PR with all changes
 - Include release checklist
 
@@ -35,12 +35,10 @@ If you prefer manual control:
 # 1. Use the release script
 ./scripts/release.sh <component> <version>
 
-# 2. Update CHANGELOG.md manually
-
-# 3. Push changes
+# 2. Push changes
 git push origin main
 
-# 4. Push tag
+# 3. Push tag
 git push origin <tag-name>
 ```
 
@@ -75,18 +73,9 @@ git push origin <tag-name>
 3. **Artifacts published**: Binaries, packages, and containers are published
 4. **GitHub Release created**: With generated release notes
 
-### Changelog Generation
+### Release Notes
 
-The system automatically generates changelogs from conventional commits:
-
-```bash
-# Generate changelog for a component
-./scripts/generate-changelog.sh <component>
-
-# Generate in different formats
-./scripts/generate-changelog.sh cli --format json
-./scripts/generate-changelog.sh cli --format github
-```
+GitHub automatically generates release notes from pull requests and commits when creating a release. This provides a more scalable and maintainable approach than in-repo text files.
 
 #### Conventional Commit Format
 
@@ -130,7 +119,7 @@ Before merging a release PR:
 
 - [ ] All CI checks pass
 - [ ] Version numbers are correct
-- [ ] Changelog accurately reflects changes
+- [ ] Release notes will accurately reflect changes
 - [ ] Documentation is updated
 - [ ] Breaking changes are clearly marked
 - [ ] Dependencies are updated if needed
@@ -199,8 +188,8 @@ If automation fails, you can:
 
 ## Best Practices
 
-1. **Use conventional commits**: Makes changelog generation automatic
-2. **Review generated changelogs**: Ensure accuracy and completeness
+1. **Use conventional commits**: Makes release notes clearer
+2. **Review GitHub release notes**: Ensure accuracy and completeness
 3. **Test before releasing**: Run tests locally for critical releases
 4. **Coordinate major releases**: Discuss breaking changes with team
 5. **Update documentation**: Keep docs in sync with releases
@@ -210,7 +199,7 @@ If automation fails, you can:
 When helping with releases:
 
 1. Always use the automated workflow when possible
-2. Ensure conventional commit format for clear changelogs
+2. Ensure conventional commit format for clear release notes
 3. Check version consistency across related packages
 4. Verify no breaking changes in patch releases
 5. Update documentation with new features
