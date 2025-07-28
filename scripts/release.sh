@@ -75,16 +75,6 @@ function update_version() {
     fi
 }
 
-function update_changelog() {
-    local component=$1
-    local version=$2
-    local date=$(date +%Y-%m-%d)
-    
-    echo -e "${BLUE}Updating CHANGELOG.md for $component v$version${NC}"
-    
-    # This is a placeholder - in a real implementation, you'd update the changelog
-    echo -e "${YELLOW}Note: Please manually update CHANGELOG.md before pushing${NC}"
-}
 
 function create_tag() {
     local tag=$1
@@ -102,8 +92,6 @@ function release_cli() {
     # Update version
     update_version "$ROOT_DIR/cli/Cargo.toml" "$version"
     
-    # Update changelog
-    update_changelog "CLI" "$version"
     
     # Commit changes
     git add -A
@@ -114,9 +102,8 @@ function release_cli() {
     
     echo -e "${GREEN}✅ CLI release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin cli-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin cli-v$version"
 }
 
 function release_sdk_rust() {
@@ -143,8 +130,7 @@ function release_sdk_rust() {
         fi
     fi
     
-    # Update changelog
-    update_changelog "Rust SDK" "$version"
+ "Rust SDK" "$version"
     
     # Commit changes
     git add -A
@@ -155,9 +141,8 @@ function release_sdk_rust() {
     
     echo -e "${GREEN}✅ Rust SDK release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin sdk-rust-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin sdk-rust-v$version"
 }
 
 function release_component() {
@@ -176,8 +161,7 @@ function release_component() {
     # Update version
     update_version "$ROOT_DIR/components/$component/Cargo.toml" "$version"
     
-    # Update changelog
-    update_changelog "$component" "$version"
+ "$component" "$version"
     
     # Commit changes
     git add -A
@@ -188,9 +172,8 @@ function release_component() {
     
     echo -e "${GREEN}✅ Component $component release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin component-$component-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin component-$component-v$version"
 }
 
 function release_sdk_typescript() {
@@ -204,8 +187,7 @@ function release_sdk_typescript() {
     npm version "$version" --no-git-tag-version
     cd "$ROOT_DIR"
     
-    # Update changelog
-    update_changelog "TypeScript SDK" "$version"
+ "TypeScript SDK" "$version"
     
     # Commit changes
     git add -A
@@ -216,9 +198,8 @@ function release_sdk_typescript() {
     
     echo -e "${GREEN}✅ TypeScript SDK release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin sdk-typescript-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin sdk-typescript-v$version"
 }
 
 function release_sdk_python() {
@@ -235,8 +216,7 @@ function release_sdk_python() {
     # Update version in pyproject.toml
     update_version "$ROOT_DIR/sdk/python/pyproject.toml" "$version"
     
-    # Update changelog
-    update_changelog "Python SDK" "$version"
+ "Python SDK" "$version"
     
     # Commit changes
     git add -A
@@ -247,9 +227,8 @@ function release_sdk_python() {
     
     echo -e "${GREEN}✅ Python SDK release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin sdk-python-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin sdk-python-v$version"
 }
 
 function release_sdk_go() {
@@ -263,8 +242,7 @@ function release_sdk_go() {
         exit 1
     fi
     
-    # Update changelog
-    update_changelog "Go SDK" "$version"
+ "Go SDK" "$version"
     
     # Note: Go modules use git tags for versioning, no file to update
     
@@ -277,9 +255,8 @@ function release_sdk_go() {
     
     echo -e "${GREEN}✅ Go SDK release prepared!${NC}"
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Review and update CHANGELOG.md"
-    echo "  2. Push changes: git push origin main"
-    echo "  3. Push tag: git push origin sdk-go-v$version"
+    echo "  1. Push changes: git push origin main"
+    echo "  2. Push tag: git push origin sdk-go-v$version"
 }
 
 # Main script
