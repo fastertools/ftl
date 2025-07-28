@@ -1,6 +1,6 @@
 pub mod add;
-pub mod app;
 pub mod auth;
+pub mod r#box;
 pub mod build;
 pub mod deploy;
 pub mod init;

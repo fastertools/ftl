@@ -595,7 +595,7 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
     let manifest_path = Path::new("spin.toml");
 
     if !manifest_path.exists() {
-        anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
+        anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
     }
 
     let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
@@ -689,7 +689,7 @@ async fn update_tools_in_project(
     let manifest_path = Path::new("spin.toml");
 
     if !manifest_path.exists() {
-        anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
+        anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
     }
 
     let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
@@ -754,7 +754,7 @@ fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) ->
     let manifest_path = Path::new("spin.toml");
 
     if !manifest_path.exists() {
-        anyhow::bail!("No spin.toml found. Run this command from an FTL project directory.");
+        anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
     }
 
     let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;

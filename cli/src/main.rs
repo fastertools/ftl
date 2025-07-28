@@ -15,36 +15,28 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize a new FTL project
+    /// Initialize a new FTL toolbox
     Init(InitArgs),
-    /// Build a Spin application
+    /// Build a toolbox
     Build(BuildArgs),
-    /// Deploy a Spin application
-    Deploy(DeployArgs),
     /// Start the Spin development server
     Up(UpArgs),
     /// Publish a component to the registry
     Publish(PublishArgs),
-    /// Authenticate with FTL Edge
-    Auth(AuthArgs),
     /// Set up FTL dependencies
     Setup(SetupArgs),
     /// Update FTL CLI to the latest version
     Update(UpdateArgs),
-    /// Add new components to your project
+    /// Add new components to your toolbox
     Add(AddArgs),
-    /// Log in to FTL Edge
-    Login(LoginArgs),
-    /// Log out from FTL Edge
-    Logout(LogoutArgs),
-    /// Run tests for your FTL project
+    /// Run tests for your toolbox
     Test(TestArgs),
-    /// Manage applications
-    App(AppArgs),
     /// Manage FTL component registry
     Registry(RegistryArgs),
-    /// Manage pre-built tools
+    /// Manage pre-built tool components
     Tools(ToolsArgs),
+    /// Manage remote tools on FTL Boxes
+    Box(BoxArgs),
 }
 
 // Simple command wrappers - just forward arguments
@@ -60,7 +52,7 @@ struct InitArgs {
 
 #[derive(Debug, Args)]
 struct BuildArgs {
-    /// Path to the Spin application
+    /// Path to the toolbox
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Build in release mode
@@ -69,11 +61,8 @@ struct BuildArgs {
 }
 
 #[derive(Debug, Args)]
-struct DeployArgs {}
-
-#[derive(Debug, Args)]
 struct UpArgs {
-    /// Path to the Spin application
+    /// Path to the toolbox
     path: Option<PathBuf>,
     /// Port to listen on
     #[arg(short, long)]
@@ -100,18 +89,6 @@ struct PublishArgs {
     /// Tag for the published image
     #[arg(short, long)]
     tag: Option<String>,
-}
-
-#[derive(Debug, Args)]
-struct AuthArgs {
-    #[command(subcommand)]
-    command: AuthCommand,
-}
-
-#[derive(Debug, Clone, Subcommand)]
-enum AuthCommand {
-    /// Show authentication status
-    Status,
 }
 
 #[derive(Debug, Args)]
@@ -146,22 +123,6 @@ struct AddArgs {
 }
 
 #[derive(Debug, Args)]
-struct LoginArgs {
-    /// Don't open browser automatically
-    #[arg(long)]
-    no_browser: bool,
-    /// `AuthKit` domain (for testing)
-    #[arg(long, hide = true)]
-    authkit_domain: Option<String>,
-    /// OAuth client ID (for testing)
-    #[arg(long, hide = true)]
-    client_id: Option<String>,
-}
-
-#[derive(Debug, Args)]
-struct LogoutArgs {}
-
-#[derive(Debug, Args)]
 struct TestArgs {
     /// Path to the project directory
     #[arg(short, long)]
@@ -169,6 +130,65 @@ struct TestArgs {
 }
 
 // Complex commands with subcommands
+
+#[derive(Debug, Args)]
+struct BoxArgs {
+    #[command(subcommand)]
+    command: BoxCommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum BoxCommand {
+    /// Log in to FTL Boxes
+    Login {
+        /// Don't open browser automatically
+        #[arg(long)]
+        no_browser: bool,
+        /// `AuthKit` domain (for testing)
+        #[arg(long, hide = true)]
+        authkit_domain: Option<String>,
+        /// OAuth client ID (for testing)
+        #[arg(long, hide = true)]
+        client_id: Option<String>,
+    },
+    /// Log out from FTL Boxes
+    Logout,
+    /// Manage authentication
+    Auth {
+        #[command(subcommand)]
+        command: BoxAuthCommand,
+    },
+    /// Deploy a box to FTL Boxes
+    Deploy,
+    /// List all boxes
+    List {
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Get box status
+    Status {
+        /// Box ID or name
+        box_id: String,
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Delete a box
+    Delete {
+        /// Box ID or name
+        box_id: String,
+        /// Force deletion without confirmation
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum BoxAuthCommand {
+    /// Show authentication status
+    Status,
+}
 
 #[derive(Debug, Args)]
 struct SetupArgs {
@@ -197,38 +217,6 @@ enum SetupCommand {
         /// Tar file URL
         #[arg(long, conflicts_with_all = ["git", "dir"])]
         tar: Option<String>,
-    },
-}
-
-#[derive(Debug, Args)]
-struct AppArgs {
-    #[command(subcommand)]
-    command: AppCommand,
-}
-
-#[derive(Debug, Clone, Subcommand)]
-enum AppCommand {
-    /// List all applications
-    List {
-        /// Output format
-        #[arg(short, long, value_enum, default_value = "table")]
-        format: OutputFormat,
-    },
-    /// Get application status
-    Status {
-        /// Application ID or name
-        app_id: String,
-        /// Output format
-        #[arg(short, long, value_enum, default_value = "table")]
-        format: OutputFormat,
-    },
-    /// Delete an application
-    Delete {
-        /// Application ID or name
-        app_id: String,
-        /// Force deletion without confirmation
-        #[arg(short, long)]
-        force: bool,
     },
 }
 
@@ -354,12 +342,6 @@ impl From<BuildArgs> for ftl_commands::build::BuildArgs {
     }
 }
 
-impl From<DeployArgs> for ftl_commands::deploy::DeployArgs {
-    fn from(_args: DeployArgs) -> Self {
-        Self {}
-    }
-}
-
 impl From<UpArgs> for ftl_commands::up::UpArgs {
     fn from(args: UpArgs) -> Self {
         Self {
@@ -378,22 +360,6 @@ impl From<PublishArgs> for ftl_commands::publish::PublishArgs {
             path: args.path,
             registry: args.registry,
             tag: args.tag,
-        }
-    }
-}
-
-impl From<AuthCommand> for ftl_commands::auth::AuthCommand {
-    fn from(cmd: AuthCommand) -> Self {
-        match cmd {
-            AuthCommand::Status => Self::Status,
-        }
-    }
-}
-
-impl From<AuthArgs> for ftl_commands::auth::AuthArgs {
-    fn from(args: AuthArgs) -> Self {
-        Self {
-            command: args.command.into(),
         }
     }
 }
@@ -418,25 +384,27 @@ impl From<AddArgs> for ftl_commands::add::AddArgs {
     }
 }
 
-impl From<LoginArgs> for ftl_commands::login::LoginArgs {
-    fn from(args: LoginArgs) -> Self {
-        Self {
-            no_browser: args.no_browser,
-            authkit_domain: args.authkit_domain,
-            client_id: args.client_id,
+impl From<TestArgs> for ftl_commands::test::TestArgs {
+    fn from(args: TestArgs) -> Self {
+        Self { path: args.path }
+    }
+}
+
+// Box command conversions
+impl From<BoxAuthCommand> for ftl_commands::auth::AuthCommand {
+    fn from(cmd: BoxAuthCommand) -> Self {
+        match cmd {
+            BoxAuthCommand::Status => Self::Status,
         }
     }
 }
 
-impl From<LogoutArgs> for ftl_commands::logout::LogoutArgs {
-    fn from(_args: LogoutArgs) -> Self {
-        Self {}
-    }
-}
-
-impl From<TestArgs> for ftl_commands::test::TestArgs {
-    fn from(args: TestArgs) -> Self {
-        Self { path: args.path }
+impl From<OutputFormat> for ftl_commands::r#box::OutputFormat {
+    fn from(fmt: OutputFormat) -> Self {
+        match fmt {
+            OutputFormat::Table => Self::Table,
+            OutputFormat::Json => Self::Json,
+        }
     }
 }
 
@@ -463,38 +431,6 @@ impl From<SetupCommand> for ftl_commands::setup::SetupCommand {
 
 impl From<SetupArgs> for ftl_commands::setup::SetupArgs {
     fn from(args: SetupArgs) -> Self {
-        Self {
-            command: args.command.into(),
-        }
-    }
-}
-
-impl From<OutputFormat> for ftl_commands::app::OutputFormat {
-    fn from(fmt: OutputFormat) -> Self {
-        match fmt {
-            OutputFormat::Table => Self::Table,
-            OutputFormat::Json => Self::Json,
-        }
-    }
-}
-
-impl From<AppCommand> for ftl_commands::app::AppCommand {
-    fn from(cmd: AppCommand) -> Self {
-        match cmd {
-            AppCommand::List { format } => Self::List {
-                format: format.into(),
-            },
-            AppCommand::Status { app_id, format } => Self::Status {
-                app_id,
-                format: format.into(),
-            },
-            AppCommand::Delete { app_id, force } => Self::Delete { app_id, force },
-        }
-    }
-}
-
-impl From<AppArgs> for ftl_commands::app::AppArgs {
-    fn from(args: AppArgs) -> Self {
         Self {
             command: args.command.into(),
         }
@@ -572,6 +508,63 @@ impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
     }
 }
 
+async fn handle_box_command(args: BoxArgs) -> Result<()> {
+    match args.command {
+        BoxCommand::Login {
+            no_browser,
+            authkit_domain,
+            client_id,
+        } => {
+            let login_args = ftl_commands::login::LoginArgs {
+                no_browser,
+                authkit_domain,
+                client_id,
+            };
+            ftl_commands::login::execute(login_args).await
+        }
+        BoxCommand::Logout => {
+            let logout_args = ftl_commands::logout::LogoutArgs {};
+            ftl_commands::logout::execute(logout_args).await
+        }
+        BoxCommand::Auth { command } => {
+            let auth_args = ftl_commands::auth::AuthArgs {
+                command: command.into(),
+            };
+            ftl_commands::auth::execute(auth_args).await
+        }
+        BoxCommand::Deploy => {
+            let deploy_args = ftl_commands::deploy::DeployArgs {};
+            ftl_commands::deploy::execute(deploy_args).await
+        }
+        BoxCommand::List { format } => {
+            let box_args = ftl_commands::r#box::BoxArgs {
+                command: ftl_commands::r#box::BoxCommand::List {
+                    format: format.into(),
+                },
+            };
+            ftl_commands::r#box::execute(box_args).await
+        }
+        BoxCommand::Status { box_id, format } => {
+            let box_args = ftl_commands::r#box::BoxArgs {
+                command: ftl_commands::r#box::BoxCommand::Status {
+                    app_id: box_id,
+                    format: format.into(),
+                },
+            };
+            ftl_commands::r#box::execute(box_args).await
+        }
+        BoxCommand::Delete { box_id, force } => {
+            let box_args = ftl_commands::r#box::BoxArgs {
+                command: ftl_commands::r#box::BoxCommand::Delete {
+                    app_id: box_id,
+                    force,
+                },
+            };
+            ftl_commands::r#box::execute(box_args).await
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -586,18 +579,14 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Init(args) => ftl_commands::init::execute(args.into()).await,
         Commands::Build(args) => ftl_commands::build::execute(args.into()).await,
-        Commands::Deploy(args) => ftl_commands::deploy::execute(args.into()).await,
         Commands::Up(args) => ftl_commands::up::execute(args.into()).await,
         Commands::Publish(args) => ftl_commands::publish::execute(args.into()).await,
-        Commands::Auth(args) => ftl_commands::auth::execute(args.into()).await,
         Commands::Setup(args) => ftl_commands::setup::execute(args.into()).await,
         Commands::Update(args) => ftl_commands::update::execute(args.into()).await,
         Commands::Add(args) => ftl_commands::add::execute(args.into()).await,
-        Commands::Login(args) => ftl_commands::login::execute(args.into()).await,
-        Commands::Logout(args) => ftl_commands::logout::execute(args.into()).await,
         Commands::Test(args) => ftl_commands::test::execute(args.into()).await,
-        Commands::App(args) => ftl_commands::app::execute(args.into()).await,
         Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
+        Commands::Box(args) => handle_box_command(args).await,
     }
 }
