@@ -195,81 +195,15 @@ jobs:
               ;;
           esac
       
-      - name: Generate changelog entry
-        id: changelog
+      - name: Store release info
+        id: release_info
         run: |
           COMPONENT="${{ inputs.component }}"
-          CURRENT_VERSION="${{ steps.version.outputs.current }}"
           NEW_VERSION="${{ steps.version.outputs.new }}"
-          DATE=$(date +%Y-%m-%d)
           
-          # Get commit messages since last release
-          case "$COMPONENT" in
-            cli)
-              TAG_PREFIX="cli-v"
-              COMPONENT_NAME="CLI"
-              ;;
-            sdk-rust)
-              TAG_PREFIX="sdk-rust-v"
-              COMPONENT_NAME="Rust SDK"
-              ;;
-            sdk-typescript)
-              TAG_PREFIX="sdk-typescript-v"
-              COMPONENT_NAME="TypeScript SDK"
-              ;;
-            mcp-authorizer|mcp-gateway)
-              TAG_PREFIX="component-${COMPONENT}-v"
-              COMPONENT_NAME="$COMPONENT"
-              ;;
-          esac
-          
-          # Find last release tag
-          LAST_TAG=$(git tag -l "${TAG_PREFIX}*" --sort=-v:refname | head -1)
-          if [ -z "$LAST_TAG" ]; then
-            LAST_TAG=$(git rev-list --max-parents=0 HEAD)
-          fi
-          
-          # Generate changelog
-          {
-            echo "## [$COMPONENT_NAME] $NEW_VERSION - $DATE"
-            echo ""
-            echo "### Changes"
-            echo ""
-            
-            # Group commits by type
-            git log "$LAST_TAG"..HEAD --pretty=format:"%s" | while read -r commit; do
-              if [[ $commit == feat:* ]] || [[ $commit == feat\(*\):* ]]; then
-                echo "- ✨ $commit"
-              elif [[ $commit == fix:* ]] || [[ $commit == fix\(*\):* ]]; then
-                echo "- 🐛 $commit"
-              elif [[ $commit == chore:* ]] || [[ $commit == chore\(*\):* ]]; then
-                echo "- 🔧 $commit"
-              elif [[ $commit == docs:* ]] || [[ $commit == docs\(*\):* ]]; then
-                echo "- 📚 $commit"
-              else
-                echo "- $commit"
-              fi
-            done | sort -u
-            
-            echo ""
-            echo "### Contributors"
-            echo ""
-            git log "$LAST_TAG"..HEAD --pretty=format:"%an" | sort -u | while read -r author; do
-              echo "- $author"
-            done
-          } > RELEASE_NOTES.md
-          
-          # Store for PR body
-          CHANGELOG=$(cat RELEASE_NOTES.md)
-          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-      
-      - name: Update changelog file
-        run: |
-          # This would update CHANGELOG.md - for now just show what would be added
-          echo "Would add the following to CHANGELOG.md:"
-          cat RELEASE_NOTES.md
+          # Store component info for PR body
+          echo "COMPONENT=$COMPONENT" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
       
       - name: Commit changes
         run: |
@@ -323,13 +257,13 @@ jobs:
           ### 📋 Checklist
           
           - [ ] Version bumped correctly
-          - [ ] Changelog updated
+          - [ ] Changes are ready for release
           - [ ] All tests passing
           - [ ] Documentation updated if needed
           
           ### 📝 Release Notes
           
-          $CHANGELOG
+          GitHub will automatically generate release notes from the commits and pull requests included in this release.
           
           ### 🔄 Release Process
           
@@ -343,7 +277,7 @@ jobs:
           ### ⚠️ Important
           
           - Ensure all CI checks pass before merging
-          - Review the changelog for accuracy
+          - Review the included changes
           - Verify version numbers are correct
           - **DO NOT** manually create the tag - it will be created automatically when merged
           EOF
