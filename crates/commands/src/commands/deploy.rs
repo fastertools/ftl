@@ -1,6 +1,5 @@
 //! Refactored deploy command with dependency injection for testability
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -9,7 +8,7 @@ use base64::{Engine as _, engine::general_purpose};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use ftl_runtime::api_client::{error::ConversionError, types};
+use ftl_runtime::api_client::types;
 use ftl_runtime::deps::{
     AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem, FtlApiClient,
     MessageStyle, UserInterface,
@@ -121,9 +120,9 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     spinner.set_message("Getting registry credentials...");
     let ecr_creds = deps
         .api_client
-        .get_ecr_credentials()
+        .create_ecr_token()
         .await
-        .map_err(|e| anyhow!("Failed to get ECR credentials: {}", e))?;
+        .map_err(|e| anyhow!("Failed to get ECR token: {}", e))?;
 
     // Docker login to ECR
     spinner.set_message("Logging into registry...");
@@ -156,7 +155,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     deps.ui.print("");
     deps.ui
         .print_styled("✓ Deployment successful!", MessageStyle::Success);
-    if let Some(deployment_url) = deployment.deployment_url {
+    if let Some(deployment_url) = deployment.provider_url {
         deps.ui.print("");
         deps.ui.print(&format!("  MCP URL: {deployment_url}"));
         deps.ui.print("");
@@ -266,7 +265,7 @@ pub fn extract_component_version(
 
 async fn docker_login(
     command_executor: &Arc<dyn CommandExecutor>,
-    ecr_creds: &types::GetEcrCredentialsResponse,
+    ecr_creds: &types::CreateEcrTokenResponse,
 ) -> Result<()> {
     // ECR authorization tokens are base64 encoded "AWS:password"
     let decoded = general_purpose::STANDARD
@@ -303,7 +302,7 @@ async fn docker_login(
 async fn create_repositories_and_push_with_progress(
     components: &[ComponentInfo],
     deps: Arc<DeployDependencies>,
-) -> Result<Vec<types::DeploymentRequestToolsItem>> {
+) -> Result<Vec<types::CreateDeploymentRequestToolsItem>> {
     // Check if wkg is available before starting
     deps.command_executor
         .check_command_exists("wkg")
@@ -331,7 +330,7 @@ async fn create_repositories_and_push_with_progress(
     for component in components {
         let pb = multi_progress.add_spinner();
         pb.set_prefix(format!("[{}]", component.name));
-        pb.set_message("Creating repository...");
+        pb.set_message("Verifying repository...");
         pb.enable_steady_tick(deps.clock.duration_from_millis(100));
 
         let component = component.clone();
@@ -353,15 +352,11 @@ async fn create_repositories_and_push_with_progress(
             let start = deps.clock.now();
 
             // Create repository
-            pb.set_message("Creating repository...");
+            pb.set_message("Verifying repository...");
             let repo_response = match deps
                 .api_client
                 .create_ecr_repository(&types::CreateEcrRepositoryRequest {
-                    tool_name: component
-                        .name
-                        .as_str()
-                        .try_into()
-                        .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
+                    tool_name: component.name.as_str().try_into()?,
                 })
                 .await
             {
@@ -405,19 +400,18 @@ async fn create_repositories_and_push_with_progress(
 
             // Add to deployed tools
             let mut tools = deployed_tools.lock().await;
-            tools.push(types::DeploymentRequestToolsItem {
+            tools.push(types::CreateDeploymentRequestToolsItem {
                 name: component
                     .name
                     .as_str()
                     .try_into()
-                    .map_err(|e: ConversionError| anyhow!("Invalid tool name: {}", e))?,
+                    .map_err(|e| anyhow!("Invalid tool name: {}", e))?,
                 tag: component
                     .version
                     .as_str()
                     .try_into()
-                    .map_err(|e: ConversionError| anyhow!("Invalid tag: {}", e))?,
+                    .map_err(|e| anyhow!("Invalid tag: {}", e))?,
                 allowed_hosts: component.allowed_hosts.clone().unwrap_or_default(),
-                component_uri: None,
             });
 
             let duration = start.elapsed();
@@ -453,12 +447,11 @@ async fn create_repositories_and_push_with_progress(
     Ok(tools)
 }
 
-#[allow(clippy::too_many_lines)]
-async fn poll_deployment_status_with_progress(
+async fn poll_app_deployment_status_with_progress(
     deps: Arc<DeployDependencies>,
-    deployment_id: &str,
+    app_id: &str,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
-) -> Result<types::DeploymentStatusDeployment> {
+) -> Result<types::App> {
     let max_attempts = 60; // 5 minutes with 5-second intervals
     let mut attempts = 0;
 
@@ -468,71 +461,46 @@ async fn poll_deployment_status_with_progress(
             return Err(anyhow!("Deployment timeout after 5 minutes"));
         }
 
-        let status_response = match deps.api_client.get_deployment_status(deployment_id).await {
-            Ok(resp) => resp,
+        let app = match deps.api_client.get_app(app_id).await {
+            Ok(app) => app,
             Err(e) => {
                 spinner.finish_and_clear();
-                return Err(anyhow!("Failed to get deployment status: {}", e));
+                return Err(anyhow!("Failed to get app status: {}", e));
             }
         };
 
-        let deployment = status_response.deployment;
-
-        // Update spinner message based on status and stages
-        let stages = &deployment.stages;
-        let status_msg = if stages.is_empty() {
-            format!("Status: {}", deployment.status)
-        } else {
-            // Find the current stage (first non-completed stage)
-            let current_stage = stages
-                .iter()
-                .find(|s| {
-                    !matches!(
-                        s.status,
-                        types::DeploymentStatusDeploymentStagesItemStatus::Completed
-                    )
-                })
-                .or(stages.last());
-
-            if let Some(stage) = current_stage {
-                match &stage.stage {
-                    types::DeploymentStatusDeploymentStagesItemStage::ImageBuild => {
-                        "Building container image...".to_string()
-                    }
-                    types::DeploymentStatusDeploymentStagesItemStage::PlatformUpload => {
-                        "Uploading to platform...".to_string()
-                    }
-                    types::DeploymentStatusDeploymentStagesItemStage::PlatformDeploy => {
-                        "Deploying application...".to_string()
-                    }
-                    types::DeploymentStatusDeploymentStagesItemStage::Validation => {
-                        "Validating deployment...".to_string()
-                    }
-                }
-            } else {
-                "Processing deployment...".to_string()
-            }
+        // Update spinner message based on status
+        let status_msg = match &app.status {
+            types::AppStatus::Pending => "Initializing deployment...",
+            types::AppStatus::Creating => "Deploying...",
+            types::AppStatus::Active => "Deployment succeeded!",
+            types::AppStatus::Failed => "Deployment failed",
+            types::AppStatus::Deleting => "Application is being deleted",
+            types::AppStatus::Deleted => "Application has been deleted",
         };
 
-        spinner.set_message(&status_msg);
+        spinner.set_message(status_msg);
 
-        match deployment.status {
-            types::DeploymentStatusDeploymentStatus::Deployed => {
+        match app.status {
+            types::AppStatus::Active => {
                 spinner.finish_and_clear();
-                return Ok(deployment);
+                return Ok(app);
             }
-            types::DeploymentStatusDeploymentStatus::Failed
-            | types::DeploymentStatusDeploymentStatus::Cancelled => {
+            types::AppStatus::Failed => {
                 spinner.finish_and_clear();
-                let error_msg = deployment
-                    .error
+                let error_msg = app
+                    .provider_error
                     .as_deref()
                     .unwrap_or("Deployment failed")
                     .to_string();
                 return Err(anyhow!("Deployment failed: {}", error_msg));
             }
-            _ => {
-                // Continue polling for other statuses
+            types::AppStatus::Deleted | types::AppStatus::Deleting => {
+                spinner.finish_and_clear();
+                return Err(anyhow!("App was deleted during deployment"));
+            }
+            types::AppStatus::Pending | types::AppStatus::Creating => {
+                // Continue polling for pending/creating statuses
                 deps.async_runtime
                     .sleep(deps.clock.duration_from_secs(5))
                     .await;
@@ -545,25 +513,59 @@ async fn poll_deployment_status_with_progress(
 async fn deploy_to_ftl_with_progress(
     deps: Arc<DeployDependencies>,
     app_name: String,
-    tools: Vec<types::DeploymentRequestToolsItem>,
+    tools: Vec<types::CreateDeploymentRequestToolsItem>,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
-) -> Result<types::DeploymentStatusDeployment> {
-    let request_body = types::DeploymentRequest {
-        app_name: app_name
-            .as_str()
-            .try_into()
-            .map_err(|e: ConversionError| anyhow!("Invalid app name: {}", e))?,
+) -> Result<types::App> {
+    // First check if app exists
+    spinner.set_message("Checking if app exists...");
+    let existing_apps = deps
+        .api_client
+        .list_apps(None, None, Some(&app_name))
+        .await
+        .map_err(|e| {
+            spinner.finish_and_clear();
+            anyhow!("Failed to check existing apps: {}", e)
+        })?;
+
+    let app_id = if existing_apps.apps.is_empty() {
+        // App doesn't exist, create it first
+        spinner.set_message("Creating application...");
+        let create_app_request = types::CreateAppRequest {
+            app_name: app_name
+                .as_str()
+                .try_into()
+                .map_err(|e| anyhow!("Invalid app name: {}", e))?,
+        };
+
+        let create_response = deps
+            .api_client
+            .create_app(&create_app_request)
+            .await
+            .map_err(|e| {
+                spinner.finish_and_clear();
+                anyhow!("Failed to create app: {}", e)
+            })?;
+
+        create_response.app_id
+    } else {
+        // App exists, use its ID
+        existing_apps.apps[0].app_id
+    };
+
+    // Now create the deployment
+    spinner.set_message("Creating deployment...");
+    let deployment_request = types::CreateDeploymentRequest {
         tools,
-        variables: HashMap::default(),
+        variables: std::collections::HashMap::new(),
     };
 
     let deployment_response = deps
         .api_client
-        .deploy_app(&request_body)
+        .create_deployment(&app_id.to_string(), &deployment_request)
         .await
         .map_err(|e| {
             spinner.finish_and_clear();
-            anyhow!("Failed to start deployment: {}", e)
+            anyhow!("Failed to create deployment: {}", e)
         })?;
 
     // Update spinner with deployment ID
@@ -572,13 +574,8 @@ async fn deploy_to_ftl_with_progress(
         &deployment_response.deployment_id
     ));
 
-    // Poll for deployment status
-    poll_deployment_status_with_progress(
-        deps,
-        &deployment_response.deployment_id.to_string(),
-        spinner,
-    )
-    .await
+    // Poll the app status to know when deployment is complete
+    poll_app_deployment_status_with_progress(deps, &app_id.to_string(), spinner).await
 }
 
 /// Deploy command arguments (matches CLI parser)

@@ -216,16 +216,16 @@ enum AppCommand {
     },
     /// Get application status
     Status {
-        /// Application name
-        app_name: String,
+        /// Application ID or name
+        app_id: String,
         /// Output format
         #[arg(short, long, value_enum, default_value = "table")]
         format: OutputFormat,
     },
     /// Delete an application
     Delete {
-        /// Application name
-        app_name: String,
+        /// Application ID or name
+        app_id: String,
         /// Force deletion without confirmation
         #[arg(short, long)]
         force: bool,
@@ -484,11 +484,11 @@ impl From<AppCommand> for ftl_commands::app::AppCommand {
             AppCommand::List { format } => Self::List {
                 format: format.into(),
             },
-            AppCommand::Status { app_name, format } => Self::Status {
-                app_name,
+            AppCommand::Status { app_id, format } => Self::Status {
+                app_id,
                 format: format.into(),
             },
-            AppCommand::Delete { app_name, force } => Self::Delete { app_name, force },
+            AppCommand::Delete { app_id, force } => Self::Delete { app_id, force },
         }
     }
 }

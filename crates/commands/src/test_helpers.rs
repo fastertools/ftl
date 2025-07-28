@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use base64::Engine;
 use mockall::mock;
@@ -315,18 +315,341 @@ impl ProcessManager for MockProcessManagerMock {
 //     .times(1)
 //     .returning(|_req| Ok(test_deployment_response("test-deployment-id")));
 // ```
-mock! {
-    pub FtlApiClientMock {}
+// Type aliases to simplify complex function signatures
+type CreateAppFn =
+    Box<dyn Fn(&types::CreateAppRequest) -> Result<types::CreateAppResponse> + Send + Sync>;
+type ListAppsFn = Box<
+    dyn Fn(
+            Option<std::num::NonZeroU64>,
+            Option<&str>,
+            Option<&str>,
+        ) -> Result<types::ListAppsResponse>
+        + Send
+        + Sync,
+>;
+type GetAppFn = Box<dyn Fn(&str) -> Result<types::App> + Send + Sync>;
+type DeleteAppFn = Box<dyn Fn(&str) -> Result<types::DeleteAppResponse> + Send + Sync>;
+type CreateDeploymentFn = Box<
+    dyn Fn(&str, &types::CreateDeploymentRequest) -> Result<types::CreateDeploymentResponse>
+        + Send
+        + Sync,
+>;
+type CreateEcrRepositoryFn = Box<
+    dyn Fn(&types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>
+        + Send
+        + Sync,
+>;
+type CreateEcrTokenFn = Box<dyn Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
 
-    #[async_trait]
-    impl FtlApiClient for FtlApiClientMock {
-        async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse>;
-        async fn create_ecr_repository(&self, request: &types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>;
-        async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus>;
-        async fn deploy_app(&self, request: &types::DeploymentRequest) -> Result<types::DeploymentResponse>;
-        async fn list_apps(&self) -> Result<types::ListAppsResponse>;
-        async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse>;
-        async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse>;
+/// Manual mock implementation for `FtlApiClient` due to mockall issues with async traits and references.
+///
+/// This mock allows setting up expectations for each method of the `FtlApiClient` trait.
+/// Each method can have a custom implementation provided via the `expect_*` methods.
+pub struct MockFtlApiClientMock {
+    create_app: Arc<Mutex<Option<CreateAppFn>>>,
+    list_apps: Arc<Mutex<Option<ListAppsFn>>>,
+    get_app: Arc<Mutex<Option<GetAppFn>>>,
+    delete_app: Arc<Mutex<Option<DeleteAppFn>>>,
+    create_deployment: Arc<Mutex<Option<CreateDeploymentFn>>>,
+    create_ecr_repository: Arc<Mutex<Option<CreateEcrRepositoryFn>>>,
+    create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
+}
+
+impl Default for MockFtlApiClientMock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MockFtlApiClientMock {
+    /// Creates a new instance of the mock API client
+    pub fn new() -> Self {
+        Self {
+            create_app: Arc::new(Mutex::new(None)),
+            list_apps: Arc::new(Mutex::new(None)),
+            get_app: Arc::new(Mutex::new(None)),
+            delete_app: Arc::new(Mutex::new(None)),
+            create_deployment: Arc::new(Mutex::new(None)),
+            create_ecr_repository: Arc::new(Mutex::new(None)),
+            create_ecr_token: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Set up expectation for `create_app` method
+    pub fn expect_create_app(&mut self) -> CreateAppExpectation {
+        CreateAppExpectation { mock: self }
+    }
+
+    /// Set up expectation for `list_apps` method
+    pub fn expect_list_apps(&mut self) -> ListAppsExpectation {
+        ListAppsExpectation { mock: self }
+    }
+
+    /// Set up expectation for `get_app` method
+    pub fn expect_get_app(&mut self) -> GetAppExpectation {
+        GetAppExpectation { mock: self }
+    }
+
+    /// Set up expectation for `delete_app` method
+    pub fn expect_delete_app(&mut self) -> DeleteAppExpectation {
+        DeleteAppExpectation { mock: self }
+    }
+
+    /// Set up expectation for `create_deployment` method
+    pub fn expect_create_deployment(&mut self) -> CreateDeploymentExpectation {
+        CreateDeploymentExpectation { mock: self }
+    }
+
+    /// Set up expectation for `create_ecr_repository` method
+    pub fn expect_create_ecr_repository(&mut self) -> CreateEcrRepositoryExpectation {
+        CreateEcrRepositoryExpectation { mock: self }
+    }
+
+    /// Set up expectation for `create_ecr_token` method
+    pub fn expect_create_ecr_token(&mut self) -> CreateEcrTokenExpectation {
+        CreateEcrTokenExpectation { mock: self }
+    }
+}
+
+// Expectation builders
+/// Expectation builder for `create_app` method
+pub struct CreateAppExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> CreateAppExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&types::CreateAppRequest) -> Result<types::CreateAppResponse> + Send + Sync + 'static,
+    {
+        *self.mock.create_app.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `list_apps` method
+pub struct ListAppsExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> ListAppsExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(
+                Option<std::num::NonZeroU64>,
+                Option<&str>,
+                Option<&str>,
+            ) -> Result<types::ListAppsResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.list_apps.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `get_app` method
+pub struct GetAppExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> GetAppExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str) -> Result<types::App> + Send + Sync + 'static,
+    {
+        *self.mock.get_app.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `delete_app` method
+pub struct DeleteAppExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> DeleteAppExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str) -> Result<types::DeleteAppResponse> + Send + Sync + 'static,
+    {
+        *self.mock.delete_app.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `create_deployment` method
+pub struct CreateDeploymentExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> CreateDeploymentExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str, &types::CreateDeploymentRequest) -> Result<types::CreateDeploymentResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.create_deployment.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `create_ecr_repository` method
+pub struct CreateEcrRepositoryExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> CreateEcrRepositoryExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.create_ecr_repository.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `create_ecr_token` method
+pub struct CreateEcrTokenExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> CreateEcrTokenExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
+    {
+        *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+#[async_trait]
+impl FtlApiClient for MockFtlApiClientMock {
+    async fn create_app(
+        &self,
+        request: &types::CreateAppRequest,
+    ) -> Result<types::CreateAppResponse> {
+        if let Some(ref f) = *self.create_app.lock().unwrap() {
+            f(request)
+        } else {
+            Err(anyhow!("create_app not mocked"))
+        }
+    }
+
+    async fn list_apps(
+        &self,
+        limit: Option<std::num::NonZeroU64>,
+        next_token: Option<&str>,
+        name: Option<&str>,
+    ) -> Result<types::ListAppsResponse> {
+        if let Some(ref f) = *self.list_apps.lock().unwrap() {
+            f(limit, next_token, name)
+        } else {
+            Err(anyhow!("list_apps not mocked"))
+        }
+    }
+
+    async fn get_app(&self, app_id: &str) -> Result<types::App> {
+        if let Some(ref f) = *self.get_app.lock().unwrap() {
+            f(app_id)
+        } else {
+            Err(anyhow!("get_app not mocked"))
+        }
+    }
+
+    async fn delete_app(&self, app_id: &str) -> Result<types::DeleteAppResponse> {
+        if let Some(ref f) = *self.delete_app.lock().unwrap() {
+            f(app_id)
+        } else {
+            Err(anyhow!("delete_app not mocked"))
+        }
+    }
+
+    async fn create_deployment(
+        &self,
+        app_id: &str,
+        request: &types::CreateDeploymentRequest,
+    ) -> Result<types::CreateDeploymentResponse> {
+        if let Some(ref f) = *self.create_deployment.lock().unwrap() {
+            f(app_id, request)
+        } else {
+            Err(anyhow!("create_deployment not mocked"))
+        }
+    }
+
+    async fn create_ecr_repository(
+        &self,
+        request: &types::CreateEcrRepositoryRequest,
+    ) -> Result<types::CreateEcrRepositoryResponse> {
+        if let Some(ref f) = *self.create_ecr_repository.lock().unwrap() {
+            f(request)
+        } else {
+            Err(anyhow!("create_ecr_repository not mocked"))
+        }
+    }
+
+    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
+        if let Some(ref f) = *self.create_ecr_token.lock().unwrap() {
+            f()
+        } else {
+            Err(anyhow!("create_ecr_token not mocked"))
+        }
     }
 }
 
@@ -440,12 +763,14 @@ pub struct CheckCommandExistsExpectation<'a> {
 
 impl<'a> CheckCommandExistsExpectation<'a> {
     /// Adds a matcher predicate for this expectation (currently unused but kept for API compatibility).
+    /// Specifies how many times this expectation should be called (currently unused)
     #[must_use]
     pub fn with<P>(self, _p: P) -> Self {
         self
     }
 
     /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    /// Specifies how many times this expectation should be called (currently unused)
     #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
@@ -499,7 +824,7 @@ impl<'a> ExecuteExpectation<'a> {
         self
     }
 
-    /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    /// Specifies how many times this expectation should be called (currently unused)
     #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
@@ -549,7 +874,7 @@ impl<'a> ExecuteWithStdinExpectation<'a> {
         self
     }
 
-    /// Specifies how many times this expectation should be called (currently unused but kept for API compatibility).
+    /// Specifies how many times this expectation should be called (currently unused)
     #[must_use]
     pub fn times(self, _n: usize) -> Self {
         self
@@ -667,99 +992,13 @@ pub fn test_credentials() -> StoredCredentials {
 /// assert!(ecr_creds.authorization_token.len() > 0);
 /// ```
 #[allow(dead_code)]
-pub fn test_ecr_credentials() -> types::GetEcrCredentialsResponse {
-    types::GetEcrCredentialsResponse {
+pub fn test_ecr_credentials() -> types::CreateEcrTokenResponse {
+    types::CreateEcrTokenResponse {
         registry_uri: "123456789012.dkr.ecr.us-east-1.amazonaws.com".to_string(),
         authorization_token: base64::engine::general_purpose::STANDARD.encode("AWS:test-password"),
         proxy_endpoint: "https://123456789012.dkr.ecr.us-east-1.amazonaws.com".to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(12),
+        expires_at: (chrono::Utc::now() + chrono::Duration::hours(12)).to_rfc3339(),
         region: "us-east-1".to_string(),
-    }
-}
-
-/// Creates a test deployment response for use in tests.
-///
-/// This function returns a valid `DeploymentResponse` that simulates the initial
-/// response when starting a deployment. If the provided `deployment_id` is not a
-/// valid UUID, a fixed UUID will be used instead.
-///
-/// # Arguments
-///
-/// * `deployment_id` - The deployment ID to use (should be a valid UUID string)
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::test_deployment_response;
-///
-/// let response = test_deployment_response("550e8400-e29b-41d4-a716-446655440000");
-/// assert_eq!(response.app_name, "test-app");
-/// assert_eq!(response.status, types::DeploymentResponseStatus::Initializing);
-/// ```
-#[allow(dead_code)]
-pub fn test_deployment_response(deployment_id: &str) -> types::DeploymentResponse {
-    // Use a fixed UUID if the provided ID is not a valid UUID
-    let uuid = deployment_id
-        .parse()
-        .unwrap_or_else(|_| "550e8400-e29b-41d4-a716-446655440000".parse().unwrap());
-    types::DeploymentResponse {
-        app_name: "test-app".to_string(),
-        deployment_id: uuid,
-        status: types::DeploymentResponseStatus::Initializing,
-        message: "Deployment started".to_string(),
-        status_url: format!("/v1/deployments/{deployment_id}/status"),
-    }
-}
-
-/// Creates a test deployment status for use in tests.
-///
-/// This function returns a valid `DeploymentStatus` that represents the current
-/// state of a deployment. This is typically used to simulate polling deployment
-/// status during tests.
-///
-/// # Arguments
-///
-/// * `deployment_id` - The deployment ID to use (should be a valid UUID string)
-/// * `status` - The deployment status to simulate (e.g., Running, Failed, etc.)
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_commands::test_helpers::test_deployment_status;
-/// use ftl_runtime::api_client::types::DeploymentStatusDeploymentStatus;
-///
-/// let status = test_deployment_status(
-///     "550e8400-e29b-41d4-a716-446655440000",
-///     DeploymentStatusDeploymentStatus::Running
-/// );
-/// assert_eq!(status.deployment.app_name, "test-app");
-/// assert_eq!(status.deployment.status, DeploymentStatusDeploymentStatus::Running);
-/// ```
-#[allow(dead_code)]
-pub fn test_deployment_status(
-    deployment_id: &str,
-    status: types::DeploymentStatusDeploymentStatus,
-) -> types::DeploymentStatus {
-    // Use a fixed UUID if the provided ID is not a valid UUID
-    let uuid = deployment_id
-        .parse()
-        .unwrap_or_else(|_| "550e8400-e29b-41d4-a716-446655440000".parse().unwrap());
-    types::DeploymentStatus {
-        deployment: types::DeploymentStatusDeployment {
-            deployment_id: uuid,
-            app_name: "test-app".to_string(),
-            display_name: "Test App".to_string(),
-            status,
-            deployment_url: Some("https://test-app.example.com".to_string()),
-            image_url: "test-image:latest".to_string(),
-            platform: "Fermyon".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            completed_at: None,
-            error: None,
-            retry_count: 0,
-            stages: vec![],
-        },
     }
 }
 

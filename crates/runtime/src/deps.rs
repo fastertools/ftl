@@ -72,8 +72,32 @@ pub struct CommandOutput {
 /// FTL API client operations
 #[async_trait]
 pub trait FtlApiClient: Send + Sync {
-    /// Get ECR credentials
-    async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse>;
+    /// Create application
+    async fn create_app(
+        &self,
+        request: &types::CreateAppRequest,
+    ) -> Result<types::CreateAppResponse>;
+
+    /// List applications
+    async fn list_apps(
+        &self,
+        limit: Option<std::num::NonZeroU64>,
+        next_token: Option<&str>,
+        name: Option<&str>,
+    ) -> Result<types::ListAppsResponse>;
+
+    /// Get application
+    async fn get_app(&self, app_id: &str) -> Result<types::App>;
+
+    /// Delete application
+    async fn delete_app(&self, app_id: &str) -> Result<types::DeleteAppResponse>;
+
+    /// Create deployment
+    async fn create_deployment(
+        &self,
+        app_id: &str,
+        request: &types::CreateDeploymentRequest,
+    ) -> Result<types::CreateDeploymentResponse>;
 
     /// Create ECR repository
     async fn create_ecr_repository(
@@ -81,23 +105,8 @@ pub trait FtlApiClient: Send + Sync {
         request: &types::CreateEcrRepositoryRequest,
     ) -> Result<types::CreateEcrRepositoryResponse>;
 
-    /// Get deployment status
-    async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus>;
-
-    /// Deploy application
-    async fn deploy_app(
-        &self,
-        request: &types::DeploymentRequest,
-    ) -> Result<types::DeploymentResponse>;
-
-    /// List applications
-    async fn list_apps(&self) -> Result<types::ListAppsResponse>;
-
-    /// Get application status
-    async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse>;
-
-    /// Delete application
-    async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse>;
+    /// Create ECR token
+    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse>;
 }
 
 /// Time/clock operations
@@ -309,19 +318,111 @@ impl Default for RealFtlApiClient {
 
 #[async_trait]
 impl FtlApiClient for RealFtlApiClient {
-    async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse> {
+    async fn create_app(
+        &self,
+        request: &types::CreateAppRequest,
+    ) -> Result<types::CreateAppResponse> {
         let auth = self
             .auth_token
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
 
         self.client
-            .get_ecr_credentials()
+            .create_app()
             .authorization(format!("Bearer {auth}"))
+            .body(request)
             .send()
             .await
             .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("{}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to create app: {}", e))
+    }
+
+    async fn list_apps(
+        &self,
+        limit: Option<std::num::NonZeroU64>,
+        next_token: Option<&str>,
+        name: Option<&str>,
+    ) -> Result<types::ListAppsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        let mut request = self
+            .client
+            .list_apps()
+            .authorization(format!("Bearer {auth}"));
+
+        if let Some(limit) = limit {
+            request = request.limit(limit);
+        }
+
+        if let Some(token) = next_token {
+            request = request.next_token(token);
+        }
+
+        if let Some(name) = name {
+            request = request.name(name);
+        }
+
+        request
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to list apps: {}", e))
+    }
+
+    async fn get_app(&self, app_id: &str) -> Result<types::App> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .get_app()
+            .authorization(format!("Bearer {auth}"))
+            .app_id(app_id)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to get app: {}", e))
+    }
+
+    async fn delete_app(&self, app_id: &str) -> Result<types::DeleteAppResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .delete_app()
+            .authorization(format!("Bearer {auth}"))
+            .app_id(app_id)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to delete app: {}", e))
+    }
+
+    async fn create_deployment(
+        &self,
+        app_id: &str,
+        request: &types::CreateDeploymentRequest,
+    ) -> Result<types::CreateDeploymentResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .create_deployment()
+            .authorization(format!("Bearer {auth}"))
+            .app_id(app_id)
+            .body(request)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to create deployment: {}", e))
     }
 
     async fn create_ecr_repository(
@@ -343,86 +444,19 @@ impl FtlApiClient for RealFtlApiClient {
             .map_err(|e| anyhow::anyhow!("Failed to create ECR repository: {}", e))
     }
 
-    async fn get_deployment_status(&self, deployment_id: &str) -> Result<types::DeploymentStatus> {
+    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
         let auth = self
             .auth_token
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
 
         self.client
-            .get_deployment_status()
-            .authorization(format!("Bearer {auth}"))
-            .deployment_id(deployment_id)
-            .send()
-            .await
-            .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to get deployment status: {}", e))
-    }
-
-    async fn deploy_app(
-        &self,
-        request: &types::DeploymentRequest,
-    ) -> Result<types::DeploymentResponse> {
-        let auth = self
-            .auth_token
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
-
-        self.client
-            .deploy_app()
-            .authorization(format!("Bearer {auth}"))
-            .body(request)
-            .send()
-            .await
-            .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to deploy app: {}", e))
-    }
-
-    async fn list_apps(&self) -> Result<types::ListAppsResponse> {
-        let auth = self
-            .auth_token
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
-
-        self.client
-            .list_apps()
+            .create_ecr_token()
             .authorization(format!("Bearer {auth}"))
             .send()
             .await
             .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to list apps: {}", e))
-    }
-
-    async fn get_app_status(&self, app_name: &str) -> Result<types::GetAppStatusResponse> {
-        let auth = self
-            .auth_token
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
-
-        self.client
-            .get_app_status()
-            .authorization(format!("Bearer {auth}"))
-            .app_name(app_name)
-            .send()
-            .await
-            .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to get app status: {}", e))
-    }
-
-    async fn delete_app(&self, app_name: &str) -> Result<types::DeleteAppResponse> {
-        let auth = self
-            .auth_token
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
-
-        self.client
-            .delete_app()
-            .authorization(format!("Bearer {auth}"))
-            .app_name(app_name)
-            .send()
-            .await
-            .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to delete app: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to create ECR token: {}", e))
     }
 }
 
