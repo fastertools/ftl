@@ -15,16 +15,16 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) with [Spin](https://github.com/spinframework/spin) to present a *just works* story for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
+FTL is a polyglot framework for [Model Context Protocol](https://modelcontextprotocol.io) tools. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for extending the capabilities of AI agents with portable tools that are deployable, performant, and secure by default.
 
 Tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Edge is an early platform that aims to be a complete surface for deploying and managing remote MCP tools on the network edge. It enables a distributed and flexible alternative to monolithic MCP gateways and generic servers running language-specific MCP SDKs. Run `ftl login` to join the waitlist.
+FTL Boxes is a new remote tool platform backed by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). It aims to be a complete surface for deploying and running MCP tools on the network edge. Run `ftl box login` to join the waitlist.
 
 ## Why?
 
 <details>
-<summary><strong>⤵ Simple across languages</strong></summary>
+<summary><strong>⤵ Simple tool DX across languages</strong></summary>
 
 * <details>
   <summary><strong>🦀 Rust</strong></summary>
@@ -120,20 +120,19 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 </details>
 
 <details>
-<summary><strong>⤵ Deploy on FTL Edge</strong></summary>
+<summary><strong>⤵ Edge deployments on FTL Boxes</strong></summary>
 
-FTL Edge offers a distributed and flexible alternative to monolithic MCP gateways and generic servers running language-specific MCP SDKs. FTL Edge Tools are powerful enough to do meaningful work themselves and snappy enough to serve as fast MCP proxies to external servers. It is backed by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
+FTL Boxes is an end-to-end platform for running remote tools called by AI agents. It offers a distributed and flexible edge computing alternative to centralized MCP gateways and generic servers running language-specific MCP SDKs. FTL Boxes are powerful enough to do meaningful work themselves and snappy enough to serve as fast proxies to other servers. Boxes run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
 
-- Workers can cold start in <1ms, automatically scale horizontally to meet demand, and scale down to zero. Pricing scales simply with invocations and there are no idle costs.
-- Tool components are isolated within sandboxed Wasm apps.
-- Tool calls are automatically routed to a worker running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
+- Tools cold start in under half a millisecond, automatically scale up to meet demand, and scale down to zero.
+- Cost scales simply and predictably with invocations. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out of the problem. Box specs are fixed and scaling is completely horizontal and automatic.
+- Tools are automatically deployed across the global network edge. Tool calls are routed to a Box running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
+- Tool components are securely isolated within Boxes, which are sandboxed themselves.
 - The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
-- High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
+- High-performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
 - Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
 
-Latency and compute overhead for remote tool calls should not be something you have to design AI systems around.
-
-FTL Edge is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl login` command to join the waitlist.
+FTL Boxes is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl box login` command to join the waitlist.
 </details>
 
 ## Quick Start
@@ -170,14 +169,16 @@ Try them out with your MCP client
 }
 ```
 
-Authenticate with FTL
+### Ready to deploy?
+
+Log in to FTL Boxes
 ```bash
-ftl login
+ftl box login
 ```
 
 Deploy
 ```bash
-ftl deploy
+ftl box deploy
 ```
 
 Plug it in
@@ -234,13 +235,14 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Tool components are individually isolated WebAssembly components with their own sandboxes. Tool components are composed together with the FTL gateway components and run as a single MCP server process on the host.
+- Tool components are individually isolated WebAssembly components with their own sandboxes.
+- Tool components are composed together with the FTL gateway components and run as a single MCP server process on the host.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
 
 ## Contributing
 
-We welcome contributions and discussion. Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions and discussion. Please see the [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 

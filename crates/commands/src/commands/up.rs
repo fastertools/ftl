@@ -35,7 +35,7 @@ pub trait SignalHandler: Send + Sync {
 
 /// Up command configuration
 pub struct UpConfig {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Port to listen on
     pub port: u16,
@@ -333,7 +333,7 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
 /// Up command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct UpArgs {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Port to listen on
     pub port: Option<u16>,

@@ -38,7 +38,7 @@ pub struct ProcessOutput {
 
 /// Configuration for the publish command
 pub struct PublishConfig {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Registry URL to publish to
     pub registry: Option<String>,
@@ -124,7 +124,7 @@ pub async fn execute_with_deps(
 /// Publish command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct PublishArgs {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Registry to publish to
     pub registry: Option<String>,

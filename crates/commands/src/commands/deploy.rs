@@ -36,7 +36,7 @@ pub struct ComponentInfo {
 
 /// Deploy configuration
 pub struct DeployConfig {
-    /// Application name from spin.toml
+    /// Box name from spin.toml
     pub app_name: String,
     /// Components to deploy
     pub components: Vec<ComponentInfo>,
@@ -65,8 +65,7 @@ pub struct DeployDependencies {
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
-    deps.ui
-        .print(&format!("{} {} Deploying project", "▶", "FTL"));
+    deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
     deps.ui.print("");
 
     // Check if we're in a Spin project directory
@@ -137,7 +136,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     deps.ui.print("");
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
-    spinner.set_message("Starting deployment...");
+    spinner.set_message("Starting box deployment...");
 
     // Refresh credentials before deployment in case the token expired
     let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
@@ -154,7 +153,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     // Display results
     deps.ui.print("");
     deps.ui
-        .print_styled("✓ Deployment successful!", MessageStyle::Success);
+        .print_styled("✓ Box deployed successfully!", MessageStyle::Success);
     if let Some(deployment_url) = deployment.provider_url {
         deps.ui.print("");
         deps.ui.print(&format!("  MCP URL: {deployment_url}"));
@@ -458,25 +457,25 @@ async fn poll_app_deployment_status_with_progress(
     loop {
         if attempts >= max_attempts {
             spinner.finish_and_clear();
-            return Err(anyhow!("Deployment timeout after 5 minutes"));
+            return Err(anyhow!("Box deployment timeout after 5 minutes"));
         }
 
         let app = match deps.api_client.get_app(app_id).await {
             Ok(app) => app,
             Err(e) => {
                 spinner.finish_and_clear();
-                return Err(anyhow!("Failed to get app status: {}", e));
+                return Err(anyhow!("Failed to get box status: {}", e));
             }
         };
 
         // Update spinner message based on status
         let status_msg = match &app.status {
-            types::AppStatus::Pending => "Initializing deployment...",
-            types::AppStatus::Creating => "Deploying...",
-            types::AppStatus::Active => "Deployment succeeded!",
-            types::AppStatus::Failed => "Deployment failed",
-            types::AppStatus::Deleting => "Application is being deleted",
-            types::AppStatus::Deleted => "Application has been deleted",
+            types::AppStatus::Pending => "Initializing box deployment...",
+            types::AppStatus::Creating => "Deploying box...",
+            types::AppStatus::Active => "Box deployment succeeded!",
+            types::AppStatus::Failed => "Box deployment failed",
+            types::AppStatus::Deleting => "Box is being deleted",
+            types::AppStatus::Deleted => "Box has been deleted",
         };
 
         spinner.set_message(status_msg);
@@ -491,13 +490,13 @@ async fn poll_app_deployment_status_with_progress(
                 let error_msg = app
                     .provider_error
                     .as_deref()
-                    .unwrap_or("Deployment failed")
+                    .unwrap_or("Box deployment failed")
                     .to_string();
-                return Err(anyhow!("Deployment failed: {}", error_msg));
+                return Err(anyhow!("Box deployment failed: {}", error_msg));
             }
             types::AppStatus::Deleted | types::AppStatus::Deleting => {
                 spinner.finish_and_clear();
-                return Err(anyhow!("App was deleted during deployment"));
+                return Err(anyhow!("Box was deleted during deployment"));
             }
             types::AppStatus::Pending | types::AppStatus::Creating => {
                 // Continue polling for pending/creating statuses
@@ -517,7 +516,7 @@ async fn deploy_to_ftl_with_progress(
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
 ) -> Result<types::App> {
     // First check if app exists
-    spinner.set_message("Checking if app exists...");
+    spinner.set_message("Checking if box exists...");
     let existing_apps = deps
         .api_client
         .list_apps(None, None, Some(&app_name))
@@ -528,8 +527,8 @@ async fn deploy_to_ftl_with_progress(
         })?;
 
     let app_id = if existing_apps.apps.is_empty() {
-        // App doesn't exist, create it first
-        spinner.set_message("Creating application...");
+        // Box doesn't exist, create it first
+        spinner.set_message("Creating box...");
         let create_app_request = types::CreateAppRequest {
             app_name: app_name
                 .as_str()
@@ -543,17 +542,17 @@ async fn deploy_to_ftl_with_progress(
             .await
             .map_err(|e| {
                 spinner.finish_and_clear();
-                anyhow!("Failed to create app: {}", e)
+                anyhow!("Failed to create box: {}", e)
             })?;
 
         create_response.app_id
     } else {
-        // App exists, use its ID
+        // Box exists, use its ID
         existing_apps.apps[0].app_id
     };
 
     // Now create the deployment
-    spinner.set_message("Creating deployment...");
+    spinner.set_message("Creating box deployment...");
     let deployment_request = types::CreateDeploymentRequest {
         tools,
         variables: std::collections::HashMap::new(),
@@ -565,16 +564,16 @@ async fn deploy_to_ftl_with_progress(
         .await
         .map_err(|e| {
             spinner.finish_and_clear();
-            anyhow!("Failed to create deployment: {}", e)
+            anyhow!("Failed to create box deployment: {}", e)
         })?;
 
     // Update spinner with deployment ID
     spinner.set_message(&format!(
-        "Deployment {} in progress...",
+        "Box deployment {} in progress...",
         &deployment_response.deployment_id
     ));
 
-    // Poll the app status to know when deployment is complete
+    // Poll the box status to know when deployment is complete
     poll_app_deployment_status_with_progress(deps, &app_id.to_string(), spinner).await
 }
 

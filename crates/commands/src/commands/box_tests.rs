@@ -1,4 +1,4 @@
-//! Tests for app commands
+//! Tests for box commands
 
 #[cfg(test)]
 mod tests {
@@ -9,7 +9,7 @@ mod tests {
     use async_trait::async_trait;
     use uuid::Uuid;
 
-    use crate::commands::app::{self, AppDependencies, OutputFormat};
+    use crate::commands::r#box::{self as box_cmd, BoxDependencies, OutputFormat};
     use ftl_runtime::api_client::types::{self};
     use ftl_runtime::deps::{
         FtlApiClient, MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface,
@@ -215,17 +215,17 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::list_with_deps(OutputFormat::Table, &deps).await;
+        let result = box_cmd::list_with_deps(OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let styled_messages = ui.get_styled_messages();
         assert_eq!(styled_messages.len(), 1);
-        assert_eq!(styled_messages[0].0, "No applications found.");
+        assert_eq!(styled_messages[0].0, "No boxes found.");
         assert!(matches!(styled_messages[0].1, MessageStyle::Yellow));
     }
 
@@ -252,12 +252,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::list_with_deps(OutputFormat::Table, &deps).await;
+        let result = box_cmd::list_with_deps(OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
@@ -274,7 +274,7 @@ mod tests {
                 .iter()
                 .any(|m| m.contains("https://test-app-1.example.com"))
         );
-        assert!(messages.iter().any(|m| m.contains("Total: 2 applications")));
+        assert!(messages.iter().any(|m| m.contains("Total: 2 boxes")));
     }
 
     #[tokio::test]
@@ -295,12 +295,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::list_with_deps(OutputFormat::Json, &deps).await;
+        let result = box_cmd::list_with_deps(OutputFormat::Json, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
@@ -325,12 +325,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::status_with_deps(app_id, OutputFormat::Table, &deps).await;
+        let result = box_cmd::status_with_deps(app_id, OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
@@ -359,12 +359,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::status_with_deps(app_name, OutputFormat::Table, &deps).await;
+        let result = box_cmd::status_with_deps(app_name, OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
@@ -387,12 +387,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new().with_prompt_response(app_name));
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps(app_id, false, &deps).await;
+        let result = box_cmd::delete_with_deps(app_id, false, &deps).await;
         assert!(result.is_ok());
 
         let styled_messages = ui.get_styled_messages();
@@ -416,12 +416,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new().with_prompt_response("wrong-name"));
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps(app_id, false, &deps).await;
+        let result = box_cmd::delete_with_deps(app_id, false, &deps).await;
         assert!(result.is_ok());
 
         let styled_messages = ui.get_styled_messages();
@@ -447,12 +447,12 @@ mod tests {
         };
 
         let ui = Arc::new(MockUI::new());
-        let deps = Arc::new(AppDependencies {
+        let deps = Arc::new(BoxDependencies {
             ui: ui.clone(),
             api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps(app_id, true, &deps).await;
+        let result = box_cmd::delete_with_deps(app_id, true, &deps).await;
         assert!(result.is_ok());
 
         // Should not prompt for confirmation

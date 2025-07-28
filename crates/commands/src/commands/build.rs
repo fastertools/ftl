@@ -26,7 +26,7 @@ pub struct ComponentBuildInfo {
 
 /// Build command configuration
 pub struct BuildConfig {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
@@ -297,7 +297,7 @@ async fn run_build_command(
 /// Build command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct BuildArgs {
-    /// Path to the Spin application
+    /// Path to the toolbox
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,

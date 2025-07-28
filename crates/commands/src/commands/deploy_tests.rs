@@ -312,7 +312,11 @@ async fn test_deploy_success() {
 
     // Verify output
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("Deployment successful!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Box deployed successfully!"))
+    );
     assert!(
         output
             .iter()
@@ -448,7 +452,7 @@ async fn test_deployment_timeout() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Deployment timeout")
+            .contains("Box deployment timeout")
     );
 }
 
