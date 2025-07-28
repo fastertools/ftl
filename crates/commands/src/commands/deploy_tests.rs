@@ -216,7 +216,7 @@ async fn test_deploy_docker_login_failure() {
     // Mock: get ECR credentials
     fixture
         .api_client
-        .expect_get_ecr_credentials()
+        .expect_create_ecr_token()
         .times(1)
         .returning(|| Ok(test_ecr_credentials()));
 
@@ -374,23 +374,63 @@ async fn test_deployment_timeout() {
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
 
-    // Mock: deploy app succeeds
+    // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
-        .expect_deploy_app()
+        .expect_list_apps()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
 
-    // Mock: status always returns "deploying" (60 times = timeout)
+    // Mock: create app succeeds
     fixture
         .api_client
-        .expect_get_deployment_status()
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: create deployment succeeds
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: status always returns "Creating" (60 times = timeout)
+    fixture
+        .api_client
+        .expect_get_app()
         .times(60)
         .returning(|_| {
-            Ok(test_deployment_status(
-                "test-deployment-id",
-                types::DeploymentStatusDeploymentStatus::Deploying,
-            ))
+            Ok(types::App {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::AppStatus::Creating,
+                provider_url: None,
+                provider_error: None,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
         });
 
     // Mock: async sleep
@@ -420,30 +460,60 @@ async fn test_deployment_failed_status() {
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
 
-    // Mock: deploy app succeeds
+    // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
-        .expect_deploy_app()
+        .expect_list_apps()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
-
-    // Mock: status returns failed
-    fixture
-        .api_client
-        .expect_get_deployment_status()
-        .times(1)
-        .returning(|_| {
-            let status = test_deployment_status(
-                "test-deployment-id",
-                types::DeploymentStatusDeploymentStatus::Failed,
-            );
-            Ok(types::DeploymentStatus {
-                deployment: types::DeploymentStatusDeployment {
-                    error: Some("Build failed".to_string()),
-                    ..status.deployment
-                },
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
             })
         });
+
+    // Mock: create app succeeds
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: create deployment succeeds
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: status returns failed
+    fixture.api_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Failed,
+            provider_url: None,
+            provider_error: Some("Build failed".to_string()),
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps).await;
@@ -517,7 +587,7 @@ fn setup_docker_login_success(fixture: &mut TestFixture) {
     // Mock: get ECR credentials
     fixture
         .api_client
-        .expect_get_ecr_credentials()
+        .expect_create_ecr_token()
         .times(1)
         .returning(|| Ok(test_ecr_credentials()));
 
@@ -577,31 +647,79 @@ fn setup_successful_push(fixture: &mut TestFixture) {
 }
 
 fn setup_successful_deployment(fixture: &mut TestFixture) {
-    // Mock: deploy app succeeds
+    // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
-        .expect_deploy_app()
+        .expect_list_apps()
         .times(1)
-        .returning(|_| Ok(test_deployment_response("test-deployment-id")));
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
 
-    // Mock: deployment status checks - first returns deploying, then deployed
-    let mut call_count = 0;
+    // Mock: create app succeeds
+    let app_id = uuid::Uuid::new_v4();
     fixture
         .api_client
-        .expect_get_deployment_status()
+        .expect_create_app()
+        .times(1)
+        .returning(move |_| {
+            Ok(types::CreateAppResponse {
+                app_id,
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: create deployment succeeds
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: app status checks - first returns creating, then active
+    let call_count = std::sync::Arc::new(std::sync::Mutex::new(0));
+    let call_count_clone = call_count.clone();
+    fixture
+        .api_client
+        .expect_get_app()
         .times(2)
         .returning(move |_| {
-            call_count += 1;
-            if call_count == 1 {
-                Ok(test_deployment_status(
-                    "test-deployment-id",
-                    types::DeploymentStatusDeploymentStatus::Deploying,
-                ))
+            let mut count = call_count_clone.lock().unwrap();
+            *count += 1;
+            if *count == 1 {
+                Ok(types::App {
+                    app_id,
+                    app_name: "test-app".to_string(),
+                    status: types::AppStatus::Creating,
+                    provider_url: None,
+                    provider_error: None,
+                    created_at: "2024-01-01T00:00:00Z".to_string(),
+                    updated_at: "2024-01-01T00:00:00Z".to_string(),
+                })
             } else {
-                Ok(test_deployment_status(
-                    "test-deployment-id",
-                    types::DeploymentStatusDeploymentStatus::Deployed,
-                ))
+                Ok(types::App {
+                    app_id,
+                    app_name: "test-app".to_string(),
+                    status: types::AppStatus::Active,
+                    provider_url: Some("https://test-app.example.com".to_string()),
+                    provider_error: None,
+                    created_at: "2024-01-01T00:00:00Z".to_string(),
+                    updated_at: "2024-01-01T00:00:00Z".to_string(),
+                })
             }
         });
 

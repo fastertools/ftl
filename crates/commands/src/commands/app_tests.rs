@@ -7,17 +7,10 @@ mod tests {
 
     use anyhow::Result;
     use async_trait::async_trait;
-    use chrono::DateTime;
     use uuid::Uuid;
 
     use crate::commands::app::{self, AppDependencies, OutputFormat};
-    use ftl_runtime::api_client::types::{
-        self, DeleteAppResponse, DeleteAppResponseApp, GetAppStatusResponse,
-        GetAppStatusResponseApp, GetAppStatusResponseAppLastDeploymentInfo,
-        GetAppStatusResponseAppLastDeploymentInfoStatus, GetAppStatusResponseAppStatus,
-        ListAppsResponse, ListAppsResponseAppsItem, ListAppsResponseAppsItemStatus,
-        ListAppsResponsePagination,
-    };
+    use ftl_runtime::api_client::types::{self};
     use ftl_runtime::deps::{
         FtlApiClient, MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface,
     };
@@ -26,14 +19,51 @@ mod tests {
 
     #[allow(clippy::struct_field_names)]
     struct MockApiClient {
-        list_response: Result<ListAppsResponse>,
-        status_response: Result<GetAppStatusResponse>,
-        delete_response: Result<DeleteAppResponse>,
+        list_response: Result<types::ListAppsResponse>,
+        get_response: Result<types::App>,
+        delete_response: Result<types::DeleteAppResponse>,
     }
 
     #[async_trait]
     impl FtlApiClient for MockApiClient {
-        async fn get_ecr_credentials(&self) -> Result<types::GetEcrCredentialsResponse> {
+        async fn create_app(
+            &self,
+            _request: &types::CreateAppRequest,
+        ) -> Result<types::CreateAppResponse> {
+            unimplemented!()
+        }
+
+        async fn list_apps(
+            &self,
+            _limit: Option<std::num::NonZeroU64>,
+            _next_token: Option<&str>,
+            _name: Option<&str>,
+        ) -> Result<types::ListAppsResponse> {
+            match &self.list_response {
+                Ok(resp) => Ok(resp.clone()),
+                Err(e) => Err(anyhow::anyhow!(e.to_string())),
+            }
+        }
+
+        async fn get_app(&self, _app_id: &str) -> Result<types::App> {
+            match &self.get_response {
+                Ok(resp) => Ok(resp.clone()),
+                Err(e) => Err(anyhow::anyhow!(e.to_string())),
+            }
+        }
+
+        async fn delete_app(&self, _app_id: &str) -> Result<types::DeleteAppResponse> {
+            match &self.delete_response {
+                Ok(resp) => Ok(resp.clone()),
+                Err(e) => Err(anyhow::anyhow!(e.to_string())),
+            }
+        }
+
+        async fn create_deployment(
+            &self,
+            _app_id: &str,
+            _request: &types::CreateDeploymentRequest,
+        ) -> Result<types::CreateDeploymentResponse> {
             unimplemented!()
         }
 
@@ -44,39 +74,8 @@ mod tests {
             unimplemented!()
         }
 
-        async fn get_deployment_status(
-            &self,
-            _deployment_id: &str,
-        ) -> Result<types::DeploymentStatus> {
+        async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
             unimplemented!()
-        }
-
-        async fn deploy_app(
-            &self,
-            _request: &types::DeploymentRequest,
-        ) -> Result<types::DeploymentResponse> {
-            unimplemented!()
-        }
-
-        async fn list_apps(&self) -> Result<ListAppsResponse> {
-            match &self.list_response {
-                Ok(resp) => Ok(resp.clone()),
-                Err(e) => Err(anyhow::anyhow!(e.to_string())),
-            }
-        }
-
-        async fn get_app_status(&self, _app_name: &str) -> Result<GetAppStatusResponse> {
-            match &self.status_response {
-                Ok(resp) => Ok(resp.clone()),
-                Err(e) => Err(anyhow::anyhow!(e.to_string())),
-            }
-        }
-
-        async fn delete_app(&self, _app_name: &str) -> Result<DeleteAppResponse> {
-            match &self.delete_response {
-                Ok(resp) => Ok(resp.clone()),
-                Err(e) => Err(anyhow::anyhow!(e.to_string())),
-            }
         }
     }
 
@@ -105,11 +104,6 @@ mod tests {
             self
         }
 
-        fn non_interactive(mut self) -> Self {
-            self.is_interactive = false;
-            self
-        }
-
         fn get_messages(&self) -> Vec<String> {
             self.messages.lock().unwrap().clone()
         }
@@ -121,11 +115,11 @@ mod tests {
 
     impl UserInterface for MockUI {
         fn create_spinner(&self) -> Box<dyn ProgressIndicator> {
-            Box::new(MockProgressIndicator)
+            Box::new(MockProgress)
         }
 
         fn create_multi_progress(&self) -> Box<dyn MultiProgressManager> {
-            unimplemented!()
+            Box::new(MockMultiProgress)
         }
 
         fn print(&self, message: &str) {
@@ -144,23 +138,24 @@ mod tests {
         }
 
         fn prompt_input(&self, _prompt: &str, _default: Option<&str>) -> Result<String> {
-            self.prompt_responses
-                .lock()
-                .unwrap()
-                .pop()
-                .ok_or_else(|| anyhow::anyhow!("No prompt response configured"))
+            let mut responses = self.prompt_responses.lock().unwrap();
+            if responses.is_empty() {
+                Ok(String::new())
+            } else {
+                Ok(responses.remove(0))
+            }
         }
 
         fn prompt_select(&self, _prompt: &str, _items: &[&str], _default: usize) -> Result<usize> {
-            unimplemented!()
+            Ok(0)
         }
 
         fn clear_screen(&self) {}
     }
 
-    struct MockProgressIndicator;
+    struct MockProgress;
 
-    impl ProgressIndicator for MockProgressIndicator {
+    impl ProgressIndicator for MockProgress {
         fn set_message(&self, _message: &str) {}
         fn finish_and_clear(&self) {}
         fn enable_steady_tick(&self, _duration: std::time::Duration) {}
@@ -168,404 +163,304 @@ mod tests {
         fn set_prefix(&self, _prefix: String) {}
     }
 
-    // Test helpers
+    struct MockMultiProgress;
 
-    fn create_test_app(name: &str, status: &str) -> ListAppsResponseAppsItem {
-        ListAppsResponseAppsItem {
-            id: format!("{name}-id"),
-            name: name.to_string(),
-            url: format!("https://{name}.example.com"),
-            urls: vec![format!("https://{name}.example.com")],
-            status: Some(match status {
-                "deployed" => ListAppsResponseAppsItemStatus::Deployed,
-                "deploying" => ListAppsResponseAppsItemStatus::Deploying,
-                "failed" => ListAppsResponseAppsItemStatus::Failed,
-                _ => ListAppsResponseAppsItemStatus::Unknown,
-            }),
-            created_at: Some(
-                DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            ),
-            last_deployment: Some(
-                DateTime::parse_from_rfc3339("2024-01-02T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            ),
-            invocations: Some("100".to_string()),
+    impl MultiProgressManager for MockMultiProgress {
+        fn add_spinner(&self) -> Box<dyn ProgressIndicator> {
+            Box::new(MockProgress)
         }
     }
 
-    fn create_app_status_response(name: &str, status: &str) -> GetAppStatusResponse {
-        GetAppStatusResponse {
-            app: GetAppStatusResponseApp {
-                id: format!("{name}-id"),
-                name: name.to_string(),
-                url: format!("https://{name}.example.com"),
-                urls: vec![format!("https://{name}.example.com")],
-                status: Some(match status {
-                    "deployed" => GetAppStatusResponseAppStatus::Deployed,
-                    "deploying" => GetAppStatusResponseAppStatus::Deploying,
-                    "failed" => GetAppStatusResponseAppStatus::Failed,
-                    _ => GetAppStatusResponseAppStatus::Unknown,
-                }),
-                created_at: Some(
-                    DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                ),
-                last_deployment: Some(
-                    DateTime::parse_from_rfc3339("2024-01-02T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                ),
-                invocations: Some("100".to_string()),
-                deployment_count: 5,
-                last_deployment_info: Some(GetAppStatusResponseAppLastDeploymentInfo {
-                    deployment_id: Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap(),
-                    status: GetAppStatusResponseAppLastDeploymentInfoStatus::Deployed,
-                    created_at: DateTime::parse_from_rfc3339("2024-01-02T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                    completed_at: Some(
-                        DateTime::parse_from_rfc3339("2024-01-02T00:10:00Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                    deployment_url: Some("https://example.com/deployment".to_string()),
-                    error: None,
-                }),
-            },
+    // Test helpers
+
+    fn create_test_app(id: &str, name: &str, status: types::AppStatus) -> types::App {
+        types::App {
+            app_id: Uuid::parse_str(id).unwrap(),
+            app_name: name.to_string(),
+            status,
+            provider_url: Some(format!("https://{name}.example.com")),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        }
+    }
+
+    fn create_test_app_item(
+        id: &str,
+        name: &str,
+        status: types::ListAppsResponseAppsItemStatus,
+    ) -> types::ListAppsResponseAppsItem {
+        types::ListAppsResponseAppsItem {
+            app_id: Uuid::parse_str(id).unwrap(),
+            app_name: name.to_string(),
+            status,
+            provider_url: Some(format!("https://{name}.example.com")),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
         }
     }
 
     // Tests
 
     #[tokio::test]
-    async fn test_list_apps_empty() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Ok(ListAppsResponse {
+    async fn test_list_empty() {
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
                 apps: vec![],
-                pagination: ListAppsResponsePagination {
-                    has_more: false,
-                    cursor: None,
-                },
+                next_token: None,
             }),
-            status_response: Err(anyhow::anyhow!("not used")),
-            delete_response: Err(anyhow::anyhow!("not used")),
-        });
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+        };
 
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
         let result = app::list_with_deps(OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
-        let styled = ui.get_styled_messages();
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, _)| msg.contains("No applications found"))
-        );
+        let styled_messages = ui.get_styled_messages();
+        assert_eq!(styled_messages.len(), 1);
+        assert_eq!(styled_messages[0].0, "No applications found.");
+        assert!(matches!(styled_messages[0].1, MessageStyle::Yellow));
     }
 
     #[tokio::test]
-    async fn test_list_apps_table() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Ok(ListAppsResponse {
+    async fn test_list_with_apps_table_format() {
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
                 apps: vec![
-                    create_test_app("app1", "deployed"),
-                    create_test_app("app2", "failed"),
+                    create_test_app_item(
+                        "550e8400-e29b-41d4-a716-446655440000",
+                        "test-app-1",
+                        types::ListAppsResponseAppsItemStatus::Active,
+                    ),
+                    create_test_app_item(
+                        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+                        "test-app-2",
+                        types::ListAppsResponseAppsItemStatus::Failed,
+                    ),
                 ],
-                pagination: ListAppsResponsePagination {
-                    has_more: false,
-                    cursor: None,
-                },
+                next_token: None,
             }),
-            status_response: Err(anyhow::anyhow!("not used")),
-            delete_response: Err(anyhow::anyhow!("not used")),
-        });
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+        };
 
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
         let result = app::list_with_deps(OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
-        let styled = ui.get_styled_messages();
-
-        // Check that app names are styled bold
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, style)| msg == "app1" && matches!(style, MessageStyle::Bold))
-        );
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, style)| msg == "app2" && matches!(style, MessageStyle::Bold))
-        );
-
-        // Check URLs are displayed
+        // Should display app names, IDs, status, URLs
+        assert!(messages.iter().any(|m| m.contains("test-app-1")));
         assert!(
             messages
                 .iter()
-                .any(|msg| msg.contains("https://app1.example.com"))
+                .any(|m| m.contains("550e8400-e29b-41d4-a716-446655440000"))
         );
+        assert!(messages.iter().any(|m| m.contains("ACTIVE")));
         assert!(
             messages
                 .iter()
-                .any(|msg| msg.contains("https://app2.example.com"))
+                .any(|m| m.contains("https://test-app-1.example.com"))
         );
-        assert!(
-            messages
-                .iter()
-                .any(|msg| msg.contains("Total: 2 applications"))
-        );
+        assert!(messages.iter().any(|m| m.contains("Total: 2 applications")));
     }
 
     #[tokio::test]
-    async fn test_list_apps_json() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Ok(ListAppsResponse {
-                apps: vec![create_test_app("app1", "deployed")],
-                pagination: ListAppsResponsePagination {
-                    has_more: false,
-                    cursor: None,
-                },
-            }),
-            status_response: Err(anyhow::anyhow!("not used")),
-            delete_response: Err(anyhow::anyhow!("not used")),
-        });
+    async fn test_list_with_apps_json_format() {
+        let apps = vec![create_test_app_item(
+            "550e8400-e29b-41d4-a716-446655440000",
+            "test-app-1",
+            types::ListAppsResponseAppsItemStatus::Active,
+        )];
 
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
+                apps: apps.clone(),
+                next_token: None,
+            }),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+        };
+
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
         let result = app::list_with_deps(OutputFormat::Json, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
-        let json_output = messages
-            .iter()
-            .find(|msg| msg.contains("\"name\""))
-            .unwrap();
-        assert!(json_output.contains("\"name\": \"app1\""));
-        assert!(json_output.contains("\"url\": \"https://app1.example.com\""));
+        assert_eq!(messages.len(), 1);
+
+        // Verify JSON output
+        let json_output = &messages[0];
+        let parsed: serde_json::Value = serde_json::from_str(json_output).unwrap();
+        assert!(parsed.is_array());
+        assert_eq!(parsed.as_array().unwrap().len(), 1);
     }
 
     #[tokio::test]
-    async fn test_status_app() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("not used")),
-            status_response: Ok(create_app_status_response("myapp", "deployed")),
-            delete_response: Err(anyhow::anyhow!("not used")),
-        });
+    async fn test_status_by_uuid() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app = create_test_app(app_id, "test-app", types::AppStatus::Active);
 
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Ok(app),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+        };
+
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
-        let result = app::status_with_deps("myapp", OutputFormat::Table, &deps).await;
+        let result = app::status_with_deps(app_id, OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
         let messages = ui.get_messages();
-        let styled = ui.get_styled_messages();
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, _)| msg.contains("Application Details"))
-        );
-        assert!(messages.iter().any(|msg| msg.contains("myapp")));
-        assert!(messages.iter().any(|msg| msg.contains("Deployments:  5")));
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, _)| msg.contains("Last Deployment"))
-        );
+        assert!(messages.iter().any(|m| m.contains("test-app")));
+        assert!(messages.iter().any(|m| m.contains(app_id)));
+        assert!(messages.iter().any(|m| m.contains("ACTIVE")));
     }
 
     #[tokio::test]
-    async fn test_delete_app_with_confirmation() {
-        let ui = Arc::new(MockUI::new().with_prompt_response("myapp"));
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("not used")),
-            status_response: Ok(create_app_status_response("myapp", "deployed")),
-            delete_response: Ok(DeleteAppResponse {
-                message: "Application deleted successfully".to_string(),
-                app: DeleteAppResponseApp {
-                    name: "myapp".to_string(),
-                    deleted_at: DateTime::parse_from_rfc3339("2024-01-03T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                    last_deployment: None,
-                },
-                warning: "This action cannot be undone".to_string(),
-            }),
-        });
+    async fn test_status_by_name() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app_name = "test-app";
+        let app = create_test_app(app_id, app_name, types::AppStatus::Active);
 
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
+                apps: vec![create_test_app_item(
+                    app_id,
+                    app_name,
+                    types::ListAppsResponseAppsItemStatus::Active,
+                )],
+                next_token: None,
+            }),
+            get_response: Ok(app),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+        };
+
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps("myapp", false, &deps).await;
+        let result = app::status_with_deps(app_name, OutputFormat::Table, &deps).await;
         assert!(result.is_ok());
 
-        let styled = ui.get_styled_messages();
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, _)| msg.contains("Application to be deleted"))
-        );
+        let messages = ui.get_messages();
+        assert!(messages.iter().any(|m| m.contains(app_name)));
+        assert!(messages.iter().any(|m| m.contains(app_id)));
+    }
 
-        let styled = ui.get_styled_messages();
+    #[tokio::test]
+    async fn test_delete_with_confirmation() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app_name = "test-app";
+        let app = create_test_app(app_id, app_name, types::AppStatus::Active);
+
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Ok(app),
+            delete_response: Ok(types::DeleteAppResponse {
+                message: "Application deleted successfully".to_string(),
+            }),
+        };
+
+        let ui = Arc::new(MockUI::new().with_prompt_response(app_name));
+        let deps = Arc::new(AppDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result = app::delete_with_deps(app_id, false, &deps).await;
+        assert!(result.is_ok());
+
+        let styled_messages = ui.get_styled_messages();
         assert!(
-            styled
+            styled_messages
                 .iter()
                 .any(|(msg, _)| msg.contains("Application deleted successfully"))
         );
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, style)| msg.contains("This action cannot be undone")
-                    && matches!(style, MessageStyle::Warning))
-        );
     }
 
     #[tokio::test]
-    async fn test_delete_app_cancelled() {
-        let ui = Arc::new(MockUI::new().with_prompt_response("wrong-name"));
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("not used")),
-            status_response: Ok(create_app_status_response("myapp", "deployed")),
-            delete_response: Err(anyhow::anyhow!("should not be called")),
-        });
+    async fn test_delete_cancelled() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app_name = "test-app";
+        let app = create_test_app(app_id, app_name, types::AppStatus::Active);
 
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Ok(app),
+            delete_response: Err(anyhow::anyhow!("Should not be called")),
+        };
+
+        let ui = Arc::new(MockUI::new().with_prompt_response("wrong-name"));
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps("myapp", false, &deps).await;
+        let result = app::delete_with_deps(app_id, false, &deps).await;
         assert!(result.is_ok());
 
-        let styled = ui.get_styled_messages();
+        let styled_messages = ui.get_styled_messages();
         assert!(
-            styled
+            styled_messages
                 .iter()
                 .any(|(msg, _)| msg.contains("Deletion cancelled"))
         );
     }
 
     #[tokio::test]
-    async fn test_delete_app_force() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("not used")),
-            status_response: Ok(create_app_status_response("myapp", "deployed")),
-            delete_response: Ok(DeleteAppResponse {
-                message: "Application deleted successfully".to_string(),
-                app: DeleteAppResponseApp {
-                    name: "myapp".to_string(),
-                    deleted_at: DateTime::parse_from_rfc3339("2024-01-03T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                    last_deployment: None,
-                },
-                warning: String::new(),
-            }),
-        });
+    async fn test_delete_forced() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app_name = "test-app";
+        let app = create_test_app(app_id, app_name, types::AppStatus::Active);
 
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Ok(app),
+            delete_response: Ok(types::DeleteAppResponse {
+                message: "Application deleted successfully".to_string(),
+            }),
+        };
+
+        let ui = Arc::new(MockUI::new());
         let deps = Arc::new(AppDependencies {
             ui: ui.clone(),
-            api_client,
+            api_client: Arc::new(api_client),
         });
 
-        let result = app::delete_with_deps("myapp", true, &deps).await;
+        let result = app::delete_with_deps(app_id, true, &deps).await;
         assert!(result.is_ok());
 
-        // Should not see any prompts when force is true
-        let messages = ui.get_messages();
+        // Should not prompt for confirmation
+        let styled_messages = ui.get_styled_messages();
         assert!(
-            !messages
-                .iter()
-                .any(|msg| msg.contains("Type 'myapp' to confirm"))
-        );
-
-        let styled = ui.get_styled_messages();
-        assert!(
-            styled
+            styled_messages
                 .iter()
                 .any(|(msg, _)| msg.contains("Application deleted successfully"))
-        );
-    }
-
-    #[tokio::test]
-    async fn test_delete_app_non_interactive() {
-        let ui = Arc::new(MockUI::new().non_interactive());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("not used")),
-            status_response: Ok(create_app_status_response("myapp", "deployed")),
-            delete_response: Ok(DeleteAppResponse {
-                message: "Application deleted successfully".to_string(),
-                app: DeleteAppResponseApp {
-                    name: "myapp".to_string(),
-                    deleted_at: DateTime::parse_from_rfc3339("2024-01-03T00:00:00Z")
-                        .unwrap()
-                        .into(),
-                    last_deployment: None,
-                },
-                warning: String::new(),
-            }),
-        });
-
-        let deps = Arc::new(AppDependencies {
-            ui: ui.clone(),
-            api_client,
-        });
-
-        let result = app::delete_with_deps("myapp", false, &deps).await;
-        assert!(result.is_ok());
-
-        // Should proceed without prompts in non-interactive mode
-        let styled = ui.get_styled_messages();
-        assert!(
-            styled
-                .iter()
-                .any(|(msg, _)| msg.contains("Application deleted successfully"))
-        );
-    }
-
-    #[tokio::test]
-    async fn test_api_error_handling() {
-        let ui = Arc::new(MockUI::new());
-        let api_client = Arc::new(MockApiClient {
-            list_response: Err(anyhow::anyhow!("API error: unauthorized")),
-            status_response: Err(anyhow::anyhow!("not used")),
-            delete_response: Err(anyhow::anyhow!("not used")),
-        });
-
-        let deps = Arc::new(AppDependencies { ui, api_client });
-
-        let result = app::list_with_deps(OutputFormat::Table, &deps).await;
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("API error: unauthorized")
         );
     }
 }

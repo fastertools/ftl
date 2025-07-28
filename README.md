@@ -15,11 +15,11 @@ Fast tools for AI agents
 
 </div>
 
-FTL is an open source tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) with [Spin](https://github.com/spinframework/spin) to present a *just works* story for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
+FTL is a tool framework for AI agents. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) with [Spin](https://github.com/spinframework/spin) to present a *just works* story for writing and running [Model Context Protocol](https://modelcontextprotocol.io) servers that are secure, deployable, and performant.
 
-FTL tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
+Tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Edge is an early platform that aims to be a complete surface for deploying and managing remote MCP tools, with sub-millisecond cold starts on globally distributed [Akamai](https://www.akamai.com/why-akamai/global-infrastructure) edge compute via [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions). Run `ftl login` to join the waitlist.
+FTL Edge is an early platform that aims to be a complete surface for deploying and managing remote MCP tools on the network edge. It enables a distributed and flexible alternative to monolithic MCP gateways and generic servers running language-specific MCP SDKs. Run `ftl login` to join the waitlist.
 
 ## Why?
 
@@ -96,20 +96,19 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
   ```
   </details>
 
-- Mix and serve tool components written in different source languages, each with multiple tools, all exposed on one `/mcp` endpoint.
-- Write tools in TypeScript, Rust, Python, Go, and [more](https://component-model.bytecodealliance.org/language-support.html).
-- Tool components can be distributed on and imported from OCI registries. See below.
+- Write tools in TypeScript, Rust, Python, Go, and [more](https://component-model.bytecodealliance.org/language-support.html). Tools are organized into tool components, which serve as isolated and distributable units.
+- Combine tool components from different source languages onto a single sandboxed MCP server process that exposes an `/mcp` Streamable HTTP endpoint. See [Architecture](#architecture) for details.
+- Tool components can be distributed on OCI registries like Docker Hub and GitHub Container Registry.
 - High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in supported languages like Rust and C.
-- Tool component binary size and performance are influenced by source language.
 </details>
 
 <details>
 <summary><strong>⤵ Secure by design</strong></summary>
 
-- Tools run in WebAssembly components to enable sandboxed tool executions by default on a provably airtight [security model](https://webassembly.org/docs/security/).
+- Tool components within the sandboxed server process are themselves [individually isolated](https://component-model.bytecodealliance.org/design/why-component-model.html#benefits-of-the-component-model) and can each expose multiple tools.
+- Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
 - MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - Plug in your own JWT issuer or OIDC provider with simple configuration.
-- Allowed outbound network calls are configurable per tool. This is especially useful when including third party tool components in your MCP server (see below).
 </details>
 
 <details>
@@ -123,16 +122,18 @@ FTL Edge is an early platform that aims to be a complete surface for deploying a
 <details>
 <summary><strong>⤵ Deploy on FTL Edge</strong></summary>
 
-Latency and compute overhead for remote tool calls should not be something you have to design AI systems around. Globally distributed high-performance compute should be accessible to agents as a resource, instantly. This enables you to do more with MCP than just proxy to a REST API.
+FTL Edge offers a distributed and flexible alternative to monolithic MCP gateways and generic servers running language-specific MCP SDKs. FTL Edge Tools are powerful enough to do meaningful work themselves and snappy enough to serve as fast MCP proxies to external servers. It is backed by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
 
-- Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
-- FTL tools run as sandboxed components on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge cloud.
-- The FTL [components](#architecture) handle MCP server implementation, auth, tool argument validation, and tool component routing.
-- Tool calls are automatically routed to a worker running on most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
-- High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents.
+- Workers can cold start in <1ms, automatically scale horizontally to meet demand, and scale down to zero. Pricing scales simply with invocations and there are no idle costs.
+- Tool components are isolated within sandboxed Wasm apps.
+- Tool calls are automatically routed to a worker running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
+- The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
+- High performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available via languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
 - Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
 
-FTL Edge is just one possible deployment target. It is currently in early alpha and free with limited capacity. Opt in with the `ftl login` command, which enables `ftl deploy`.
+Latency and compute overhead for remote tool calls should not be something you have to design AI systems around.
+
+FTL Edge is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl login` command to join the waitlist.
 </details>
 
 ## Quick Start
@@ -233,9 +234,8 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Tools run as WebAssembly components in their own sandboxes. Tool components are composed together with the FTL components and run as a single process while maintaining security boundaries.
+- Tool components are individually isolated WebAssembly components with their own sandboxes. Tool components are composed together with the FTL gateway components and run as a single MCP server process on the host.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
-- Workers automatically scale horizontally to meet demand, can cold start in < 1ms, and scale down to zero.
 - Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
 
 ## Contributing
