@@ -201,7 +201,7 @@ pub fn example_custom_path() -> Result<()> {
     use std::path::Path;
 
     // Load from a custom path
-    let custom_path = Path::new("/tmp/my-app/config.json");
+    let custom_path = Path::new("/tmp/my-app/config.toml");
     let mut config = Config::load_from_path(custom_path)?;
 
     // Use it normally

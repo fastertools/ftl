@@ -45,9 +45,11 @@ webbrowser = { workspace = true }
 async-trait = { workspace = true }
 num_cpus = { workspace = true }
 chrono = { workspace = true }
-keyring = { workspace = true }
 base64 = { workspace = true }
 uuid = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+keyring = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30.1", features = ["signal", "process"] }
