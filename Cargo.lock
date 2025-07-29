@@ -1021,13 +1021,16 @@ dependencies = [
  "ftl-common",
  "ftl-language",
  "ftl-runtime",
+ "ftl-telemetry",
  "nix",
  "notify",
  "predicates",
+ "regex",
  "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -1108,7 +1111,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
- "toml 0.9.2",
+ "toml 0.9.4",
  "tracing",
  "which",
  "wiremock",
