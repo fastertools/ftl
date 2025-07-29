@@ -1193,6 +1193,7 @@ name = "ftl-telemetry"
 version = "0.0.23"
 dependencies = [
  "anyhow",
+ "atty",
  "chrono",
  "dirs",
  "ftl-common",
