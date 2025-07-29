@@ -4,6 +4,7 @@
 //! the FTL CLI application, including UI helpers, Spin installation utilities,
 //! and version caching.
 
+pub mod config;
 pub mod spin_installer;
 pub mod ui;
 pub mod version_cache;

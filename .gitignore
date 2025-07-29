@@ -1,6 +1,7 @@
 # Local Deps
 .memory
 .mnemic
+.agent
 
 # Rust build artifacts
 target/
