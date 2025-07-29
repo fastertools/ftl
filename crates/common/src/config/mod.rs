@@ -2,7 +2,7 @@
 //!
 //! This module provides a flexible, extensible configuration system that allows
 //! different parts of the application to manage their own configuration sections
-//! within a unified config file at ~/.ftl/config.json.
+//! within a unified config file at ~/.ftl/config.toml.
 //!
 //! # Architecture
 //!
@@ -49,12 +49,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use toml::Value;
 
 /// Trait that all configuration sections must implement
 pub trait ConfigSection: Serialize + for<'de> Deserialize<'de> + Clone {
     /// Returns the name of this configuration section
-    /// This will be used as the key in the top-level JSON object
+    /// This will be used as the key in the top-level TOML table
     fn section_name() -> &'static str;
 }
 
@@ -63,7 +63,7 @@ pub trait ConfigSection: Serialize + for<'de> Deserialize<'de> + Clone {
 pub struct Config {
     /// Path to the configuration file
     path: PathBuf,
-    /// Raw JSON data stored as a map
+    /// Raw TOML data stored as a map
     data: HashMap<String, Value>,
 }
 
@@ -72,9 +72,9 @@ impl Config {
     pub const CONFIG_DIR: &'static str = ".ftl";
     
     /// Default configuration file name
-    pub const CONFIG_FILE: &'static str = "config.json";
+    pub const CONFIG_FILE: &'static str = "config.toml";
 
-    /// Load configuration from the default location (~/.ftl/config.json)
+    /// Load configuration from the default location (~/.ftl/config.toml)
     pub fn load() -> Result<Self> {
         let path = Self::default_config_path()?;
         Self::load_from_path(&path)
@@ -89,7 +89,7 @@ impl Config {
             if contents.trim().is_empty() {
                 HashMap::new()
             } else {
-                serde_json::from_str(&contents)
+                toml::from_str(&contents)
                     .with_context(|| format!("Failed to parse config file at {:?}", path))?
             }
         } else {
@@ -115,7 +115,7 @@ impl Config {
         
         match self.data.get(section_name) {
             Some(value) => {
-                let section = serde_json::from_value(value.clone())
+                let section = value.clone().try_into()
                     .with_context(|| format!("Failed to deserialize {} section", section_name))?;
                 Ok(Some(section))
             }
@@ -126,7 +126,7 @@ impl Config {
     /// Set a configuration section
     pub fn set_section<T: ConfigSection>(&mut self, section: T) -> Result<()> {
         let section_name = T::section_name();
-        let value = serde_json::to_value(section)
+        let value = toml::Value::try_from(section)
             .with_context(|| format!("Failed to serialize {} section", section_name))?;
         
         self.data.insert(section_name.to_string(), value);
@@ -147,8 +147,8 @@ impl Config {
                 .with_context(|| format!("Failed to create config directory at {:?}", parent))?;
         }
 
-        // Serialize to pretty JSON
-        let contents = serde_json::to_string_pretty(&self.data)
+        // Serialize to pretty TOML
+        let contents = toml::to_string_pretty(&self.data)
             .context("Failed to serialize config data")?;
 
         fs::write(&self.path, contents)
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_empty_config() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         let config = Config::load_from_path(&config_path).unwrap();
         assert!(config.section_names().is_empty());
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn test_section_management() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         let mut config = Config::load_from_path(&config_path).unwrap();
         
@@ -278,7 +278,7 @@ mod tests {
         }
 
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         let mut config = Config::load_from_path(&config_path).unwrap();
         
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn test_remove_section() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         let mut config = Config::load_from_path(&config_path).unwrap();
         
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn test_clear_config() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         let mut config = Config::load_from_path(&config_path).unwrap();
         
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_load_or_create_with_default() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         // Create a config at a specific path
         let mut config = Config::load_from_path(&config_path).unwrap();
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn test_empty_file_handling() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
         // Create an empty file
         fs::write(&config_path, "").unwrap();
@@ -372,10 +372,10 @@ mod tests {
     #[test]
     fn test_malformed_json_error() {
         let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.json");
+        let config_path = temp_dir.path().join("config.toml");
         
-        // Write malformed JSON
-        fs::write(&config_path, "{ invalid json }").unwrap();
+        // Write malformed TOML
+        fs::write(&config_path, "[invalid toml").unwrap();
         
         // Should return an error
         let result = Config::load_from_path(&config_path);

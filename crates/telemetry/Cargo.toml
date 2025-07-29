@@ -1,0 +1,33 @@
+[package]
+name = "ftl-telemetry"
+version = "0.0.23"
+publish = false
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Telemetry infrastructure for FTL CLI"
+readme = "README.md"
+keywords = ["ftl", "cli", "telemetry", "metrics", "analytics"]
+categories = ["development-tools"]
+
+[dependencies]
+ftl-common = { version = "0.0.23", path = "../common" }
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

@@ -4,7 +4,7 @@ The FTL configuration system provides a flexible, type-safe way to manage applic
 
 ## Overview
 
-The configuration system stores data in `~/.ftl/config.json` as a JSON object where each top-level key represents a different configuration section. Each section is managed independently by the component that owns it.
+The configuration system stores data in `~/.ftl/config.toml` as a TOML file where each top-level table represents a different configuration section. Each section is managed independently by the component that owns it.
 
 ## Quick Start
 
@@ -77,7 +77,7 @@ The main configuration manager:
 
 ```rust
 impl Config {
-    // Load from default location (~/.ftl/config.json)
+    // Load from default location (~/.ftl/config.toml)
     pub fn load() -> Result<Self>
     
     // Load from custom path
@@ -177,30 +177,25 @@ fn logout() -> Result<()> {
 
 ## File Structure
 
-The configuration file is stored at `~/.ftl/config.json` with the following structure:
+The configuration file is stored at `~/.ftl/config.toml` with the following structure:
 
-```json
-{
-  "telemetry": {
-    "installation_id": "550e8400-e29b-41d4-a716-446655440000",
-    "telemetry_enabled": true
-  },
-  "auth": {
-    "access_token": "...",
-    "refresh_token": "...",
-    "expires_at": 1234567890
-  },
-  "registry": {
-    "default_registry": "ghcr.io",
-    "registries": [
-      {
-        "name": "ghcr.io",
-        "url": "https://ghcr.io",
-        "auth_required": true
-      }
-    ]
-  }
-}
+```toml
+[telemetry]
+installation_id = "550e8400-e29b-41d4-a716-446655440000"
+telemetry_enabled = true
+
+[auth]
+access_token = "..."
+refresh_token = "..."
+expires_at = 1234567890
+
+[registry]
+default_registry = "ghcr.io"
+
+[[registry.registries]]
+name = "ghcr.io"
+url = "https://ghcr.io"
+auth_required = true
 ```
 
 ## Error Handling
@@ -241,7 +236,7 @@ use tempfile::TempDir;
 #[test]
 fn test_my_feature() {
     let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.json");
+    let config_path = temp_dir.path().join("config.toml");
     
     let mut config = Config::load_from_path(&config_path).unwrap();
     // Test your configuration logic
