@@ -998,13 +998,16 @@ dependencies = [
  "ftl-common",
  "ftl-language",
  "ftl-runtime",
+ "ftl-telemetry",
  "nix",
  "notify",
  "predicates",
+ "regex",
  "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
