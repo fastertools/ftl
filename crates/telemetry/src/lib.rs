@@ -7,6 +7,7 @@
 pub mod config;
 pub mod events;
 pub mod logger;
+pub mod notice;
 pub mod storage;
 
 #[cfg(test)]
@@ -36,6 +37,20 @@ impl TelemetryClient {
         Ok(Self { config, logger })
     }
     
+    /// Initialize telemetry and show first-run notice if needed
+    pub fn initialize() -> Result<Self> {
+        // Check if we should show the notice
+        if notice::should_show_notice()? {
+            if notice::is_interactive() {
+                notice::show_notice()?;
+            } else {
+                notice::show_notice_non_interactive()?;
+            }
+        }
+        
+        Self::new()
+    }
+    
     /// Check if telemetry is enabled
     pub fn is_enabled(&self) -> bool {
         self.config.is_enabled()
@@ -53,5 +68,10 @@ impl TelemetryClient {
     /// Get the telemetry log directory
     pub fn log_directory(&self) -> PathBuf {
         self.logger.log_directory()
+    }
+    
+    /// Get the installation ID
+    pub fn installation_id(&self) -> &str {
+        &self.config.installation_id
     }
 }
