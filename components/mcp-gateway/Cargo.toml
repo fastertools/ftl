@@ -21,12 +21,12 @@ package = "ftl:mcp-gateway"
 
 [dependencies]
 anyhow = "1"
-spin-sdk = "3.1.0"
+spin-sdk = "4.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["macros", "rt"] }
 futures = "0.3"
-jsonschema = { version = "0.26", default-features = false }
+jsonschema = { version = "0.31", default-features = false }
 ftl-sdk = { path = "../../sdk/rust" }
 
 [lints.rust]
