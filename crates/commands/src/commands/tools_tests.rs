@@ -730,43 +730,33 @@ mod add_tools_integration_tests {
         // This test documents the exact bug that was fixed
         let mut fixture = TestFixture::new();
 
-        let spin_toml_content = r#"spin_manifest_version = 2
-
-[application]
+        let ftl_toml_content = r#"[project]
 name = "test-app"
 version = "0.1.0"
 "#;
 
-        // Mock: ftl.toml doesn't exist
+        // Mock: ftl.toml exists (required in new architecture)
         fixture
             .file_system
             .expect_exists()
             .with(mockall::predicate::eq(std::path::Path::new("ftl.toml")))
             .times(1)
-            .returning(|_| false);
-
-        // Mock: spin.toml exists
-        fixture
-            .file_system
-            .expect_exists()
-            .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
-            .times(1)
             .returning(|_| true);
 
-        // Mock: reading spin.toml
+        // Mock: reading ftl.toml
         fixture
             .file_system
             .expect_read_to_string()
-            .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+            .with(mockall::predicate::eq(std::path::Path::new("ftl.toml")))
             .times(1)
-            .returning(move |_| Ok(spin_toml_content.to_string()));
+            .returning(move |_| Ok(ftl_toml_content.to_string()));
 
-        // Mock: writing spin.toml (the test will update it)
+        // Mock: writing ftl.toml (the test will update it)
         fixture
             .file_system
             .expect_write_string()
             .with(
-                mockall::predicate::eq(std::path::Path::new("spin.toml")),
+                mockall::predicate::eq(std::path::Path::new("ftl.toml")),
                 mockall::predicate::always(),
             )
             .times(1)
