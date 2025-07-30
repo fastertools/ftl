@@ -70,7 +70,7 @@ pub struct Config {
 impl Config {
     /// Default configuration directory name
     pub const CONFIG_DIR: &'static str = ".ftl";
-    
+
     /// Default configuration file name
     pub const CONFIG_FILE: &'static str = "config.toml";
 
@@ -85,7 +85,7 @@ impl Config {
         let data = if path.exists() {
             let contents = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file at {:?}", path))?;
-            
+
             if contents.trim().is_empty() {
                 HashMap::new()
             } else {
@@ -104,18 +104,19 @@ impl Config {
 
     /// Get the default configuration file path
     pub fn default_config_path() -> Result<PathBuf> {
-        let home = dirs::home_dir()
-            .context("Could not determine home directory")?;
+        let home = dirs::home_dir().context("Could not determine home directory")?;
         Ok(home.join(Self::CONFIG_DIR).join(Self::CONFIG_FILE))
     }
 
     /// Get a configuration section
     pub fn get_section<T: ConfigSection>(&self) -> Result<Option<T>> {
         let section_name = T::section_name();
-        
+
         match self.data.get(section_name) {
             Some(value) => {
-                let section = value.clone().try_into()
+                let section = value
+                    .clone()
+                    .try_into()
                     .with_context(|| format!("Failed to deserialize {} section", section_name))?;
                 Ok(Some(section))
             }
@@ -128,7 +129,7 @@ impl Config {
         let section_name = T::section_name();
         let value = toml::Value::try_from(section)
             .with_context(|| format!("Failed to serialize {} section", section_name))?;
-        
+
         self.data.insert(section_name.to_string(), value);
         Ok(())
     }
@@ -148,8 +149,8 @@ impl Config {
         }
 
         // Serialize to pretty TOML
-        let contents = toml::to_string_pretty(&self.data)
-            .context("Failed to serialize config data")?;
+        let contents =
+            toml::to_string_pretty(&self.data).context("Failed to serialize config data")?;
 
         fs::write(&self.path, contents)
             .with_context(|| format!("Failed to write config file at {:?}", self.path))?;
@@ -182,10 +183,9 @@ impl Config {
 ///
 /// This function loads the configuration, gets or creates the specified section,
 /// and returns both the section and whether it was newly created.
-pub fn load_or_create_section<T: ConfigSection + Default>(
-) -> Result<(T, bool)> {
+pub fn load_or_create_section<T: ConfigSection + Default>() -> Result<(T, bool)> {
     let mut config = Config::load()?;
-    
+
     match config.get_section::<T>()? {
         Some(section) => Ok((section, false)),
         None => {
@@ -200,8 +200,8 @@ pub fn load_or_create_section<T: ConfigSection + Default>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct TestSection {
@@ -228,7 +228,7 @@ mod tests {
     fn test_empty_config() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         let config = Config::load_from_path(&config_path).unwrap();
         assert!(config.section_names().is_empty());
     }
@@ -237,26 +237,26 @@ mod tests {
     fn test_section_management() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         let mut config = Config::load_from_path(&config_path).unwrap();
-        
+
         // Test getting non-existent section
         assert!(config.get_section::<TestSection>().unwrap().is_none());
-        
+
         // Test setting section
         let section = TestSection {
             value: "test_value".to_string(),
             enabled: false,
         };
         config.set_section(section.clone()).unwrap();
-        
+
         // Test getting section
         let retrieved = config.get_section::<TestSection>().unwrap().unwrap();
         assert_eq!(retrieved, section);
-        
+
         // Test has_section
         assert!(config.has_section::<TestSection>());
-        
+
         // Test saving and reloading
         config.save().unwrap();
         let config2 = Config::load_from_path(&config_path).unwrap();
@@ -279,14 +279,16 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         let mut config = Config::load_from_path(&config_path).unwrap();
-        
+
         config.set_section(TestSection::default()).unwrap();
-        config.set_section(AnotherSection {
-            name: "test".to_string(),
-        }).unwrap();
-        
+        config
+            .set_section(AnotherSection {
+                name: "test".to_string(),
+            })
+            .unwrap();
+
         assert_eq!(config.section_names().len(), 2);
         assert!(config.has_section::<TestSection>());
         assert!(config.has_section::<AnotherSection>());
@@ -296,18 +298,18 @@ mod tests {
     fn test_remove_section() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         let mut config = Config::load_from_path(&config_path).unwrap();
-        
+
         // Add a section
         config.set_section(TestSection::default()).unwrap();
         assert!(config.has_section::<TestSection>());
-        
+
         // Remove the section
         let removed = config.remove_section::<TestSection>();
         assert!(removed.is_some());
         assert!(!config.has_section::<TestSection>());
-        
+
         // Save and reload to verify persistence
         config.save().unwrap();
         let config2 = Config::load_from_path(&config_path).unwrap();
@@ -318,17 +320,17 @@ mod tests {
     fn test_clear_config() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         let mut config = Config::load_from_path(&config_path).unwrap();
-        
+
         // Add some sections
         config.set_section(TestSection::default()).unwrap();
         assert!(!config.section_names().is_empty());
-        
+
         // Clear all sections
         config.clear();
         assert!(config.section_names().is_empty());
-        
+
         // Save and verify
         config.save().unwrap();
         let config2 = Config::load_from_path(&config_path).unwrap();
@@ -339,17 +341,17 @@ mod tests {
     fn test_load_or_create_with_default() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         // Create a config at a specific path
         let mut config = Config::load_from_path(&config_path).unwrap();
-        
+
         // First time - section doesn't exist
         assert!(config.get_section::<TestSection>().unwrap().is_none());
-        
+
         // Add default section
         config.set_section(TestSection::default()).unwrap();
         config.save().unwrap();
-        
+
         // Load again and verify
         let config2 = Config::load_from_path(&config_path).unwrap();
         let section = config2.get_section::<TestSection>().unwrap().unwrap();
@@ -360,10 +362,10 @@ mod tests {
     fn test_empty_file_handling() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         // Create an empty file
         fs::write(&config_path, "").unwrap();
-        
+
         // Should handle empty file gracefully
         let config = Config::load_from_path(&config_path).unwrap();
         assert!(config.section_names().is_empty());
@@ -373,24 +375,29 @@ mod tests {
     fn test_malformed_json_error() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
-        
+
         // Write malformed TOML
         fs::write(&config_path, "[invalid toml").unwrap();
-        
+
         // Should return an error
         let result = Config::load_from_path(&config_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to parse config file"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to parse config file")
+        );
     }
 
     #[test]
     fn test_nested_directory_creation() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("deep/nested/path/config.json");
-        
+
         let mut config = Config::load_from_path(&config_path).unwrap();
         config.set_section(TestSection::default()).unwrap();
-        
+
         // Should create all parent directories
         config.save().unwrap();
         assert!(config_path.exists());
