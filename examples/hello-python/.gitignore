@@ -1,0 +1,9 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+*.wasm
+.spin-aka/
