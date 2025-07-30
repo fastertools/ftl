@@ -35,32 +35,39 @@ pub enum EventType {
     
     /// Command failed
     CommandError,
-    
-    /// Feature used
-    FeatureUsed,
-    
-    /// Performance metric
-    PerformanceMetric,
 }
 
 impl TelemetryEvent {
-    /// Create a new telemetry event
+    /// Create a new telemetry event with system information
     pub fn new(event_type: EventType, session_id: String) -> Self {
-        Self {
+        let mut event = Self {
             id: uuid::Uuid::new_v4().to_string(),
             event_type,
             timestamp: Utc::now(),
             session_id,
             properties: HashMap::new(),
-        }
+        };
+        
+        // Add system information to all events
+        event.properties.insert("os".to_string(), serde_json::Value::String(std::env::consts::OS.to_string()));
+        event.properties.insert("arch".to_string(), serde_json::Value::String(std::env::consts::ARCH.to_string()));
+        event.properties.insert("ftl_version".to_string(), serde_json::Value::String(env!("CARGO_PKG_VERSION").to_string()));
+        event.properties.insert("event_version".to_string(), serde_json::Value::String("1.0".to_string()));
+        
+        event
     }
     
     /// Add a property to the event
     pub fn with_property<T: Serialize>(mut self, key: &str, value: T) -> Self {
-        self.properties.insert(
-            key.to_string(),
-            serde_json::to_value(value).unwrap_or(serde_json::Value::Null),
-        );
+        match serde_json::to_value(value) {
+            Ok(v) => {
+                self.properties.insert(key.to_string(), v);
+            }
+            Err(e) => {
+                tracing::debug!("Failed to serialize telemetry property '{}': {}", key, e);
+                self.properties.insert(key.to_string(), serde_json::Value::String("[SERIALIZATION_ERROR]".to_string()));
+            }
+        }
         self
     }
     

@@ -700,7 +700,7 @@ async fn main() -> Result<()> {
         .init();
 
     // Initialize telemetry (shows first-run notice if needed)
-    let telemetry_client = match ftl_telemetry::TelemetryClient::initialize() {
+    let telemetry_client = match ftl_telemetry::TelemetryClient::initialize().await {
         Ok(client) => Some(client),
         Err(e) => {
             tracing::debug!("Failed to initialize telemetry: {}", e);
@@ -732,9 +732,13 @@ async fn main() -> Result<()> {
     // Record command execution start
     let start_time = std::time::Instant::now();
     if let Some(ref client) = telemetry_client {
+        // Filter sensitive arguments before logging
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let filtered_args = ftl_telemetry::privacy::filter_command_args(args);
+        
         let event = ftl_telemetry::events::TelemetryEvent::command_executed(
             command_name,
-            std::env::args().skip(1).collect(),
+            filtered_args,
             session_id.clone(),
         );
         if let Err(e) = client.log_event(event).await {

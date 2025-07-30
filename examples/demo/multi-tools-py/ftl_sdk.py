@@ -134,11 +134,8 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
             path = request.uri
             method = request.method
             
-            # Log all requests for debugging
-            print(f"[DEBUG] Method: {method}, Path: '{path}', URI: '{request.uri}'")
-            
             # Handle GET / - return tool metadata
-            if method == "GET" and (path == "/" or path == ""):
+            if method == "GET" and path == "/":
                 metadata = []
                 for key, tool in tools.items():
                     # Use explicit name if provided, otherwise convert from key
@@ -206,16 +203,10 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
                     )
             
             # Method not allowed
-            error_response = {
-                "error": {
-                    "code": -32601,
-                    "message": "Method not allowed"
-                }
-            }
             return Response(
                 405,
-                {"content-type": "application/json", "allow": "GET, POST"},
-                bytes(json.dumps(error_response), "utf-8")
+                {"content-type": "text/plain"},
+                b"Method not allowed"
             )
     
     return IncomingHandler

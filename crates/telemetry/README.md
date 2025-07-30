@@ -20,10 +20,9 @@ This crate implements anonymous usage telemetry for FTL CLI. All telemetry data 
 telemetry/
 ├── config.rs       # Telemetry configuration and settings
 ├── events.rs       # Event types and builders
-├── logger.rs       # Local file logging implementation
+├── logger.rs       # Local file logging implementation with file locking
 ├── notice.rs       # First-run notice system
-├── privacy.rs      # Privacy utilities for sanitizing data
-└── storage.rs      # Future: telemetry data aggregation
+└── privacy.rs      # Privacy utilities for sanitizing data and filtering arguments
 ```
 
 ## Usage
@@ -70,17 +69,24 @@ retention_days = 30
 
 The telemetry system implements several privacy protections:
 
-1. **Automatic sanitization** of error messages to remove:
+1. **Command argument filtering** to automatically redact:
+   - Passwords, tokens, and API keys
+   - URLs, email addresses, and IP addresses (including IPv6)
+   - Sensitive file paths
+
+2. **Automatic sanitization** of error messages to remove:
    - File paths containing user directories
    - URLs that might contain credentials  
    - Email addresses
-   - IP addresses
+   - IP addresses (both IPv4 and IPv6)
 
-2. **No network transmission** - all data stays local
+3. **No network transmission** - all data stays local
 
-3. **Minimal data collection** - only essential usage metrics
+4. **File locking** - prevents concurrent write corruption
 
-4. **User control** - easy opt-out mechanisms
+5. **Minimal data collection** - only essential usage metrics
+
+6. **User control** - easy opt-out mechanisms
 
 See [PRIVACY_AUDIT.md](./PRIVACY_AUDIT.md) for a detailed privacy analysis.
 

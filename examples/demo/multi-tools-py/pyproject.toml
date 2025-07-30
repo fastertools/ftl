@@ -1,0 +1,8 @@
+[project]
+name = "multi-tools-py"
+version = "0.1.0"
+description = "Multiple MCP tools in Python demonstrating component with multiple tools"
+dependencies = [
+    "spin-sdk>=3.3.0",
+    "componentize-py>=0.17.0"
+]

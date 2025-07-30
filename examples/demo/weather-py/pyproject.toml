@@ -1,0 +1,8 @@
+[project]
+name = "weather-py"
+version = "0.1.0"
+description = "Weather tool written in Python for FTL MCP"
+dependencies = [
+    "spin-sdk>=3.3.0",
+    "componentize-py>=0.17.0"
+]

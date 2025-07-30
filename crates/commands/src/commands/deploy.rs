@@ -784,6 +784,20 @@ pub fn extract_component_version(
         }
     }
 
+    // Try pyproject.toml for Python projects
+    let pyproject_path = component_dir.join("pyproject.toml");
+    if file_system.exists(&pyproject_path) {
+        let pyproject_content = file_system.read_to_string(&pyproject_path)?;
+        let pyproject_toml: toml::Value = toml::from_str(&pyproject_content)?;
+        if let Some(version) = pyproject_toml
+            .get("project")
+            .and_then(|p| p.get("version"))
+            .and_then(|v| v.as_str())
+        {
+            return Ok(version.to_string());
+        }
+    }
+
     // Default to 0.1.0 if no version found
     Ok("0.1.0".to_string())
 }

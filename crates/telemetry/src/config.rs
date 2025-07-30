@@ -14,10 +14,6 @@ pub struct TelemetryConfig {
     /// Unique installation ID
     pub installation_id: String,
     
-    /// Whether to upload telemetry (future feature)
-    #[serde(default)]
-    pub upload_enabled: bool,
-    
     /// Log directory path
     #[serde(skip)]
     pub log_directory: PathBuf,
@@ -33,12 +29,14 @@ fn default_retention_days() -> u32 {
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let log_directory = dirs::home_dir()
+            .map(|h| h.join(".ftl").join("logs"))
+            .unwrap_or_else(|| PathBuf::from(".ftl").join("logs"));
+        
         Self {
             enabled: true,
             installation_id: uuid::Uuid::new_v4().to_string(),
-            upload_enabled: false,
-            log_directory: home.join(".ftl").join("logs"),
+            log_directory,
             retention_days: default_retention_days(),
         }
     }
@@ -53,22 +51,15 @@ impl ConfigSection for TelemetryConfig {
 impl TelemetryConfig {
     /// Load telemetry configuration
     pub fn load() -> Result<Self> {
-        // Check environment variable first
-        if std::env::var("FTL_TELEMETRY_DISABLED").is_ok() {
-            return Ok(Self {
-                enabled: false,
-                ..Default::default()
-            });
-        }
-        
         // Load from config file
         let config = Config::load()?;
         let mut telemetry_config = config.get_section::<TelemetryConfig>()?
             .unwrap_or_default();
         
         // Set the log directory based on home
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        telemetry_config.log_directory = home.join(".ftl").join("logs");
+        telemetry_config.log_directory = dirs::home_dir()
+            .map(|h| h.join(".ftl").join("logs"))
+            .unwrap_or_else(|| PathBuf::from(".ftl").join("logs"));
         
         Ok(telemetry_config)
     }

@@ -7,7 +7,11 @@
     "build": "npm run typecheck && esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && mkdir -p dist && j2w -i build/bundle.js -o dist/weather-ts.wasm",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["mcp", "ftl", "tool"],
+  "keywords": [
+    "mcp",
+    "ftl",
+    "tool"
+  ],
   "author": "bowlofarugula <bowlofarugula@gmail.com>",
   "license": "Apache-2.0",
   "devDependencies": {
@@ -17,7 +21,7 @@
   "dependencies": {
     "@spinframework/build-tools": "^1.0.1",
     "@spinframework/wasi-http-proxy": "^1.0.0",
-    "ftl-sdk": "^0.2.7",
+    "ftl-sdk": "file:../../../sdk/typescript",
     "zod": "^4.0.3"
   }
 }

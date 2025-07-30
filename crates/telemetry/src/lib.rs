@@ -9,7 +9,6 @@ pub mod events;
 pub mod logger;
 pub mod notice;
 pub mod privacy;
-pub mod storage;
 
 #[cfg(test)]
 mod tests;
@@ -40,7 +39,7 @@ impl TelemetryClient {
     }
     
     /// Initialize telemetry and show first-run notice if needed
-    pub fn initialize() -> Result<Self> {
+    pub async fn initialize() -> Result<Self> {
         // Check if we should show the notice
         if notice::should_show_notice()? {
             if notice::is_interactive() {
@@ -50,7 +49,16 @@ impl TelemetryClient {
             }
         }
         
-        Self::new()
+        let client = Self::new()?;
+        
+        // Clean up old log files on startup
+        if client.is_enabled() {
+            if let Err(e) = client.logger.cleanup().await {
+                tracing::debug!("Failed to clean up old telemetry logs: {}", e);
+            }
+        }
+        
+        Ok(client)
     }
     
     /// Check if telemetry is enabled

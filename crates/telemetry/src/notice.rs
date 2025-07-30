@@ -44,24 +44,26 @@ const TELEMETRY_NOTICE: &str = r#"
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  FTL CLI collects anonymous usage data to help improve the     │
-│  tool. This data is stored locally on your machine and is      │
-│  never sent to external servers.                               │
+│  tool. This data is stored locally and shared with FTL to      │
+│  help us understand usage patterns and improve the platform.   │
 │                                                                 │
 │  We collect:                                                    │
 │  • Command usage (which commands are run)                      │
+│  • Command arguments (with sensitive values filtered)          │
 │  • Command success/failure rates                               │
 │  • Performance metrics (execution time)                         │
+│  • Operating system and architecture                           │
 │                                                                 │
 │  We do NOT collect:                                            │
 │  • Personal information                                         │
-│  • Project names or file paths                                 │
-│  • Command arguments or file contents                          │
+│  • Passwords, tokens, or API keys                              │
+│  • File contents or project data                               │
 │                                                                 │
 │  To opt out of telemetry:                                      │
 │  • Run: ftl telemetry disable                                  │
 │  • Or set: FTL_TELEMETRY_DISABLED=1                           │
 │                                                                 │
-│  Learn more: https://github.com/fermyon/ftl#telemetry          │
+│  Learn more: https://github.com/FamilyLYX/ftl-cli#telemetry    │
 │                                                                 │
 ╰─────────────────────────────────────────────────────────────────╯
 "#;

@@ -60,7 +60,6 @@ async fn test_telemetry_client_initialize() {
     let telemetry_config = crate::config::TelemetryConfig {
         enabled: true,
         installation_id: "test-id".to_string(),
-        upload_enabled: false,
         log_directory: temp_dir.path().join("logs"),
         retention_days: 30,
     };
@@ -78,7 +77,6 @@ async fn test_telemetry_client_initialize() {
     let client = TelemetryClient::from_config(crate::config::TelemetryConfig {
         enabled: true,
         installation_id: "test-id".to_string(),
-        upload_enabled: false,
         log_directory: temp_dir.path().join("logs"),
         retention_days: 30,
     }).unwrap();

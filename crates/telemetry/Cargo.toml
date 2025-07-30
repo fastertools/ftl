@@ -26,6 +26,8 @@ dirs = { workspace = true }
 uuid = { workspace = true }
 atty = { workspace = true }
 regex = { workspace = true }
+once_cell = { workspace = true }
+fs4 = "0.13"
 
 [dev-dependencies]
 tempfile = { workspace = true }

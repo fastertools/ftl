@@ -1,0 +1,4 @@
+spin-sdk>=3.3.0
+componentize-py>=0.17.0
+# Copy ftl_sdk.py locally for now since editable installs need setup.py
+# TODO: Replace with published package once available
