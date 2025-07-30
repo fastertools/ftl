@@ -9,7 +9,7 @@ use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
 use ftl_runtime::deps::{
     CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
 };
-use crate::config::ftl_config::{FtlConfig, ProjectConfig, AuthConfig, DeploymentConfig, GatewayConfig};
+use crate::config::ftl_config::{FtlConfig, ProjectConfig, AuthConfig, GatewayConfig};
 
 /// Init command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
@@ -170,8 +170,8 @@ fn create_ftl_project(
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        deployment: DeploymentConfig::default(),
         gateway: GatewayConfig::default(),
+        variables: HashMap::new(),
     };
     
     let ftl_content = config.to_toml_string()?;
@@ -230,6 +230,7 @@ node_modules/
 target/
 dist/
 .spin/
+.ftl/
 
 # Environment
 .env

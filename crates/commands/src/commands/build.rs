@@ -12,6 +12,8 @@ use ftl_common::SpinInstaller;
 use ftl_runtime::deps::{
     CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, UserInterface,
 };
+use crate::config::ftl_config::FtlConfig;
+use crate::config::transpiler::transpile_ftl_to_spin;
 
 /// Information about a component to build
 #[derive(Debug, Clone)]
@@ -30,6 +32,10 @@ pub struct BuildConfig {
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
+    /// Export transpiled configuration (e.g., "spin")
+    pub export: Option<String>,
+    /// Output path for exported configuration
+    pub export_out: Option<PathBuf>,
 }
 
 /// Dependencies for the build command
@@ -46,7 +52,12 @@ pub struct BuildDependencies {
 
 /// Execute the build command with injected dependencies
 pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>) -> Result<()> {
-    let working_path = config.path.unwrap_or_else(|| PathBuf::from("."));
+    let working_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
+
+    // If export mode is requested, handle that first
+    if let Some(export_format) = &config.export {
+        return handle_export(&config, &deps, &working_path, export_format);
+    }
 
     // Check for ftl.toml and generate temporary spin.toml if needed
     let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
@@ -107,6 +118,47 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         let _ = std::fs::remove_file(&manifest_path);
     }
     
+    Ok(())
+}
+
+/// Handle export functionality
+fn handle_export(
+    config: &BuildConfig,
+    deps: &Arc<BuildDependencies>,
+    working_path: &Path,
+    export_format: &str,
+) -> Result<()> {
+    // Currently only support "spin" format
+    if export_format != "spin" {
+        anyhow::bail!("Unsupported export format '{}'. Currently only 'spin' is supported.", export_format);
+    }
+
+    // Check if ftl.toml exists
+    let ftl_toml_path = working_path.join("ftl.toml");
+    if !deps.file_system.exists(&ftl_toml_path) {
+        anyhow::bail!("No ftl.toml found in the project directory. Export requires an ftl.toml file.");
+    }
+
+    // Read and parse ftl.toml
+    let ftl_content = deps.file_system.read_to_string(&ftl_toml_path)
+        .context("Failed to read ftl.toml")?;
+    
+    let ftl_config = FtlConfig::parse(&ftl_content)?;
+    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+
+    // Determine output path
+    let output_path = config.export_out.clone()
+        .unwrap_or_else(|| PathBuf::from("./spin.toml"));
+
+    // Write the transpiled content
+    deps.file_system.write_string(&output_path, &spin_content)
+        .context("Failed to write exported spin.toml")?;
+
+    deps.ui.print_styled(
+        &format!("✓ Exported spin.toml to {}", output_path.display()),
+        MessageStyle::Success,
+    );
+
     Ok(())
 }
 
@@ -328,6 +380,10 @@ pub struct BuildArgs {
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
+    /// Export transpiled configuration (e.g., "spin")
+    pub export: Option<String>,
+    /// Output path for exported configuration
+    pub export_out: Option<PathBuf>,
 }
 
 // Spin installer wrapper that adapts the common implementation
@@ -357,6 +413,8 @@ pub async fn execute(args: BuildArgs) -> Result<()> {
     let config = BuildConfig {
         path: args.path,
         release: args.release,
+        export: args.export,
+        export_out: args.export_out,
     };
 
     execute_with_deps(config, deps).await

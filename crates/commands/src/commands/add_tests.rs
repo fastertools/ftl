@@ -77,7 +77,6 @@ async fn test_add_not_in_spin_project() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -108,7 +107,6 @@ async fn test_add_invalid_name_uppercase() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("MyTool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -139,7 +137,6 @@ async fn test_add_invalid_name_leading_hyphen() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("-tool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -187,7 +184,6 @@ async fn test_add_templates_not_installed() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: Some("A test tool".to_string()),
             language: Some("rust".to_string()),
             git: None,
             branch: None,
@@ -273,7 +269,6 @@ route = "/mcp/..."
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: Some("A test tool".to_string()),
             language: Some("rust".to_string()),
             git: None,
             branch: None,
@@ -349,7 +344,6 @@ tool_components = { default = "existing-tool" }
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-ts-tool".to_string()),
-            description: Some("A TypeScript tool".to_string()),
             language: Some("typescript".to_string()),
             git: None,
             branch: None,
@@ -407,7 +401,6 @@ async fn test_add_with_git_template() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("custom-tool".to_string()),
-            description: Some("Custom template tool".to_string()),
             language: Some("rust".to_string()),
             git: Some("https://github.com/example/template.git".to_string()),
             branch: Some("main".to_string()),
@@ -453,7 +446,6 @@ async fn test_add_interactive_prompts() {
     let result = execute_with_deps(
         AddConfig {
             name: None,        // Will prompt for name
-            description: None, // Will prompt for description
             language: None,    // Will prompt for language
             git: None,
             branch: None,
@@ -497,7 +489,6 @@ async fn test_add_javascript_mapped_to_typescript() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("js-tool".to_string()),
-            description: Some("JavaScript tool".to_string()),
             language: Some("javascript".to_string()), // Should be mapped to TypeScript
             git: None,
             branch: None,

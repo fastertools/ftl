@@ -146,7 +146,12 @@ impl BuildExecutor for BuildExecutorWrapper {
     async fn execute(&self, path: Option<PathBuf>, release: bool) -> Result<()> {
         use crate::commands::build;
 
-        let args = build::BuildArgs { path, release };
+        let args = build::BuildArgs { 
+            path, 
+            release,
+            export: None,
+            export_out: None,
+        };
 
         build::execute(args).await
     }

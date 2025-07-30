@@ -15,8 +15,6 @@ use ftl_runtime::deps::{CommandExecutor, FileSystem, MessageStyle, UserInterface
 pub struct AddConfig {
     /// Name of the component to add
     pub name: Option<String>,
-    /// Description of the component
-    pub description: Option<String>,
     /// Language to use for the component
     pub language: Option<String>,
     /// Git repository URL for templates
@@ -61,22 +59,6 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Validate component name
     validate_component_name(&component_name)?;
-
-    // Get description interactively if not provided
-    let description = match config.description {
-        Some(d) => d,
-        None => {
-            if deps.ui.is_interactive() {
-                deps.ui.prompt_input("Tool description", None)?
-            } else {
-                // Non-interactive mode - use default
-                format!(
-                    "MCP tool written in {}",
-                    config.language.as_ref().unwrap_or(&"Rust".to_string())
-                )
-            }
-        }
-    };
 
     // Determine language
     let selected_language = determine_language(config.language.as_ref(), &deps.ui)?;
@@ -127,9 +109,6 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     }
 
     args.push("--accept-defaults");
-    args.push("--value");
-    let desc_value = format!("tool-description={description}");
-    args.push(&desc_value);
     args.push(&component_name);
 
     // Execute spin add
@@ -161,7 +140,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Update configuration - ftl.toml if it exists, otherwise spin.toml
     if has_ftl_toml {
-        update_ftl_toml(&deps.file_system, &component_name, selected_language, &description)?;
+        update_ftl_toml(&deps.file_system, &component_name, selected_language)?;
     } else {
         // Update spin.toml to add the component to tool_components variable
         update_tool_components(&deps.file_system, &component_name)?;
@@ -236,9 +215,9 @@ fn update_ftl_toml(
     fs: &Arc<dyn FileSystem>,
     component_name: &str,
     language: Language,
-    _description: &str,
 ) -> Result<()> {
-    use crate::config::ftl_config::{FtlConfig, ToolConfig};
+    use crate::config::ftl_config::{FtlConfig, ToolConfig, BuildConfig};
+    use std::collections::HashMap;
     
     // Read ftl.toml
     let content = fs
@@ -248,21 +227,38 @@ fn update_ftl_toml(
     // Parse config
     let mut config = FtlConfig::parse(&content)?;
     
-    // Determine tool type
-    let tool_type = match language {
-        Language::Rust => "rust",
-        Language::TypeScript | Language::JavaScript => "typescript",
-    }.to_string();
+    // Create build configuration with explicit defaults based on language
+    let build = match language {
+        Language::Rust => BuildConfig {
+            command: "cargo build --target wasm32-wasip1 --release".to_string(),
+            workdir: None,
+            watch: vec![
+                "src/**/*.rs".to_string(),
+                "Cargo.toml".to_string(),
+            ],
+            env: HashMap::new(),
+        },
+        Language::TypeScript | Language::JavaScript => BuildConfig {
+            command: "npm install && npm run build".to_string(),
+            workdir: None,
+            watch: vec![
+                "src/**/*.ts".to_string(),
+                "src/**/*.js".to_string(),
+                "package.json".to_string(),
+                "tsconfig.json".to_string(),
+            ],
+            env: HashMap::new(),
+        },
+    };
     
     // Add the new tool
     config.tools.insert(
         component_name.to_string(),
         ToolConfig {
-            tool_type,
             path: component_name.to_string(),
-            build: None,
-            allowed_hosts: vec![],
-            watch: vec![],
+            build,
+            allowed_outbound_hosts: vec![],
+            variables: HashMap::new(),
         },
     );
     
@@ -388,8 +384,6 @@ fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, lang
 pub struct AddArgs {
     /// Name of the tool to add
     pub name: Option<String>,
-    /// Description of the tool
-    pub description: Option<String>,
     /// Programming language
     pub language: Option<String>,
     /// Git repository URL for custom template
@@ -428,7 +422,6 @@ pub async fn execute(args: AddArgs) -> Result<()> {
 
     let config = AddConfig {
         name: args.name,
-        description: args.description,
         language: args.language,
         git: args.git,
         branch: args.branch,

@@ -347,6 +347,7 @@ async fn test_up_no_spin_toml() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -396,6 +397,7 @@ async fn test_up_normal_mode_no_build() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -485,6 +487,7 @@ command = "cargo build --target wasm32-wasi"
             build: true,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -533,6 +536,7 @@ async fn test_up_process_fails() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -593,6 +597,7 @@ async fn test_up_with_custom_path() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -625,6 +630,7 @@ async fn test_up_watch_mode_initial_build_fails() {
             build: false,
             watch: true,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -711,6 +717,7 @@ command = "cargo build --target wasm32-wasi"
                 build: false,
                 watch: true,
                 clear: false,
+                log_dir: None,
             },
             deps,
         ),
@@ -798,6 +805,7 @@ async fn test_up_with_specific_port() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )
@@ -878,6 +886,7 @@ command = "cargo build --target wasm32-wasi"
                 build: false,
                 watch: true,
                 clear: true, // Clear screen enabled
+                log_dir: None,
             },
             deps,
         ),
@@ -899,6 +908,7 @@ async fn test_execute_function() {
         watch: false,
         clear: false,
         port: Some(3000),
+        log_dir: None,
     };
 
     // This will fail because the path doesn't exist, but we're testing
@@ -941,6 +951,7 @@ async fn test_up_ctrlc_handling() {
             build: false,
             watch: false,
             clear: false,
+            log_dir: None,
         },
         deps,
     )

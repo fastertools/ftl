@@ -39,6 +39,20 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     // Build variables section
     let mut vars_table = Table::new();
     
+    // Add application-level variables first
+    for (name, var) in &ftl_config.variables {
+        match var {
+            crate::config::ftl_config::ApplicationVariable::Default { default } => {
+                vars_table[name] = create_default_var(default);
+            }
+            crate::config::ftl_config::ApplicationVariable::Required { required: _ } => {
+                // For required variables, we create an empty default
+                // Spin will enforce the requirement at runtime
+                vars_table[name] = create_required_var();
+            }
+        }
+    }
+    
     // Tool components variable
     let tool_names = ftl_config.tool_components().join(",");
     vars_table["tool_components"] = create_default_var(&tool_names);
@@ -138,6 +152,13 @@ fn create_default_var(value: &str) -> Item {
     Item::Value(Value::InlineTable(inline_table))
 }
 
+/// Create a required variable (no default value)
+fn create_required_var() -> Item {
+    let mut inline_table = InlineTable::new();
+    inline_table.insert("required", Value::from(true));
+    Item::Value(Value::InlineTable(inline_table))
+}
+
 /// Create an HTTP trigger configuration
 fn create_http_trigger(route: &str, component: &str, private: bool) -> Table {
     let mut trigger = Table::new();
@@ -225,78 +246,72 @@ fn create_gateway_component(version: &str, validate_args: bool) -> Table {
 fn create_tool_component(name: &str, config: &ToolConfig) -> Table {
     let mut component = Table::new();
     
-    // Handle prebuilt tools differently
-    if config.tool_type == "prebuilt" {
-        // For prebuilt tools, use registry source
-        let mut source = InlineTable::new();
-        source.insert("registry", Value::from("ghcr.io"));
-        
-        // Extract the actual tool name (remove "tool-" prefix)
-        let tool_name = name.strip_prefix("tool-").unwrap_or(name);
-        source.insert("package", Value::from(format!("fastertools:{tool_name}")));
-        source.insert("version", Value::from("latest")); // TODO: Support version from config
-        component["source"] = Item::Value(Value::InlineTable(source));
+    // Determine source path based on build command
+    let source_path = if config.build.command.contains("cargo") {
+        // Rust project - output goes to target/wasm32-wasip1/release/
+        let tool_basename = std::path::Path::new(&config.path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(name);
+        format!("{}/target/wasm32-wasip1/release/{}.wasm", 
+            config.path, 
+            tool_basename.replace('-', "_")
+        )
+    } else if config.build.command.contains("npm") || config.build.command.contains("node") {
+        // Node.js project - output typically goes to dist/
+        format!("{}/dist/{}.wasm", config.path, name)
     } else {
-        // Determine source path based on tool type
-        let source_path = match config.tool_type.as_str() {
-            "rust" => {
-                // Extract just the tool name from the path for the wasm filename
-                let tool_basename = std::path::Path::new(&config.path)
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or(name);
-                format!("{}/target/wasm32-wasip1/release/{}.wasm", 
-                    config.path, 
-                    tool_basename.replace('-', "_")
-                )
-            },
-            "typescript" | "javascript" => format!("{}/dist/{}.wasm", config.path, name),
-            _ => format!("{}/{}.wasm", config.path, name),
-        };
-        
-        component["source"] = toml_edit::value(source_path);
-    }
+        // Unknown build system - assume output is in the tool directory
+        format!("{}/{}.wasm", config.path, name)
+    };
     
-    // Allowed hosts
-    let hosts = config.allowed_hosts.iter().map(std::string::String::as_str).collect::<Array>();
+    component["source"] = toml_edit::value(source_path);
+    
+    // Allowed outbound hosts
+    let hosts = config.allowed_outbound_hosts.iter().map(std::string::String::as_str).collect::<Array>();
     component["allowed_outbound_hosts"] = toml_edit::value(hosts);
     
-    // Build configuration (always add for non-prebuilt tools)
-    if config.tool_type != "prebuilt" {
-        let mut build_table = Table::new();
-        
-        // Build command
-        let build_command = config.build.clone().unwrap_or_else(|| {
-            match config.tool_type.as_str() {
-                "rust" => "cargo build --target wasm32-wasip1 --release".to_string(),
-                "typescript" | "javascript" => "npm install && npm run build".to_string(),
-                _ => String::new(),
-            }
-        });
-        
-        if !build_command.is_empty() {
-            build_table["command"] = toml_edit::value(build_command);
-            build_table["workdir"] = toml_edit::value(&config.path);
-            
-            // Watch paths
-            let watch_paths = if config.watch.is_empty() {
-                match config.tool_type.as_str() {
-                    "rust" => vec!["src/**/*.rs", "Cargo.toml"],
-                    "typescript" => vec!["src/**/*.ts", "package.json", "tsconfig.json"],
-                    "javascript" => vec!["src/**/*.js", "package.json"],
-                    _ => vec![],
-                }
-            } else {
-                config.watch.iter().map(std::string::String::as_str).collect()
-            };
-            
-            if !watch_paths.is_empty() {
-                let watch_array = Array::from_iter(watch_paths);
-                build_table["watch"] = toml_edit::value(watch_array);
-            }
-            
-            component["build"] = Item::Table(build_table);
+    // Build configuration - always present now
+    let mut build_table = Table::new();
+    
+    // Build command
+    build_table["command"] = toml_edit::value(&config.build.command);
+    
+    // Working directory - use build config's workdir or default to tool path
+    let workdir = config.build.workdir.as_deref().unwrap_or(&config.path);
+    build_table["workdir"] = toml_edit::value(workdir);
+    
+    // Watch paths
+    if !config.build.watch.is_empty() {
+        let watch_array: Array = config.build.watch.iter().map(String::as_str).collect();
+        build_table["watch"] = toml_edit::value(watch_array);
+    }
+    
+    // Environment variables
+    if !config.build.env.is_empty() {
+        let mut env_table = Table::new();
+        for (key, value) in &config.build.env {
+            env_table[key] = toml_edit::value(value);
         }
+        build_table["environment"] = Item::Table(env_table);
+    }
+    
+    component["build"] = Item::Table(build_table);
+    
+    // Variables
+    if !config.variables.is_empty() {
+        let mut vars_table = Table::new();
+        for (key, value) in &config.variables {
+            // Check if the value is a template reference (e.g., {{ api_token }})
+            if value.starts_with("{{") && value.ends_with("}}") {
+                // It's a template reference, pass it through as-is
+                vars_table[key] = toml_edit::value(value);
+            } else {
+                // It's a static value, keep as-is
+                vars_table[key] = toml_edit::value(value);
+            }
+        }
+        component["variables"] = Item::Table(vars_table);
     }
     
     component

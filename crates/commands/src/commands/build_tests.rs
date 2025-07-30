@@ -66,6 +66,8 @@ async fn test_build_no_spin_toml() {
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -124,6 +126,8 @@ source = "target/wasm32-wasi/release/test.wasm"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -210,6 +214,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -292,6 +298,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: true,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -377,6 +385,8 @@ workdir = "frontend"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -458,6 +468,8 @@ workdir = "frontend"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -527,6 +539,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -564,6 +578,8 @@ async fn test_build_invalid_toml() {
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -642,6 +658,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: Some("/projects/myapp".into()),
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )

@@ -700,7 +700,7 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
 
 /// Add tools to ftl.toml
 fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
-    use crate::config::ftl_config::{FtlConfig, ToolConfig};
+    use crate::config::ftl_config::{FtlConfig, ToolConfig, BuildConfig};
     
     // Read ftl.toml
     let content = fs::read_to_string("ftl.toml").context("Failed to read ftl.toml")?;
@@ -713,11 +713,15 @@ fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) 
         config.tools.insert(
             tool_name.clone(),
             ToolConfig {
-                tool_type: "prebuilt".to_string(), // Prebuilt tools
                 path: tool_name.clone(),
-                build: None,
-                allowed_hosts: vec![],
-                watch: vec![],
+                build: BuildConfig {
+                    command: format!("echo 'Using prebuilt {} tool from registry'", tool.name),
+                    workdir: None,
+                    watch: vec![],
+                    env: HashMap::new(),
+                },
+                allowed_outbound_hosts: vec![],
+                variables: HashMap::new(),
             },
         );
         

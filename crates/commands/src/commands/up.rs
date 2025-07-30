@@ -49,6 +49,8 @@ pub struct UpConfig {
     pub watch: bool,
     /// Clear terminal on rebuild
     pub clear: bool,
+    /// Directory for component logs
+    pub log_dir: Option<PathBuf>,
 }
 
 /// Dependencies for the up command
@@ -73,7 +75,7 @@ pub struct UpDependencies {
 
 /// Execute the up command with injected dependencies
 pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
-    let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
+    let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
     // Check for ftl.toml and generate temporary spin.toml if needed
     let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &project_path)?;
@@ -94,17 +96,16 @@ pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> R
 
     // Pass the temp_spin_toml flag so we know whether to clean up
     if config.watch {
-        run_with_watch(project_path, manifest_path.clone(), config.port, config.clear, &deps, temp_spin_toml.is_some()).await
+        run_with_watch(project_path, manifest_path.clone(), config, &deps, temp_spin_toml.is_some()).await
     } else {
-        run_normal(project_path, manifest_path.clone(), config.port, config.build, &deps, temp_spin_toml.is_some()).await
+        run_normal(project_path, manifest_path.clone(), config, &deps, temp_spin_toml.is_some()).await
     }
 }
 
 async fn run_normal(
     project_path: PathBuf,
     manifest_path: PathBuf,
-    port: u16,
-    build: bool,
+    config: UpConfig,
     deps: &Arc<UpDependencies>,
     is_temp_manifest: bool,
 ) -> Result<()> {
@@ -112,7 +113,7 @@ async fn run_normal(
     let spin_path = deps.spin_installer.check_and_install().await?;
 
     // If build flag is set, run our parallel build first
-    if build {
+    if config.build {
         deps.ui.print(&format!(
             "{} Building project before starting server...",
             "→"
@@ -130,8 +131,13 @@ async fn run_normal(
 
     // Build command args for spin up (without --build since we already built)
     let mut args = vec!["up", "-f", manifest_path.to_str().unwrap()];
-    let listen_addr = format!("127.0.0.1:{port}");
+    let listen_addr = format!("127.0.0.1:{}", config.port);
     args.extend(["--listen", &listen_addr]);
+    
+    // Set log directory - use provided path or default to .ftl/logs in project
+    let log_dir = config.log_dir.clone()
+        .unwrap_or_else(|| project_path.join(".ftl").join("logs"));
+    args.extend(["--log-dir", log_dir.to_str().unwrap()]);
 
     deps.ui.print(&format!("{} Starting server...", "→"));
     deps.ui.print("");
@@ -190,8 +196,7 @@ async fn run_normal(
 async fn run_with_watch(
     project_path: PathBuf,
     manifest_path: PathBuf,
-    port: u16,
-    clear: bool,
+    config: UpConfig,
     deps: &Arc<UpDependencies>,
     is_temp_manifest: bool,
 ) -> Result<()> {
@@ -202,7 +207,7 @@ async fn run_with_watch(
     deps.ui.print("");
     deps.ui.print("👀 Watching for file changes");
     deps.ui
-        .print(&format!("🌐 Server will start at http://127.0.0.1:{port}"));
+        .print(&format!("🌐 Server will start at http://127.0.0.1:{}", config.port));
     deps.ui.print("⏹ Press Ctrl+C to stop");
     deps.ui.print("");
 
@@ -213,8 +218,17 @@ async fn run_with_watch(
 
     // Start the server
     let spin_path = deps.spin_installer.check_and_install().await?;
-    let listen_addr = format!("127.0.0.1:{port}");
-    let args = vec!["up", "-f", manifest_path.to_str().unwrap(), "--listen", &listen_addr];
+    let listen_addr = format!("127.0.0.1:{}", config.port);
+    
+    // Set log directory - use provided path or default to .ftl/logs in project
+    let log_dir = config.log_dir.clone()
+        .unwrap_or_else(|| project_path.join(".ftl").join("logs"));
+    let args = vec![
+        "up",
+        "-f", manifest_path.to_str().unwrap(),
+        "--listen", &listen_addr,
+        "--log-dir", log_dir.to_str().unwrap()
+    ];
 
     let mut server_process = deps
         .process_manager
@@ -246,7 +260,7 @@ async fn run_with_watch(
                     // Debounce - wait a bit for multiple file changes to settle
                     deps.async_runtime.sleep(Duration::from_millis(200)).await;
 
-                    if clear {
+                    if config.clear {
                         // Clear screen
                         deps.ui.clear_screen();
                     }
@@ -357,6 +371,8 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
         BuildConfig {
             path: Some(project_path.to_path_buf()),
             release: false,
+            export: None,
+            export_out: None,
         },
         build_deps,
     )
@@ -553,6 +569,8 @@ pub struct UpArgs {
     pub watch: bool,
     /// Clear screen on rebuild (only with --watch)
     pub clear: bool,
+    /// Directory for component logs
+    pub log_dir: Option<PathBuf>,
 }
 
 // File watcher implementation using notify
@@ -667,6 +685,7 @@ pub async fn execute(args: UpArgs) -> Result<()> {
         build: args.build,
         watch: args.watch,
         clear: args.clear,
+        log_dir: args.log_dir,
     };
 
     execute_with_deps(config, deps).await

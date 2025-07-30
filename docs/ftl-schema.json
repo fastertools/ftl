@@ -27,15 +27,6 @@
       },
       "default": {}
     },
-    "deployment": {
-      "description": "Deployment configuration",
-      "$ref": "#/$defs/DeploymentConfig",
-      "default": {
-        "registry": "",
-        "package": "",
-        "tag": ""
-      }
-    },
     "gateway": {
       "description": "Gateway component configuration",
       "$ref": "#/$defs/GatewayConfig",
@@ -44,6 +35,14 @@
         "authorizer_version": "",
         "validate_arguments": true
       }
+    },
+    "variables": {
+      "description": "Application-level variables",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ApplicationVariable"
+      },
+      "default": {}
     }
   },
   "$defs": {
@@ -141,22 +140,17 @@
     "ToolConfig": {
       "description": "Tool configuration",
       "type": "object",
-      "required": ["type", "path"],
+      "required": ["path", "build"],
       "properties": {
-        "type": {
-          "description": "Tool implementation language",
-          "type": "string",
-          "pattern": "^(rust|typescript|javascript)$"
-        },
         "path": {
           "description": "Path to tool directory (relative to project root)",
           "type": "string"
         },
         "build": {
-          "description": "Custom build command",
-          "type": "string"
+          "description": "Build configuration",
+          "$ref": "#/$defs/BuildConfig"
         },
-        "allowed_hosts": {
+        "allowed_outbound_hosts": {
           "description": "Allowed outbound hosts for the tool",
           "type": "array",
           "items": {
@@ -164,36 +158,74 @@
           },
           "default": []
         },
+        "variables": {
+          "description": "Tool-specific variables",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "BuildConfig": {
+      "description": "Build configuration for a tool",
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "description": "Build command to execute",
+          "type": "string"
+        },
+        "workdir": {
+          "description": "Working directory for the build command (relative to tool path)",
+          "type": "string"
+        },
         "watch": {
-          "description": "Watch paths for development mode",
+          "description": "Paths to watch for changes in development mode",
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": []
+        },
+        "env": {
+          "description": "Environment variables to set during build",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
         }
       }
     },
-    "DeploymentConfig": {
-      "description": "Deployment configuration",
-      "type": "object",
-      "properties": {
-        "registry": {
-          "description": "Registry URL (e.g., 'ghcr.io')",
-          "type": "string",
-          "default": ""
+    "ApplicationVariable": {
+      "description": "Application-level variable configuration",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "default": {
+              "description": "Default value for the variable",
+              "type": "string"
+            }
+          },
+          "required": ["default"],
+          "additionalProperties": false
         },
-        "package": {
-          "description": "Package name (e.g., 'myorg/my-project')",
-          "type": "string",
-          "default": ""
-        },
-        "tag": {
-          "description": "Default tag/version for deployment",
-          "type": "string",
-          "default": ""
+        {
+          "type": "object",
+          "properties": {
+            "required": {
+              "description": "Whether the variable is required",
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": ["required"],
+          "additionalProperties": false
         }
-      }
+      ]
     },
     "GatewayConfig": {
       "description": "Gateway component configuration",

@@ -26,15 +26,31 @@ pub struct FtlConfig {
     #[garde(custom(validate_tools))]
     pub tools: HashMap<String, ToolConfig>,
     
-    /// Deployment configuration
-    #[serde(default)]
-    #[garde(dive)]
-    pub deployment: DeploymentConfig,
-    
     /// Gateway component configuration
     #[serde(default)]
     #[garde(dive)]
     pub gateway: GatewayConfig,
+    
+    /// Application-level variables
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[garde(skip)]
+    pub variables: HashMap<String, ApplicationVariable>,
+}
+
+/// Application-level variable configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ApplicationVariable {
+    /// Variable with a default value
+    Default { 
+        /// The default value for the variable
+        default: String 
+    },
+    /// Required variable that must be provided at runtime
+    Required { 
+        /// Whether the variable is required (should always be true)
+        required: bool 
+    },
 }
 
 /// Project metadata
@@ -120,46 +136,46 @@ pub struct OidcConfig {
 /// Tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct ToolConfig {
-    /// Tool type ("rust", "typescript", "javascript")
-    #[serde(rename = "type")]
-    #[garde(pattern(r"^(rust|typescript|javascript)$"))]
-    pub tool_type: String,
-    
     /// Path to tool directory relative to project root
     #[garde(length(min = 1))]
     pub path: String,
     
-    /// Build command override (optional)
-    #[serde(default)]
-    #[garde(skip)]
-    pub build: Option<String>,
+    /// Build configuration
+    #[garde(dive)]
+    pub build: BuildConfig,
     
     /// Allowed outbound hosts for the tool
     #[serde(default)]
     #[garde(skip)]
-    pub allowed_hosts: Vec<String>,
+    pub allowed_outbound_hosts: Vec<String>,
     
-    /// Watch paths for development mode
-    #[serde(default)]
+    /// Variables to pass to the tool at runtime
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     #[garde(skip)]
-    pub watch: Vec<String>,
+    pub variables: HashMap<String, String>,
 }
 
-/// Deployment configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Validate)]
-#[garde(allow_unvalidated)]
-pub struct DeploymentConfig {
-    /// Registry URL (e.g., "ghcr.io")
-    #[serde(default)]
-    pub registry: String,
+/// Build configuration for a tool
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct BuildConfig {
+    /// Build command to execute
+    #[garde(length(min = 1))]
+    pub command: String,
     
-    /// Package name (e.g., "myorg/my-project")
-    #[serde(default)]
-    pub package: String,
+    /// Working directory for the build command (relative to tool path)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub workdir: Option<String>,
     
-    /// Default tag/version for deployment
-    #[serde(default)]
-    pub tag: String,
+    /// Paths to watch for changes in development mode
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[garde(skip)]
+    pub watch: Vec<String>,
+    
+    /// Environment variables to set during build
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[garde(skip)]
+    pub env: HashMap<String, String>,
 }
 
 /// Gateway component configuration
@@ -244,6 +260,18 @@ fn validate_tools(tools: &HashMap<String, ToolConfig>, _ctx: &()) -> garde::Resu
     Ok(())
 }
 
+impl ToolConfig {
+    /// Get the build command
+    pub fn get_build_command(&self) -> &str {
+        &self.build.command
+    }
+    
+    /// Get watch paths
+    pub fn get_watch_paths(&self) -> &[String] {
+        &self.build.watch
+    }
+}
+
 impl FtlConfig {
     /// Load FTL configuration from a TOML string
     pub fn parse(content: &str) -> Result<Self> {
@@ -302,26 +330,16 @@ name = "123-invalid"
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Validation error"));
         
-        // Test invalid tool type
-        let content = r#"
-[project]
-name = "valid-name"
-
-[tools.my-tool]
-type = "python"
-path = "my-tool"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        
         // Test empty tool path
         let content = r#"
 [project]
 name = "valid-name"
 
 [tools.my-tool]
-type = "rust"
 path = ""
+
+[tools.my-tool.build]
+command = "cargo build --target wasm32-wasip1 --release"
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
@@ -402,8 +420,10 @@ name = "{name}"
 name = "test-project"
 
 [tools.{name}]
-type = "rust"
 path = "tool-path"
+
+[tools.{name}.build]
+command = "cargo build --target wasm32-wasip1 --release"
 "#);
             let result = FtlConfig::parse(&content);
             assert!(result.is_ok(), "Tool name '{name}' should be valid");
@@ -427,59 +447,16 @@ path = "tool-path"
 name = "test-project"
 
 [tools."{name}"]
-type = "rust"
 path = "tool-path"
+
+[tools."{name}".build]
+command = "cargo build --target wasm32-wasip1 --release"
 "#);
             let result = FtlConfig::parse(&content);
             assert!(result.is_err(), "Tool name '{name}' should be invalid");
         }
     }
     
-    #[test]
-    fn test_tool_type_validation() {
-        // Valid tool types
-        let valid_types = vec!["rust", "typescript", "javascript"];
-        
-        for tool_type in valid_types {
-            let content = format!(r#"
-[project]
-name = "test-project"
-
-[tools.mytool]
-type = "{tool_type}"
-path = "tool-path"
-"#);
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_ok(), "Tool type '{tool_type}' should be valid");
-        }
-        
-        // Invalid tool types
-        let invalid_types = vec![
-            "python",
-            "go",
-            "java",
-            "c++",
-            "Ruby",
-            "RUST",
-            "TypeScript",
-            "ts",
-            "js",
-            "",
-        ];
-        
-        for tool_type in invalid_types {
-            let content = format!(r#"
-[project]
-name = "test-project"
-
-[tools.mytool]
-type = "{tool_type}"
-path = "tool-path"
-"#);
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_err(), "Tool type '{tool_type}' should be invalid");
-        }
-    }
     
     #[test]
     fn test_auth_validation() {
@@ -625,10 +602,6 @@ name = "test-project"
         assert!(!config.auth.enabled);
         assert_eq!(config.auth.provider, "");
         
-        // Check deployment defaults
-        assert_eq!(config.deployment.registry, "");
-        assert_eq!(config.deployment.package, "");
-        assert_eq!(config.deployment.tag, "");
         
         // Check gateway defaults
         assert_eq!(config.gateway.version, "0.0.9");
@@ -652,20 +625,21 @@ issuer = "https://my-tenant.authkit.app"
 audience = "mcp-api"
 
 [tools.echo]
-type = "rust"
 path = "echo-rs"
-allowed_hosts = []
+allowed_outbound_hosts = []
+
+[tools.echo.build]
+command = "cargo build --target wasm32-wasip1 --release"
+watch = ["src/**/*.rs", "Cargo.toml"]
 
 [tools.weather]
-type = "typescript"
 path = "weather-ts"
-allowed_hosts = ["https://api.weather.com"]
-build = "npm run build:custom"
+allowed_outbound_hosts = ["https://api.weather.com"]
 
-[deployment]
-registry = "ghcr.io"
-package = "myorg/my-project"
-tag = "latest"
+[tools.weather.build]
+command = "npm run build:custom"
+watch = ["src/**/*.ts", "package.json"]
+
 "#;
         
         let config = FtlConfig::parse(content).unwrap();
@@ -674,9 +648,8 @@ tag = "latest"
         assert!(config.auth.enabled);
         assert_eq!(config.auth.provider, "authkit");
         assert_eq!(config.tools.len(), 2);
-        assert_eq!(config.tools["echo"].tool_type, "rust");
-        assert_eq!(config.tools["weather"].tool_type, "typescript");
-        assert_eq!(config.deployment.registry, "ghcr.io");
+        assert_eq!(config.tools["echo"].build.command, "cargo build --target wasm32-wasip1 --release");
+        assert_eq!(config.tools["weather"].build.command, "npm run build:custom");
     }
     
     #[test]
@@ -686,16 +659,22 @@ tag = "latest"
 name = "test-project"
 
 [tools.tool1]
-type = "rust"
 path = "tool1"
 
+[tools.tool1.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
 [tools.tool2]
-type = "typescript"
 path = "tool2"
 
+[tools.tool2.build]
+command = "npm run build"
+
 [tools.tool3]
-type = "javascript"
 path = "tool3"
+
+[tools.tool3.build]
+command = "npm run build"
 "#;
         let config = FtlConfig::parse(content).unwrap();
         let components = config.tool_components();
@@ -716,8 +695,8 @@ path = "tool3"
             },
             auth: AuthConfig::default(),
             tools: HashMap::new(),
-            deployment: DeploymentConfig::default(),
             gateway: GatewayConfig::default(),
+            variables: HashMap::new(),
         };
         
         let toml_string = config.to_toml_string().unwrap();
@@ -725,6 +704,94 @@ path = "tool3"
         assert!(toml_string.contains("name = \"test-project\""));
         assert!(toml_string.contains("version = \"1.0.0\""));
         assert!(toml_string.contains("description = \"Test description\""));
+    }
+    
+    #[test]
+    fn test_skip_empty_build_fields() {
+        let mut tools = HashMap::new();
+        tools.insert("test-tool".to_string(), ToolConfig {
+            path: "test-tool".to_string(),
+            build: BuildConfig {
+                command: "cargo build --target wasm32-wasip1 --release".to_string(),
+                workdir: None,
+                watch: vec!["src/**/*.rs".to_string()],
+                env: HashMap::new(),
+            },
+            allowed_outbound_hosts: vec![],
+            variables: HashMap::new(),
+        });
+        
+        let config = FtlConfig {
+            project: ProjectConfig {
+                name: "test-project".to_string(),
+                version: "0.1.0".to_string(),
+                description: String::new(),
+                authors: vec![],
+            },
+            auth: AuthConfig::default(),
+            tools,
+            gateway: GatewayConfig::default(),
+            variables: HashMap::new(),
+        };
+        
+        let toml_string = config.to_toml_string().unwrap();
+        println!("Generated TOML:\n{toml_string}");
+        
+        // Should NOT contain empty env section
+        assert!(!toml_string.contains("[tools.test-tool.build.env]"));
+        // Should NOT contain workdir since it's None
+        assert!(!toml_string.contains("workdir"));
+        // Should contain watch array
+        assert!(toml_string.contains("watch = ["));
+    }
+    
+    #[test]
+    fn test_application_variables() {
+        let content = r#"
+[project]
+name = "test-project"
+
+[variables]
+api_token = { required = true }
+api_url = { default = "https://api.example.com" }
+debug = { default = "false" }
+
+[tools.my-tool]
+path = "my-tool"
+
+[tools.my-tool.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
+[tools.my-tool.variables]
+token = "{{ api_token }}"
+url = "{{ api_url }}"
+debug_mode = "{{ debug }}"
+static_var = "static-value"
+"#;
+        let config = FtlConfig::parse(content).unwrap();
+        
+        // Check application variables
+        assert_eq!(config.variables.len(), 3);
+        
+        // Check required variable
+        if let Some(ApplicationVariable::Required { required }) = config.variables.get("api_token") {
+            assert!(required);
+        } else {
+            panic!("api_token should be a required variable");
+        }
+        
+        // Check default variables
+        if let Some(ApplicationVariable::Default { default }) = config.variables.get("api_url") {
+            assert_eq!(default, "https://api.example.com");
+        } else {
+            panic!("api_url should have a default value");
+        }
+        
+        // Check tool variables with templates
+        let tool = &config.tools["my-tool"];
+        assert_eq!(tool.variables.get("token"), Some(&"{{ api_token }}".to_string()));
+        assert_eq!(tool.variables.get("url"), Some(&"{{ api_url }}".to_string()));
+        assert_eq!(tool.variables.get("static_var"), Some(&"static-value".to_string()));
     }
     
     #[test]
@@ -750,32 +817,38 @@ version = "2.0.0"
     
     #[test]
     fn test_custom_validation_edge_cases() {
-        // Test tool with build command
+        // Test tool with environment variables
         let content = r#"
 [project]
 name = "test-project"
 
 [tools.custom-build]
-type = "typescript"
 path = "custom"
-build = "npm run build:special"
+
+[tools.custom-build.build]
+command = "npm run build:special"
+env = { NODE_ENV = "production", CUSTOM_VAR = "value" }
 "#;
         let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.tools["custom-build"].build, Some("npm run build:special".to_string()));
+        assert_eq!(config.tools["custom-build"].build.command, "npm run build:special");
+        assert_eq!(config.tools["custom-build"].build.env.get("NODE_ENV"), Some(&"production".to_string()));
         
-        // Test tool with watch paths
+        // Test tool with custom workdir
         let content = r#"
 [project]
 name = "test-project"
 
 [tools.watch-tool]
-type = "rust"
 path = "watch"
-watch = ["src/**/*.rs", "Cargo.toml"]
+
+[tools.watch-tool.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "src"
+watch = ["**/*.rs", "Cargo.toml"]
 "#;
         let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.tools["watch-tool"].watch.len(), 2);
-        assert_eq!(config.tools["watch-tool"].watch[0], "src/**/*.rs");
+        assert_eq!(config.tools["watch-tool"].build.watch.len(), 2);
+        assert_eq!(config.tools["watch-tool"].build.workdir, Some("src".to_string()));
         
         // Test multiple validation errors at once
         let content = r#"
@@ -787,13 +860,73 @@ enabled = true
 provider = ""
 
 [tools."bad@name"]
-type = "python"
 path = ""
+
+[tools."bad@name".build]
+command = ""
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         // Should contain at least one validation error
         assert!(error_msg.contains("Validation error"));
+    }
+    
+    #[test]
+    fn test_build_configuration() {
+        // Test minimal build config
+        let content = r#"
+[project]
+name = "test-project"
+
+[tools.minimal]
+path = "minimal-tool"
+
+[tools.minimal.build]
+command = "make build"
+"#;
+        let config = FtlConfig::parse(content).unwrap();
+        assert_eq!(config.tools["minimal"].build.command, "make build");
+        assert!(config.tools["minimal"].build.workdir.is_none());
+        assert!(config.tools["minimal"].build.watch.is_empty());
+        assert!(config.tools["minimal"].build.env.is_empty());
+        
+        // Test full build config
+        let content = r#"
+[project]
+name = "test-project"
+
+[tools.full]
+path = "full-tool"
+
+[tools.full.build]
+command = "cargo build --release"
+workdir = "backend"
+watch = ["src/**/*.rs", "Cargo.toml", "build.rs"]
+
+[tools.full.build.env]
+RUSTFLAGS = "-C target-cpu=native"
+CARGO_BUILD_JOBS = "4"
+"#;
+        let config = FtlConfig::parse(content).unwrap();
+        let build = &config.tools["full"].build;
+        assert_eq!(build.command, "cargo build --release");
+        assert_eq!(build.workdir, Some("backend".to_string()));
+        assert_eq!(build.watch.len(), 3);
+        assert_eq!(build.watch[2], "build.rs");
+        assert_eq!(build.env.get("RUSTFLAGS"), Some(&"-C target-cpu=native".to_string()));
+        assert_eq!(build.env.get("CARGO_BUILD_JOBS"), Some(&"4".to_string()));
+        
+        // Test missing build section validation
+        let content = r#"
+[project]
+name = "test-project"
+
+[tools.no-build]
+path = "tool"
+"#;
+        let result = FtlConfig::parse(content);
+        assert!(result.is_err());
+        // The error will be a TOML parse error about missing required field
     }
 }

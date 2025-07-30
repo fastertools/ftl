@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
@@ -31,7 +32,7 @@ pub struct ComponentInfo {
     /// Component version
     pub version: String,
     /// Allowed outbound hosts for the component
-    pub allowed_hosts: Option<Vec<String>>,
+    pub allowed_outbound_hosts: Option<Vec<String>>,
 }
 
 /// Deploy configuration
@@ -64,7 +65,7 @@ pub struct DeployDependencies {
 
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
-pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
+pub async fn execute_with_deps(deps: Arc<DeployDependencies>, variables: Vec<String>) -> Result<()> {
     deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
     deps.ui.print("");
 
@@ -138,6 +139,9 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     let deployed_tools =
         create_repositories_and_push_with_progress(&config.components, deps.clone()).await?;
 
+    // Parse variables from command line
+    let parsed_variables = parse_variables(&variables)?;
+
     // Deploy to FTL
     deps.ui.print("");
     let spinner = deps.ui.create_spinner();
@@ -154,7 +158,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     };
 
     let deployment =
-        deploy_to_ftl_with_progress(deps.clone(), config.app_name, deployed_tools, spinner).await?;
+        deploy_to_ftl_with_progress(deps.clone(), config.app_name, deployed_tools, parsed_variables, spinner).await?;
 
     // Display results
     deps.ui.print("");
@@ -167,6 +171,32 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Parse KEY=VALUE variable pairs from command line arguments
+pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> {
+    let mut parsed = HashMap::new();
+    
+    for var in variables {
+        let parts: Vec<&str> = var.splitn(2, '=').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!(
+                "Invalid variable format '{}'. Expected KEY=VALUE format.",
+                var
+            ));
+        }
+        
+        let key = parts[0].trim();
+        let value = parts[1].trim();
+        
+        if key.is_empty() {
+            return Err(anyhow!("Variable key cannot be empty"));
+        }
+        
+        parsed.insert(key.to_string(), value.to_string());
+    }
+    
+    Ok(parsed)
 }
 
 /// Parse deployment configuration from spin.toml
@@ -197,7 +227,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                         let version = extract_component_version(file_system, name, source_path)?;
 
                         // Extract allowed_outbound_hosts if present
-                        let allowed_hosts = component
+                        let allowed_outbound_hosts = component
                             .get("allowed_outbound_hosts")
                             .and_then(|hosts| hosts.as_array())
                             .map(|arr| {
@@ -211,7 +241,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                             name: name.clone(),
                             source_path: source_path.to_string(),
                             version,
-                            allowed_hosts,
+                            allowed_outbound_hosts,
                         });
                     }
                 }
@@ -416,7 +446,7 @@ async fn create_repositories_and_push_with_progress(
                     .as_str()
                     .try_into()
                     .map_err(|e| anyhow!("Invalid tag: {}", e))?,
-                allowed_hosts: component.allowed_hosts.clone().unwrap_or_default(),
+                allowed_hosts: component.allowed_outbound_hosts.clone().unwrap_or_default(),
             });
 
             let duration = start.elapsed();
@@ -519,6 +549,7 @@ async fn deploy_to_ftl_with_progress(
     deps: Arc<DeployDependencies>,
     app_name: String,
     tools: Vec<types::CreateDeploymentRequestToolsItem>,
+    variables: HashMap<String, String>,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
 ) -> Result<types::App> {
     // First check if app exists
@@ -561,7 +592,7 @@ async fn deploy_to_ftl_with_progress(
     spinner.set_message("Creating box deployment...");
     let deployment_request = types::CreateDeploymentRequest {
         tools,
-        variables: std::collections::HashMap::new(),
+        variables,
     };
 
     let deployment_response = deps
@@ -586,7 +617,8 @@ async fn deploy_to_ftl_with_progress(
 /// Deploy command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct DeployArgs {
-    // Deploy takes no arguments - it uses the current directory
+    /// Variable(s) to be passed to the app (KEY=VALUE format)
+    pub variables: Vec<String>,
 }
 
 // Build executor implementation
@@ -600,6 +632,8 @@ impl BuildExecutor for BuildExecutorImpl {
         let args = build::BuildArgs {
             path: path.map(std::path::Path::to_path_buf),
             release,
+            export: None,
+            export_out: None,
         };
 
         build::execute(args).await
@@ -607,7 +641,7 @@ impl BuildExecutor for BuildExecutorImpl {
 }
 
 /// Execute the deploy command with default dependencies
-pub async fn execute(_args: DeployArgs) -> Result<()> {
+pub async fn execute(args: DeployArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
     use ftl_runtime::deps::{
         RealAsyncRuntime, RealClock, RealCommandExecutor, RealCredentialsProvider, RealFileSystem,
@@ -633,7 +667,7 @@ pub async fn execute(_args: DeployArgs) -> Result<()> {
         async_runtime: Arc::new(RealAsyncRuntime),
     });
 
-    execute_with_deps(deps).await
+    execute_with_deps(deps, args.variables).await
 }
 
 #[cfg(test)]

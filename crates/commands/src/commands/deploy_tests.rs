@@ -111,7 +111,7 @@ async fn test_deploy_no_spin_toml() {
         .returning(|_| false);
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -158,7 +158,7 @@ async fn test_deploy_authentication_expired() {
         .returning(|| Err(anyhow::anyhow!("Token expired")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -219,7 +219,7 @@ name = "test-app"
         .returning(|| Ok(test_credentials()));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -259,7 +259,7 @@ async fn test_deploy_docker_login_failure() {
         });
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -287,7 +287,7 @@ async fn test_deploy_wkg_not_found() {
         .returning(|_| Err(anyhow::anyhow!("wkg not found")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("wkg not found"));
@@ -308,7 +308,7 @@ async fn test_deploy_repository_creation_failure() {
         .returning(|_| Err(anyhow::anyhow!("Repository creation failed")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -330,7 +330,7 @@ async fn test_deploy_success() {
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_ok());
 
@@ -469,7 +469,7 @@ async fn test_deployment_timeout() {
         .returning(|_| ());
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(
@@ -544,7 +544,7 @@ async fn test_deployment_failed_status() {
     });
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps).await;
+    let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Build failed"));
@@ -846,7 +846,7 @@ version = "1.2.3"
     assert_eq!(api.source_path, "api/target/wasm32-wasi/release/api.wasm");
     assert_eq!(api.version, "1.2.3");
     assert_eq!(
-        api.allowed_hosts,
+        api.allowed_outbound_hosts,
         Some(vec!["https://*.amazonaws.com".to_string()])
     );
 
@@ -857,7 +857,7 @@ version = "1.2.3"
         "worker/target/wasm32-wasi/release/worker.wasm"
     );
     assert_eq!(worker.version, "2.0.0");
-    assert_eq!(worker.allowed_hosts, None);
+    assert_eq!(worker.allowed_outbound_hosts, None);
 }
 
 #[test]
@@ -865,4 +865,115 @@ fn test_extract_component_version_default() {
     let fs: Arc<dyn FileSystem> = Arc::new(MockFileSystem::new());
     let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
     assert_eq!(version, "0.1.0");
+}
+
+#[test]
+fn test_parse_variables() {
+    // Test valid variable formats
+    let vars = vec![
+        "KEY=value".to_string(),
+        "API_KEY=12345".to_string(),
+        "DEBUG=true".to_string(),
+    ];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(parsed.len(), 3);
+    assert_eq!(parsed.get("KEY"), Some(&"value".to_string()));
+    assert_eq!(parsed.get("API_KEY"), Some(&"12345".to_string()));
+    assert_eq!(parsed.get("DEBUG"), Some(&"true".to_string()));
+
+    // Test variable with equals sign in value
+    let vars = vec!["URL=https://example.com?key=value".to_string()];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(parsed.get("URL"), Some(&"https://example.com?key=value".to_string()));
+
+    // Test invalid format (no equals sign)
+    let vars = vec!["INVALID".to_string()];
+    let result = parse_variables(&vars);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Invalid variable format"));
+
+    // Test empty key
+    let vars = vec!["=value".to_string()];
+    let result = parse_variables(&vars);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Variable key cannot be empty"));
+}
+
+#[tokio::test]
+async fn test_deploy_with_variables() {
+    let mut fixture = TestFixture::new();
+
+    // Setup all mocks for successful deployment
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+    
+    // Verify variables are passed through to deployment request
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: create deployment with variables
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, req| {
+            // Verify variables are passed correctly
+            assert!(req.variables.contains_key("API_KEY"));
+            assert_eq!(req.variables.get("API_KEY"), Some(&"test123".to_string()));
+            
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: app becomes active
+    fixture
+        .api_client
+        .expect_get_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::App {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::AppStatus::Active,
+                provider_url: Some("https://test-app.example.com".to_string()),
+                provider_error: None,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+    let result = execute_with_deps(deps, vec!["API_KEY=test123".to_string()]).await;
+
+    assert!(result.is_ok());
+    let output = ui.get_output();
+    assert!(output.iter().any(|s| s.contains("Box deployed successfully!")));
 }

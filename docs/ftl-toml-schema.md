@@ -28,18 +28,34 @@ authors = ["Name <email>"]   # Optional: List of authors
 
 ### Tools Section
 
-Define your MCP tools:
+Define your MCP tools with explicit build configurations:
 
 ```toml
 [tools.my-tool]
-type = "rust"                # Required: "rust", "typescript", or "javascript"
 path = "my-tool"             # Required: Path to tool directory
-build = "custom build cmd"   # Optional: Custom build command
-allowed_hosts = [            # Optional: Allowed outbound hosts
+allowed_outbound_hosts = [   # Optional: Allowed outbound hosts
     "https://api.example.com"
 ]
-watch = ["src/**/*.rs"]      # Optional: File patterns to watch in dev mode
+
+[tools.my-tool.build]        # Required: Build configuration
+command = "cargo build --target wasm32-wasip1 --release"  # Build command
+workdir = "."                # Optional: Working directory (relative to tool path)
+watch = [                    # Optional: Paths to watch for changes
+    "src/**/*.rs",
+    "Cargo.toml"
+]
+env = { RUSTFLAGS = "-C opt-level=z" }  # Optional: Environment variables
 ```
+
+The build configuration is always explicit, giving you full visibility and control:
+- **command**: The exact build command to run
+- **workdir**: Working directory for the build (defaults to the tool path)
+- **watch**: File patterns to watch in development mode
+- **env**: Environment variables to set during the build
+
+When you run `ftl add`, it will create the appropriate build configuration based on your chosen language:
+- **Rust**: Creates a cargo build configuration with wasm32-wasip1 target
+- **TypeScript/JavaScript**: Creates an npm build configuration
 
 ### Authentication Section
 
@@ -96,7 +112,7 @@ audience = "weather-api"
 [tools.weather]
 type = "typescript"
 path = "weather-tool"
-allowed_hosts = ["https://api.openweathermap.org"]
+allowed_outbound_hosts = ["https://api.openweathermap.org"]
 watch = ["src/**/*.ts", "package.json"]
 
 [tools.forecast]
