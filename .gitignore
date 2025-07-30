@@ -52,6 +52,13 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *$py.class
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
 
 # Node (for potential web components)
 node_modules/
