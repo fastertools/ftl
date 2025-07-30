@@ -129,13 +129,13 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
         })
     """
     
-    class FTLHandler(http.IncomingHandler):
+    class IncomingHandler(http.IncomingHandler):
         def handle_request(self, request: Request) -> Response:
-            path = request.uri.rstrip('/')
+            path = request.uri
             method = request.method
             
             # Handle GET / - return tool metadata
-            if method == "GET" and (path == "" or path == "/"):
+            if method == "GET" and path == "/":
                 metadata = []
                 for key, tool in tools.items():
                     # Use explicit name if provided, otherwise convert from key
@@ -209,7 +209,7 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
                 b"Method not allowed"
             )
     
-    return FTLHandler
+    return IncomingHandler
 
 
 # Type guards for content types

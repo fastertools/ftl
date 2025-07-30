@@ -13,7 +13,6 @@ mod tests {
         let config = TelemetryConfig {
             enabled: true,
             installation_id: "test-id".to_string(),
-            upload_enabled: false,
             log_directory: temp_dir.path().to_path_buf(),
             retention_days: 7,
         };
@@ -28,7 +27,6 @@ mod tests {
         let config = TelemetryConfig {
             enabled: true,
             installation_id: "test-logger-id".to_string(),
-            upload_enabled: false,
             log_directory: temp_dir.path().to_path_buf(),
             retention_days: 7,
         };
@@ -64,7 +62,6 @@ mod tests {
         let config = TelemetryConfig {
             enabled: true,
             installation_id: "test-concurrent-id".to_string(),
-            upload_enabled: false,
             log_directory: temp_dir.path().to_path_buf(),
             retention_days: 7,
         };
@@ -119,7 +116,6 @@ mod tests {
         let config = TelemetryConfig {
             enabled: true,
             installation_id: "test-nested-id".to_string(),
-            upload_enabled: false,
             log_directory: nested_path.clone(),
             retention_days: 7,
         };

@@ -82,7 +82,6 @@ mod tests {
         let telemetry_config = TelemetryConfig {
             enabled: true,
             installation_id: "test-id".to_string(),
-            upload_enabled: false,
             log_directory: log_dir.clone(),
             retention_days: 7,
         };
@@ -129,7 +128,6 @@ mod tests {
         let telemetry_config = TelemetryConfig {
             enabled: true,
             installation_id: "test-installation-id".to_string(),
-            upload_enabled: false,
             log_directory: logs_dir.clone(),
             retention_days: 7,
         };
@@ -255,7 +253,6 @@ mod tests {
         let telemetry_config = TelemetryConfig {
             enabled: true,
             installation_id: "test-installation-id".to_string(),
-            upload_enabled: false,
             log_directory: logs_dir.clone(),
             retention_days: 7,
         };
@@ -313,7 +310,6 @@ mod tests {
         let telemetry_config = TelemetryConfig {
             enabled: true,
             installation_id: "test-error-id".to_string(),
-            upload_enabled: false,
             log_directory: logs_dir.clone(),
             retention_days: 7,
         };

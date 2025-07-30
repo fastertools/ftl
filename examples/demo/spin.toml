@@ -7,7 +7,7 @@ authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "FTL MCP server for hosting MCP tools"
 
 [variables]
-tool_components = { default = "echo-rs,echo-ts,weather-rs,weather-ts,multi-tools-rs,multi-tools-ts" }
+tool_components = { default = "echo-rs,echo-ts,echo-py,weather-rs,weather-ts,weather-py,multi-tools-rs,multi-tools-ts,multi-tools-py" }
 
 # ========================================
 # Auth Gateway Configuration
@@ -129,6 +129,23 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # in the [variables] section at the top of spin.toml to include "echo-ts"
 # Example: tool_components = { default = "existing-tool,echo-ts" }
 
+# Echo tool (Python)
+[[trigger.http]]
+route = { private = true }
+component = "echo-py"
+
+[component.echo-py]
+source = "echo-py/dist/echo-py.wasm"
+allowed_outbound_hosts = []
+[component.echo-py.build]
+command = "./build.sh"
+workdir = "echo-py"
+watch = ["**/*.py", "pyproject.toml"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "echo-py"
+# Example: tool_components = { default = "existing-tool,echo-py" }
+
 # Weather tool (Rust)
 [[trigger.http]]
 route = { private = true }
@@ -196,3 +213,37 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # IMPORTANT: After adding this component, update the tool_components variable
 # in the [variables] section at the top of spin.toml to include "multi-tools-ts"
 # Example: tool_components = { default = "existing-tool,multi-tools-ts" }
+
+# Weather tool (Python)
+[[trigger.http]]
+route = { private = true }
+component = "weather-py"
+
+[component.weather-py]
+source = "weather-py/dist/weather-py.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+[component.weather-py.build]
+command = "./build.sh"
+workdir = "weather-py"
+watch = ["**/*.py", "pyproject.toml"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "weather-py"
+# Example: tool_components = { default = "existing-tool,weather-py" }
+
+# Multi-tools example (Python) - demonstrates multiple tools in one component
+[[trigger.http]]
+route = { private = true }
+component = "multi-tools-py"
+
+[component.multi-tools-py]
+source = "multi-tools-py/dist/multi-tools-py.wasm"
+allowed_outbound_hosts = []
+[component.multi-tools-py.build]
+command = "./build.sh"
+workdir = "multi-tools-py"
+watch = ["**/*.py", "pyproject.toml"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "multi-tools-py"
+# Example: tool_components = { default = "existing-tool,multi-tools-py" }
