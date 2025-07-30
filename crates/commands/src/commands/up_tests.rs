@@ -281,24 +281,37 @@ impl TestFixture {
         }
     }
 
-    /// Mock that ftl.toml doesn't exist but spin.toml does
-    fn mock_spin_toml_exists(&mut self) {
-        self.mock_spin_toml_exists_with_times(1, 1);
+    /// Mock that ftl.toml exists
+    fn mock_ftl_toml_exists(&mut self) {
+        self.mock_ftl_toml_exists_with_content(
+            r#"[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.test-tool]
+path = "test"
+
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#,
+        );
     }
 
-    /// Mock that ftl.toml doesn't exist but spin.toml does, with custom times
-    fn mock_spin_toml_exists_with_times(&mut self, ftl_times: usize, spin_times: usize) {
+    /// Mock that ftl.toml exists with custom content
+    fn mock_ftl_toml_exists_with_content(&mut self, content: &str) {
+        let content = content.to_string();
+
         self.file_system
             .expect_exists()
             .with(eq(Path::new("./ftl.toml")))
-            .times(ftl_times)
-            .returning(|_| false);
+            .times(1)
+            .returning(|_| true);
 
         self.file_system
-            .expect_exists()
-            .with(eq(Path::new("./spin.toml")))
-            .times(spin_times)
-            .returning(|_| true);
+            .expect_read_to_string()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(move |_| Ok(content.clone()));
     }
 
     #[allow(clippy::wrong_self_convention)]
@@ -320,7 +333,7 @@ impl TestFixture {
 use mockall::predicate::*;
 
 #[tokio::test]
-async fn test_up_no_spin_toml() {
+async fn test_up_no_ftl_toml() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist
@@ -328,14 +341,6 @@ async fn test_up_no_spin_toml() {
         .file_system
         .expect_exists()
         .with(eq(Path::new("./ftl.toml")))
-        .times(1)
-        .returning(|_| false);
-
-    // Mock: spin.toml doesn't exist
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
         .times(1)
         .returning(|_| false);
 
@@ -358,7 +363,7 @@ async fn test_up_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml or ftl.toml found")
+            .contains("No ftl.toml found")
     );
 }
 
@@ -367,7 +372,7 @@ async fn test_up_normal_mode_no_build() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists();
+    fixture.mock_ftl_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -426,26 +431,10 @@ async fn test_up_with_build() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist, spin.toml exists (checked 3 times - up, build check, build)
-    fixture.mock_spin_toml_exists_with_times(2, 2);
+    fixture.mock_ftl_toml_exists();
 
-    // Mock: read spin.toml for build
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
-name = "test-app"
-
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
-command = "cargo build --target wasm32-wasi"
-"#
-            .to_string())
-        });
+    // Note: We don't need to mock reading spin.toml for build because
+    // the build command will use the temporary spin.toml
 
     // Mock: spin installer (called twice - once for build, once for up)
     fixture
@@ -510,7 +499,7 @@ async fn test_up_process_fails() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists();
+    fixture.mock_ftl_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -555,21 +544,33 @@ async fn test_up_process_fails() {
 async fn test_up_with_custom_path() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist at custom path
+    // Mock: ftl.toml exists at custom path
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("/my/project/ftl.toml")))
         .times(1)
-        .returning(|_| false);
+        .returning(|_| true);
 
-    // Mock: spin.toml exists at custom path
+    // Mock: read ftl.toml at custom path
     fixture
         .file_system
-        .expect_exists()
-        .with(eq(Path::new("/my/project/spin.toml")))
+        .expect_read_to_string()
+        .with(eq(Path::new("/my/project/ftl.toml")))
         .times(1)
-        .returning(|_| true);
+        .returning(|_| {
+            Ok(r#"[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.test-tool]
+path = "test"
+
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#
+            .to_string())
+        });
 
     // Mock: spin installer
     fixture
@@ -610,14 +611,19 @@ async fn test_up_with_custom_path() {
 async fn test_up_watch_mode_initial_build_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml exists (checked multiple times)
-    fixture.mock_spin_toml_exists_with_times(2, 2);
+    // Mock: ftl.toml exists but with invalid content
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("./ftl.toml")))
+        .times(1)
+        .returning(|_| true);
 
-    // Mock: read spin.toml for build - return invalid toml
+    // Mock: read ftl.toml - return invalid toml
     fixture
         .file_system
         .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
+        .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(|_| Ok("invalid toml content".to_string()));
 
@@ -637,33 +643,31 @@ async fn test_up_watch_mode_initial_build_fails() {
     .await;
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse spin.toml")
-    );
+    // Error should be about parsing ftl.toml
+    let error_msg = result.unwrap_err().to_string();
+    assert!(error_msg.contains("Failed to parse ftl.toml") || error_msg.contains("missing field"));
 }
 
 #[tokio::test]
 async fn test_up_watch_mode_file_change() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists (multiple checks)
+    // Mock: ftl.toml exists (multiple checks)
     fixture
         .file_system
         .expect_exists()
-        .returning(|path| path == Path::new("./spin.toml"));
+        .returning(|path| path == Path::new("./ftl.toml"));
 
-    // Mock: read spin.toml for builds
+    // Mock: read ftl.toml for builds
     fixture.file_system.expect_read_to_string().returning(|_| {
-        Ok(r#"
-spin_manifest_version = "1"
+        Ok(r#"[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
         .to_string())
@@ -775,7 +779,7 @@ async fn test_up_with_specific_port() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists();
+    fixture.mock_ftl_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -829,21 +833,22 @@ async fn test_up_with_specific_port() {
 async fn test_up_with_clear_screen() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists (multiple checks)
+    // Mock: ftl.toml exists (multiple checks)
     fixture
         .file_system
         .expect_exists()
-        .returning(|path| path == Path::new("./spin.toml"));
+        .returning(|path| path == Path::new("./ftl.toml"));
 
-    // Mock: read spin.toml for builds
+    // Mock: read ftl.toml for builds
     fixture.file_system.expect_read_to_string().returning(|_| {
-        Ok(r#"
-spin_manifest_version = "1"
+        Ok(r#"[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
         .to_string())
@@ -922,7 +927,7 @@ async fn test_up_ctrlc_handling() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists();
+    fixture.mock_ftl_toml_exists();
 
     // Mock: spin installer
     fixture

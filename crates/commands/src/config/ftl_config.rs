@@ -235,11 +235,7 @@ fn validate_auth_config(auth: &AuthConfig, _ctx: &()) -> garde::Result {
                 "issuer must be specified when auth is enabled",
             ));
         }
-        if auth.audience.is_empty() {
-            return Err(garde::Error::new(
-                "audience must be specified when auth is enabled",
-            ));
-        }
+        // audience is now optional
     }
     Ok(())
 }
@@ -549,7 +545,7 @@ audience = "my-api"
                 .contains("issuer must be specified")
         );
 
-        // Test auth enabled with missing audience
+        // Test auth enabled with empty audience - should now pass
         let content = r#"
 [project]
 name = "test-project"
@@ -561,13 +557,7 @@ issuer = "https://example.com"
 audience = ""
 "#;
         let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("audience must be specified")
-        );
+        assert!(result.is_ok());
     }
 
     #[test]

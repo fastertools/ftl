@@ -59,33 +59,20 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         return handle_export(&config, &deps, &working_path, export_format);
     }
 
-    // Check for ftl.toml and generate temporary spin.toml if needed
+    // Generate temporary spin.toml from ftl.toml
     let temp_spin_toml =
         crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
 
-    // Determine which manifest to use
-    let manifest_path = if let Some(temp_path) = &temp_spin_toml {
-        temp_path.clone()
-    } else {
-        // Check if spin.toml exists in project
-        let spin_toml_path = working_path.join("spin.toml");
-        if !deps.file_system.exists(&spin_toml_path) {
-            anyhow::bail!(
-                "No spin.toml or ftl.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
-            );
-        }
-        spin_toml_path
-    };
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml.ok_or_else(|| {
+        anyhow::anyhow!("No ftl.toml found. Run 'ftl build' from an FTL project directory or use 'ftl init' to create a new project.")
+    })?;
 
     // Parse spin.toml to find components with build commands
     // For temporary files, we need to read directly since FileSystem trait doesn't know about them
-    let components = if temp_spin_toml.is_some() {
-        let content = std::fs::read_to_string(&manifest_path)
-            .context("Failed to read temporary spin.toml")?;
-        parse_component_builds_from_content(&content)?
-    } else {
-        parse_component_builds(&deps.file_system, &manifest_path)?
-    };
+    let content =
+        std::fs::read_to_string(&manifest_path).context("Failed to read temporary spin.toml")?;
+    let components = parse_component_builds_from_content(&content)?;
 
     if components.is_empty() {
         deps.ui.print_styled(
@@ -113,11 +100,6 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         "✓ All components built successfully!",
         MessageStyle::Success,
     );
-
-    // Clean up temporary file if it was created
-    if temp_spin_toml.is_some() {
-        let _ = std::fs::remove_file(&manifest_path);
-    }
 
     Ok(())
 }

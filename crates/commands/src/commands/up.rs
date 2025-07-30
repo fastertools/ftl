@@ -77,43 +77,20 @@ pub struct UpDependencies {
 pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
     let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
-    // Check for ftl.toml and generate temporary spin.toml if needed
+    // Generate temporary spin.toml from ftl.toml
     let temp_spin_toml =
         crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &project_path)?;
 
-    // Determine which manifest to use
-    let manifest_path = if let Some(temp_path) = &temp_spin_toml {
-        temp_path.clone()
-    } else {
-        // Check if spin.toml exists in project
-        let spin_toml_path = project_path.join("spin.toml");
-        if !deps.file_system.exists(&spin_toml_path) {
-            anyhow::bail!(
-                "No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' to create a new project."
-            );
-        }
-        spin_toml_path
-    };
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml.ok_or_else(|| {
+        anyhow::anyhow!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' to create a new project.")
+    })?;
 
-    // Pass the temp_spin_toml flag so we know whether to clean up
+    // Always pass true for is_temp_manifest since we always generate temp spin.toml
     if config.watch {
-        run_with_watch(
-            project_path,
-            manifest_path.clone(),
-            config,
-            &deps,
-            temp_spin_toml.is_some(),
-        )
-        .await
+        run_with_watch(project_path, manifest_path.clone(), config, &deps, true).await
     } else {
-        run_normal(
-            project_path,
-            manifest_path.clone(),
-            config,
-            &deps,
-            temp_spin_toml.is_some(),
-        )
-        .await
+        run_normal(project_path, manifest_path.clone(), config, &deps, true).await
     }
 }
 

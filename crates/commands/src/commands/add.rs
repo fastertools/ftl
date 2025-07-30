@@ -41,14 +41,9 @@ pub struct AddDependencies {
 
 /// Execute the add command with injected dependencies
 pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) -> Result<()> {
-    // Check if we have ftl.toml first
-    let has_ftl_toml = deps.file_system.exists(Path::new("ftl.toml"));
-
-    // Check if we're in a project directory
-    if !has_ftl_toml && !deps.file_system.exists(Path::new("spin.toml")) {
-        anyhow::bail!(
-            "No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' first."
-        );
+    // Check if we have ftl.toml (required)
+    if !deps.file_system.exists(Path::new("ftl.toml")) {
+        anyhow::bail!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' first.");
     }
 
     // Get component name interactively if not provided
@@ -68,14 +63,10 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
 
-    // If using ftl.toml, we need to temporarily generate spin.toml for spin add
-    let temp_spin_created = if has_ftl_toml {
-        // Generate spin.toml in the project directory temporarily
-        crate::config::transpiler::ensure_spin_toml(&deps.file_system, &PathBuf::from("."))?;
-        true
-    } else {
-        false
-    };
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &PathBuf::from("."))?
+            .ok_or_else(|| anyhow::anyhow!("No ftl.toml found"))?;
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
@@ -88,7 +79,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         config.git.is_some() || config.dir.is_some() || config.tar.is_some();
 
     // Build spin add command
-    let mut args = vec!["add"];
+    let mut args = vec!["add", "-f", temp_spin_toml.to_str().unwrap()];
 
     // Add template source options
     if let Some(git_url) = &config.git {
@@ -140,21 +131,22 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         anyhow::bail!("Failed to add tool:\n{}", stderr);
     }
 
-    // Update configuration - ftl.toml if it exists, otherwise spin.toml
-    if has_ftl_toml {
-        update_ftl_toml(&deps.file_system, &component_name, selected_language)?;
-    } else {
-        // Update spin.toml to add the component to tool_components variable
-        update_tool_components(&deps.file_system, &component_name)?;
+    // Move the component from temp directory to current directory
+    let temp_dir = temp_spin_toml.parent().unwrap();
+    let temp_component_path = temp_dir.join(&component_name);
+    let target_component_path = PathBuf::from(&component_name);
+
+    if temp_component_path.exists() {
+        // Use std::fs directly since FileSystem trait doesn't have rename/move
+        std::fs::rename(&temp_component_path, &target_component_path)
+            .context("Failed to move component to project directory")?;
     }
+
+    // Update ftl.toml with the new component
+    update_ftl_toml(&deps.file_system, &component_name, selected_language)?;
 
     // Success message
     print_success_message(&deps.ui, &component_name, selected_language);
-
-    // Clean up temporary spin.toml if we created it
-    if temp_spin_created {
-        let _ = std::fs::remove_file("spin.toml");
-    }
 
     Ok(())
 }
@@ -267,89 +259,6 @@ fn update_ftl_toml(
         .context("Failed to write updated ftl.toml")?;
 
     Ok(())
-}
-
-/// Update the `tool_components` variable in spin.toml to include the new component
-fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Result<()> {
-    use toml_edit::{DocumentMut, InlineTable};
-
-    // Read the spin.toml file
-    let content = fs
-        .read_to_string(Path::new("spin.toml"))
-        .context("Failed to read spin.toml")?;
-
-    // Parse as TOML document (preserves formatting)
-    let mut doc = content
-        .parse::<DocumentMut>()
-        .context("Failed to parse spin.toml")?;
-
-    // Navigate to variables.tool_components.default
-    let variables = doc
-        .get_mut("variables")
-        .and_then(|v| v.as_table_mut())
-        .ok_or_else(|| anyhow::anyhow!("No [variables] section found in spin.toml"))?;
-
-    // Ensure tool_components exists
-    if !variables.contains_key("tool_components") {
-        let mut inline_table = InlineTable::new();
-        inline_table.insert("default", "".into());
-        variables["tool_components"] = toml_edit::Item::Value(inline_table.into());
-    }
-
-    // Get tool_components table
-    let tool_components = variables
-        .get_mut("tool_components")
-        .ok_or_else(|| anyhow::anyhow!("Failed to get tool_components"))?;
-
-    // Handle both inline table and regular table formats
-    match tool_components {
-        toml_edit::Item::Value(val) => {
-            if let Some(table) = val.as_inline_table_mut() {
-                update_component_list_in_table(table, component_name);
-            } else {
-                anyhow::bail!("tool_components is not a table");
-            }
-        }
-        toml_edit::Item::Table(table) => {
-            update_component_list_in_table(table, component_name);
-        }
-        _ => anyhow::bail!("tool_components has unexpected type"),
-    }
-
-    // Write back to file
-    let updated_content = doc.to_string();
-    fs.write_string(Path::new("spin.toml"), &updated_content)
-        .context("Failed to write updated spin.toml")?;
-
-    Ok(())
-}
-
-/// Helper function to update component list in either table type
-fn update_component_list_in_table<T>(table: &mut T, component_name: &str)
-where
-    T: toml_edit::TableLike,
-{
-    // Get current value of "default"
-    let current_value = table.get("default").and_then(|v| v.as_str()).unwrap_or("");
-
-    // Parse existing components
-    let mut component_list: Vec<String> = if current_value.is_empty() {
-        vec![]
-    } else {
-        current_value
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
-    };
-
-    // Add new component if not already present
-    if !component_list.contains(&component_name.to_string()) {
-        component_list.push(component_name.to_string());
-    }
-
-    // Update the value
-    table.insert("default", component_list.join(",").into());
 }
 
 /// Print success message

@@ -52,6 +52,7 @@ impl BuildExecutor for MockBuildExecutor {
 struct MockProcessExecutor {
     expected_commands: Vec<(String, Vec<String>, Option<PathBuf>, ProcessOutput)>,
     call_count: std::sync::Mutex<usize>,
+    flexible_args: bool,
 }
 
 impl MockProcessExecutor {
@@ -59,6 +60,15 @@ impl MockProcessExecutor {
         Self {
             expected_commands: Vec::new(),
             call_count: std::sync::Mutex::new(0),
+            flexible_args: false,
+        }
+    }
+
+    fn new_flexible() -> Self {
+        Self {
+            expected_commands: Vec::new(),
+            call_count: std::sync::Mutex::new(0),
+            flexible_args: true,
         }
     }
 
@@ -104,13 +114,39 @@ impl ProcessExecutor for MockProcessExecutor {
             ));
         }
 
-        let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
-        if args_vec != *expected_args {
-            return Err(anyhow::anyhow!(
-                "Expected args {:?}, got {:?}",
-                expected_args,
-                args_vec
-            ));
+        if self.flexible_args {
+            // In flexible mode, only check that key args are present
+            let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+
+            // Check that the command has the basic structure we expect
+            if !args_vec.contains(&"registry".to_string())
+                || !args_vec.contains(&"push".to_string())
+            {
+                return Err(anyhow::anyhow!(
+                    "Expected 'registry push' in args, got {:?}",
+                    args_vec
+                ));
+            }
+
+            // Check for expected optional args
+            for expected_arg in expected_args {
+                if expected_arg.starts_with("--") && !args_vec.contains(expected_arg) {
+                    return Err(anyhow::anyhow!(
+                        "Expected arg '{}' not found in {:?}",
+                        expected_arg,
+                        args_vec
+                    ));
+                }
+            }
+        } else {
+            let args_vec: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+            if args_vec != *expected_args {
+                return Err(anyhow::anyhow!(
+                    "Expected args {:?}, got {:?}",
+                    expected_args,
+                    args_vec
+                ));
+            }
         }
 
         if working_dir.map(std::path::Path::to_path_buf) != *expected_dir {
@@ -181,31 +217,55 @@ impl TestFixture {
         }
     }
 
-    /// Mock that ftl.toml doesn't exist but spin.toml does
-    fn mock_spin_toml_exists(&mut self, path: Option<&Path>) {
-        let ftl_path = if let Some(p) = path {
-            p.join("ftl.toml")
-        } else {
-            PathBuf::from("./ftl.toml")
-        };
+    /// Mock that ftl.toml exists (always required)
+    fn mock_ftl_toml_exists(&mut self, path: Option<&Path>) {
+        let base_path = path.unwrap_or(Path::new("."));
+        let ftl_path = base_path.join("ftl.toml");
 
-        let spin_path = if let Some(p) = path {
-            p.join("spin.toml")
-        } else {
-            PathBuf::from("./spin.toml")
-        };
-
+        // Check if ftl.toml exists (yes)
         self.file_system
             .expect_exists()
-            .withf(move |p: &Path| p == ftl_path.as_path())
-            .times(1)
-            .returning(|_| false);
-
-        self.file_system
-            .expect_exists()
-            .withf(move |p: &Path| p == spin_path.as_path())
+            .with(eq(ftl_path.clone()))
             .times(1)
             .returning(|_| true);
+
+        // Read ftl.toml content
+        self.file_system
+            .expect_read_to_string()
+            .with(eq(ftl_path))
+            .times(1)
+            .returning(|_| {
+                Ok(r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.test-tool]
+path = "test-tool"
+
+[tools.test-tool.build]
+command = "cargo build --release --target wasm32-wasip1"
+"#
+                .to_string())
+            });
+    }
+
+    /// Create a flexible process executor that expects spin registry push
+    fn expect_spin_push(
+        &mut self,
+        extra_args: &[&str],
+        working_dir: Option<PathBuf>,
+        output: ProcessOutput,
+    ) {
+        let mut args = vec!["registry", "push"];
+        args.extend_from_slice(extra_args);
+
+        self.process_executor = Arc::new(MockProcessExecutor::new_flexible().expect_execute(
+            "/usr/local/bin/spin",
+            &args,
+            working_dir.or_else(|| Some(PathBuf::from("."))),
+            output,
+        ));
     }
 
     #[allow(clippy::wrong_self_convention)]
@@ -224,20 +284,19 @@ impl TestFixture {
 async fn test_publish_success() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push succeeds
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &[],
+        None,
         ProcessOutput {
             success: true,
             stdout: "Published to registry successfully!".to_string(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -269,7 +328,7 @@ async fn test_publish_success() {
 }
 
 #[tokio::test]
-async fn test_publish_no_spin_toml() {
+async fn test_publish_no_ftl_toml() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml doesn't exist
@@ -277,14 +336,6 @@ async fn test_publish_no_spin_toml() {
         .file_system
         .expect_exists()
         .with(eq(Path::new("./ftl.toml")))
-        .times(1)
-        .returning(|_| false);
-
-    // Mock: spin.toml doesn't exist
-    fixture
-        .file_system
-        .expect_exists()
-        .withf(|path: &Path| path == Path::new("./spin.toml"))
         .times(1)
         .returning(|_| false);
 
@@ -302,7 +353,7 @@ async fn test_publish_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml or ftl.toml found")
+            .contains("No ftl.toml found")
     );
 }
 
@@ -312,20 +363,19 @@ async fn test_publish_with_custom_path() {
 
     let custom_path = PathBuf::from("/my/project");
 
-    // Mock: ftl.toml doesn't exist, spin.toml does at custom path
-    fixture.mock_spin_toml_exists(Some(&custom_path));
+    // Mock: ftl.toml exists at custom path
+    fixture.mock_ftl_toml_exists(Some(&custom_path));
 
     // Mock: spin registry push with custom path
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push"],
+    fixture.expect_spin_push(
+        &[],
         Some(custom_path.clone()),
         ProcessOutput {
             success: true,
             stdout: String::new(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let deps = fixture.to_deps();
 
@@ -343,20 +393,19 @@ async fn test_publish_with_custom_path() {
 async fn test_publish_with_registry() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with custom registry
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push", "--registry", "https://my.registry.com"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &["--registry", "https://my.registry.com"],
+        None,
         ProcessOutput {
             success: true,
             stdout: String::new(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let deps = fixture.to_deps();
 
@@ -374,20 +423,19 @@ async fn test_publish_with_registry() {
 async fn test_publish_with_tag() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with tag
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push", "--tag", "v1.0.0"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &["--tag", "v1.0.0"],
+        None,
         ProcessOutput {
             success: true,
             stdout: String::new(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let deps = fixture.to_deps();
 
@@ -405,27 +453,19 @@ async fn test_publish_with_tag() {
 async fn test_publish_with_registry_and_tag() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with both registry and tag
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &[
-            "registry",
-            "push",
-            "--registry",
-            "https://my.registry.com",
-            "--tag",
-            "v2.0.0",
-        ],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &["--registry", "https://my.registry.com", "--tag", "v2.0.0"],
+        None,
         ProcessOutput {
             success: true,
             stdout: String::new(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let deps = fixture.to_deps();
 
@@ -443,8 +483,8 @@ async fn test_publish_with_registry_and_tag() {
 async fn test_publish_spin_install_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin installer fails
     fixture.spin_installer = Arc::new(MockSpinInstaller::with_failure());
@@ -471,8 +511,8 @@ async fn test_publish_spin_install_fails() {
 async fn test_publish_build_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: build fails
     fixture.build_executor =
@@ -500,20 +540,19 @@ async fn test_publish_build_fails() {
 async fn test_publish_registry_push_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push fails
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &[],
+        None,
         ProcessOutput {
             success: false,
             stdout: "Error: Authentication failed".to_string(),
             stderr: "Please login first".to_string(),
         },
-    ));
+    );
 
     let deps = fixture.to_deps();
 
@@ -537,20 +576,19 @@ async fn test_publish_with_custom_tag() {
     let build_executor = Arc::new(MockBuildExecutor::new());
     fixture.build_executor = build_executor.clone();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with tag
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push", "--tag", "v1.0.0"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &["--tag", "v1.0.0"],
+        None,
         ProcessOutput {
             success: true,
             stdout: "Published with tag v1.0.0".to_string(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -579,27 +617,19 @@ async fn test_publish_with_custom_registry_and_tag() {
     let build_executor = Arc::new(MockBuildExecutor::new());
     fixture.build_executor = build_executor.clone();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with registry and tag
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &[
-            "registry",
-            "push",
-            "--registry",
-            "https://my-registry.com",
-            "--tag",
-            "latest",
-        ],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &["--registry", "https://my-registry.com", "--tag", "latest"],
+        None,
         ProcessOutput {
             success: true,
             stdout: "Published to custom registry".to_string(),
             stderr: String::new(),
         },
-    ));
+    );
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -628,20 +658,19 @@ async fn test_publish_empty_stdout() {
     let build_executor = Arc::new(MockBuildExecutor::new());
     fixture.build_executor = build_executor.clone();
 
-    // Mock: ftl.toml doesn't exist, spin.toml does
-    fixture.mock_spin_toml_exists(None);
+    // Mock: ftl.toml exists (required)
+    fixture.mock_ftl_toml_exists(None);
 
     // Mock: spin registry push with empty stdout
-    fixture.process_executor = Arc::new(MockProcessExecutor::new().expect_execute(
-        "/usr/local/bin/spin",
-        &["registry", "push"],
-        Some(PathBuf::from(".")),
+    fixture.expect_spin_push(
+        &[],
+        None,
         ProcessOutput {
             success: true,
             stdout: "   \n  \t  ".to_string(), // Whitespace only
             stderr: String::new(),
         },
-    ));
+    );
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();

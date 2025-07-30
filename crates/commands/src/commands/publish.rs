@@ -65,25 +65,32 @@ pub async fn execute_with_deps(
     config: PublishConfig,
     deps: Arc<PublishDependencies>,
 ) -> Result<()> {
-    let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
+    let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
     deps.ui
         .print_styled("→ Publishing project", MessageStyle::Cyan);
 
-    // For deploy and publish, we need actual spin.toml in the project directory
-    // since these commands package the project for upload
-    if deps.file_system.exists(&project_path.join("ftl.toml")) {
-        crate::config::transpiler::ensure_spin_toml(&deps.file_system, &project_path)?;
-    }
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &project_path)?;
 
-    // Validate we're in a Spin project directory
-    let spin_toml_path = project_path.join("spin.toml");
-    if !deps.file_system.exists(&spin_toml_path) {
-        anyhow::bail!(
-            "No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' to create a new project."
-        );
-    }
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml.ok_or_else(|| {
+        anyhow::anyhow!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' to create a new project.")
+    })?;
 
+    // Run the publish with manifest path
+    // Clean up is handled by tempfile crate when temp_spin_toml goes out of scope
+    execute_publish_inner(config, deps.clone(), project_path.clone(), manifest_path).await
+}
+
+/// Inner publish logic separated for proper cleanup handling
+async fn execute_publish_inner(
+    config: PublishConfig,
+    deps: Arc<PublishDependencies>,
+    project_path: PathBuf,
+    manifest_path: PathBuf,
+) -> Result<()> {
     // Install spin if needed
     let spin_path = deps.spin_installer.check_and_install().await?;
 
@@ -95,6 +102,14 @@ pub async fn execute_with_deps(
 
     // Prepare registry push arguments
     let mut args = vec!["registry", "push"];
+
+    // Specify the manifest file location
+    args.push("-f");
+    args.push(
+        manifest_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid manifest path"))?,
+    );
 
     if let Some(registry_url) = config.registry.as_ref() {
         args.push("--registry");
