@@ -27,6 +27,23 @@ impl TestFixture {
         }
     }
 
+    /// Mock that ftl.toml exists
+    fn mock_ftl_toml_exists(&mut self) {
+        // First check by add command itself
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("ftl.toml")))
+            .times(1)
+            .returning(|_| true);
+
+        // Second check by transpiler
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(|_| true);
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<AddDependencies> {
         Arc::new(AddDependencies {
@@ -39,14 +56,14 @@ impl TestFixture {
 }
 
 #[tokio::test]
-async fn test_add_not_in_spin_project() {
+async fn test_add_not_in_ftl_project() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml doesn't exist
+    // Mock: ftl.toml doesn't exist
     fixture
         .file_system
         .expect_exists()
-        .with(eq(Path::new("spin.toml")))
+        .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| false);
 
@@ -54,7 +71,6 @@ async fn test_add_not_in_spin_project() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -70,7 +86,7 @@ async fn test_add_not_in_spin_project() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No ftl.toml found")
     );
 }
 
@@ -78,11 +94,11 @@ async fn test_add_not_in_spin_project() {
 async fn test_add_invalid_name_uppercase() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
+    // Mock: ftl.toml exists (only the first check, validation fails before transpiler)
     fixture
         .file_system
         .expect_exists()
-        .with(eq(Path::new("spin.toml")))
+        .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| true);
 
@@ -90,7 +106,6 @@ async fn test_add_invalid_name_uppercase() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("MyTool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -114,11 +129,11 @@ async fn test_add_invalid_name_uppercase() {
 async fn test_add_invalid_name_leading_hyphen() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
+    // Mock: ftl.toml exists (only the first check, validation fails before transpiler)
     fixture
         .file_system
         .expect_exists()
-        .with(eq(Path::new("spin.toml")))
+        .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| true);
 
@@ -126,7 +141,6 @@ async fn test_add_invalid_name_leading_hyphen() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("-tool".to_string()),
-            description: None,
             language: None,
             git: None,
             branch: None,
@@ -174,7 +188,6 @@ async fn test_add_templates_not_installed() {
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: Some("A test tool".to_string()),
             language: Some("rust".to_string()),
             git: None,
             branch: None,
@@ -209,13 +222,18 @@ async fn test_add_success_rust() {
 
     setup_basic_add_mocks(&mut fixture);
 
-    // Mock: spin add succeeds
+    // Mock: spin add succeeds (now with -f and -o flags)
     fixture
         .command_executor
         .expect_execute()
         .times(1)
         .returning(|_, args| {
-            if args.contains(&"add") && args.contains(&"-t") && args.contains(&"ftl-mcp-rust") {
+            if args.contains(&"add") 
+                && args.contains(&"-t") 
+                && args.contains(&"ftl-mcp-rust")
+                && args.contains(&"-f")  // temp spin.toml path
+                && args.contains(&"my-tool")
+            {
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"Tool added successfully".to_vec(),
@@ -226,40 +244,13 @@ async fn test_add_success_rust() {
             }
         });
 
-    // Mock: read spin.toml
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-[variables]
-tool_components = { default = "" }
-
-[[trigger.http]]
-route = "/mcp/..."
-"#
-            .to_string())
-        });
-
-    // Mock: write updated spin.toml
-    fixture
-        .file_system
-        .expect_write_string()
-        .with(eq(Path::new("spin.toml")), always())
-        .times(1)
-        .returning(|_, content| {
-            assert!(content.contains("my-tool"));
-            Ok(())
-        });
+    setup_ftl_toml_mocks(&mut fixture);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-tool".to_string()),
-            description: Some("A test tool".to_string()),
             language: Some("rust".to_string()),
             git: None,
             branch: None,
@@ -288,13 +279,18 @@ async fn test_add_success_typescript() {
 
     setup_basic_add_mocks(&mut fixture);
 
-    // Mock: spin add succeeds
+    // Mock: spin add succeeds (now with -f and -o flags)
     fixture
         .command_executor
         .expect_execute()
         .times(1)
         .returning(|_, args| {
-            if args.contains(&"add") && args.contains(&"-t") && args.contains(&"ftl-mcp-ts") {
+            if args.contains(&"add") 
+                && args.contains(&"-t") 
+                && args.contains(&"ftl-mcp-ts")
+                && args.contains(&"-f")  // temp spin.toml path
+                && args.contains(&"my-ts-tool")
+            {
                 Ok(CommandOutput {
                     success: true,
                     stdout: b"Tool added successfully".to_vec(),
@@ -305,37 +301,13 @@ async fn test_add_success_typescript() {
             }
         });
 
-    // Mock: read spin.toml
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-[variables]
-tool_components = { default = "existing-tool" }
-"#
-            .to_string())
-        });
-
-    // Mock: write updated spin.toml
-    fixture
-        .file_system
-        .expect_write_string()
-        .with(eq(Path::new("spin.toml")), always())
-        .times(1)
-        .returning(|_, content| {
-            assert!(content.contains("existing-tool,my-ts-tool"));
-            Ok(())
-        });
+    setup_ftl_toml_mocks(&mut fixture);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
             name: Some("my-ts-tool".to_string()),
-            description: Some("A TypeScript tool".to_string()),
             language: Some("typescript".to_string()),
             git: None,
             branch: None,
@@ -387,13 +359,12 @@ async fn test_add_with_git_template() {
         });
 
     // Mock: read/write spin.toml
-    setup_spin_toml_mocks(&mut fixture);
+    setup_ftl_toml_mocks(&mut fixture);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
             name: Some("custom-tool".to_string()),
-            description: Some("Custom template tool".to_string()),
             language: Some("rust".to_string()),
             git: Some("https://github.com/example/template.git".to_string()),
             branch: Some("main".to_string()),
@@ -433,14 +404,13 @@ async fn test_add_interactive_prompts() {
             }
         });
 
-    setup_spin_toml_mocks(&mut fixture);
+    setup_ftl_toml_mocks(&mut fixture);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
-            name: None,        // Will prompt for name
-            description: None, // Will prompt for description
-            language: None,    // Will prompt for language
+            name: None,     // Will prompt for name
+            language: None, // Will prompt for language
             git: None,
             branch: None,
             dir: None,
@@ -477,13 +447,12 @@ async fn test_add_javascript_mapped_to_typescript() {
             }
         });
 
-    setup_spin_toml_mocks(&mut fixture);
+    setup_ftl_toml_mocks(&mut fixture);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
             name: Some("js-tool".to_string()),
-            description: Some("JavaScript tool".to_string()),
             language: Some("javascript".to_string()), // Should be mapped to TypeScript
             git: None,
             branch: None,
@@ -499,13 +468,22 @@ async fn test_add_javascript_mapped_to_typescript() {
 
 // Helper functions
 fn setup_basic_add_mocks(fixture: &mut TestFixture) {
-    // Mock: spin.toml exists
+    // Mock: ftl.toml exists
+    fixture.mock_ftl_toml_exists();
+
+    // Mock: read ftl.toml for transpilation
     fixture
         .file_system
-        .expect_exists()
-        .with(eq(Path::new("spin.toml")))
+        .expect_read_to_string()
+        .with(eq(Path::new("./ftl.toml")))
         .times(1)
-        .returning(|_| true);
+        .returning(|_| {
+            Ok(r#"[project]
+name = "test-project"
+version = "0.1.0"
+"#
+            .to_string())
+        });
 
     // Mock: spin installer
     fixture
@@ -515,26 +493,26 @@ fn setup_basic_add_mocks(fixture: &mut TestFixture) {
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 }
 
-fn setup_spin_toml_mocks(fixture: &mut TestFixture) {
-    // Mock: read spin.toml
+fn setup_ftl_toml_mocks(fixture: &mut TestFixture) {
+    // Mock: read ftl.toml
     fixture
         .file_system
         .expect_read_to_string()
-        .with(eq(Path::new("spin.toml")))
+        .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| {
-            Ok(r#"
-[variables]
-tool_components = { default = "" }
+            Ok(r#"[project]
+name = "test-project"
+version = "0.1.0"
 "#
             .to_string())
         });
 
-    // Mock: write updated spin.toml
+    // Mock: write updated ftl.toml
     fixture
         .file_system
         .expect_write_string()
-        .with(eq(Path::new("spin.toml")), always())
+        .with(eq(Path::new("ftl.toml")), always())
         .times(1)
         .returning(|_, _| Ok(()));
 }

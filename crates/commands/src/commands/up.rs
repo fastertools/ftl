@@ -3,14 +3,18 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
+use tokio::sync::{Mutex, Semaphore};
+use tokio::task::JoinSet;
 
 use ftl_common::SpinInstaller;
 use ftl_runtime::deps::{
     AsyncRuntime, CommandExecutor, FileSystem, MessageStyle, ProcessManager, UserInterface,
 };
+
+use crate::commands::build::parse_component_builds_from_content;
 
 /// File watcher trait for testability
 #[async_trait::async_trait]
@@ -45,6 +49,8 @@ pub struct UpConfig {
     pub watch: bool,
     /// Clear terminal on rebuild
     pub clear: bool,
+    /// Directory for component logs
+    pub log_dir: Option<PathBuf>,
 }
 
 /// Dependencies for the up command
@@ -69,48 +75,63 @@ pub struct UpDependencies {
 
 /// Execute the up command with injected dependencies
 pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
-    let project_path = config.path.unwrap_or_else(|| PathBuf::from("."));
+    let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
-    // Validate project directory exists
-    if !deps.file_system.exists(&project_path.join("spin.toml")) {
-        anyhow::bail!(
-            "No spin.toml found. Not in a project directory? Run 'ftl init' to create a new project."
-        );
-    }
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &project_path)?;
 
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml.ok_or_else(|| {
+        anyhow::anyhow!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' to create a new project.")
+    })?;
+
+    // Always pass true for is_temp_manifest since we always generate temp spin.toml
     if config.watch {
-        run_with_watch(project_path, config.port, config.clear, &deps).await
+        run_with_watch(project_path, manifest_path.clone(), config, &deps, true).await
     } else {
-        run_normal(project_path, config.port, config.build, &deps).await
+        run_normal(project_path, manifest_path.clone(), config, &deps, true).await
     }
 }
 
 async fn run_normal(
     project_path: PathBuf,
-    port: u16,
-    build: bool,
+    manifest_path: PathBuf,
+    config: UpConfig,
     deps: &Arc<UpDependencies>,
+    is_temp_manifest: bool,
 ) -> Result<()> {
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
 
     // If build flag is set, run our parallel build first
-    if build {
+    if config.build {
         deps.ui.print(&format!(
             "{} Building project before starting server...",
             "→"
         ));
         deps.ui.print("");
 
-        // Run build command
-        run_build_command(&project_path, deps).await?;
+        // Run build command with our manifest path if it's temporary
+        if is_temp_manifest {
+            run_build_command_with_manifest(&project_path, &manifest_path, deps).await?;
+        } else {
+            run_build_command(&project_path, deps).await?;
+        }
         deps.ui.print("");
     }
 
     // Build command args for spin up (without --build since we already built)
-    let mut args = vec!["up"];
-    let listen_addr = format!("127.0.0.1:{port}");
+    let mut args = vec!["up", "-f", manifest_path.to_str().unwrap()];
+    let listen_addr = format!("127.0.0.1:{}", config.port);
     args.extend(["--listen", &listen_addr]);
+
+    // Set log directory - use provided path or default to .ftl/logs in project
+    let log_dir = config
+        .log_dir
+        .clone()
+        .unwrap_or_else(|| project_path.join(".ftl").join("logs"));
+    args.extend(["--log-dir", log_dir.to_str().unwrap()]);
 
     deps.ui.print(&format!("{} Starting server...", "→"));
     deps.ui.print("");
@@ -150,6 +171,11 @@ async fn run_normal(
         }
     };
 
+    // Clean up temporary manifest if it was created
+    if is_temp_manifest {
+        let _ = std::fs::remove_file(&manifest_path);
+    }
+
     // Check exit status
     if !ctrlc_pressed.load(Ordering::SeqCst) && !exit_status.success() {
         anyhow::bail!(
@@ -163,9 +189,10 @@ async fn run_normal(
 
 async fn run_with_watch(
     project_path: PathBuf,
-    port: u16,
-    clear: bool,
+    manifest_path: PathBuf,
+    config: UpConfig,
     deps: &Arc<UpDependencies>,
+    is_temp_manifest: bool,
 ) -> Result<()> {
     deps.ui.print(&format!(
         "{} Starting development server with auto-rebuild...",
@@ -173,8 +200,10 @@ async fn run_with_watch(
     ));
     deps.ui.print("");
     deps.ui.print("👀 Watching for file changes");
-    deps.ui
-        .print(&format!("🌐 Server will start at http://127.0.0.1:{port}"));
+    deps.ui.print(&format!(
+        "🌐 Server will start at http://127.0.0.1:{}",
+        config.port
+    ));
     deps.ui.print("⏹ Press Ctrl+C to stop");
     deps.ui.print("");
 
@@ -185,8 +214,22 @@ async fn run_with_watch(
 
     // Start the server
     let spin_path = deps.spin_installer.check_and_install().await?;
-    let listen_addr = format!("127.0.0.1:{port}");
-    let args = vec!["up", "--listen", &listen_addr];
+    let listen_addr = format!("127.0.0.1:{}", config.port);
+
+    // Set log directory - use provided path or default to .ftl/logs in project
+    let log_dir = config
+        .log_dir
+        .clone()
+        .unwrap_or_else(|| project_path.join(".ftl").join("logs"));
+    let args = vec![
+        "up",
+        "-f",
+        manifest_path.to_str().unwrap(),
+        "--listen",
+        &listen_addr,
+        "--log-dir",
+        log_dir.to_str().unwrap(),
+    ];
 
     let mut server_process = deps
         .process_manager
@@ -218,7 +261,7 @@ async fn run_with_watch(
                     // Debounce - wait a bit for multiple file changes to settle
                     deps.async_runtime.sleep(Duration::from_millis(200)).await;
 
-                    if clear {
+                    if config.clear {
                         // Clear screen
                         deps.ui.clear_screen();
                     }
@@ -263,6 +306,11 @@ async fn run_with_watch(
                 break;
             }
         }
+    }
+
+    // Clean up temporary manifest if it was created
+    if is_temp_manifest {
+        let _ = std::fs::remove_file(&manifest_path);
     }
 
     Ok(())
@@ -324,10 +372,191 @@ async fn run_build_command(project_path: &Path, deps: &Arc<UpDependencies>) -> R
         BuildConfig {
             path: Some(project_path.to_path_buf()),
             release: false,
+            export: None,
+            export_out: None,
         },
         build_deps,
     )
     .await
+}
+
+async fn run_build_command_with_manifest(
+    project_path: &Path,
+    manifest_path: &Path,
+    deps: &Arc<UpDependencies>,
+) -> Result<()> {
+    // Read the manifest content to parse components
+    let manifest_content =
+        std::fs::read_to_string(manifest_path).context("Failed to read manifest file")?;
+
+    // Parse component builds from the manifest content
+    let components = parse_component_builds_from_content(&manifest_content)?;
+
+    if components.is_empty() {
+        deps.ui.print_styled(
+            "→ No components with build commands found",
+            MessageStyle::Cyan,
+        );
+        return Ok(());
+    }
+
+    // Check if spin is installed
+    let _spin_path = deps.spin_installer.check_and_install().await?;
+
+    deps.ui.print(&format!(
+        "→ Building {} component{} in parallel",
+        components.len(),
+        if components.len() > 1 { "s" } else { "" }
+    ));
+    deps.ui.print("");
+
+    // Build components using our existing parallel build infrastructure
+    let multi_progress = deps.ui.create_multi_progress();
+    let mut tasks = JoinSet::new();
+
+    // Track errors across all tasks
+    let error_flag = Arc::new(Mutex::new(None::<String>));
+
+    // Limit concurrent builds
+    let max_concurrent = std::env::var("FTL_MAX_CONCURRENT_BUILDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(num_cpus::get);
+
+    let semaphore = Arc::new(Semaphore::new(max_concurrent));
+
+    for component in components {
+        let pb = multi_progress.add_spinner();
+        pb.set_prefix(format!("[{}]", component.name));
+        pb.set_message("Starting build...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+
+        let project_path = project_path.to_path_buf();
+        let error_flag = Arc::clone(&error_flag);
+        let semaphore = Arc::clone(&semaphore);
+        let deps = Arc::clone(deps);
+
+        tasks.spawn(async move {
+            // Acquire permit to limit concurrency
+            let _permit = semaphore.acquire().await.unwrap();
+
+            // Check if another task has already failed
+            if error_flag.lock().await.is_some() {
+                pb.finish_with_message("Skipped due to error".to_string());
+                return Ok(());
+            }
+
+            let start = Instant::now();
+            let result = build_single_component_with_deps(
+                &component,
+                &project_path,
+                false, // release
+                pb.as_ref(),
+                &deps,
+            )
+            .await;
+
+            match result {
+                Ok(()) => {
+                    let duration = start.elapsed();
+                    pb.finish_with_message(format!("✓ Built in {:.1}s", duration.as_secs_f64()));
+                    Ok(())
+                }
+                Err(e) => {
+                    pb.finish_with_message(format!("✗ Build failed: {e}"));
+
+                    // Set error flag to prevent new tasks from starting
+                    let mut error_guard = error_flag.lock().await;
+                    if error_guard.is_none() {
+                        *error_guard =
+                            Some(format!("Component '{}' failed: {}", component.name, e));
+                    }
+
+                    Err(e)
+                }
+            }
+        });
+    }
+
+    // Wait for all tasks to complete
+    let mut first_error = None;
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result? {
+            if first_error.is_none() {
+                first_error = Some(e);
+            }
+        }
+    }
+
+    // If any component failed, return the first error
+    if let Some(e) = first_error {
+        return Err(e);
+    }
+
+    deps.ui.print("");
+    deps.ui.print_styled(
+        "✓ All components built successfully!",
+        MessageStyle::Success,
+    );
+
+    Ok(())
+}
+
+async fn build_single_component_with_deps(
+    component: &crate::commands::build::ComponentBuildInfo,
+    working_path: &Path,
+    release: bool,
+    pb: &dyn ftl_runtime::deps::ProgressIndicator,
+    deps: &Arc<UpDependencies>,
+) -> Result<()> {
+    if let Some(build_command) = &component.build_command {
+        pb.set_message("Building...");
+
+        // Determine the working directory for the build
+        let build_dir = if let Some(workdir) = &component.workdir {
+            working_path.join(workdir)
+        } else {
+            working_path.to_path_buf()
+        };
+
+        // Replace --release flag in command if needed
+        let command = if release && !build_command.contains("--release") {
+            // For common build tools, add release flag
+            if build_command.starts_with("cargo build") {
+                build_command.replace("cargo build", "cargo build --release")
+            } else if build_command.starts_with("npm run build") {
+                // npm scripts typically handle this internally
+                build_command.to_string()
+            } else {
+                // For other commands, just use as-is
+                build_command.to_string()
+            }
+        } else {
+            build_command.to_string()
+        };
+
+        // Execute the build command using shell
+        let (shell_cmd, shell_args) = if cfg!(target_os = "windows") {
+            ("cmd", vec!["/C", &command])
+        } else {
+            ("sh", vec!["-c", &command])
+        };
+
+        // Run the command in the correct directory
+        let cd_and_run = format!("cd {} && {}", build_dir.display(), shell_args[1]);
+        let output = deps
+            .command_executor
+            .execute(shell_cmd, &[shell_args[0], &cd_and_run])
+            .await
+            .context("Failed to execute build command")?;
+
+        if !output.success {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Build failed:\n{}", stderr));
+        }
+    }
+
+    Ok(())
 }
 
 /// Up command arguments (matches CLI parser)
@@ -343,6 +572,8 @@ pub struct UpArgs {
     pub watch: bool,
     /// Clear screen on rebuild (only with --watch)
     pub clear: bool,
+    /// Directory for component logs
+    pub log_dir: Option<PathBuf>,
 }
 
 // File watcher implementation using notify
@@ -457,6 +688,7 @@ pub async fn execute(args: UpArgs) -> Result<()> {
         build: args.build,
         watch: args.watch,
         clear: args.clear,
+        log_dir: args.log_dir,
     };
 
     execute_with_deps(config, deps).await

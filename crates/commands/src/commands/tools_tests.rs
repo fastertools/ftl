@@ -5,13 +5,15 @@ use std::sync::Arc;
 use crate::commands::tools::{
     ToolsDependencies, add_with_deps, list_with_deps, remove_with_deps, update_with_deps,
 };
+use crate::test_helpers::MockFileSystemMock;
 use ftl_common::ui::TestUserInterface;
-use ftl_runtime::deps::UserInterface;
+use ftl_runtime::deps::{FileSystem, UserInterface};
 use reqwest::Client;
 
 struct TestFixture {
     ui: Arc<TestUserInterface>,
     client: Client,
+    file_system: MockFileSystemMock,
 }
 
 impl TestFixture {
@@ -19,6 +21,7 @@ impl TestFixture {
         Self {
             ui: Arc::new(TestUserInterface::new()),
             client: Client::new(),
+            file_system: MockFileSystemMock::new(),
         }
     }
 
@@ -27,6 +30,7 @@ impl TestFixture {
         Arc::new(ToolsDependencies {
             ui: self.ui as Arc<dyn UserInterface>,
             client: self.client,
+            file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
         })
     }
 }
@@ -133,26 +137,50 @@ async fn test_list_tools_direct_from_registry() {
 
 #[tokio::test]
 async fn test_add_tools_without_confirmation() {
-    let fixture = TestFixture::new();
+    let mut fixture = TestFixture::new();
     let _ui = fixture.ui.clone();
+
+    // Mock: No ftl.toml or spin.toml exists
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
     let deps = fixture.to_deps();
 
     // Test adding tools with --yes flag (skips confirmation)
-    // Note: This test would need a test project setup to actually work
-    // For now, we'll just verify it handles the missing spin.toml gracefully
+    // Should fail because no project file exists
     let result = add_with_deps(&deps, &["add".to_string()], None, None, true).await;
 
-    // Should fail because no spin.toml exists
+    // Should fail because no spin.toml or ftl.toml exists
     assert!(result.is_err());
     if let Err(e) = result {
-        assert!(e.to_string().contains("No spin.toml found"));
+        assert!(e.to_string().contains("No spin.toml or ftl.toml found"));
     }
 }
 
 #[tokio::test]
 async fn test_update_tools_without_confirmation() {
-    let fixture = TestFixture::new();
+    let mut fixture = TestFixture::new();
     let ui = fixture.ui.clone();
+
+    // Mock: spin.toml doesn't exist (no tools installed)
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
     let deps = fixture.to_deps();
 
     // Test updating tools with --yes flag
@@ -172,8 +200,17 @@ async fn test_update_tools_without_confirmation() {
 
 #[tokio::test]
 async fn test_remove_tools_without_confirmation() {
-    let fixture = TestFixture::new();
+    let mut fixture = TestFixture::new();
     let ui = fixture.ui.clone();
+
+    // Mock: spin.toml doesn't exist (no tools installed)
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
     let deps = fixture.to_deps();
 
     // Test removing tools with --yes flag
@@ -234,27 +271,28 @@ allowed_outbound_hosts = []
 #[tokio::test]
 async fn test_get_installed_tools_empty() {
     use crate::commands::tools::get_installed_tools;
-    use tempfile::TempDir;
 
-    // Create empty temp directory
-    let temp_dir = TempDir::new().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&temp_dir).unwrap();
+    let mut fixture = TestFixture::new();
 
-    let tools = get_installed_tools().unwrap();
+    // Mock: spin.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
+    let deps = fixture.to_deps();
+
+    let tools = get_installed_tools(&deps).unwrap();
     assert!(tools.is_empty());
-
-    std::env::set_current_dir(original_dir).unwrap();
 }
 
 #[tokio::test]
 async fn test_get_installed_tools_with_tools() {
     use crate::commands::tools::get_installed_tools;
-    use std::fs;
-    use tempfile::TempDir;
 
-    let temp_dir = TempDir::new().unwrap();
-    let spin_toml_path = temp_dir.path().join("spin.toml");
+    let mut fixture = TestFixture::new();
 
     let spin_toml_content = r#"
 [component.tool-json-formatter]
@@ -267,24 +305,43 @@ source = { registry = "ghcr.io", package = "ftl-tool-add", version = "1.0.0" }
 source = { registry = "ghcr.io", package = "some-other-component", version = "1.0.0" }
 "#;
 
-    fs::write(&spin_toml_path, spin_toml_content).unwrap();
+    // Mock: spin.toml exists and contains tools
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| true);
 
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&temp_dir).unwrap();
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(move |_| Ok(spin_toml_content.to_string()));
 
-    let tools = get_installed_tools().unwrap();
+    let deps = fixture.to_deps();
+
+    let tools = get_installed_tools(&deps).unwrap();
     assert_eq!(tools.len(), 2);
     assert!(tools.contains("json-formatter"));
     assert!(tools.contains("add"));
     assert!(!tools.contains("not-a-tool"));
-
-    std::env::set_current_dir(original_dir).unwrap();
 }
 
 #[tokio::test]
 async fn test_update_without_existing_tool() {
-    let fixture = TestFixture::new();
+    let mut fixture = TestFixture::new();
     let ui = fixture.ui.clone();
+
+    // Mock: spin.toml doesn't exist (no tools installed)
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
     let deps = fixture.to_deps();
 
     // Try to update a tool that's not installed
@@ -305,8 +362,17 @@ async fn test_update_without_existing_tool() {
 
 #[tokio::test]
 async fn test_remove_without_existing_tool() {
-    let fixture = TestFixture::new();
+    let mut fixture = TestFixture::new();
     let ui = fixture.ui.clone();
+
+    // Mock: spin.toml doesn't exist (no tools installed)
+    fixture
+        .file_system
+        .expect_exists()
+        .with(mockall::predicate::eq(std::path::Path::new("spin.toml")))
+        .times(1)
+        .returning(|_| false);
+
     let deps = fixture.to_deps();
 
     // Try to remove a tool that's not installed
@@ -658,28 +724,45 @@ mod registry_integration_tests {
 mod add_tools_integration_tests {
     use super::*;
     use crate::commands::tools::{ResolvedTool, add_tools_to_project};
-    use std::fs;
-    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_add_tools_with_latest_version_should_fail_without_registry_resolution() {
         // This test documents the exact bug that was fixed
-        let fixture = TestFixture::new();
-        let deps = fixture.to_deps();
+        let mut fixture = TestFixture::new();
 
-        // Create temporary directory with spin.toml
-        let temp_dir = TempDir::new().unwrap();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&temp_dir).unwrap();
-
-        let spin_toml_content = r#"spin_manifest_version = 2
-
-[application]
+        let ftl_toml_content = r#"[project]
 name = "test-app"
 version = "0.1.0"
 "#;
 
-        fs::write(temp_dir.path().join("spin.toml"), spin_toml_content).unwrap();
+        // Mock: ftl.toml exists (required in new architecture)
+        fixture
+            .file_system
+            .expect_exists()
+            .with(mockall::predicate::eq(std::path::Path::new("ftl.toml")))
+            .times(1)
+            .returning(|_| true);
+
+        // Mock: reading ftl.toml
+        fixture
+            .file_system
+            .expect_read_to_string()
+            .with(mockall::predicate::eq(std::path::Path::new("ftl.toml")))
+            .times(1)
+            .returning(move |_| Ok(ftl_toml_content.to_string()));
+
+        // Mock: writing ftl.toml (the test will update it)
+        fixture
+            .file_system
+            .expect_write_string()
+            .with(
+                mockall::predicate::eq(std::path::Path::new("ftl.toml")),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let deps = fixture.to_deps();
 
         // Create a ResolvedTool with "latest" version - this simulates the old buggy behavior
         let resolved_tools = vec![ResolvedTool {
@@ -710,8 +793,6 @@ version = "0.1.0"
                 );
             }
         }
-
-        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]

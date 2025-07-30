@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FtlConfig",
+  "description": "Root configuration structure for ftl.toml",
+  "type": "object",
+  "required": ["project"],
+  "properties": {
+    "project": {
+      "description": "Project metadata",
+      "$ref": "#/$defs/ProjectConfig"
+    },
+    "auth": {
+      "description": "Authentication configuration",
+      "$ref": "#/$defs/AuthConfig",
+      "default": {
+        "enabled": false,
+        "provider": "",
+        "issuer": "",
+        "audience": ""
+      }
+    },
+    "tools": {
+      "description": "Tool definitions",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ToolConfig"
+      },
+      "default": {}
+    },
+    "gateway": {
+      "description": "Gateway component configuration",
+      "$ref": "#/$defs/GatewayConfig",
+      "default": {
+        "version": "",
+        "authorizer_version": "",
+        "validate_arguments": true
+      }
+    },
+    "variables": {
+      "description": "Application-level variables",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ApplicationVariable"
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "ProjectConfig": {
+      "description": "Project metadata",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "description": "Project name (alphanumeric, hyphens, underscores only, must start with letter)",
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+        },
+        "version": {
+          "description": "Semantic version (e.g., 0.1.0)",
+          "type": "string",
+          "default": "0.1.0"
+        },
+        "description": {
+          "description": "Project description",
+          "type": "string",
+          "default": ""
+        },
+        "authors": {
+          "description": "Project authors",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "AuthConfig": {
+      "description": "Authentication configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable authentication for this MCP server",
+          "type": "boolean",
+          "default": false
+        },
+        "provider": {
+          "description": "Authentication provider type",
+          "type": "string",
+          "default": ""
+        },
+        "issuer": {
+          "description": "OIDC issuer URL",
+          "type": "string",
+          "default": ""
+        },
+        "audience": {
+          "description": "Expected audience for tokens",
+          "type": "string",
+          "default": ""
+        },
+        "oidc": {
+          "description": "OIDC-specific configuration",
+          "$ref": "#/$defs/OidcConfig"
+        }
+      }
+    },
+    "OidcConfig": {
+      "description": "OIDC-specific configuration",
+      "type": "object",
+      "required": ["provider_name", "jwks_uri", "authorize_endpoint", "token_endpoint", "userinfo_endpoint", "allowed_domains"],
+      "properties": {
+        "provider_name": {
+          "description": "Display name for the OIDC provider",
+          "type": "string"
+        },
+        "jwks_uri": {
+          "description": "JWKS endpoint URL",
+          "type": "string"
+        },
+        "authorize_endpoint": {
+          "description": "Authorization endpoint URL",
+          "type": "string"
+        },
+        "token_endpoint": {
+          "description": "Token endpoint URL",
+          "type": "string"
+        },
+        "userinfo_endpoint": {
+          "description": "Userinfo endpoint URL",
+          "type": "string"
+        },
+        "allowed_domains": {
+          "description": "Comma-separated list of allowed email domains",
+          "type": "string"
+        }
+      }
+    },
+    "ToolConfig": {
+      "description": "Tool configuration",
+      "type": "object",
+      "required": ["path", "build"],
+      "properties": {
+        "path": {
+          "description": "Path to tool directory (relative to project root)",
+          "type": "string"
+        },
+        "build": {
+          "description": "Build configuration",
+          "$ref": "#/$defs/BuildConfig"
+        },
+        "allowed_outbound_hosts": {
+          "description": "Allowed outbound hosts for the tool",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "variables": {
+          "description": "Tool-specific variables",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "BuildConfig": {
+      "description": "Build configuration for a tool",
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "description": "Build command to execute",
+          "type": "string"
+        },
+        "workdir": {
+          "description": "Working directory for the build command (relative to tool path)",
+          "type": "string"
+        },
+        "watch": {
+          "description": "Paths to watch for changes in development mode",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "env": {
+          "description": "Environment variables to set during build",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "ApplicationVariable": {
+      "description": "Application-level variable configuration",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "default": {
+              "description": "Default value for the variable",
+              "type": "string"
+            }
+          },
+          "required": ["default"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "required": {
+              "description": "Whether the variable is required",
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": ["required"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "GatewayConfig": {
+      "description": "Gateway component configuration",
+      "type": "object",
+      "properties": {
+        "version": {
+          "description": "MCP gateway component version (leave empty for latest)",
+          "type": "string",
+          "default": ""
+        },
+        "authorizer_version": {
+          "description": "MCP authorizer component version (leave empty for latest)",
+          "type": "string",
+          "default": ""
+        },
+        "validate_arguments": {
+          "description": "Whether to validate tool arguments",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

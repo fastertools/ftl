@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
+use crate::config::ftl_config::FtlConfig;
+use crate::config::transpiler::transpile_ftl_to_spin;
 use ftl_common::SpinInstaller;
 use ftl_runtime::deps::{
     CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, UserInterface,
@@ -30,6 +32,10 @@ pub struct BuildConfig {
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
+    /// Export transpiled configuration (e.g., "spin")
+    pub export: Option<String>,
+    /// Output path for exported configuration
+    pub export_out: Option<PathBuf>,
 }
 
 /// Dependencies for the build command
@@ -46,18 +52,27 @@ pub struct BuildDependencies {
 
 /// Execute the build command with injected dependencies
 pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>) -> Result<()> {
-    let working_path = config.path.unwrap_or_else(|| PathBuf::from("."));
+    let working_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
-    // Check if we're in a project directory (has spin.toml)
-    let spin_toml_path = working_path.join("spin.toml");
-    if !deps.file_system.exists(&spin_toml_path) {
-        anyhow::bail!(
-            "No spin.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
-        );
+    // If export mode is requested, handle that first
+    if let Some(export_format) = &config.export {
+        return handle_export(&config, &deps, &working_path, export_format);
     }
 
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
+
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml.ok_or_else(|| {
+        anyhow::anyhow!("No ftl.toml found. Run 'ftl build' from an FTL project directory or use 'ftl init' to create a new project.")
+    })?;
+
     // Parse spin.toml to find components with build commands
-    let components = parse_component_builds(&deps.file_system, &spin_toml_path)?;
+    // For temporary files, we need to read directly since FileSystem trait doesn't know about them
+    let content =
+        std::fs::read_to_string(&manifest_path).context("Failed to read temporary spin.toml")?;
+    let components = parse_component_builds_from_content(&content)?;
 
     if components.is_empty() {
         deps.ui.print_styled(
@@ -85,18 +100,64 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         "✓ All components built successfully!",
         MessageStyle::Success,
     );
+
     Ok(())
 }
 
-/// Parse component build information from spin.toml
-pub fn parse_component_builds(
-    fs: &Arc<dyn FileSystem>,
-    spin_toml_path: &Path,
-) -> Result<Vec<ComponentBuildInfo>> {
-    let content = fs
-        .read_to_string(spin_toml_path)
-        .context("Failed to read spin.toml")?;
-    let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
+/// Handle export functionality
+fn handle_export(
+    config: &BuildConfig,
+    deps: &Arc<BuildDependencies>,
+    working_path: &Path,
+    export_format: &str,
+) -> Result<()> {
+    // Currently only support "spin" format
+    if export_format != "spin" {
+        anyhow::bail!(
+            "Unsupported export format '{}'. Currently only 'spin' is supported.",
+            export_format
+        );
+    }
+
+    // Check if ftl.toml exists
+    let ftl_toml_path = working_path.join("ftl.toml");
+    if !deps.file_system.exists(&ftl_toml_path) {
+        anyhow::bail!(
+            "No ftl.toml found in the project directory. Export requires an ftl.toml file."
+        );
+    }
+
+    // Read and parse ftl.toml
+    let ftl_content = deps
+        .file_system
+        .read_to_string(&ftl_toml_path)
+        .context("Failed to read ftl.toml")?;
+
+    let ftl_config = FtlConfig::parse(&ftl_content)?;
+    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+
+    // Determine output path
+    let output_path = config
+        .export_out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("./spin.toml"));
+
+    // Write the transpiled content
+    deps.file_system
+        .write_string(&output_path, &spin_content)
+        .context("Failed to write exported spin.toml")?;
+
+    deps.ui.print_styled(
+        &format!("✓ Exported spin.toml to {}", output_path.display()),
+        MessageStyle::Success,
+    );
+
+    Ok(())
+}
+
+/// Parse component build information from spin.toml content
+pub fn parse_component_builds_from_content(content: &str) -> Result<Vec<ComponentBuildInfo>> {
+    let toml: toml::Value = toml::from_str(content).context("Failed to parse spin.toml")?;
 
     let mut components = Vec::new();
 
@@ -122,6 +183,17 @@ pub fn parse_component_builds(
     }
 
     Ok(components)
+}
+
+/// Parse component build information from spin.toml
+pub fn parse_component_builds(
+    fs: &Arc<dyn FileSystem>,
+    spin_toml_path: &Path,
+) -> Result<Vec<ComponentBuildInfo>> {
+    let content = fs
+        .read_to_string(spin_toml_path)
+        .context("Failed to read spin.toml")?;
+    parse_component_builds_from_content(&content)
 }
 
 async fn build_components_parallel(
@@ -301,6 +373,10 @@ pub struct BuildArgs {
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
+    /// Export transpiled configuration (e.g., "spin")
+    pub export: Option<String>,
+    /// Output path for exported configuration
+    pub export_out: Option<PathBuf>,
 }
 
 // Spin installer wrapper that adapts the common implementation
@@ -330,6 +406,8 @@ pub async fn execute(args: BuildArgs) -> Result<()> {
     let config = BuildConfig {
         path: args.path,
         release: args.release,
+        export: args.export,
+        export_out: args.export_out,
     };
 
     execute_with_deps(config, deps).await

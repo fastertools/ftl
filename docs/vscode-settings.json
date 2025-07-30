@@ -1,0 +1,14 @@
+{
+  "yaml.schemas": {
+    "./ftl-schema.json": "ftl.toml"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["ftl.toml"],
+      "url": "./ftl-schema.json"
+    }
+  ],
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  }
+}

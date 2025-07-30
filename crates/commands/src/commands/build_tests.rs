@@ -26,6 +26,34 @@ impl TestFixture {
         }
     }
 
+    /// Mock that ftl.toml doesn't exist  
+    fn mock_no_ftl_toml(&mut self) {
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(|_| false);
+    }
+
+    /// Mock that ftl.toml exists with the given content
+    fn mock_ftl_toml_with_content(&mut self, content: &str) {
+        let content = content.to_string();
+
+        // Check if ftl.toml exists (yes)
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(|_| true);
+
+        // Read ftl.toml content
+        self.file_system
+            .expect_read_to_string()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(move |_| Ok(content.clone()));
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<BuildDependencies> {
         Arc::new(BuildDependencies {
@@ -38,22 +66,19 @@ impl TestFixture {
 }
 
 #[tokio::test]
-async fn test_build_no_spin_toml() {
+async fn test_build_no_ftl_toml() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml doesn't exist
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| false);
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -64,7 +89,7 @@ async fn test_build_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No ftl.toml found")
     );
 }
 
@@ -72,34 +97,13 @@ async fn test_build_no_spin_toml() {
 async fn test_build_no_components() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml with no build components
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists with no tools (hence no build commands)
+    fixture.mock_ftl_toml_with_content(
+        r#"[project]
 name = "test-app"
 version = "0.1.0"
-
-[[trigger.http]]
-route = "/..."
-
-[component.test]
-source = "target/wasm32-wasi/release/test.wasm"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // No need to mock spin installer since we don't have components to build
 
@@ -109,6 +113,8 @@ source = "target/wasm32-wasi/release/test.wasm"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -127,36 +133,20 @@ source = "target/wasm32-wasi/release/test.wasm"
 async fn test_build_single_component_success() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml with one build component
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists with one build component
+    fixture.mock_ftl_toml_with_content(
+        r#"
+[project]
 name = "test-app"
 version = "0.1.0"
 
-[[trigger.http]]
-route = "/..."
+[tools.backend]
+path = "backend"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // Mock: spin installer
     fixture
@@ -165,20 +155,22 @@ command = "cargo build --target wasm32-wasi"
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 
-    // Mock: build command execution
+    // Mock: build command execution - the command will have cd prefix
     fixture
         .command_executor
         .expect_execute()
         .withf(|cmd: &str, args: &[&str]| {
-            (cfg!(target_os = "windows")
-                && cmd == "cmd"
-                && args == ["/C", "cargo build --target wasm32-wasi"])
+            (cfg!(target_os = "windows") && cmd == "cmd" && args.len() == 2 && args[0] == "/C")
                 || (!cfg!(target_os = "windows")
                     && cmd == "sh"
-                    && args == ["-c", "cargo build --target wasm32-wasi"])
+                    && args.len() == 2
+                    && args[0] == "-c")
         })
         .times(1)
-        .returning(|_: &str, _: &[&str]| {
+        .returning(|_: &str, args: &[&str]| {
+            // Verify the command contains the build command
+            let command = args.get(1).unwrap_or(&"");
+            assert!(command.contains("cargo build --target wasm32-wasi"));
             Ok(CommandOutput {
                 success: true,
                 stdout: b"Build successful".to_vec(),
@@ -192,6 +184,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -211,32 +205,20 @@ command = "cargo build --target wasm32-wasi"
 async fn test_build_with_release_flag() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml with one build component
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists with one build component
+    fixture.mock_ftl_toml_with_content(
+        r#"
+[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // Mock: spin installer
     fixture
@@ -245,20 +227,22 @@ command = "cargo build --target wasm32-wasi"
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 
-    // Mock: build command execution with --release
+    // Mock: build command execution with --release (the command is modified by the build system)
     fixture
         .command_executor
         .expect_execute()
         .withf(|cmd: &str, args: &[&str]| {
-            (cfg!(target_os = "windows")
-                && cmd == "cmd"
-                && args == ["/C", "cargo build --release --target wasm32-wasi"])
+            (cfg!(target_os = "windows") && cmd == "cmd" && args.len() == 2 && args[0] == "/C")
                 || (!cfg!(target_os = "windows")
                     && cmd == "sh"
-                    && args == ["-c", "cargo build --release --target wasm32-wasi"])
+                    && args.len() == 2
+                    && args[0] == "-c")
         })
         .times(1)
-        .returning(|_: &str, _: &[&str]| {
+        .returning(|_: &str, args: &[&str]| {
+            // Verify the command contains the build command with --release
+            let command = args.get(1).unwrap_or(&"");
+            assert!(command.contains("cargo build --release --target wasm32-wasi"));
             Ok(CommandOutput {
                 success: true,
                 stdout: b"Build successful".to_vec(),
@@ -271,6 +255,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: true,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -283,33 +269,21 @@ command = "cargo build --target wasm32-wasi"
 async fn test_build_with_workdir() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml with workdir
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists with workdir
+    fixture.mock_ftl_toml_with_content(
+        r#"
+[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.frontend]
-source = "frontend/dist/frontend.wasm"
-[component.frontend.build]
+[tools.frontend]
+path = "frontend"
+
+[tools.frontend.build]
 command = "npm run build"
 workdir = "frontend"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // Mock: spin installer
     fixture
@@ -353,6 +327,8 @@ workdir = "frontend"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -365,38 +341,27 @@ workdir = "frontend"
 async fn test_build_multiple_components() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml with multiple components
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists with multiple components
+    fixture.mock_ftl_toml_with_content(
+        r#"
+[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
 
-[component.frontend]
-source = "frontend/dist/frontend.wasm"
-[component.frontend.build]
+[tools.frontend]
+path = "frontend"
+
+[tools.frontend.build]
 command = "npm run build"
 workdir = "frontend"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // Mock: spin installer
     fixture
@@ -431,6 +396,8 @@ workdir = "frontend"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -445,32 +412,20 @@ workdir = "frontend"
 async fn test_build_failure() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
-
-    // Mock: spin.toml
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| {
-            Ok(r#"
-spin_manifest_version = "1"
+    // Mock: ftl.toml exists
+    fixture.mock_ftl_toml_with_content(
+        r#"
+[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
-"#
-            .to_string())
-        });
+"#,
+    );
 
     // Mock: spin installer
     fixture
@@ -497,6 +452,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
@@ -510,19 +467,19 @@ command = "cargo build --target wasm32-wasi"
 async fn test_build_invalid_toml() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
+    // Mock: ftl.toml exists
     fixture
         .file_system
         .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
+        .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(|_| true);
 
-    // Mock: invalid spin.toml
+    // Mock: invalid ftl.toml
     fixture
         .file_system
         .expect_read_to_string()
-        .with(eq(Path::new("./spin.toml")))
+        .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(|_| Ok("invalid toml content".to_string()));
 
@@ -531,46 +488,47 @@ async fn test_build_invalid_toml() {
         BuildConfig {
             path: None,
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )
     .await;
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse spin.toml")
-    );
+    // The error will be about parsing ftl.toml now
+    let error_msg = result.unwrap_err().to_string();
+    assert!(error_msg.contains("Failed to parse ftl.toml") || error_msg.contains("missing field"));
 }
 
 #[tokio::test]
 async fn test_build_with_custom_path() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists in custom path
+    // Mock: ftl.toml exists in custom path
     fixture
         .file_system
         .expect_exists()
-        .with(eq(Path::new("/projects/myapp/spin.toml")))
+        .with(eq(Path::new("/projects/myapp/ftl.toml")))
         .times(1)
         .returning(|_| true);
 
-    // Mock: spin.toml
+    // Mock: ftl.toml content
     fixture
         .file_system
         .expect_read_to_string()
-        .with(eq(Path::new("/projects/myapp/spin.toml")))
+        .with(eq(Path::new("/projects/myapp/ftl.toml")))
         .times(1)
         .returning(|_| {
             Ok(r#"
-spin_manifest_version = "1"
+[project]
 name = "test-app"
+version = "0.1.0"
 
-[component.backend]
-source = "target/wasm32-wasi/release/backend.wasm"
-[component.backend.build]
+[tools.backend]
+path = "backend"
+
+[tools.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
             .to_string())
@@ -601,6 +559,8 @@ command = "cargo build --target wasm32-wasi"
         BuildConfig {
             path: Some("/projects/myapp".into()),
             release: false,
+            export: None,
+            export_out: None,
         },
         deps,
     )

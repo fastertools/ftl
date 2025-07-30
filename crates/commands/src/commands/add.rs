@@ -15,8 +15,6 @@ use ftl_runtime::deps::{CommandExecutor, FileSystem, MessageStyle, UserInterface
 pub struct AddConfig {
     /// Name of the component to add
     pub name: Option<String>,
-    /// Description of the component
-    pub description: Option<String>,
     /// Language to use for the component
     pub language: Option<String>,
     /// Git repository URL for templates
@@ -43,9 +41,9 @@ pub struct AddDependencies {
 
 /// Execute the add command with injected dependencies
 pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) -> Result<()> {
-    // Check if we're in a Spin project directory
-    if !deps.file_system.exists(Path::new("spin.toml")) {
-        anyhow::bail!("No spin.toml found. Not in a Spin project directory? Run 'ftl init' first.");
+    // Check if we have ftl.toml (required)
+    if !deps.file_system.exists(Path::new("ftl.toml")) {
+        anyhow::bail!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' first.");
     }
 
     // Get component name interactively if not provided
@@ -59,27 +57,16 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     // Validate component name
     validate_component_name(&component_name)?;
 
-    // Get description interactively if not provided
-    let description = match config.description {
-        Some(d) => d,
-        None => {
-            if deps.ui.is_interactive() {
-                deps.ui.prompt_input("Tool description", None)?
-            } else {
-                // Non-interactive mode - use default
-                format!(
-                    "MCP tool written in {}",
-                    config.language.as_ref().unwrap_or(&"Rust".to_string())
-                )
-            }
-        }
-    };
-
     // Determine language
     let selected_language = determine_language(config.language.as_ref(), &deps.ui)?;
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
+
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &PathBuf::from("."))?
+            .ok_or_else(|| anyhow::anyhow!("No ftl.toml found"))?;
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
@@ -92,7 +79,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         config.git.is_some() || config.dir.is_some() || config.tar.is_some();
 
     // Build spin add command
-    let mut args = vec!["add"];
+    let mut args = vec!["add", "-f", temp_spin_toml.to_str().unwrap()];
 
     // Add template source options
     if let Some(git_url) = &config.git {
@@ -115,9 +102,6 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     }
 
     args.push("--accept-defaults");
-    args.push("--value");
-    let desc_value = format!("tool-description={description}");
-    args.push(&desc_value);
     args.push(&component_name);
 
     // Execute spin add
@@ -147,8 +131,19 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         anyhow::bail!("Failed to add tool:\n{}", stderr);
     }
 
-    // Update spin.toml to add the component to tool_components variable
-    update_tool_components(&deps.file_system, &component_name)?;
+    // Move the component from temp directory to current directory
+    let temp_dir = temp_spin_toml.parent().unwrap();
+    let temp_component_path = temp_dir.join(&component_name);
+    let target_component_path = PathBuf::from(&component_name);
+
+    if temp_component_path.exists() {
+        // Use std::fs directly since FileSystem trait doesn't have rename/move
+        std::fs::rename(&temp_component_path, &target_component_path)
+            .context("Failed to move component to project directory")?;
+    }
+
+    // Update ftl.toml with the new component
+    update_ftl_toml(&deps.file_system, &component_name, selected_language)?;
 
     // Success message
     print_success_message(&deps.ui, &component_name, selected_language);
@@ -209,87 +204,61 @@ fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) ->
     }
 }
 
-/// Update the `tool_components` variable in spin.toml to include the new component
-fn update_tool_components(fs: &Arc<dyn FileSystem>, component_name: &str) -> Result<()> {
-    use toml_edit::{DocumentMut, InlineTable};
+/// Update ftl.toml to add the new tool
+fn update_ftl_toml(
+    fs: &Arc<dyn FileSystem>,
+    component_name: &str,
+    language: Language,
+) -> Result<()> {
+    use crate::config::ftl_config::{BuildConfig, FtlConfig, ToolConfig};
+    use std::collections::HashMap;
 
-    // Read the spin.toml file
+    // Read ftl.toml
     let content = fs
-        .read_to_string(Path::new("spin.toml"))
-        .context("Failed to read spin.toml")?;
+        .read_to_string(Path::new("ftl.toml"))
+        .context("Failed to read ftl.toml")?;
 
-    // Parse as TOML document (preserves formatting)
-    let mut doc = content
-        .parse::<DocumentMut>()
-        .context("Failed to parse spin.toml")?;
+    // Parse config
+    let mut config = FtlConfig::parse(&content)?;
 
-    // Navigate to variables.tool_components.default
-    let variables = doc
-        .get_mut("variables")
-        .and_then(|v| v.as_table_mut())
-        .ok_or_else(|| anyhow::anyhow!("No [variables] section found in spin.toml"))?;
-
-    // Ensure tool_components exists
-    if !variables.contains_key("tool_components") {
-        let mut inline_table = InlineTable::new();
-        inline_table.insert("default", "".into());
-        variables["tool_components"] = toml_edit::Item::Value(inline_table.into());
-    }
-
-    // Get tool_components table
-    let tool_components = variables
-        .get_mut("tool_components")
-        .ok_or_else(|| anyhow::anyhow!("Failed to get tool_components"))?;
-
-    // Handle both inline table and regular table formats
-    match tool_components {
-        toml_edit::Item::Value(val) => {
-            if let Some(table) = val.as_inline_table_mut() {
-                update_component_list_in_table(table, component_name);
-            } else {
-                anyhow::bail!("tool_components is not a table");
-            }
-        }
-        toml_edit::Item::Table(table) => {
-            update_component_list_in_table(table, component_name);
-        }
-        _ => anyhow::bail!("tool_components has unexpected type"),
-    }
-
-    // Write back to file
-    let updated_content = doc.to_string();
-    fs.write_string(Path::new("spin.toml"), &updated_content)
-        .context("Failed to write updated spin.toml")?;
-
-    Ok(())
-}
-
-/// Helper function to update component list in either table type
-fn update_component_list_in_table<T>(table: &mut T, component_name: &str)
-where
-    T: toml_edit::TableLike,
-{
-    // Get current value of "default"
-    let current_value = table.get("default").and_then(|v| v.as_str()).unwrap_or("");
-
-    // Parse existing components
-    let mut component_list: Vec<String> = if current_value.is_empty() {
-        vec![]
-    } else {
-        current_value
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
+    // Create build configuration with explicit defaults based on language
+    let build = match language {
+        Language::Rust => BuildConfig {
+            command: "cargo build --target wasm32-wasip1 --release".to_string(),
+            workdir: None,
+            watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
+            env: HashMap::new(),
+        },
+        Language::TypeScript | Language::JavaScript => BuildConfig {
+            command: "npm install && npm run build".to_string(),
+            workdir: None,
+            watch: vec![
+                "src/**/*.ts".to_string(),
+                "src/**/*.js".to_string(),
+                "package.json".to_string(),
+                "tsconfig.json".to_string(),
+            ],
+            env: HashMap::new(),
+        },
     };
 
-    // Add new component if not already present
-    if !component_list.contains(&component_name.to_string()) {
-        component_list.push(component_name.to_string());
-    }
+    // Add the new tool
+    config.tools.insert(
+        component_name.to_string(),
+        ToolConfig {
+            path: component_name.to_string(),
+            build,
+            allowed_outbound_hosts: vec![],
+            variables: HashMap::new(),
+        },
+    );
 
-    // Update the value
-    table.insert("default", component_list.join(",").into());
+    // Write back
+    let updated_content = config.to_toml_string()?;
+    fs.write_string(Path::new("ftl.toml"), &updated_content)
+        .context("Failed to write updated ftl.toml")?;
+
+    Ok(())
 }
 
 /// Print success message
@@ -323,8 +292,6 @@ fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, lang
 pub struct AddArgs {
     /// Name of the tool to add
     pub name: Option<String>,
-    /// Description of the tool
-    pub description: Option<String>,
     /// Programming language
     pub language: Option<String>,
     /// Git repository URL for custom template
@@ -363,7 +330,6 @@ pub async fn execute(args: AddArgs) -> Result<()> {
 
     let config = AddConfig {
         name: args.name,
-        description: args.description,
         language: args.language,
         git: args.git,
         branch: args.branch,
