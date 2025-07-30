@@ -1,7 +1,10 @@
 //! CLI interface for tools command
 
 use anyhow::Result;
-use ftl_runtime::deps::{MessageStyle, MultiProgressManager, ProgressIndicator, UserInterface};
+use ftl_runtime::deps::{
+    FileSystem, MessageStyle, MultiProgressManager, ProgressIndicator, RealFileSystem,
+    UserInterface,
+};
 use reqwest::Client;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -72,8 +75,13 @@ pub async fn execute(args: ToolsArgs) -> Result<()> {
     // Create dependencies
     let ui: Arc<dyn UserInterface> = Arc::new(ConsoleUserInterface);
     let client = Client::new();
+    let file_system: Arc<dyn FileSystem> = Arc::new(RealFileSystem);
 
-    let deps = Arc::new(ToolsDependencies { ui, client });
+    let deps = Arc::new(ToolsDependencies {
+        ui,
+        client,
+        file_system,
+    });
 
     match args.command {
         ToolsCommand::List {

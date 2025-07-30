@@ -57,10 +57,10 @@ jobs:
           cd test-project
           
           # Add a Rust tool
-          ftl add test-rust --language rust --description "Test Rust tool"
+          ftl add test-rust --language rust
           
-          # Verify tool_components was updated
-          grep -q "test-rust" spin.toml || (echo "tool_components not updated" && exit 1)
+          # Verify tool was added to ftl.toml
+          grep -q "test-rust" ftl.toml || (echo "tool not added to ftl.toml" && exit 1)
           
           # Build the project
           ftl build
@@ -126,12 +126,12 @@ jobs:
           cd test-project
           
           # Add multiple tools
-          ftl add rust-tool --language rust --description "Rust tool"
-          ftl add ts-tool --language typescript --description "TypeScript tool"
+          ftl add rust-tool --language rust
+          ftl add ts-tool --language typescript
           
-          # Verify both tools are in tool_components
-          grep -q "rust-tool" spin.toml || (echo "rust-tool not in tool_components" && exit 1)
-          grep -q "ts-tool" spin.toml || (echo "ts-tool not in tool_components" && exit 1)
+          # Verify both tools are in ftl.toml
+          grep -q "rust-tool" ftl.toml || (echo "rust-tool not in ftl.toml" && exit 1)
+          grep -q "ts-tool" ftl.toml || (echo "ts-tool not in ftl.toml" && exit 1)
           
           # Build the project
           ftl build
@@ -192,10 +192,10 @@ jobs:
           cd test-project
           
           # Add a TypeScript tool
-          ftl add test-ts --language typescript --description "Test TypeScript tool"
+          ftl add test-ts --language typescript
           
-          # Verify tool_components was updated
-          grep -q "test-ts" spin.toml || (echo "tool_components not updated" && exit 1)
+          # Verify tool was added to ftl.toml
+          grep -q "test-ts" ftl.toml || (echo "tool not added to ftl.toml" && exit 1)
           
           # Build the project
           ftl build

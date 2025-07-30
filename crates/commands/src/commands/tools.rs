@@ -1,12 +1,11 @@
 //! Tools command for managing pre-built FTL tools
 
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use ftl_runtime::deps::{MessageStyle, UserInterface};
+use ftl_runtime::deps::{FileSystem, MessageStyle, UserInterface};
 use reqwest::Client;
 use serde_json;
 use toml_edit::{DocumentMut, Item, Table};
@@ -20,6 +19,8 @@ pub struct ToolsDependencies {
     pub ui: Arc<dyn UserInterface>,
     /// HTTP client for registry operations
     pub client: Client,
+    /// File system operations
+    pub file_system: Arc<dyn FileSystem>,
 }
 
 /// Represents a tool that has been resolved from the registry
@@ -115,7 +116,7 @@ pub async fn update_with_deps(
     yes: bool,
 ) -> Result<()> {
     // Check if tools are currently installed
-    let installed_tools = get_installed_tools()?;
+    let installed_tools = get_installed_tools(deps)?;
     let mut valid_tools = Vec::new();
 
     for tool_spec in tools {
@@ -172,7 +173,7 @@ pub async fn remove_with_deps(
     yes: bool,
 ) -> Result<()> {
     // Check if tools are currently installed
-    let installed_tools = get_installed_tools()?;
+    let installed_tools = get_installed_tools(deps)?;
     let mut valid_tools = Vec::new();
 
     for tool_name in tools {
@@ -592,13 +593,33 @@ fn confirm_tool_removal(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Resu
 
 /// Add tools to project spin manifest using registry infrastructure
 async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
-    let manifest_path = Path::new("spin.toml");
+    // Check if we have ftl.toml first
+    let has_ftl_toml = deps.file_system.exists(Path::new("ftl.toml"));
 
-    if !manifest_path.exists() {
-        anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
+    if has_ftl_toml {
+        // If using ftl.toml, add tools there
+        add_tools_to_ftl_toml(deps, tools)?;
+
+        deps.ui.print("");
+        deps.ui.print(&format!(
+            "{} Added tools to ftl.toml",
+            styled_text("✓", MessageStyle::Success)
+        ));
+
+        return Ok(());
     }
 
-    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+    // Otherwise use spin.toml directly
+    let manifest_path = Path::new("spin.toml");
+
+    if !deps.file_system.exists(manifest_path) {
+        anyhow::bail!("No spin.toml or ftl.toml found. Run this command from a toolbox directory.");
+    }
+
+    let content = deps
+        .file_system
+        .read_to_string(manifest_path)
+        .context("Failed to read spin.toml")?;
 
     let mut doc = content
         .parse::<DocumentMut>()
@@ -670,13 +691,62 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
+    deps.file_system
+        .write_string(manifest_path, &doc.to_string())
+        .context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
         "{} tools added successfully!",
         styled_text("✓", MessageStyle::Green)
     ));
+
+    Ok(())
+}
+
+/// Add tools to ftl.toml
+fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
+    use crate::config::ftl_config::{BuildConfig, FtlConfig, ToolConfig};
+
+    // Read ftl.toml
+    let content = deps
+        .file_system
+        .read_to_string(Path::new("ftl.toml"))
+        .context("Failed to read ftl.toml")?;
+    let mut config = FtlConfig::parse(&content)?;
+
+    for tool in tools {
+        let tool_name = format!("tool-{}", tool.name);
+
+        // Add tool to config
+        config.tools.insert(
+            tool_name.clone(),
+            ToolConfig {
+                path: tool_name.clone(),
+                build: BuildConfig {
+                    command: format!("echo 'Using prebuilt {} tool from registry'", tool.name),
+                    workdir: None,
+                    watch: vec![],
+                    env: HashMap::new(),
+                },
+                allowed_outbound_hosts: vec![],
+                variables: HashMap::new(),
+            },
+        );
+
+        deps.ui.print(&format!(
+            "{} Added {} {} to ftl.toml",
+            styled_text("→", MessageStyle::Cyan),
+            styled_text(&tool.name, MessageStyle::Bold),
+            styled_text(&format!("({})", tool.version), MessageStyle::Yellow)
+        ));
+    }
+
+    // Write back
+    let updated_content = config.to_toml_string()?;
+    deps.file_system
+        .write_string(Path::new("ftl.toml"), &updated_content)
+        .context("Failed to write updated ftl.toml")?;
 
     Ok(())
 }
@@ -688,11 +758,14 @@ async fn update_tools_in_project(
 ) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
 
-    if !manifest_path.exists() {
+    if !deps.file_system.exists(manifest_path) {
         anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
     }
 
-    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+    let content = deps
+        .file_system
+        .read_to_string(manifest_path)
+        .context("Failed to read spin.toml")?;
 
     let mut doc = content
         .parse::<DocumentMut>()
@@ -738,7 +811,9 @@ async fn update_tools_in_project(
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
+    deps.file_system
+        .write_string(manifest_path, &doc.to_string())
+        .context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
@@ -753,11 +828,14 @@ async fn update_tools_in_project(
 fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Result<()> {
     let manifest_path = Path::new("spin.toml");
 
-    if !manifest_path.exists() {
+    if !deps.file_system.exists(manifest_path) {
         anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
     }
 
-    let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+    let content = deps
+        .file_system
+        .read_to_string(manifest_path)
+        .context("Failed to read spin.toml")?;
 
     let mut doc = content
         .parse::<DocumentMut>()
@@ -790,7 +868,9 @@ fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) ->
     }
 
     // Write back to file
-    fs::write(manifest_path, doc.to_string()).context("Failed to write spin.toml")?;
+    deps.file_system
+        .write_string(manifest_path, &doc.to_string())
+        .context("Failed to write spin.toml")?;
 
     deps.ui.print("");
     deps.ui.print(&format!(
@@ -806,23 +886,30 @@ fn remove_tools_from_project(deps: &Arc<ToolsDependencies>, tools: &[String]) ->
 /// Reads the component section and extracts tool names (removing "tool-" prefix).
 /// Returns an empty set if no spin.toml exists or no tools are installed.
 #[cfg(test)]
-pub fn get_installed_tools() -> Result<std::collections::HashSet<String>> {
-    get_installed_tools_impl()
+pub fn get_installed_tools(
+    deps: &Arc<ToolsDependencies>,
+) -> Result<std::collections::HashSet<String>> {
+    get_installed_tools_impl(deps)
 }
 
 #[cfg(not(test))]
-fn get_installed_tools() -> Result<std::collections::HashSet<String>> {
-    get_installed_tools_impl()
+fn get_installed_tools(deps: &Arc<ToolsDependencies>) -> Result<std::collections::HashSet<String>> {
+    get_installed_tools_impl(deps)
 }
 
-fn get_installed_tools_impl() -> Result<std::collections::HashSet<String>> {
-    let manifest_path = std::path::Path::new("spin.toml");
+fn get_installed_tools_impl(
+    deps: &Arc<ToolsDependencies>,
+) -> Result<std::collections::HashSet<String>> {
+    let manifest_path = Path::new("spin.toml");
 
-    if !manifest_path.exists() {
+    if !deps.file_system.exists(manifest_path) {
         return Ok(std::collections::HashSet::new());
     }
 
-    let content = std::fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
+    let content = deps
+        .file_system
+        .read_to_string(manifest_path)
+        .context("Failed to read spin.toml")?;
 
     let doc = content
         .parse::<DocumentMut>()

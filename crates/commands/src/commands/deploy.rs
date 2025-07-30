@@ -1,5 +1,6 @@
 //! Refactored deploy command with dependency injection for testability
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -31,7 +32,7 @@ pub struct ComponentInfo {
     /// Component version
     pub version: String,
     /// Allowed outbound hosts for the component
-    pub allowed_hosts: Option<Vec<String>>,
+    pub allowed_outbound_hosts: Option<Vec<String>>,
 }
 
 /// Deploy configuration
@@ -64,16 +65,33 @@ pub struct DeployDependencies {
 
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
-pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
+pub async fn execute_with_deps(
+    deps: Arc<DeployDependencies>,
+    variables: Vec<String>,
+) -> Result<()> {
     deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
     deps.ui.print("");
 
-    // Check if we're in a Spin project directory
-    let spin_toml_path = PathBuf::from("spin.toml");
-    if !deps.file_system.exists(&spin_toml_path) {
-        return Err(anyhow!("No spin.toml found. Not in a project directory?"));
-    }
+    // Generate temporary spin.toml from ftl.toml
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &PathBuf::from("."))?;
 
+    // We must have a temp spin.toml since ftl.toml is required
+    let manifest_path = temp_spin_toml
+        .ok_or_else(|| anyhow!("No ftl.toml found. Not in an FTL project directory?"))?;
+
+    // Run the deployment with the manifest path
+    // Clean up is handled by tempfile crate when temp_spin_toml goes out of scope
+    execute_deploy_inner(deps.clone(), variables, manifest_path, true).await
+}
+
+/// Inner deployment logic separated for proper cleanup handling
+async fn execute_deploy_inner(
+    deps: Arc<DeployDependencies>,
+    variables: Vec<String>,
+    manifest_path: PathBuf,
+    _is_temp_manifest: bool,
+) -> Result<()> {
     // Create a spinner for status updates
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
@@ -109,7 +127,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
 
     // Parse spin.toml to find user components
     spinner.set_message("Parsing project...");
-    let config = parse_deploy_config(&deps.file_system)?;
+    let config = parse_deploy_config(&deps.file_system, &manifest_path)?;
     if config.components.is_empty() {
         spinner.finish_and_clear();
         return Err(anyhow!("No user components found in spin.toml"));
@@ -132,6 +150,14 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     let deployed_tools =
         create_repositories_and_push_with_progress(&config.components, deps.clone()).await?;
 
+    // Parse variables from command line
+    let mut parsed_variables = parse_variables(&variables)?;
+
+    // If we have ftl.toml, extract auth configuration and add to variables
+    if deps.file_system.exists(Path::new("ftl.toml")) {
+        add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
+    }
+
     // Deploy to FTL
     deps.ui.print("");
     let spinner = deps.ui.create_spinner();
@@ -147,8 +173,14 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
         }
     };
 
-    let deployment =
-        deploy_to_ftl_with_progress(deps.clone(), config.app_name, deployed_tools, spinner).await?;
+    let deployment = deploy_to_ftl_with_progress(
+        deps.clone(),
+        config.app_name,
+        deployed_tools,
+        parsed_variables,
+        spinner,
+    )
+    .await?;
 
     // Display results
     deps.ui.print("");
@@ -163,9 +195,130 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     Ok(())
 }
 
+/// Parse KEY=VALUE variable pairs from command line arguments
+pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> {
+    let mut parsed = HashMap::new();
+
+    for var in variables {
+        let parts: Vec<&str> = var.splitn(2, '=').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!(
+                "Invalid variable format '{}'. Expected KEY=VALUE format.",
+                var
+            ));
+        }
+
+        let key = parts[0].trim();
+        let value = parts[1].trim();
+
+        if key.is_empty() {
+            return Err(anyhow!("Variable key cannot be empty"));
+        }
+
+        parsed.insert(key.to_string(), value.to_string());
+    }
+
+    Ok(parsed)
+}
+
+/// Add auth-related variables from ftl.toml to the variables map
+fn add_auth_variables_from_ftl(
+    file_system: &Arc<dyn FileSystem>,
+    variables: &mut HashMap<String, String>,
+) -> Result<()> {
+    use crate::config::ftl_config::FtlConfig;
+
+    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
+    let config = FtlConfig::parse(&content)?;
+
+    // Only add auth variables if they're not already provided via command line
+    if config.auth.enabled && !variables.contains_key("auth_enabled") {
+        variables.insert("auth_enabled".to_string(), "true".to_string());
+    }
+
+    if !config.auth.provider.is_empty() && !variables.contains_key("auth_provider_type") {
+        variables.insert(
+            "auth_provider_type".to_string(),
+            config.auth.provider.clone(),
+        );
+    }
+
+    if !config.auth.issuer.is_empty() && !variables.contains_key("auth_provider_issuer") {
+        variables.insert(
+            "auth_provider_issuer".to_string(),
+            config.auth.issuer.clone(),
+        );
+    }
+
+    if !config.auth.audience.is_empty() && !variables.contains_key("auth_provider_audience") {
+        variables.insert(
+            "auth_provider_audience".to_string(),
+            config.auth.audience.clone(),
+        );
+    }
+
+    // Add OIDC-specific variables if present
+    if let Some(oidc) = &config.auth.oidc {
+        if !oidc.provider_name.is_empty() && !variables.contains_key("auth_provider_name") {
+            variables.insert("auth_provider_name".to_string(), oidc.provider_name.clone());
+        }
+
+        if !oidc.jwks_uri.is_empty() && !variables.contains_key("auth_provider_jwks_uri") {
+            variables.insert("auth_provider_jwks_uri".to_string(), oidc.jwks_uri.clone());
+        }
+
+        if !oidc.authorize_endpoint.is_empty()
+            && !variables.contains_key("auth_provider_authorize_endpoint")
+        {
+            variables.insert(
+                "auth_provider_authorize_endpoint".to_string(),
+                oidc.authorize_endpoint.clone(),
+            );
+        }
+
+        if !oidc.token_endpoint.is_empty()
+            && !variables.contains_key("auth_provider_token_endpoint")
+        {
+            variables.insert(
+                "auth_provider_token_endpoint".to_string(),
+                oidc.token_endpoint.clone(),
+            );
+        }
+
+        if !oidc.userinfo_endpoint.is_empty()
+            && !variables.contains_key("auth_provider_userinfo_endpoint")
+        {
+            variables.insert(
+                "auth_provider_userinfo_endpoint".to_string(),
+                oidc.userinfo_endpoint.clone(),
+            );
+        }
+
+        if !oidc.allowed_domains.is_empty()
+            && !variables.contains_key("auth_provider_allowed_domains")
+        {
+            variables.insert(
+                "auth_provider_allowed_domains".to_string(),
+                oidc.allowed_domains.clone(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Parse deployment configuration from spin.toml
-pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployConfig> {
-    let content = file_system.read_to_string(Path::new("spin.toml"))?;
+pub fn parse_deploy_config(
+    file_system: &Arc<dyn FileSystem>,
+    manifest_path: &Path,
+) -> Result<DeployConfig> {
+    // For temporary files, we need to read directly since FileSystem trait doesn't know about them
+    let content = if manifest_path.starts_with("/tmp") || manifest_path.starts_with("/var/folders")
+    {
+        std::fs::read_to_string(manifest_path).context("Failed to read temporary spin.toml")?
+    } else {
+        file_system.read_to_string(manifest_path)?
+    };
     let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
 
     let app_name = toml
@@ -191,7 +344,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                         let version = extract_component_version(file_system, name, source_path)?;
 
                         // Extract allowed_outbound_hosts if present
-                        let allowed_hosts = component
+                        let allowed_outbound_hosts = component
                             .get("allowed_outbound_hosts")
                             .and_then(|hosts| hosts.as_array())
                             .map(|arr| {
@@ -205,7 +358,7 @@ pub fn parse_deploy_config(file_system: &Arc<dyn FileSystem>) -> Result<DeployCo
                             name: name.clone(),
                             source_path: source_path.to_string(),
                             version,
-                            allowed_hosts,
+                            allowed_outbound_hosts,
                         });
                     }
                 }
@@ -424,7 +577,7 @@ async fn create_repositories_and_push_with_progress(
                     .as_str()
                     .try_into()
                     .map_err(|e| anyhow!("Invalid tag: {}", e))?,
-                allowed_hosts: component.allowed_hosts.clone().unwrap_or_default(),
+                allowed_hosts: component.allowed_outbound_hosts.clone().unwrap_or_default(),
             });
 
             let duration = start.elapsed();
@@ -527,6 +680,7 @@ async fn deploy_to_ftl_with_progress(
     deps: Arc<DeployDependencies>,
     app_name: String,
     tools: Vec<types::CreateDeploymentRequestToolsItem>,
+    variables: HashMap<String, String>,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
 ) -> Result<types::App> {
     // First check if app exists
@@ -567,10 +721,7 @@ async fn deploy_to_ftl_with_progress(
 
     // Now create the deployment
     spinner.set_message("Creating box deployment...");
-    let deployment_request = types::CreateDeploymentRequest {
-        tools,
-        variables: std::collections::HashMap::new(),
-    };
+    let deployment_request = types::CreateDeploymentRequest { tools, variables };
 
     let deployment_response = deps
         .api_client
@@ -594,7 +745,8 @@ async fn deploy_to_ftl_with_progress(
 /// Deploy command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct DeployArgs {
-    // Deploy takes no arguments - it uses the current directory
+    /// Variable(s) to be passed to the app (KEY=VALUE format)
+    pub variables: Vec<String>,
 }
 
 // Build executor implementation
@@ -608,6 +760,8 @@ impl BuildExecutor for BuildExecutorImpl {
         let args = build::BuildArgs {
             path: path.map(std::path::Path::to_path_buf),
             release,
+            export: None,
+            export_out: None,
         };
 
         build::execute(args).await
@@ -615,7 +769,7 @@ impl BuildExecutor for BuildExecutorImpl {
 }
 
 /// Execute the deploy command with default dependencies
-pub async fn execute(_args: DeployArgs) -> Result<()> {
+pub async fn execute(args: DeployArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
     use ftl_runtime::deps::{
         RealAsyncRuntime, RealClock, RealCommandExecutor, RealCredentialsProvider, RealFileSystem,
@@ -641,7 +795,7 @@ pub async fn execute(_args: DeployArgs) -> Result<()> {
         async_runtime: Arc::new(RealAsyncRuntime),
     });
 
-    execute_with_deps(deps).await
+    execute_with_deps(deps, args.variables).await
 }
 
 #[cfg(test)]

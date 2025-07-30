@@ -169,24 +169,38 @@ async fn test_init_here_not_empty() {
 }
 
 #[tokio::test]
-async fn test_init_templates_not_installed() {
+async fn test_init_creates_ftl_toml() {
     let mut fixture = TestFixture::new();
 
     setup_basic_init_mocks(&mut fixture);
 
-    // Mock: templates list doesn't contain ftl-mcp-server
+    // Mock: write ftl.toml
     fixture
-        .command_executor
-        .expect_execute()
-        .withf(|_: &str, args: &[&str]| args == ["templates", "list"])
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/ftl.toml")), always())
         .times(1)
-        .returning(|_, _| {
-            Ok(CommandOutput {
-                success: true,
-                stdout: b"some-other-template\nanother-template".to_vec(),
-                stderr: vec![],
-            })
+        .returning(|_, content| {
+            assert!(content.contains("[project]"));
+            assert!(content.contains("name = \"my-project\""));
+            Ok(())
         });
+
+    // Mock: write README.md
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/README.md")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write .gitignore
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/.gitignore")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -198,17 +212,11 @@ async fn test_init_templates_not_installed() {
     )
     .await;
 
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("ftl-mcp templates not installed")
-    );
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_init_spin_new_fails() {
+async fn test_init_write_fails() {
     let mut fixture = TestFixture::new();
 
     // Setup basic mocks
@@ -225,43 +233,16 @@ async fn test_init_spin_new_fails() {
         .times(1)
         .returning(|_| false);
 
-    // Mock: templates list
+    // Mock: write ftl.toml fails
     fixture
-        .command_executor
-        .expect_execute()
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/ftl.toml")), always())
         .times(1)
-        .returning(|path, args| {
-            println!("Mock execute called with path: {path}, args: {args:?}");
-            if args == ["templates", "list"] {
-                println!("Returning success for templates list");
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
-                    stderr: vec![],
-                })
-            } else {
-                panic!("Unexpected command for first call: {path} {args:?}");
-            }
-        });
-
-    // Mock: spin new fails
-    fixture
-        .command_executor
-        .expect_execute()
-        .times(1)
-        .returning(|path, args| {
-            println!("Mock execute called with path: {path}, args: {args:?}");
-            if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
-                println!("Returning failure for spin new");
-                // Simulate failure for spin new
-                Ok(CommandOutput {
-                    success: false,
-                    stdout: vec![],
-                    stderr: b"Failed to create project: some error".to_vec(),
-                })
-            } else {
-                panic!("Unexpected command for second call: {path} {args:?}");
-            }
+        .returning(|_, _| {
+            Err(anyhow::anyhow!(
+                "Failed to write ftl.toml: permission denied"
+            ))
         });
 
     let deps = fixture.to_deps();
@@ -274,12 +255,11 @@ async fn test_init_spin_new_fails() {
     )
     .await;
 
-    println!("Test result: {result:?}");
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("Failed to create project"),
-        "Expected 'Failed to create project', got: {err_msg}"
+        err_msg.contains("Failed to write ftl.toml"),
+        "Expected 'Failed to write ftl.toml', got: {err_msg}"
     );
 }
 
@@ -301,28 +281,29 @@ async fn test_init_success() {
         .times(1)
         .returning(|_| false);
 
-    // Setup all command executor expectations in one returning function
-    fixture.command_executor
-        .expect_execute()
-        .times(2) // templates list + spin new
-        .returning(|path, args| {
-            println!("Mock execute called with path: {path}, args: {args:?}");
-            if args == ["templates", "list"] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
-                    stderr: vec![],
-                })
-            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"Project created successfully".to_vec(),
-                    stderr: vec![],
-                })
-            } else {
-                panic!("Unexpected command: {path} {args:?}");
-            }
-        });
+    // Mock: write ftl.toml
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/ftl.toml")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write README.md
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/README.md")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write .gitignore
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/.gitignore")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -335,9 +316,6 @@ async fn test_init_success() {
     )
     .await;
 
-    if let Err(e) = &result {
-        eprintln!("Init error: {e}");
-    }
     assert!(result.is_ok());
 
     // Verify output
@@ -371,28 +349,29 @@ async fn test_init_here_success() {
         .times(7) // 7 common files we check
         .returning(|_| false);
 
-    // Setup all command executor expectations in one returning function
-    fixture.command_executor
-        .expect_execute()
-        .times(2) // templates list + spin new
-        .returning(|path, args| {
-            println!("Mock execute called with path: {path}, args: {args:?}");
-            if args == ["templates", "list"] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
-                    stderr: vec![],
-                })
-            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "."] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"Project created successfully".to_vec(),
-                    stderr: vec![],
-                })
-            } else {
-                panic!("Unexpected command: {path} {args:?}");
-            }
-        });
+    // Mock: write ftl.toml
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("./ftl.toml")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write README.md
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("./README.md")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write .gitignore
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("./.gitignore")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -405,9 +384,6 @@ async fn test_init_here_success() {
     )
     .await;
 
-    if let Err(e) = &result {
-        eprintln!("Init error: {e}");
-    }
     assert!(result.is_ok());
 
     // Verify output doesn't contain cd instruction
@@ -436,7 +412,7 @@ async fn test_init_interactive_name() {
         .times(1)
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 
-    // Mock: directory doesn't exist - expects "my-project" since that's the default provided to prompt_input
+    // Mock: directory doesn't exist - expects "my-project" since TestUserInterface returns the default value
     fixture
         .file_system
         .expect_exists()
@@ -444,27 +420,29 @@ async fn test_init_interactive_name() {
         .times(1)
         .returning(|_| false);
 
-    // Mock: command executor for both templates check and spin new
-    fixture.command_executor
-        .expect_execute()
-        .times(2) // Called twice: once for templates, once for spin new
-        .returning(|_path, args| {
-            if args == ["templates", "list"] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"ftl-mcp-server\nsome-other-template".to_vec(),
-                    stderr: vec![],
-                })
-            } else if args == ["new", "-t", "ftl-mcp-server", "-a", "my-project"] {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: b"Project created successfully".to_vec(),
-                    stderr: vec![],
-                })
-            } else {
-                panic!("Unexpected command: {args:?}");
-            }
-        });
+    // Mock: write ftl.toml
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/ftl.toml")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write README.md
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/README.md")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Mock: write .gitignore
+    fixture
+        .file_system
+        .expect_write_string()
+        .with(eq(Path::new("my-project/.gitignore")), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -477,12 +455,9 @@ async fn test_init_interactive_name() {
     )
     .await;
 
-    if let Err(e) = &result {
-        eprintln!("Init error: {e}");
-    }
     assert!(result.is_ok());
 
-    // Verify output - it will use "my-project" as the default from TestUserInterface
+    // Verify output
     let output = ui.get_output();
     assert!(
         output

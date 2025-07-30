@@ -60,6 +60,12 @@ struct BuildArgs {
     /// Build in release mode
     #[arg(short, long)]
     release: bool,
+    /// Export transpiled configuration (e.g., "spin")
+    #[arg(long, value_name = "FORMAT")]
+    export: Option<String>,
+    /// Output path for exported configuration
+    #[arg(long, value_name = "PATH", requires = "export")]
+    export_out: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -78,6 +84,9 @@ struct UpArgs {
     /// Clear screen on rebuild (only with --watch)
     #[arg(short, long, requires = "watch")]
     clear: bool,
+    /// Directory for component logs (default: .ftl/logs)
+    #[arg(long)]
+    log_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -104,9 +113,6 @@ struct UpdateArgs {
 struct AddArgs {
     /// Name of the tool to add
     name: Option<String>,
-    /// Description of the tool
-    #[arg(short, long)]
-    description: Option<String>,
     /// Programming language (rust, typescript, javascript)
     #[arg(short, long)]
     language: Option<String>,
@@ -161,7 +167,11 @@ enum BoxCommand {
         command: BoxAuthCommand,
     },
     /// Deploy a box to FTL Boxes
-    Deploy,
+    Deploy {
+        /// Variable(s) to be passed to the app
+        #[arg(long, value_name = "KEY=VALUE")]
+        variable: Vec<String>,
+    },
     /// List all boxes
     List {
         /// Output format
@@ -356,6 +366,8 @@ impl From<BuildArgs> for ftl_commands::build::BuildArgs {
         Self {
             path: args.path,
             release: args.release,
+            export: args.export,
+            export_out: args.export_out,
         }
     }
 }
@@ -368,6 +380,7 @@ impl From<UpArgs> for ftl_commands::up::UpArgs {
             build: args.build,
             watch: args.watch,
             clear: args.clear,
+            log_dir: args.log_dir,
         }
     }
 }
@@ -392,7 +405,6 @@ impl From<AddArgs> for ftl_commands::add::AddArgs {
     fn from(args: AddArgs) -> Self {
         Self {
             name: args.name,
-            description: args.description,
             language: args.language,
             git: args.git,
             branch: args.branch,
@@ -600,8 +612,10 @@ async fn handle_box_command(args: BoxArgs) -> Result<()> {
             };
             ftl_commands::auth::execute(auth_args).await
         }
-        BoxCommand::Deploy => {
-            let deploy_args = ftl_commands::deploy::DeployArgs {};
+        BoxCommand::Deploy { variable } => {
+            let deploy_args = ftl_commands::deploy::DeployArgs {
+                variables: variable,
+            };
             ftl_commands::deploy::execute(deploy_args).await
         }
         BoxCommand::List { format } => {
