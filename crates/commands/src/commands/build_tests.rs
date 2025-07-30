@@ -25,7 +25,7 @@ impl TestFixture {
             spin_installer: MockSpinInstallerMock::new(),
         }
     }
-    
+
     /// Mock that ftl.toml doesn't exist  
     fn mock_no_ftl_toml(&mut self) {
         self.file_system

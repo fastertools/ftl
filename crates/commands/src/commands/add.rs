@@ -43,10 +43,12 @@ pub struct AddDependencies {
 pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) -> Result<()> {
     // Check if we have ftl.toml first
     let has_ftl_toml = deps.file_system.exists(Path::new("ftl.toml"));
-    
+
     // Check if we're in a project directory
     if !has_ftl_toml && !deps.file_system.exists(Path::new("spin.toml")) {
-        anyhow::bail!("No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' first.");
+        anyhow::bail!(
+            "No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' first."
+        );
     }
 
     // Get component name interactively if not provided
@@ -65,7 +67,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
-    
+
     // If using ftl.toml, we need to temporarily generate spin.toml for spin add
     let temp_spin_created = if has_ftl_toml {
         // Generate spin.toml in the project directory temporarily
@@ -148,7 +150,7 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
 
     // Success message
     print_success_message(&deps.ui, &component_name, selected_language);
-    
+
     // Clean up temporary spin.toml if we created it
     if temp_spin_created {
         let _ = std::fs::remove_file("spin.toml");
@@ -216,26 +218,23 @@ fn update_ftl_toml(
     component_name: &str,
     language: Language,
 ) -> Result<()> {
-    use crate::config::ftl_config::{FtlConfig, ToolConfig, BuildConfig};
+    use crate::config::ftl_config::{BuildConfig, FtlConfig, ToolConfig};
     use std::collections::HashMap;
-    
+
     // Read ftl.toml
     let content = fs
         .read_to_string(Path::new("ftl.toml"))
         .context("Failed to read ftl.toml")?;
-    
+
     // Parse config
     let mut config = FtlConfig::parse(&content)?;
-    
+
     // Create build configuration with explicit defaults based on language
     let build = match language {
         Language::Rust => BuildConfig {
             command: "cargo build --target wasm32-wasip1 --release".to_string(),
             workdir: None,
-            watch: vec![
-                "src/**/*.rs".to_string(),
-                "Cargo.toml".to_string(),
-            ],
+            watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
             env: HashMap::new(),
         },
         Language::TypeScript | Language::JavaScript => BuildConfig {
@@ -250,7 +249,7 @@ fn update_ftl_toml(
             env: HashMap::new(),
         },
     };
-    
+
     // Add the new tool
     config.tools.insert(
         component_name.to_string(),
@@ -261,12 +260,12 @@ fn update_ftl_toml(
             variables: HashMap::new(),
         },
     );
-    
+
     // Write back
     let updated_content = config.to_toml_string()?;
     fs.write_string(Path::new("ftl.toml"), &updated_content)
         .context("Failed to write updated ftl.toml")?;
-    
+
     Ok(())
 }
 

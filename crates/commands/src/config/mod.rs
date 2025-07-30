@@ -9,6 +9,6 @@ pub mod ftl_config;
 /// Transpiler for converting ftl.toml to spin.toml
 pub mod transpiler;
 
+pub use ftl_config::{AuthConfig, FtlConfig, ToolConfig};
 pub use registry::{RegistryConfig, RegistryType};
-pub use ftl_config::{FtlConfig, ToolConfig, AuthConfig};
 pub use transpiler::transpile_ftl_to_spin;

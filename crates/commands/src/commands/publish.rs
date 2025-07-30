@@ -70,7 +70,7 @@ pub async fn execute_with_deps(
     deps.ui
         .print_styled("→ Publishing project", MessageStyle::Cyan);
 
-    // For deploy and publish, we need actual spin.toml in the project directory  
+    // For deploy and publish, we need actual spin.toml in the project directory
     // since these commands package the project for upload
     if deps.file_system.exists(&project_path.join("ftl.toml")) {
         crate::config::transpiler::ensure_spin_toml(&deps.file_system, &project_path)?;
@@ -146,8 +146,8 @@ impl BuildExecutor for BuildExecutorWrapper {
     async fn execute(&self, path: Option<PathBuf>, release: bool) -> Result<()> {
         use crate::commands::build;
 
-        let args = build::BuildArgs { 
-            path, 
+        let args = build::BuildArgs {
+            path,
             release,
             export: None,
             export_out: None,

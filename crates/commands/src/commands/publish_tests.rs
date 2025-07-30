@@ -1,8 +1,8 @@
 //! Unit tests for the publish command
 
+use mockall::predicate::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use mockall::predicate::*;
 
 use crate::commands::publish::{
     BuildExecutor, ProcessExecutor, ProcessOutput, PublishConfig, PublishDependencies,
@@ -180,7 +180,7 @@ impl TestFixture {
             build_executor: Arc::new(MockBuildExecutor::new()),
         }
     }
-    
+
     /// Mock that ftl.toml doesn't exist but spin.toml does
     fn mock_spin_toml_exists(&mut self, path: Option<&Path>) {
         let ftl_path = if let Some(p) = path {
@@ -188,19 +188,19 @@ impl TestFixture {
         } else {
             PathBuf::from("./ftl.toml")
         };
-        
+
         let spin_path = if let Some(p) = path {
             p.join("spin.toml")
         } else {
             PathBuf::from("./spin.toml")
         };
-        
+
         self.file_system
             .expect_exists()
             .withf(move |p: &Path| p == ftl_path.as_path())
             .times(1)
             .returning(|_| false);
-            
+
         self.file_system
             .expect_exists()
             .withf(move |p: &Path| p == spin_path.as_path())
@@ -279,7 +279,7 @@ async fn test_publish_no_spin_toml() {
         .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(|_| false);
-        
+
     // Mock: spin.toml doesn't exist
     fixture
         .file_system

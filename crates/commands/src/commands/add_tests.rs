@@ -26,7 +26,7 @@ impl TestFixture {
             spin_installer: MockSpinInstallerMock::new(),
         }
     }
-    
+
     /// Mock that ftl.toml doesn't exist but spin.toml does
     fn mock_spin_toml_exists(&mut self) {
         self.file_system
@@ -34,7 +34,7 @@ impl TestFixture {
             .with(eq(Path::new("ftl.toml")))
             .times(1)
             .returning(|_| false);
-            
+
         self.file_system
             .expect_exists()
             .with(eq(Path::new("spin.toml")))
@@ -64,7 +64,7 @@ async fn test_add_not_in_spin_project() {
         .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| false);
-    
+
     // Mock: spin.toml doesn't exist either
     fixture
         .file_system
@@ -234,7 +234,6 @@ async fn test_add_success_rust() {
                 panic!("Unexpected command: {args:?}");
             }
         });
-
 
     // Mock: read spin.toml
     fixture
@@ -445,8 +444,8 @@ async fn test_add_interactive_prompts() {
     let deps = fixture.to_deps();
     let result = execute_with_deps(
         AddConfig {
-            name: None,        // Will prompt for name
-            language: None,    // Will prompt for language
+            name: None,     // Will prompt for name
+            language: None, // Will prompt for language
             git: None,
             branch: None,
             dir: None,

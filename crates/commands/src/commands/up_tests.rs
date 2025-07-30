@@ -280,12 +280,12 @@ impl TestFixture {
             signal_handler: Arc::new(MockSignalHandler::new()),
         }
     }
-    
+
     /// Mock that ftl.toml doesn't exist but spin.toml does
     fn mock_spin_toml_exists(&mut self) {
         self.mock_spin_toml_exists_with_times(1, 1);
     }
-    
+
     /// Mock that ftl.toml doesn't exist but spin.toml does, with custom times
     fn mock_spin_toml_exists_with_times(&mut self, ftl_times: usize, spin_times: usize) {
         self.file_system
@@ -293,7 +293,7 @@ impl TestFixture {
             .with(eq(Path::new("./ftl.toml")))
             .times(ftl_times)
             .returning(|_| false);
-            
+
         self.file_system
             .expect_exists()
             .with(eq(Path::new("./spin.toml")))
@@ -330,7 +330,7 @@ async fn test_up_no_spin_toml() {
         .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(|_| false);
-        
+
     // Mock: spin.toml doesn't exist
     fixture
         .file_system
@@ -562,7 +562,7 @@ async fn test_up_with_custom_path() {
         .with(eq(Path::new("/my/project/ftl.toml")))
         .times(1)
         .returning(|_| false);
-        
+
     // Mock: spin.toml exists at custom path
     fixture
         .file_system

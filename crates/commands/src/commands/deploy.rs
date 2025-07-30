@@ -1,8 +1,8 @@
 //! Refactored deploy command with dependency injection for testability
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
@@ -65,7 +65,10 @@ pub struct DeployDependencies {
 
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
-pub async fn execute_with_deps(deps: Arc<DeployDependencies>, variables: Vec<String>) -> Result<()> {
+pub async fn execute_with_deps(
+    deps: Arc<DeployDependencies>,
+    variables: Vec<String>,
+) -> Result<()> {
     deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
     deps.ui.print("");
 
@@ -78,7 +81,9 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, variables: Vec<Str
     // Check if we're in a Spin project directory
     let spin_toml_path = PathBuf::from("spin.toml");
     if !deps.file_system.exists(&spin_toml_path) {
-        return Err(anyhow!("No spin.toml or ftl.toml found. Not in a project directory?"));
+        return Err(anyhow!(
+            "No spin.toml or ftl.toml found. Not in a project directory?"
+        ));
     }
 
     // Create a spinner for status updates
@@ -157,8 +162,14 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, variables: Vec<Str
         }
     };
 
-    let deployment =
-        deploy_to_ftl_with_progress(deps.clone(), config.app_name, deployed_tools, parsed_variables, spinner).await?;
+    let deployment = deploy_to_ftl_with_progress(
+        deps.clone(),
+        config.app_name,
+        deployed_tools,
+        parsed_variables,
+        spinner,
+    )
+    .await?;
 
     // Display results
     deps.ui.print("");
@@ -176,7 +187,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, variables: Vec<Str
 /// Parse KEY=VALUE variable pairs from command line arguments
 pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> {
     let mut parsed = HashMap::new();
-    
+
     for var in variables {
         let parts: Vec<&str> = var.splitn(2, '=').collect();
         if parts.len() != 2 {
@@ -185,17 +196,17 @@ pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> 
                 var
             ));
         }
-        
+
         let key = parts[0].trim();
         let value = parts[1].trim();
-        
+
         if key.is_empty() {
             return Err(anyhow!("Variable key cannot be empty"));
         }
-        
+
         parsed.insert(key.to_string(), value.to_string());
     }
-    
+
     Ok(parsed)
 }
 
@@ -590,10 +601,7 @@ async fn deploy_to_ftl_with_progress(
 
     // Now create the deployment
     spinner.set_message("Creating box deployment...");
-    let deployment_request = types::CreateDeploymentRequest {
-        tools,
-        variables,
-    };
+    let deployment_request = types::CreateDeploymentRequest { tools, variables };
 
     let deployment_response = deps
         .api_client

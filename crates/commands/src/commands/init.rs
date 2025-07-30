@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 
+use crate::config::ftl_config::{AuthConfig, FtlConfig, GatewayConfig, ProjectConfig};
 use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
 use ftl_runtime::deps::{
     CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
 };
-use crate::config::ftl_config::{FtlConfig, ProjectConfig, AuthConfig, GatewayConfig};
 
 /// Init command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
@@ -142,7 +142,6 @@ fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> bool {
     true
 }
 
-
 /// Create FTL project with ftl.toml
 fn create_ftl_project(
     fs: &Arc<dyn FileSystem>,
@@ -150,16 +149,15 @@ fn create_ftl_project(
     project_name: Option<&str>,
 ) -> Result<()> {
     use std::collections::HashMap;
-    
+
     // Create project directory if not using --here
     if target_dir != "." {
-        std::fs::create_dir_all(target_dir)
-            .context("Failed to create project directory")?;
+        std::fs::create_dir_all(target_dir).context("Failed to create project directory")?;
     }
-    
+
     let project_path = Path::new(target_dir);
     let name = project_name.unwrap_or(target_dir);
-    
+
     // Create basic ftl.toml
     let config = FtlConfig {
         project: ProjectConfig {
@@ -173,13 +171,14 @@ fn create_ftl_project(
         gateway: GatewayConfig::default(),
         variables: HashMap::new(),
     };
-    
+
     let ftl_content = config.to_toml_string()?;
     fs.write_string(&project_path.join("ftl.toml"), &ftl_content)
         .context("Failed to write ftl.toml")?;
-    
+
     // Create README.md
-    let readme_content = format!(r"# {name}
+    let readme_content = format!(
+        r"# {name}
 
 FTL MCP server for hosting MCP tools.
 
@@ -219,11 +218,12 @@ ftl deploy
 ```
 
 For more information, visit the [FTL documentation](https://docs.fastertools.com).
-");
-    
+"
+    );
+
     fs.write_string(&project_path.join("README.md"), &readme_content)
         .context("Failed to write README.md")?;
-    
+
     // Create .gitignore
     let gitignore_content = r"# Dependencies
 node_modules/
@@ -254,10 +254,10 @@ spin.toml
 .DS_Store
 Thumbs.db
 ";
-    
+
     fs.write_string(&project_path.join(".gitignore"), gitignore_content)
         .context("Failed to write .gitignore")?;
-    
+
     Ok(())
 }
 

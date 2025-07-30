@@ -8,12 +8,12 @@ use anyhow::{Context, Result};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
+use crate::config::ftl_config::FtlConfig;
+use crate::config::transpiler::transpile_ftl_to_spin;
 use ftl_common::SpinInstaller;
 use ftl_runtime::deps::{
     CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, UserInterface,
 };
-use crate::config::ftl_config::FtlConfig;
-use crate::config::transpiler::transpile_ftl_to_spin;
 
 /// Information about a component to build
 #[derive(Debug, Clone)]
@@ -60,8 +60,9 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
     }
 
     // Check for ftl.toml and generate temporary spin.toml if needed
-    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
-    
+    let temp_spin_toml =
+        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
+
     // Determine which manifest to use
     let manifest_path = if let Some(temp_path) = &temp_spin_toml {
         temp_path.clone()
@@ -112,12 +113,12 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         "✓ All components built successfully!",
         MessageStyle::Success,
     );
-    
+
     // Clean up temporary file if it was created
     if temp_spin_toml.is_some() {
         let _ = std::fs::remove_file(&manifest_path);
     }
-    
+
     Ok(())
 }
 
@@ -130,28 +131,38 @@ fn handle_export(
 ) -> Result<()> {
     // Currently only support "spin" format
     if export_format != "spin" {
-        anyhow::bail!("Unsupported export format '{}'. Currently only 'spin' is supported.", export_format);
+        anyhow::bail!(
+            "Unsupported export format '{}'. Currently only 'spin' is supported.",
+            export_format
+        );
     }
 
     // Check if ftl.toml exists
     let ftl_toml_path = working_path.join("ftl.toml");
     if !deps.file_system.exists(&ftl_toml_path) {
-        anyhow::bail!("No ftl.toml found in the project directory. Export requires an ftl.toml file.");
+        anyhow::bail!(
+            "No ftl.toml found in the project directory. Export requires an ftl.toml file."
+        );
     }
 
     // Read and parse ftl.toml
-    let ftl_content = deps.file_system.read_to_string(&ftl_toml_path)
+    let ftl_content = deps
+        .file_system
+        .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
-    
+
     let ftl_config = FtlConfig::parse(&ftl_content)?;
     let spin_content = transpile_ftl_to_spin(&ftl_config)?;
 
     // Determine output path
-    let output_path = config.export_out.clone()
+    let output_path = config
+        .export_out
+        .clone()
         .unwrap_or_else(|| PathBuf::from("./spin.toml"));
 
     // Write the transpiled content
-    deps.file_system.write_string(&output_path, &spin_content)
+    deps.file_system
+        .write_string(&output_path, &spin_content)
         .context("Failed to write exported spin.toml")?;
 
     deps.ui.print_styled(

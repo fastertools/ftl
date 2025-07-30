@@ -884,19 +884,32 @@ fn test_parse_variables() {
     // Test variable with equals sign in value
     let vars = vec!["URL=https://example.com?key=value".to_string()];
     let parsed = parse_variables(&vars).unwrap();
-    assert_eq!(parsed.get("URL"), Some(&"https://example.com?key=value".to_string()));
+    assert_eq!(
+        parsed.get("URL"),
+        Some(&"https://example.com?key=value".to_string())
+    );
 
     // Test invalid format (no equals sign)
     let vars = vec!["INVALID".to_string()];
     let result = parse_variables(&vars);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid variable format"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid variable format")
+    );
 
     // Test empty key
     let vars = vec!["=value".to_string()];
     let result = parse_variables(&vars);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Variable key cannot be empty"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Variable key cannot be empty")
+    );
 }
 
 #[tokio::test]
@@ -906,7 +919,7 @@ async fn test_deploy_with_variables() {
     // Setup all mocks for successful deployment
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
-    
+
     // Verify variables are passed through to deployment request
     fixture
         .api_client
@@ -942,7 +955,7 @@ async fn test_deploy_with_variables() {
             // Verify variables are passed correctly
             assert!(req.variables.contains_key("API_KEY"));
             assert_eq!(req.variables.get("API_KEY"), Some(&"test123".to_string()));
-            
+
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -953,21 +966,17 @@ async fn test_deploy_with_variables() {
         });
 
     // Mock: app becomes active
-    fixture
-        .api_client
-        .expect_get_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::App {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::AppStatus::Active,
-                provider_url: Some("https://test-app.example.com".to_string()),
-                provider_error: None,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    fixture.api_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -975,5 +984,9 @@ async fn test_deploy_with_variables() {
 
     assert!(result.is_ok());
     let output = ui.get_output();
-    assert!(output.iter().any(|s| s.contains("Box deployed successfully!")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Box deployed successfully!"))
+    );
 }

@@ -174,7 +174,6 @@ async fn test_init_creates_ftl_toml() {
 
     setup_basic_init_mocks(&mut fixture);
 
-
     // Mock: write ftl.toml
     fixture
         .file_system
@@ -202,7 +201,6 @@ async fn test_init_creates_ftl_toml() {
         .with(eq(Path::new("my-project/.gitignore")), always())
         .times(1)
         .returning(|_, _| Ok(()));
-    
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -242,7 +240,9 @@ async fn test_init_write_fails() {
         .with(eq(Path::new("my-project/ftl.toml")), always())
         .times(1)
         .returning(|_, _| {
-            Err(anyhow::anyhow!("Failed to write ftl.toml: permission denied"))
+            Err(anyhow::anyhow!(
+                "Failed to write ftl.toml: permission denied"
+            ))
         });
 
     let deps = fixture.to_deps();
@@ -281,7 +281,6 @@ async fn test_init_success() {
         .times(1)
         .returning(|_| false);
 
-
     // Mock: write ftl.toml
     fixture
         .file_system
@@ -305,7 +304,6 @@ async fn test_init_success() {
         .with(eq(Path::new("my-project/.gitignore")), always())
         .times(1)
         .returning(|_, _| Ok(()));
-    
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -351,7 +349,6 @@ async fn test_init_here_success() {
         .times(7) // 7 common files we check
         .returning(|_| false);
 
-
     // Mock: write ftl.toml
     fixture
         .file_system
@@ -375,7 +372,6 @@ async fn test_init_here_success() {
         .with(eq(Path::new("./.gitignore")), always())
         .times(1)
         .returning(|_, _| Ok(()));
-    
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -424,7 +420,6 @@ async fn test_init_interactive_name() {
         .times(1)
         .returning(|_| false);
 
-
     // Mock: write ftl.toml
     fixture
         .file_system
@@ -448,7 +443,6 @@ async fn test_init_interactive_name() {
         .with(eq(Path::new("my-project/.gitignore")), always())
         .times(1)
         .returning(|_, _| Ok(()));
-    
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
