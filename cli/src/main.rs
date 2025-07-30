@@ -635,24 +635,7 @@ async fn handle_box_command(args: BoxArgs) -> Result<()> {
 
 /// Sanitize error messages to remove potentially sensitive information
 fn sanitize_error(error: &anyhow::Error) -> String {
-    let error_str = error.to_string();
-    
-    // Remove file paths that might contain user information
-    let sanitized = regex::Regex::new(r"(/[^/\s]+)+/([^/\s]+)")
-        .unwrap_or_else(|_| regex::Regex::new("").unwrap())
-        .replace_all(&error_str, ".../$2");
-    
-    // Remove URLs that might contain credentials
-    let sanitized = regex::Regex::new(r"https?://[^\s]+")
-        .unwrap_or_else(|_| regex::Regex::new("").unwrap())
-        .replace_all(&sanitized, "[URL_REDACTED]");
-    
-    // Truncate to reasonable length
-    if sanitized.len() > 200 {
-        format!("{}...", &sanitized[..200])
-    } else {
-        sanitized.to_string()
-    }
+    ftl_telemetry::privacy::sanitize_error_message(&error.to_string())
 }
 
 #[tokio::main]

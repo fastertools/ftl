@@ -2,51 +2,100 @@
 
 Privacy-first telemetry infrastructure for the FTL CLI.
 
+## Overview
+
+This crate implements anonymous usage telemetry for FTL CLI. All telemetry data is stored locally on the user's machine and is never transmitted to external servers.
+
 ## Features
 
-- **Local-only by default**: All telemetry data is stored locally in `~/.ftl/logs/<installation-id>/`
-- **Privacy-first**: No PII collection, minimal data collection
-- **Configurable**: Can be disabled via config file or environment variable
-- **Transparent**: Users can inspect all collected data
+- **Local-only storage**: All data stays on the user's machine
+- **Privacy by design**: No PII collection, automatic sanitization of sensitive data
+- **User control**: Easy opt-out via config or environment variable
+- **Transparent**: JSONL format for easy inspection
+- **First-run notice**: Users are informed about telemetry on first use
 
-## Configuration
+## Architecture
 
-Telemetry can be disabled in two ways:
-
-1. Environment variable: `FTL_TELEMETRY_DISABLED=1`
-2. Config file (`~/.ftl/config.toml`):
-   ```toml
-   [telemetry]
-   enabled = false
-   ```
-
-## Data Collection
-
-The telemetry system collects:
-
-- Command usage (which commands are run)
-- Command success/failure rates
-- Performance metrics (execution time)
-- Feature usage patterns
-
-The telemetry system does NOT collect:
-
-- Personal information
-- Project names or paths
-- File contents
-- Command arguments that might contain sensitive data
-
-## Storage
-
-Telemetry data is stored as JSONL (JSON Lines) files in:
 ```
-~/.ftl/logs/<installation-id>/YYYY-MM-DD.jsonl
+telemetry/
+├── config.rs       # Telemetry configuration and settings
+├── events.rs       # Event types and builders
+├── logger.rs       # Local file logging implementation
+├── notice.rs       # First-run notice system
+├── privacy.rs      # Privacy utilities for sanitizing data
+└── storage.rs      # Future: telemetry data aggregation
 ```
 
-Log files older than 30 days are automatically cleaned up.
+## Usage
 
-## Future Features
+### For CLI Integration
 
-- Opt-in remote telemetry for aggregated usage statistics
-- Export functionality for data analysis
-- Telemetry dashboard for viewing local data
+```rust
+use ftl_telemetry::{TelemetryClient, events::TelemetryEvent};
+
+// Initialize telemetry (shows first-run notice if needed)
+let telemetry = TelemetryClient::initialize()?;
+
+// Log command execution
+let event = TelemetryEvent::command_executed(
+    "build",
+    vec!["--release"],
+    session_id,
+);
+telemetry.log_event(event).await?;
+
+// Log command completion
+let event = TelemetryEvent::command_success("build", duration_ms, session_id);
+telemetry.log_event(event).await?;
+```
+
+### Configuration
+
+Telemetry configuration is stored in `~/.ftl/config.toml`:
+
+```toml
+[telemetry]
+enabled = true
+installation_id = "550e8400-e29b-41d4-a716-446655440000"
+upload_enabled = false  # Reserved for future use
+retention_days = 30
+```
+
+### Environment Variables
+
+- `FTL_TELEMETRY_DISABLED=1` - Disables telemetry regardless of config
+- `CI=true` - Disables interactive first-run notice in CI environments
+
+## Privacy
+
+The telemetry system implements several privacy protections:
+
+1. **Automatic sanitization** of error messages to remove:
+   - File paths containing user directories
+   - URLs that might contain credentials  
+   - Email addresses
+   - IP addresses
+
+2. **No network transmission** - all data stays local
+
+3. **Minimal data collection** - only essential usage metrics
+
+4. **User control** - easy opt-out mechanisms
+
+See [PRIVACY_AUDIT.md](./PRIVACY_AUDIT.md) for a detailed privacy analysis.
+
+## Data Format
+
+Telemetry events are stored in JSONL format (one JSON object per line):
+
+```json
+{"event_type":"command_executed","timestamp":"2025-07-17T10:00:00Z","session_id":"...","command":"build","args":["--release"],"ftl_version":"0.0.36","os":"macos","arch":"aarch64"}
+{"event_type":"command_success","timestamp":"2025-07-17T10:00:05Z","session_id":"...","command":"build","duration_ms":5000}
+```
+
+## Future Enhancements
+
+- [ ] Aggregate local statistics for user insights
+- [ ] Optional crash reporting (with explicit opt-in)
+- [ ] Argument filtering for sensitive flags
+- [ ] Local analytics dashboard

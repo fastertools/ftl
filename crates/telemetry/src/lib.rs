@@ -8,6 +8,7 @@ pub mod config;
 pub mod events;
 pub mod logger;
 pub mod notice;
+pub mod privacy;
 pub mod storage;
 
 #[cfg(test)]
@@ -17,6 +18,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 /// Main telemetry client
+#[derive(Clone)]
 pub struct TelemetryClient {
     config: config::TelemetryConfig,
     logger: logger::TelemetryLogger,
