@@ -1,0 +1,115 @@
+[project]
+name = "ftl-mcp-demo"
+version = "0.1.0"
+description = "FTL MCP server for hosting MCP tools"
+authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+
+# ========================================
+# Auth Gateway Configuration
+# ========================================
+# Authentication is DISABLED by default. To enable, set auth_enabled = true
+
+[auth]
+enabled = false
+provider = ""  # "authkit" or "oidc"
+issuer = ""
+audience = ""
+
+# OIDC-specific settings (only required for provider = "oidc")
+[auth.oidc]
+provider_name = ""
+jwks_uri = ""
+authorize_endpoint = ""
+token_endpoint = ""
+userinfo_endpoint = ""
+allowed_domains = ""  # comma-separated list
+
+# ========================================
+# Example configurations:
+# ========================================
+# AuthKit:
+#   [auth]
+#   enabled = true
+#   provider = "authkit"
+#   issuer = "https://your-tenant.authkit.app"
+#   audience = "mcp-api"  # optional
+#
+# Auth0:
+#   [auth]
+#   enabled = true
+#   provider = "oidc"
+#   issuer = "https://your-domain.auth0.com"
+#   audience = "your-api-identifier"  # optional
+#   
+#   [auth.oidc]
+#   provider_name = "auth0"
+#   jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+#   authorize_endpoint = "https://your-domain.auth0.com/authorize"
+#   token_endpoint = "https://your-domain.auth0.com/oauth/token"
+#   userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
+#   allowed_domains = "*.auth0.com"  # optional
+
+[gateway]
+version = "0.0.9"
+authorizer_version = "0.0.9"
+validate_arguments = true
+
+# Echo tool (Rust)
+[tools.echo-rs]
+path = "echo-rs"
+allowed_outbound_hosts = []
+
+[tools.echo-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "echo-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+# Echo tool (TypeScript)
+[tools.echo-ts]
+path = "echo-ts"
+allowed_outbound_hosts = []
+
+[tools.echo-ts.build]
+command = "npm install && npm run build"
+workdir = "echo-ts"
+watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# Weather tool (Rust)
+[tools.weather-rs]
+path = "weather-rs"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[tools.weather-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "weather-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+# Weather tool (TypeScript)
+[tools.weather-ts]
+path = "weather-ts"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[tools.weather-ts.build]
+command = "npm install && npm run build"
+workdir = "weather-ts"
+watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# Multi-tools example (Rust) - demonstrates multiple tools in one component
+[tools.multi-tools-rs]
+path = "multi-tools-rs"
+allowed_outbound_hosts = []
+
+[tools.multi-tools-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "multi-tools-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+# Multi-tools example (TypeScript) - demonstrates multiple tools in one component
+[tools.multi-tools-ts]
+path = "multi-tools-ts"
+allowed_outbound_hosts = []
+
+[tools.multi-tools-ts.build]
+command = "npm install && npm run build"
+workdir = "multi-tools-ts"
+watch = ["src/**/*.ts", "package.json", "tsconfig.json"]

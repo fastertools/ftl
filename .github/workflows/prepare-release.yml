@@ -173,23 +173,33 @@ jobs:
               # Update Cargo.lock - components use ftl- prefix in package names
               cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}"
               
-              # Update example spin.toml files to use the new version
+              # Update example ftl.toml files to use the new version
               echo "Updating component references in examples..."
-              find examples -name "spin.toml" -type f | while read -r file; do
-                # Update any references to this component
-                if grep -q "package = \"fastertools:${COMPONENT}\"" "$file"; then
-                  echo "Updating ${COMPONENT} version to ${NEW_VERSION} in $file"
-                  sed -i "s/package = \"fastertools:${COMPONENT}\", version = \"[^\"]*\"/package = \"fastertools:${COMPONENT}\", version = \"${NEW_VERSION}\"/g" "$file"
+              find examples -name "ftl.toml" -type f | while read -r file; do
+                # Update gateway versions
+                if [ "${COMPONENT}" = "mcp-gateway" ]; then
+                  echo "Updating gateway version to ${NEW_VERSION} in $file"
+                  sed -i "s/^version = \"[^\"]*\"/version = \"${NEW_VERSION}\"/" "$file"
+                fi
+                # Update authorizer versions
+                if [ "${COMPONENT}" = "mcp-authorizer" ]; then
+                  echo "Updating authorizer version to ${NEW_VERSION} in $file"
+                  sed -i "s/^authorizer_version = \"[^\"]*\"/authorizer_version = \"${NEW_VERSION}\"/" "$file"
                 fi
               done
               
-              # Update template spin.toml files to use the new version
+              # Update template ftl.toml files to use the new version
               echo "Updating component references in templates..."
-              find templates -name "spin.toml" -type f | while read -r file; do
-                # Update any references to this component
-                if grep -q "package = \"fastertools:${COMPONENT}\"" "$file"; then
-                  echo "Updating ${COMPONENT} version to ${NEW_VERSION} in $file"
-                  sed -i "s/package = \"fastertools:${COMPONENT}\", version = \"[^\"]*\"/package = \"fastertools:${COMPONENT}\", version = \"${NEW_VERSION}\"/g" "$file"
+              find templates -name "ftl.toml" -type f | while read -r file; do
+                # Update gateway versions
+                if [ "${COMPONENT}" = "mcp-gateway" ]; then
+                  echo "Updating gateway version to ${NEW_VERSION} in $file"
+                  sed -i "s/^version = \"[^\"]*\"/version = \"${NEW_VERSION}\"/" "$file"
+                fi
+                # Update authorizer versions
+                if [ "${COMPONENT}" = "mcp-authorizer" ]; then
+                  echo "Updating authorizer version to ${NEW_VERSION} in $file"
+                  sed -i "s/^authorizer_version = \"[^\"]*\"/authorizer_version = \"${NEW_VERSION}\"/" "$file"
                 fi
               done
               ;;
