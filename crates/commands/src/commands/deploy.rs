@@ -68,10 +68,16 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>) -> Result<()> {
     deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
     deps.ui.print("");
 
+    // For deploy and publish, we need actual spin.toml in the project directory
+    // since these commands package the project for upload
+    if deps.file_system.exists(&PathBuf::from("ftl.toml")) {
+        crate::config::transpiler::ensure_spin_toml(&deps.file_system, &PathBuf::from("."))?;
+    }
+
     // Check if we're in a Spin project directory
     let spin_toml_path = PathBuf::from("spin.toml");
     if !deps.file_system.exists(&spin_toml_path) {
-        return Err(anyhow!("No spin.toml found. Not in a project directory?"));
+        return Err(anyhow!("No spin.toml or ftl.toml found. Not in a project directory?"));
     }
 
     // Create a spinner for status updates

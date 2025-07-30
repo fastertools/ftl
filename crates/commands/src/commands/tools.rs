@@ -592,10 +592,27 @@ fn confirm_tool_removal(deps: &Arc<ToolsDependencies>, tools: &[String]) -> Resu
 
 /// Add tools to project spin manifest using registry infrastructure
 async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
+    // Check if we have ftl.toml first
+    let has_ftl_toml = Path::new("ftl.toml").exists();
+    
+    if has_ftl_toml {
+        // If using ftl.toml, add tools there
+        add_tools_to_ftl_toml(deps, tools)?;
+        
+        deps.ui.print("");
+        deps.ui.print(&format!(
+            "{} Added tools to ftl.toml",
+            styled_text("✓", MessageStyle::Success)
+        ));
+        
+        return Ok(());
+    }
+    
+    // Otherwise use spin.toml directly
     let manifest_path = Path::new("spin.toml");
 
     if !manifest_path.exists() {
-        anyhow::bail!("No spin.toml found. Run this command from a toolbox directory.");
+        anyhow::bail!("No spin.toml or ftl.toml found. Run this command from a toolbox directory.");
     }
 
     let content = fs::read_to_string(manifest_path).context("Failed to read spin.toml")?;
@@ -678,6 +695,44 @@ async fn add_tools_to_project(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTo
         styled_text("✓", MessageStyle::Green)
     ));
 
+    Ok(())
+}
+
+/// Add tools to ftl.toml
+fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) -> Result<()> {
+    use crate::config::ftl_config::{FtlConfig, ToolConfig};
+    
+    // Read ftl.toml
+    let content = fs::read_to_string("ftl.toml").context("Failed to read ftl.toml")?;
+    let mut config = FtlConfig::parse(&content)?;
+    
+    for tool in tools {
+        let tool_name = format!("tool-{}", tool.name);
+        
+        // Add tool to config
+        config.tools.insert(
+            tool_name.clone(),
+            ToolConfig {
+                tool_type: "prebuilt".to_string(), // Prebuilt tools
+                path: tool_name.clone(),
+                build: None,
+                allowed_hosts: vec![],
+                watch: vec![],
+            },
+        );
+        
+        deps.ui.print(&format!(
+            "{} Added {} {} to ftl.toml",
+            styled_text("→", MessageStyle::Cyan),
+            styled_text(&tool.name, MessageStyle::Bold),
+            styled_text(&format!("({})", tool.version), MessageStyle::Yellow)
+        ));
+    }
+    
+    // Write back
+    let updated_content = config.to_toml_string()?;
+    fs::write("ftl.toml", updated_content).context("Failed to write updated ftl.toml")?;
+    
     Ok(())
 }
 

@@ -94,6 +94,14 @@ impl BuildExecutor for MockBuildExecutor {
 async fn test_deploy_no_spin_toml() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+
     // Mock: spin.toml doesn't exist
     fixture
         .file_system
@@ -110,13 +118,21 @@ async fn test_deploy_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No spin.toml or ftl.toml found")
     );
 }
 
 #[tokio::test]
 async fn test_deploy_authentication_expired() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
 
     // Mock: spin.toml exists
     fixture
@@ -156,6 +172,14 @@ async fn test_deploy_authentication_expired() {
 #[tokio::test]
 async fn test_deploy_no_components() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
 
     // Mock: spin.toml exists
     fixture
@@ -529,6 +553,14 @@ async fn test_deployment_failed_status() {
 // Helper functions to setup common mock scenarios
 
 fn setup_basic_mocks(fixture: &mut TestFixture) {
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+
     // Mock: spin.toml exists
     fixture
         .file_system

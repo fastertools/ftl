@@ -25,6 +25,15 @@ impl TestFixture {
             spin_installer: MockSpinInstallerMock::new(),
         }
     }
+    
+    /// Mock that ftl.toml doesn't exist  
+    fn mock_no_ftl_toml(&mut self) {
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(1)
+            .returning(|_| false);
+    }
 
     #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<BuildDependencies> {
@@ -40,6 +49,9 @@ impl TestFixture {
 #[tokio::test]
 async fn test_build_no_spin_toml() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
 
     // Mock: spin.toml doesn't exist
     fixture
@@ -64,13 +76,16 @@ async fn test_build_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No spin.toml or ftl.toml found")
     );
 }
 
 #[tokio::test]
 async fn test_build_no_components() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
 
     // Mock: spin.toml exists
     fixture
@@ -126,6 +141,9 @@ source = "target/wasm32-wasi/release/test.wasm"
 #[tokio::test]
 async fn test_build_single_component_success() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
 
     // Mock: spin.toml exists
     fixture
@@ -211,6 +229,9 @@ command = "cargo build --target wasm32-wasi"
 async fn test_build_with_release_flag() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
+
     // Mock: spin.toml exists
     fixture
         .file_system
@@ -282,6 +303,9 @@ command = "cargo build --target wasm32-wasi"
 #[tokio::test]
 async fn test_build_with_workdir() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
 
     // Mock: spin.toml exists
     fixture
@@ -365,6 +389,9 @@ workdir = "frontend"
 async fn test_build_multiple_components() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
+
     // Mock: spin.toml exists
     fixture
         .file_system
@@ -445,6 +472,9 @@ workdir = "frontend"
 async fn test_build_failure() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
+
     // Mock: spin.toml exists
     fixture
         .file_system
@@ -510,6 +540,9 @@ command = "cargo build --target wasm32-wasi"
 async fn test_build_invalid_toml() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture.mock_no_ftl_toml();
+
     // Mock: spin.toml exists
     fixture
         .file_system
@@ -548,6 +581,14 @@ async fn test_build_invalid_toml() {
 #[tokio::test]
 async fn test_build_with_custom_path() {
     let mut fixture = TestFixture::new();
+
+    // Mock: ftl.toml doesn't exist in custom path
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("/projects/myapp/ftl.toml")))
+        .times(1)
+        .returning(|_| false);
 
     // Mock: spin.toml exists in custom path
     fixture

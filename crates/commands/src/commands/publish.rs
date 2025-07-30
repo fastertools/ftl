@@ -70,11 +70,17 @@ pub async fn execute_with_deps(
     deps.ui
         .print_styled("→ Publishing project", MessageStyle::Cyan);
 
+    // For deploy and publish, we need actual spin.toml in the project directory  
+    // since these commands package the project for upload
+    if deps.file_system.exists(&project_path.join("ftl.toml")) {
+        crate::config::transpiler::ensure_spin_toml(&deps.file_system, &project_path)?;
+    }
+
     // Validate we're in a Spin project directory
     let spin_toml_path = project_path.join("spin.toml");
     if !deps.file_system.exists(&spin_toml_path) {
         anyhow::bail!(
-            "No spin.toml found. Not in a project directory? Run 'ftl init' to create a new project."
+            "No spin.toml or ftl.toml found. Not in a project directory? Run 'ftl init' to create a new project."
         );
     }
 

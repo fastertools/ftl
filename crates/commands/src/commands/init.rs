@@ -9,6 +9,7 @@ use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
 use ftl_runtime::deps::{
     CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
 };
+use crate::config::ftl_config::{FtlConfig, ProjectConfig, AuthConfig, DeploymentConfig, GatewayConfig};
 
 /// Init command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
@@ -44,7 +45,7 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
     let InitConfig { mut name, here } = config;
 
     // Install Spin if needed
-    let spin_path = deps.spin_installer.check_and_install().await?;
+    let _spin_path = deps.spin_installer.check_and_install().await?;
 
     // Get project name
     if name.is_none() && !here {
@@ -71,11 +72,8 @@ pub async fn execute_with_deps(config: InitConfig, deps: Arc<InitDependencies>) 
         anyhow::bail!("Current directory is not empty. Use --here only in an empty directory.");
     }
 
-    // Check templates are installed
-    check_templates_installed(&deps.command_executor, &spin_path).await?;
-
-    // Create project
-    create_project(&deps.command_executor, &spin_path, &target_dir).await?;
+    // Create project with ftl.toml
+    create_ftl_project(&deps.file_system, &target_dir, name.as_deref())?;
 
     // Success message
     deps.ui.print("");
@@ -144,42 +142,121 @@ fn is_directory_empty(fs: &Arc<dyn FileSystem>) -> bool {
     true
 }
 
-/// Check if ftl-mcp templates are installed
-async fn check_templates_installed(
-    executor: &Arc<dyn CommandExecutor>,
-    spin_path: &str,
-) -> Result<()> {
-    let output = executor
-        .execute(spin_path, &["templates", "list"])
-        .await
-        .context("Failed to list Spin templates")?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if !stdout.contains("ftl-mcp-server") {
-        anyhow::bail!("ftl-mcp templates not installed. Run 'ftl setup templates' first.");
-    }
-
-    Ok(())
-}
-
-/// Create the project using spin new
-async fn create_project(
-    executor: &Arc<dyn CommandExecutor>,
-    spin_path: &str,
+/// Create FTL project with ftl.toml
+fn create_ftl_project(
+    fs: &Arc<dyn FileSystem>,
     target_dir: &str,
+    project_name: Option<&str>,
 ) -> Result<()> {
-    let output = executor
-        .execute(
-            spin_path,
-            &["new", "-t", "ftl-mcp-server", "-a", target_dir],
-        )
-        .await?;
-
-    if !output.success {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("Failed to create project: {}", stderr);
+    use std::collections::HashMap;
+    
+    // Create project directory if not using --here
+    if target_dir != "." {
+        std::fs::create_dir_all(target_dir)
+            .context("Failed to create project directory")?;
     }
+    
+    let project_path = Path::new(target_dir);
+    let name = project_name.unwrap_or(target_dir);
+    
+    // Create basic ftl.toml
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: name.to_string(),
+            version: "0.1.0".to_string(),
+            description: "FTL MCP server for hosting MCP tools".to_string(),
+            authors: vec![],
+        },
+        auth: AuthConfig::default(),
+        tools: HashMap::new(),
+        deployment: DeploymentConfig::default(),
+        gateway: GatewayConfig::default(),
+    };
+    
+    let ftl_content = config.to_toml_string()?;
+    fs.write_string(&project_path.join("ftl.toml"), &ftl_content)
+        .context("Failed to write ftl.toml")?;
+    
+    // Create README.md
+    let readme_content = format!(r"# {name}
 
+FTL MCP server for hosting MCP tools.
+
+## Getting Started
+
+Add tools to your project:
+```bash
+ftl add my-tool --language rust
+```
+
+Start the development server:
+```bash
+ftl up
+```
+
+The server will be available at http://localhost:3000/mcp
+
+## Adding Tools
+
+You can add tools in two ways:
+
+1. **Custom tools**: Write your own MCP tools
+   ```bash
+   ftl add my-tool --language rust
+   ```
+
+2. **Pre-built tools**: Use tools from the registry
+   ```bash
+   ftl tools add calculator
+   ```
+
+## Deployment
+
+Deploy your MCP server:
+```bash
+ftl deploy
+```
+
+For more information, visit the [FTL documentation](https://docs.fastertools.com).
+");
+    
+    fs.write_string(&project_path.join("README.md"), &readme_content)
+        .context("Failed to write README.md")?;
+    
+    // Create .gitignore
+    let gitignore_content = r"# Dependencies
+node_modules/
+target/
+dist/
+.spin/
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+*.wasm
+*.wat
+
+# Generated files
+# spin.toml is auto-generated from ftl.toml
+spin.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+";
+    
+    fs.write_string(&project_path.join(".gitignore"), gitignore_content)
+        .context("Failed to write .gitignore")?;
+    
     Ok(())
 }
 

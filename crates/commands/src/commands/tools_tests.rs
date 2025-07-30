@@ -145,7 +145,7 @@ async fn test_add_tools_without_confirmation() {
     // Should fail because no spin.toml exists
     assert!(result.is_err());
     if let Err(e) = result {
-        assert!(e.to_string().contains("No spin.toml found"));
+        assert!(e.to_string().contains("No spin.toml or ftl.toml found"));
     }
 }
 

@@ -48,16 +48,32 @@ pub struct BuildDependencies {
 pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>) -> Result<()> {
     let working_path = config.path.unwrap_or_else(|| PathBuf::from("."));
 
-    // Check if we're in a project directory (has spin.toml)
-    let spin_toml_path = working_path.join("spin.toml");
-    if !deps.file_system.exists(&spin_toml_path) {
-        anyhow::bail!(
-            "No spin.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
-        );
-    }
+    // Check for ftl.toml and generate temporary spin.toml if needed
+    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
+    
+    // Determine which manifest to use
+    let manifest_path = if let Some(temp_path) = &temp_spin_toml {
+        temp_path.clone()
+    } else {
+        // Check if spin.toml exists in project
+        let spin_toml_path = working_path.join("spin.toml");
+        if !deps.file_system.exists(&spin_toml_path) {
+            anyhow::bail!(
+                "No spin.toml or ftl.toml found. Run 'ftl build' from a project directory or use 'ftl init' to create a new project."
+            );
+        }
+        spin_toml_path
+    };
 
     // Parse spin.toml to find components with build commands
-    let components = parse_component_builds(&deps.file_system, &spin_toml_path)?;
+    // For temporary files, we need to read directly since FileSystem trait doesn't know about them
+    let components = if temp_spin_toml.is_some() {
+        let content = std::fs::read_to_string(&manifest_path)
+            .context("Failed to read temporary spin.toml")?;
+        parse_component_builds_from_content(&content)?
+    } else {
+        parse_component_builds(&deps.file_system, &manifest_path)?
+    };
 
     if components.is_empty() {
         deps.ui.print_styled(
@@ -85,18 +101,18 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         "✓ All components built successfully!",
         MessageStyle::Success,
     );
+    
+    // Clean up temporary file if it was created
+    if temp_spin_toml.is_some() {
+        let _ = std::fs::remove_file(&manifest_path);
+    }
+    
     Ok(())
 }
 
-/// Parse component build information from spin.toml
-pub fn parse_component_builds(
-    fs: &Arc<dyn FileSystem>,
-    spin_toml_path: &Path,
-) -> Result<Vec<ComponentBuildInfo>> {
-    let content = fs
-        .read_to_string(spin_toml_path)
-        .context("Failed to read spin.toml")?;
-    let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
+/// Parse component build information from spin.toml content
+pub fn parse_component_builds_from_content(content: &str) -> Result<Vec<ComponentBuildInfo>> {
+    let toml: toml::Value = toml::from_str(content).context("Failed to parse spin.toml")?;
 
     let mut components = Vec::new();
 
@@ -122,6 +138,17 @@ pub fn parse_component_builds(
     }
 
     Ok(components)
+}
+
+/// Parse component build information from spin.toml
+pub fn parse_component_builds(
+    fs: &Arc<dyn FileSystem>,
+    spin_toml_path: &Path,
+) -> Result<Vec<ComponentBuildInfo>> {
+    let content = fs
+        .read_to_string(spin_toml_path)
+        .context("Failed to read spin.toml")?;
+    parse_component_builds_from_content(&content)
 }
 
 async fn build_components_parallel(

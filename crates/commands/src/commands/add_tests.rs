@@ -26,6 +26,21 @@ impl TestFixture {
             spin_installer: MockSpinInstallerMock::new(),
         }
     }
+    
+    /// Mock that ftl.toml doesn't exist but spin.toml does
+    fn mock_spin_toml_exists(&mut self) {
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("ftl.toml")))
+            .times(1)
+            .returning(|_| false);
+            
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("spin.toml")))
+            .times(1)
+            .returning(|_| true);
+    }
 
     #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<AddDependencies> {
@@ -42,7 +57,15 @@ impl TestFixture {
 async fn test_add_not_in_spin_project() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml doesn't exist
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+    
+    // Mock: spin.toml doesn't exist either
     fixture
         .file_system
         .expect_exists()
@@ -70,7 +93,7 @@ async fn test_add_not_in_spin_project() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No spin.toml or ftl.toml found")
     );
 }
 
@@ -79,12 +102,7 @@ async fn test_add_invalid_name_uppercase() {
     let mut fixture = TestFixture::new();
 
     // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    fixture.mock_spin_toml_exists();
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -115,12 +133,7 @@ async fn test_add_invalid_name_leading_hyphen() {
     let mut fixture = TestFixture::new();
 
     // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    fixture.mock_spin_toml_exists();
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(
@@ -225,6 +238,7 @@ async fn test_add_success_rust() {
                 panic!("Unexpected command: {args:?}");
             }
         });
+
 
     // Mock: read spin.toml
     fixture
@@ -500,12 +514,7 @@ async fn test_add_javascript_mapped_to_typescript() {
 // Helper functions
 fn setup_basic_add_mocks(fixture: &mut TestFixture) {
     // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    fixture.mock_spin_toml_exists();
 
     // Mock: spin installer
     fixture

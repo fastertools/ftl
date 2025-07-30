@@ -280,6 +280,26 @@ impl TestFixture {
             signal_handler: Arc::new(MockSignalHandler::new()),
         }
     }
+    
+    /// Mock that ftl.toml doesn't exist but spin.toml does
+    fn mock_spin_toml_exists(&mut self) {
+        self.mock_spin_toml_exists_with_times(1, 1);
+    }
+    
+    /// Mock that ftl.toml doesn't exist but spin.toml does, with custom times
+    fn mock_spin_toml_exists_with_times(&mut self, ftl_times: usize, spin_times: usize) {
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./ftl.toml")))
+            .times(ftl_times)
+            .returning(|_| false);
+            
+        self.file_system
+            .expect_exists()
+            .with(eq(Path::new("./spin.toml")))
+            .times(spin_times)
+            .returning(|_| true);
+    }
 
     #[allow(clippy::wrong_self_convention)]
     fn to_deps(self) -> Arc<UpDependencies> {
@@ -303,6 +323,14 @@ use mockall::predicate::*;
 async fn test_up_no_spin_toml() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("./ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+        
     // Mock: spin.toml doesn't exist
     fixture
         .file_system
@@ -329,7 +357,7 @@ async fn test_up_no_spin_toml() {
         result
             .unwrap_err()
             .to_string()
-            .contains("No spin.toml found")
+            .contains("No spin.toml or ftl.toml found")
     );
 }
 
@@ -337,13 +365,8 @@ async fn test_up_no_spin_toml() {
 async fn test_up_normal_mode_no_build() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    // Mock: ftl.toml doesn't exist, spin.toml does
+    fixture.mock_spin_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -400,12 +423,8 @@ async fn test_up_normal_mode_no_build() {
 async fn test_up_with_build() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists (checked twice - once for up, once for build)
-    fixture
-        .file_system
-        .expect_exists()
-        .times(2)
-        .returning(|path| path == Path::new("./spin.toml"));
+    // Mock: ftl.toml doesn't exist, spin.toml exists (checked 3 times - up, build check, build)
+    fixture.mock_spin_toml_exists_with_times(2, 2);
 
     // Mock: read spin.toml for build
     fixture
@@ -487,13 +506,8 @@ command = "cargo build --target wasm32-wasi"
 async fn test_up_process_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    // Mock: ftl.toml doesn't exist, spin.toml does
+    fixture.mock_spin_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -537,6 +551,14 @@ async fn test_up_process_fails() {
 async fn test_up_with_custom_path() {
     let mut fixture = TestFixture::new();
 
+    // Mock: ftl.toml doesn't exist at custom path
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("/my/project/ftl.toml")))
+        .times(1)
+        .returning(|_| false);
+        
     // Mock: spin.toml exists at custom path
     fixture
         .file_system
@@ -583,12 +605,8 @@ async fn test_up_with_custom_path() {
 async fn test_up_watch_mode_initial_build_fails() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists (checked twice)
-    fixture
-        .file_system
-        .expect_exists()
-        .times(2)
-        .returning(|path| path == Path::new("./spin.toml"));
+    // Mock: ftl.toml doesn't exist, spin.toml exists (checked multiple times)
+    fixture.mock_spin_toml_exists_with_times(2, 2);
 
     // Mock: read spin.toml for build - return invalid toml
     fixture
@@ -749,13 +767,8 @@ fn test_should_watch_file() {
 async fn test_up_with_specific_port() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    // Mock: ftl.toml doesn't exist, spin.toml does
+    fixture.mock_spin_toml_exists();
 
     // Mock: spin installer
     fixture
@@ -898,13 +911,8 @@ async fn test_execute_function() {
 async fn test_up_ctrlc_handling() {
     let mut fixture = TestFixture::new();
 
-    // Mock: spin.toml exists
-    fixture
-        .file_system
-        .expect_exists()
-        .with(eq(Path::new("./spin.toml")))
-        .times(1)
-        .returning(|_| true);
+    // Mock: ftl.toml doesn't exist, spin.toml does
+    fixture.mock_spin_toml_exists();
 
     // Mock: spin installer
     fixture
