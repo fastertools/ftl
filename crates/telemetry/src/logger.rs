@@ -42,7 +42,7 @@ impl TelemetryLogger {
 
         // Create daily log file
         let date = Local::now().format("%Y-%m-%d");
-        let log_file = self.log_dir.join(format!("{}.jsonl", date));
+        let log_file = self.log_dir.join(format!("{date}.jsonl"));
 
         // Serialize event before entering blocking section
         let json = serde_json::to_string(&event)?;
@@ -72,9 +72,9 @@ impl TelemetryLogger {
         Ok(())
     }
 
-    /// Clean up old log files (older than retention_days)
+    /// Clean up old log files (older than `retention_days`)
     pub async fn cleanup(&self) -> Result<()> {
-        let cutoff = Local::now() - chrono::Duration::days(self.retention_days as i64);
+        let cutoff = Local::now() - chrono::Duration::days(i64::from(self.retention_days));
 
         let mut entries = fs::read_dir(&self.log_dir).await?;
         while let Some(entry) = entries.next_entry().await? {

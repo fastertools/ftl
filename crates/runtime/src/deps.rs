@@ -495,7 +495,7 @@ impl CredentialsProvider for RealCredentialsProvider {
                 .get_password()
                 .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))?;
 
-            let mut credentials: StoredCredentials = serde_json::from_str(&json)
+            let credentials: StoredCredentials = serde_json::from_str(&json)
                 .map_err(|e| anyhow::anyhow!("Failed to parse stored credentials: {}", e))?;
 
             // Check if token is expired or about to expire (within 30 seconds)

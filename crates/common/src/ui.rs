@@ -48,7 +48,8 @@ impl UserInterface for RealUserInterface {
     }
 
     fn is_interactive(&self) -> bool {
-        atty::is(atty::Stream::Stdin)
+        use std::io::IsTerminal;
+        std::io::stdin().is_terminal()
     }
 
     fn prompt_input(&self, prompt: &str, default: Option<&str>) -> Result<String> {

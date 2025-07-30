@@ -1,20 +1,20 @@
 //! Privacy utilities for telemetry
 
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 // Compile regexes once at startup
-static URL_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"https?://[^\s]+").expect("Invalid URL regex"));
+static URL_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"https?://[^\s]+").expect("Invalid URL regex"));
 
-static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").expect("Invalid email regex")
 });
 
-static IPV4_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").expect("Invalid IPv4 regex"));
+static IPV4_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").expect("Invalid IPv4 regex"));
 
-static IPV6_REGEX: Lazy<Regex> = Lazy::new(|| {
+static IPV6_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b").expect("Invalid IPv6 regex")
 });
 
@@ -37,11 +37,11 @@ const SENSITIVE_ARGS: &[&str] = &[
 ];
 
 /// Filter sensitive command arguments
-pub fn filter_command_args(args: Vec<String>) -> Vec<String> {
+pub fn filter_command_args(args: &[String]) -> Vec<String> {
     let mut filtered = Vec::new();
     let mut skip_next = false;
 
-    for arg in args.iter() {
+    for arg in args {
         if skip_next {
             filtered.push("[REDACTED]".to_string());
             skip_next = false;
@@ -51,7 +51,7 @@ pub fn filter_command_args(args: Vec<String>) -> Vec<String> {
         // Check if this is a sensitive argument
         let is_sensitive = SENSITIVE_ARGS
             .iter()
-            .any(|&sensitive| arg == sensitive || arg.starts_with(&format!("{}=", sensitive)));
+            .any(|&sensitive| arg == sensitive || arg.starts_with(&format!("{sensitive}=")));
 
         if is_sensitive {
             if arg.contains('=') {
@@ -98,7 +98,7 @@ fn sanitize_value(value: &str) -> String {
                 // This looks like a Unix path
                 if let Some(last_slash) = part.rfind('/') {
                     let filename = &part[last_slash..];
-                    new_parts.push(format!("[REDACTED]{}", filename));
+                    new_parts.push(format!("[REDACTED]{filename}"));
                 } else {
                     new_parts.push(part.to_string());
                 }
@@ -106,7 +106,7 @@ fn sanitize_value(value: &str) -> String {
                 // Windows path
                 if let Some(last_sep) = part.rfind('\\') {
                     let filename = &part[last_sep..];
-                    new_parts.push(format!("[REDACTED]{}", filename));
+                    new_parts.push(format!("[REDACTED]{filename}"));
                 } else {
                     new_parts.push(part.to_string());
                 }
@@ -193,7 +193,7 @@ mod tests {
             "secret123".to_string(),
             "--verbose".to_string(),
         ];
-        let filtered = filter_command_args(args);
+        let filtered = filter_command_args(&args);
         assert_eq!(
             filtered,
             vec!["build", "--token", "[REDACTED]", "--verbose"]
@@ -207,7 +207,7 @@ mod tests {
             "--password=secret456".to_string(),
             "--region=us-west".to_string(),
         ];
-        let filtered = filter_command_args(args);
+        let filtered = filter_command_args(&args);
         assert_eq!(
             filtered,
             vec!["deploy", "--password=[REDACTED]", "--region=us-west"]
@@ -223,7 +223,7 @@ mod tests {
             "--api-key=key456".to_string(),
             "https://api.example.com".to_string(),
         ];
-        let filtered = filter_command_args(args);
+        let filtered = filter_command_args(&args);
         assert_eq!(
             filtered,
             vec![
@@ -243,7 +243,7 @@ mod tests {
             "/home/user/secret/file.txt".to_string(),
             "output.log".to_string(),
         ];
-        let filtered = filter_command_args(args);
+        let filtered = filter_command_args(&args);
         assert_eq!(filtered[1], "[REDACTED]/file.txt");
         assert_eq!(filtered[2], "output.log"); // Relative path not filtered
     }

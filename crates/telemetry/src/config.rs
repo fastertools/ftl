@@ -23,15 +23,14 @@ pub struct TelemetryConfig {
     pub retention_days: u32,
 }
 
-fn default_retention_days() -> u32 {
+const fn default_retention_days() -> u32 {
     30
 }
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
         let log_directory = dirs::home_dir()
-            .map(|h| h.join(".ftl").join("logs"))
-            .unwrap_or_else(|| PathBuf::from(".ftl").join("logs"));
+            .map_or_else(|| PathBuf::from(".ftl").join("logs"), |h| h.join(".ftl").join("logs"));
 
         Self {
             enabled: true,
@@ -53,12 +52,11 @@ impl TelemetryConfig {
     pub fn load() -> Result<Self> {
         // Load from config file
         let config = Config::load()?;
-        let mut telemetry_config = config.get_section::<TelemetryConfig>()?.unwrap_or_default();
+        let mut telemetry_config = config.get_section::<Self>()?.unwrap_or_default();
 
         // Set the log directory based on home
         telemetry_config.log_directory = dirs::home_dir()
-            .map(|h| h.join(".ftl").join("logs"))
-            .unwrap_or_else(|| PathBuf::from(".ftl").join("logs"));
+            .map_or_else(|| PathBuf::from(".ftl").join("logs"), |h| h.join(".ftl").join("logs"));
 
         Ok(telemetry_config)
     }
@@ -67,7 +65,7 @@ impl TelemetryConfig {
     pub fn load_from_path(path: &Path) -> Result<Self> {
         let config = Config::load_from_path(path)?;
         let mut telemetry_config = config
-            .get_section::<TelemetryConfig>()?
+            .get_section::<Self>()?
             .ok_or_else(|| anyhow::anyhow!("Telemetry configuration not found"))?;
 
         // Set the log directory relative to the config path
@@ -80,7 +78,7 @@ impl TelemetryConfig {
 
     /// Check if telemetry is enabled
     pub fn is_enabled(&self) -> bool {
-        self.enabled && !std::env::var("FTL_TELEMETRY_DISABLED").is_ok()
+        self.enabled && std::env::var("FTL_TELEMETRY_DISABLED").is_err()
     }
 
     /// Save configuration

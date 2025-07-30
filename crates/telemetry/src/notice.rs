@@ -44,7 +44,7 @@ impl ConfigSection for NoticeConfig {
 const NOTICE_VERSION: &str = "1.0";
 
 /// The telemetry notice text
-const TELEMETRY_NOTICE: &str = r#"
+const TELEMETRY_NOTICE: &str = r"
 ╭─────────────────────────────────────────────────────────────────╮
 │                    FTL CLI Telemetry Notice                     │
 ├─────────────────────────────────────────────────────────────────┤
@@ -72,7 +72,7 @@ const TELEMETRY_NOTICE: &str = r#"
 │  Learn more: https://github.com/fastertools/ftl-cli             │
 │                                                                 │
 ╰─────────────────────────────────────────────────────────────────╯
-"#;
+";
 
 /// Check if we should show the first-run notice
 pub fn should_show_notice() -> Result<bool> {
@@ -90,10 +90,8 @@ pub fn should_show_notice() -> Result<bool> {
     let config = Config::load()?;
     
     // Try to get the notice config - if it fails to deserialize, treat as first run
-    let notice_config = match config.get_section::<NoticeConfig>() {
-        Ok(Some(config)) => config,
-        Ok(None) => return Ok(true), // No config section means first run
-        Err(_) => return Ok(true), // Failed to deserialize means malformed config, show notice
+    let Ok(Some(notice_config)) = config.get_section::<NoticeConfig>() else {
+        return Ok(true); // No config or malformed config means show notice
     };
     
     // Show notice if not shown before or version has changed
@@ -103,7 +101,7 @@ pub fn should_show_notice() -> Result<bool> {
 /// Display the first-run notice
 pub fn show_notice() -> Result<()> {
     // Print the notice
-    println!("{}", TELEMETRY_NOTICE);
+    println!("{TELEMETRY_NOTICE}");
 
     // Add a small pause to ensure the user sees it
     println!("Press Enter to continue...");
@@ -118,7 +116,7 @@ pub fn show_notice() -> Result<()> {
 
 /// Display the notice without waiting for input (non-interactive mode)
 pub fn show_notice_non_interactive() -> Result<()> {
-    println!("{}", TELEMETRY_NOTICE);
+    println!("{TELEMETRY_NOTICE}");
     mark_notice_shown()?;
     Ok(())
 }
@@ -155,7 +153,8 @@ fn is_ci_environment() -> bool {
 
 /// Check if stdout is a terminal (for interactive detection)
 pub fn is_interactive() -> bool {
-    atty::is(atty::Stream::Stdout) && atty::is(atty::Stream::Stdin)
+    use std::io::IsTerminal;
+    std::io::stdout().is_terminal() && std::io::stdin().is_terminal()
 }
 
 #[cfg(test)]

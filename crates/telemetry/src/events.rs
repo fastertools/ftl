@@ -70,6 +70,7 @@ impl TelemetryEvent {
     }
 
     /// Add a property to the event
+    #[must_use]
     pub fn with_property<T: Serialize>(mut self, key: &str, value: T) -> Self {
         match serde_json::to_value(value) {
             Ok(v) => {
