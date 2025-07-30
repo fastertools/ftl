@@ -12,9 +12,11 @@ mod tests {
     fn create_test_config(temp_dir: &TempDir, enabled: bool) -> PathBuf {
         let config_path = temp_dir.path().join("config.toml");
         let mut config = Config::load_from_path(&config_path).unwrap();
-        let mut telemetry_config = TelemetryConfig::default();
-        telemetry_config.enabled = enabled;
-        telemetry_config.installation_id = "test-installation-id".to_string();
+        let telemetry_config = TelemetryConfig {
+            enabled,
+            installation_id: "test-installation-id".to_string(),
+            ..Default::default()
+        };
         config.set_section(telemetry_config).unwrap();
         config.save().unwrap();
         config_path
@@ -49,8 +51,10 @@ mod tests {
         let config_path = temp_dir.path().join("config.toml");
 
         let mut config = Config::load_from_path(&config_path).unwrap();
-        let mut telemetry_config = TelemetryConfig::default();
-        telemetry_config.enabled = false;
+        let telemetry_config = TelemetryConfig {
+            enabled: false,
+            ..Default::default()
+        };
 
         config.set_section(telemetry_config).unwrap();
         config.save().unwrap();
@@ -168,7 +172,7 @@ mod tests {
 
         // Read and verify log contents
         let log_contents = fs::read_to_string(&log_file_path).unwrap();
-        let lines: Vec<&str> = log_contents.trim().split('\n').collect();
+        let lines: Vec<&str> = log_contents.lines().collect();
 
         assert_eq!(lines.len(), 2, "Expected 2 log entries");
 
@@ -195,8 +199,10 @@ mod tests {
 
         // Create config with telemetry disabled
         let mut config = Config::load_from_path(&config_path).unwrap();
-        let mut telemetry_config = TelemetryConfig::default();
-        telemetry_config.enabled = false;
+        let telemetry_config = TelemetryConfig {
+            enabled: false,
+            ..Default::default()
+        };
         config.set_section(telemetry_config.clone()).unwrap();
         config.save().unwrap();
 
@@ -213,8 +219,10 @@ mod tests {
     fn test_telemetry_env_var_check() {
         // We can't test actual env var behavior without unsafe code,
         // but we can test the is_enabled logic
-        let mut config = TelemetryConfig::default();
-        config.enabled = true;
+        let config = TelemetryConfig {
+            enabled: true,
+            ..Default::default()
+        };
 
         // In production, is_enabled() checks:
         // 1. If config.enabled is false, return false
@@ -222,8 +230,11 @@ mod tests {
         // 3. Otherwise return true
         assert!(config.is_enabled());
 
-        config.enabled = false;
-        assert!(!config.is_enabled());
+        let config_disabled = TelemetryConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(!config_disabled.is_enabled());
     }
 
     #[tokio::test]
@@ -271,9 +282,9 @@ mod tests {
             let client_clone = client.clone();
             let handle = tokio::spawn(async move {
                 let event = TelemetryEvent::command_executed(
-                    &format!("command-{}", i),
+                    &format!("command-{i}"),
                     vec![],
-                    format!("session-{}", i),
+                    format!("session-{i}"),
                 );
                 client_clone.log_event(event).await
             });
@@ -305,8 +316,7 @@ mod tests {
         // What matters is that all 10 events were logged
         assert_eq!(
             json_count, 10,
-            "Expected 10 JSON objects, got {}",
-            json_count
+            "Expected 10 JSON objects, got {json_count}"
         );
 
         // No cleanup needed - temp dir will be removed automatically
@@ -349,7 +359,7 @@ mod tests {
 
         // Read and verify log contents
         let log_contents = fs::read_to_string(&log_file_path).unwrap();
-        let lines: Vec<&str> = log_contents.trim().split('\n').collect();
+        let lines: Vec<&str> = log_contents.lines().collect();
 
         assert!(!lines.is_empty(), "Expected at least one log entry");
 

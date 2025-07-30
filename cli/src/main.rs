@@ -562,11 +562,11 @@ impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
     }
 }
 
-async fn handle_telemetry_command(args: TelemetryArgs) -> Result<()> {
+fn handle_telemetry_command(args: &TelemetryArgs) -> Result<()> {
     use ftl_common::config::Config;
     use ftl_telemetry::config::TelemetryConfig;
 
-    match args.command {
+    match &args.command {
         TelemetryCommand::Enable => {
             let mut config = Config::load()?;
             let mut telemetry_config = config.get_section::<TelemetryConfig>()?.unwrap_or_default();
@@ -741,7 +741,7 @@ async fn main() -> Result<()> {
     if let Some(ref client) = telemetry_client {
         // Filter sensitive arguments before logging
         let args: Vec<String> = std::env::args().skip(1).collect();
-        let filtered_args = ftl_telemetry::privacy::filter_command_args(args);
+        let filtered_args = ftl_telemetry::privacy::filter_command_args(&args);
 
         let event = ftl_telemetry::events::TelemetryEvent::command_executed(
             command_name,
@@ -766,14 +766,14 @@ async fn main() -> Result<()> {
         Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
         Commands::Eng(args) => handle_eng_command(args).await,
-        Commands::Telemetry(args) => handle_telemetry_command(args).await,
+        Commands::Telemetry(args) => handle_telemetry_command(&args),
     };
 
     // Record command completion
     let duration_ms = start_time.elapsed().as_millis() as u64;
     if let Some(ref client) = telemetry_client {
         let event = match &result {
-            Ok(_) => ftl_telemetry::events::TelemetryEvent::command_success(
+            Ok(()) => ftl_telemetry::events::TelemetryEvent::command_success(
                 command_name,
                 duration_ms,
                 session_id,

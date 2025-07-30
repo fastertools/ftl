@@ -84,13 +84,13 @@ impl Config {
     pub fn load_from_path(path: &Path) -> Result<Self> {
         let data = if path.exists() {
             let contents = fs::read_to_string(path)
-                .with_context(|| format!("Failed to read config file at {:?}", path))?;
+                .with_context(|| format!("Failed to read config file at {}", path.display()))?;
 
             if contents.trim().is_empty() {
                 HashMap::new()
             } else {
                 toml::from_str(&contents)
-                    .with_context(|| format!("Failed to parse config file at {:?}", path))?
+                    .with_context(|| format!("Failed to parse config file at {}", path.display()))?
             }
         } else {
             HashMap::new()
@@ -117,7 +117,7 @@ impl Config {
                 let section = value
                     .clone()
                     .try_into()
-                    .with_context(|| format!("Failed to deserialize {} section", section_name))?;
+                    .with_context(|| format!("Failed to deserialize {section_name} section"))?;
                 Ok(Some(section))
             }
             None => Ok(None),
@@ -128,7 +128,7 @@ impl Config {
     pub fn set_section<T: ConfigSection>(&mut self, section: T) -> Result<()> {
         let section_name = T::section_name();
         let value = toml::Value::try_from(section)
-            .with_context(|| format!("Failed to serialize {} section", section_name))?;
+            .with_context(|| format!("Failed to serialize {section_name} section"))?;
 
         self.data.insert(section_name.to_string(), value);
         Ok(())
@@ -145,7 +145,7 @@ impl Config {
         // Ensure the directory exists
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create config directory at {:?}", parent))?;
+                .with_context(|| format!("Failed to create config directory at {}", parent.display()))?;
         }
 
         // Serialize to pretty TOML
@@ -153,7 +153,7 @@ impl Config {
             toml::to_string_pretty(&self.data).context("Failed to serialize config data")?;
 
         fs::write(&self.path, contents)
-            .with_context(|| format!("Failed to write config file at {:?}", self.path))?;
+            .with_context(|| format!("Failed to write config file at {}", self.path.display()))?;
 
         Ok(())
     }
@@ -170,7 +170,7 @@ impl Config {
 
     /// Get all section names
     pub fn section_names(&self) -> Vec<&str> {
-        self.data.keys().map(|s| s.as_str()).collect()
+        self.data.keys().map(String::as_str).collect()
     }
 
     /// Clear all configuration data
@@ -186,14 +186,13 @@ impl Config {
 pub fn load_or_create_section<T: ConfigSection + Default>() -> Result<(T, bool)> {
     let mut config = Config::load()?;
 
-    match config.get_section::<T>()? {
-        Some(section) => Ok((section, false)),
-        None => {
-            let section = T::default();
-            config.set_section(section.clone())?;
-            config.save()?;
-            Ok((section, true))
-        }
+    if let Some(section) = config.get_section::<T>()? {
+        Ok((section, false))
+    } else {
+        let section = T::default();
+        config.set_section(section.clone())?;
+        config.save()?;
+        Ok((section, true))
     }
 }
 

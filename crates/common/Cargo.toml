@@ -36,7 +36,6 @@ zip = { workspace = true }
 chrono = { workspace = true }
 dialoguer = { workspace = true }
 async-trait = { workspace = true }
-atty = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
