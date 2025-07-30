@@ -62,5 +62,4 @@ validate_arguments = true
 # 
 # [tools.echo.build]
 # command = "cargo build --target wasm32-wasip1 --release"
-# workdir = "echo"
 # watch = ["src/**/*.rs", "Cargo.toml"]

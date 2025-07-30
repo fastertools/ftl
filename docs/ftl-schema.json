@@ -177,10 +177,6 @@
           "description": "Build command to execute",
           "type": "string"
         },
-        "workdir": {
-          "description": "Working directory for the build command (relative to tool path)",
-          "type": "string"
-        },
         "watch": {
           "description": "Paths to watch for changes in development mode",
           "type": "array",

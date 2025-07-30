@@ -61,7 +61,6 @@ allowed_outbound_hosts = []
 
 [tools.echo-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "echo-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Echo tool (TypeScript)
@@ -71,7 +70,6 @@ allowed_outbound_hosts = []
 
 [tools.echo-ts.build]
 command = "npm install && npm run build"
-workdir = "echo-ts"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
 # Weather tool (Rust)
@@ -81,7 +79,6 @@ allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.o
 
 [tools.weather-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "weather-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Weather tool (TypeScript)
@@ -91,7 +88,6 @@ allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.o
 
 [tools.weather-ts.build]
 command = "npm install && npm run build"
-workdir = "weather-ts"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
 # Multi-tools example (Rust) - demonstrates multiple tools in one component
@@ -101,7 +97,6 @@ allowed_outbound_hosts = []
 
 [tools.multi-tools-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "multi-tools-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Multi-tools example (TypeScript) - demonstrates multiple tools in one component
@@ -111,5 +106,4 @@ allowed_outbound_hosts = []
 
 [tools.multi-tools-ts.build]
 command = "npm install && npm run build"
-workdir = "multi-tools-ts"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]

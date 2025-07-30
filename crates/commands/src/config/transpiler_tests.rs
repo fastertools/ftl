@@ -44,7 +44,6 @@ fn test_transpile_with_tools() {
             path: "echo-tool".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                workdir: None,
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: HashMap::new(),
             },
@@ -58,7 +57,6 @@ fn test_transpile_with_tools() {
             path: "weather-ts".to_string(),
             build: BuildConfig {
                 command: "npm run build:custom".to_string(),
-                workdir: None,
                 watch: vec!["src/**/*.ts".to_string()],
                 env: HashMap::new(),
             },
@@ -107,7 +105,6 @@ fn test_transpile_with_variables() {
             path: "api-tool".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                workdir: None,
                 watch: vec![],
                 env: HashMap::new(),
             },
@@ -197,7 +194,6 @@ fn test_transpile_with_application_variables() {
             path: "api-consumer".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                workdir: None,
                 watch: vec![],
                 env: HashMap::new(),
             },
@@ -258,7 +254,6 @@ fn test_transpile_simple_variable_reference() {
             path: "hello".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                workdir: None,
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: HashMap::new(),
             },
@@ -396,7 +391,6 @@ fn test_transpile_variable_edge_cases() {
             path: "edge-tool".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                workdir: None,
                 watch: vec![],
                 env: HashMap::new(),
             },

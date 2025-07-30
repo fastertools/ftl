@@ -7,7 +7,6 @@ source = "{{project-name | kebab_case}}/dist/{{project-name | kebab_case}}.wasm"
 allowed_outbound_hosts = []
 [component.{{project-name | kebab_case}}.build]
 command = "npm install && npm run build"
-workdir = "{{project-name | kebab_case}}"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
 # IMPORTANT: After adding this component, update the tool_components variable

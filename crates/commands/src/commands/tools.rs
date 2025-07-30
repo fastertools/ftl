@@ -725,7 +725,6 @@ fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) 
                 path: tool_name.clone(),
                 build: BuildConfig {
                     command: format!("echo 'Using prebuilt {} tool from registry'", tool.name),
-                    workdir: None,
                     watch: vec![],
                     env: HashMap::new(),
                 },

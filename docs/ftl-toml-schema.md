@@ -39,7 +39,6 @@ allowed_outbound_hosts = [   # Optional: Allowed outbound hosts
 
 [tools.my-tool.build]        # Required: Build configuration
 command = "cargo build --target wasm32-wasip1 --release"  # Build command
-workdir = "."                # Optional: Working directory (relative to tool path)
 watch = [                    # Optional: Paths to watch for changes
     "src/**/*.rs",
     "Cargo.toml"
@@ -49,7 +48,6 @@ env = { RUSTFLAGS = "-C opt-level=z" }  # Optional: Environment variables
 
 The build configuration is always explicit, giving you full visibility and control:
 - **command**: The exact build command to run
-- **workdir**: Working directory for the build (defaults to the tool path)
 - **watch**: File patterns to watch in development mode
 - **env**: Environment variables to set during the build
 

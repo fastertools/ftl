@@ -225,13 +225,11 @@ fn update_ftl_toml(
     let build = match language {
         Language::Rust => BuildConfig {
             command: "cargo build --target wasm32-wasip1 --release".to_string(),
-            workdir: None,
             watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
             env: HashMap::new(),
         },
         Language::TypeScript | Language::JavaScript => BuildConfig {
             command: "npm install && npm run build".to_string(),
-            workdir: None,
             watch: vec![
                 "src/**/*.ts".to_string(),
                 "src/**/*.js".to_string(),

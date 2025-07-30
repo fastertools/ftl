@@ -295,9 +295,8 @@ fn create_tool_component(name: &str, config: &ToolConfig) -> Table {
     // Build command
     build_table["command"] = toml_edit::value(&config.build.command);
 
-    // Working directory - use build config's workdir or default to tool path
-    let workdir = config.build.workdir.as_deref().unwrap_or(&config.path);
-    build_table["workdir"] = toml_edit::value(workdir);
+    // Working directory - always use tool path
+    build_table["workdir"] = toml_edit::value(&config.path);
 
     // Watch paths
     if !config.build.watch.is_empty() {

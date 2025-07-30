@@ -162,11 +162,6 @@ pub struct BuildConfig {
     #[garde(length(min = 1))]
     pub command: String,
 
-    /// Working directory for the build command (relative to tool path)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[garde(skip)]
-    pub workdir: Option<String>,
-
     /// Paths to watch for changes in development mode
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[garde(skip)]
@@ -746,7 +741,6 @@ command = "npm run build"
                 path: "test-tool".to_string(),
                 build: BuildConfig {
                     command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                    workdir: None,
                     watch: vec!["src/**/*.rs".to_string()],
                     env: HashMap::new(),
                 },
@@ -773,8 +767,6 @@ command = "npm run build"
 
         // Should NOT contain empty env section
         assert!(!toml_string.contains("[tools.test-tool.build.env]"));
-        // Should NOT contain workdir since it's None
-        assert!(!toml_string.contains("workdir"));
         // Should contain watch array
         assert!(toml_string.contains("watch = ["));
     }
@@ -883,7 +875,7 @@ env = { NODE_ENV = "production", CUSTOM_VAR = "value" }
             Some(&"production".to_string())
         );
 
-        // Test tool with custom workdir
+        // Test tool with watch patterns
         let content = r#"
 [project]
 name = "test-project"
@@ -893,15 +885,10 @@ path = "watch"
 
 [tools.watch-tool.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "src"
 watch = ["**/*.rs", "Cargo.toml"]
 "#;
         let config = FtlConfig::parse(content).unwrap();
         assert_eq!(config.tools["watch-tool"].build.watch.len(), 2);
-        assert_eq!(
-            config.tools["watch-tool"].build.workdir,
-            Some("src".to_string())
-        );
 
         // Test multiple validation errors at once
         let content = r#"
@@ -940,7 +927,6 @@ command = "make build"
 "#;
         let config = FtlConfig::parse(content).unwrap();
         assert_eq!(config.tools["minimal"].build.command, "make build");
-        assert!(config.tools["minimal"].build.workdir.is_none());
         assert!(config.tools["minimal"].build.watch.is_empty());
         assert!(config.tools["minimal"].build.env.is_empty());
 
@@ -954,7 +940,6 @@ path = "full-tool"
 
 [tools.full.build]
 command = "cargo build --release"
-workdir = "backend"
 watch = ["src/**/*.rs", "Cargo.toml", "build.rs"]
 
 [tools.full.build.env]
@@ -964,7 +949,6 @@ CARGO_BUILD_JOBS = "4"
         let config = FtlConfig::parse(content).unwrap();
         let build = &config.tools["full"].build;
         assert_eq!(build.command, "cargo build --release");
-        assert_eq!(build.workdir, Some("backend".to_string()));
         assert_eq!(build.watch.len(), 3);
         assert_eq!(build.watch[2], "build.rs");
         assert_eq!(

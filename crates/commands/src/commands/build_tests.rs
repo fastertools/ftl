@@ -266,10 +266,10 @@ command = "cargo build --target wasm32-wasi"
 }
 
 #[tokio::test]
-async fn test_build_with_workdir() {
+async fn test_build_with_custom_path() {
     let mut fixture = TestFixture::new();
 
-    // Mock: ftl.toml exists with workdir
+    // Mock: ftl.toml exists with custom path
     fixture.mock_ftl_toml_with_content(
         r#"
 [project]
@@ -281,7 +281,6 @@ path = "frontend"
 
 [tools.frontend.build]
 command = "npm run build"
-workdir = "frontend"
 "#,
     );
 
@@ -359,7 +358,6 @@ path = "frontend"
 
 [tools.frontend.build]
 command = "npm run build"
-workdir = "frontend"
 "#,
     );
 
@@ -502,7 +500,7 @@ async fn test_build_invalid_toml() {
 }
 
 #[tokio::test]
-async fn test_build_with_custom_path() {
+async fn test_build_with_project_path() {
     let mut fixture = TestFixture::new();
 
     // Mock: ftl.toml exists in custom path
@@ -606,7 +604,6 @@ command = "cargo build"
 source = "frontend.wasm"
 [component.frontend.build]
 command = "npm run build"
-workdir = "frontend"
 
 [component.static]
 source = "static.wasm"
@@ -624,14 +621,12 @@ source = "static.wasm"
 
     assert_eq!(components[0].name, "backend");
     assert_eq!(components[0].build_command, Some("cargo build".to_string()));
-    assert_eq!(components[0].workdir, None);
 
     assert_eq!(components[1].name, "frontend");
     assert_eq!(
         components[1].build_command,
         Some("npm run build".to_string())
     );
-    assert_eq!(components[1].workdir, Some("frontend".to_string()));
 }
 
 #[test]
