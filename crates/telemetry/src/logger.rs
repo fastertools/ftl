@@ -24,31 +24,31 @@ impl TelemetryLogger {
     /// Create a new telemetry logger
     pub fn new(config: &TelemetryConfig) -> Result<Self> {
         let log_dir = config.log_directory.join(&config.installation_id);
-        Ok(Self { 
+        Ok(Self {
             log_dir,
             retention_days: config.retention_days,
         })
     }
-    
+
     /// Get the log directory
     pub fn log_directory(&self) -> PathBuf {
         self.log_dir.clone()
     }
-    
+
     /// Log an event to a local file with file locking
     pub async fn log(&self, event: TelemetryEvent) -> Result<()> {
         // Create log directory if it doesn't exist
         fs::create_dir_all(&self.log_dir).await?;
-        
+
         // Create daily log file
         let date = Local::now().format("%Y-%m-%d");
         let log_file = self.log_dir.join(format!("{}.jsonl", date));
-        
+
         // Serialize event before entering blocking section
         let json = serde_json::to_string(&event)?;
         let mut json_with_newline = json;
         json_with_newline.push('\n');
-        
+
         // Use blocking task for file locking operations
         task::spawn_blocking(move || -> Result<()> {
             // Open file with exclusive lock
@@ -56,26 +56,26 @@ impl TelemetryLogger {
                 .create(true)
                 .append(true)
                 .open(&log_file)?;
-            
+
             // Lock the file exclusively
             file.lock_exclusive()?;
-            
+
             // Write the event
             file.write_all(json_with_newline.as_bytes())?;
             file.flush()?;
-            
+
             // Unlock happens automatically when file is dropped
             Ok(())
         })
         .await??;
-        
+
         Ok(())
     }
-    
+
     /// Clean up old log files (older than retention_days)
     pub async fn cleanup(&self) -> Result<()> {
         let cutoff = Local::now() - chrono::Duration::days(self.retention_days as i64);
-        
+
         let mut entries = fs::read_dir(&self.log_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
@@ -85,14 +85,18 @@ impl TelemetryLogger {
                         let modified_time: DateTime<Local> = modified.into();
                         if modified_time < cutoff {
                             if let Err(e) = fs::remove_file(&path).await {
-                                tracing::debug!("Failed to remove old telemetry log {}: {}", path.display(), e);
+                                tracing::debug!(
+                                    "Failed to remove old telemetry log {}: {}",
+                                    path.display(),
+                                    e
+                                );
                             }
                         }
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 }

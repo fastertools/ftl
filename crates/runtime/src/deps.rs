@@ -535,7 +535,7 @@ impl CredentialsProvider for RealCredentialsProvider {
 
             Ok(credentials)
         }
-        
+
         #[cfg(target_arch = "wasm32")]
         {
             Err(anyhow::anyhow!("Credentials storage not supported on WASM"))
