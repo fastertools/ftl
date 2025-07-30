@@ -1,5 +1,8 @@
 //! Local telemetry logging
 
+#[cfg(test)]
+mod tests;
+
 use crate::{config::TelemetryConfig, events::TelemetryEvent};
 use anyhow::Result;
 use chrono::{DateTime, Local};
@@ -8,6 +11,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
 /// Telemetry logger for local file storage
+#[derive(Clone)]
 pub struct TelemetryLogger {
     log_dir: PathBuf,
     retention_days: u32,

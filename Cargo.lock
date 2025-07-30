@@ -1225,6 +1225,7 @@ dependencies = [
  "dirs",
  "ftl-common",
  "pretty_assertions",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
