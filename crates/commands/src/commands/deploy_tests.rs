@@ -159,7 +159,7 @@ async fn test_deploy_no_ftl_toml() {
     setup_project_file_mocks(&mut fixture, false);
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
@@ -193,7 +193,7 @@ async fn test_deploy_authentication_expired() {
         .returning(|| Err(anyhow::anyhow!("Token expired")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
@@ -237,7 +237,7 @@ version = "0.1.0"
         .returning(|| Ok(test_credentials()));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
@@ -277,7 +277,7 @@ async fn test_deploy_docker_login_failure() {
         });
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
@@ -295,7 +295,7 @@ async fn test_deploy_wkg_not_found() {
     // Setup basic mocks including successful docker login
     setup_basic_mocks(&mut fixture);
     setup_docker_login_success(&mut fixture);
-    
+
     // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
@@ -333,7 +333,7 @@ async fn test_deploy_wkg_not_found() {
         .returning(|_| Err(anyhow::anyhow!("wkg not found")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("wkg not found"));
@@ -345,7 +345,7 @@ async fn test_deploy_repository_creation_failure() {
 
     // Setup all basic mocks
     setup_full_mocks(&mut fixture);
-    
+
     // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
@@ -382,7 +382,7 @@ async fn test_deploy_repository_creation_failure() {
         .returning(|_, _| Err(anyhow::anyhow!("Failed to update components")));
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
@@ -404,17 +404,13 @@ async fn test_deploy_success() {
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_ok());
 
     // Verify output
     let output = ui.get_output();
-    assert!(
-        output
-            .iter()
-            .any(|s| s.contains("Box deployed successfully!"))
-    );
+    assert!(output.iter().any(|s| s.contains("Deployed!")));
     assert!(
         output
             .iter()
@@ -511,7 +507,7 @@ async fn test_deployment_timeout() {
         .returning(|_, req| {
             // Verify we have at least one component
             assert!(!req.components.is_empty());
-            
+
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -546,14 +542,14 @@ async fn test_deployment_timeout() {
         .returning(|_| ());
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
     assert!(
         result
             .unwrap_err()
             .to_string()
-            .contains("Box deployment timeout")
+            .contains("Engine deployment timeout")
     );
 }
 
@@ -600,7 +596,7 @@ async fn test_deployment_failed_status() {
         .returning(|_, req| {
             // Verify we have at least one component
             assert!(!req.components.is_empty());
-            
+
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -624,10 +620,15 @@ async fn test_deployment_failed_status() {
     });
 
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Box deployment failed: Build failed"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Engine deployment failed: Build failed")
+    );
 }
 
 // Helper functions to setup common mock scenarios
@@ -747,7 +748,9 @@ fn setup_successful_push(fixture: &mut TestFixture) {
                 components: vec![types::UpdateComponentsResponseComponentsItem {
                     component_name: "test-tool".to_string(),
                     description: None,
-                    repository_uri: Some("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string()),
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
                     repository_name: Some("user/test-tool".to_string()),
                 }],
                 changes: types::UpdateComponentsResponseChanges {
@@ -784,7 +787,9 @@ fn setup_successful_push_for_api(fixture: &mut TestFixture) {
                 components: vec![types::UpdateComponentsResponseComponentsItem {
                     component_name: "api".to_string(),
                     description: None,
-                    repository_uri: Some("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string()),
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string(),
+                    ),
                     repository_name: Some("user/api".to_string()),
                 }],
                 changes: types::UpdateComponentsResponseChanges {
@@ -847,7 +852,7 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .returning(|_, req| {
             // Verify we have at least one component
             assert!(!req.components.is_empty());
-            
+
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -1111,15 +1116,15 @@ async fn test_deploy_with_variables() {
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec!["API_KEY=test123".to_string()]).await;
+    let result = execute_with_deps(
+        deps,
+        deploy_args_with_variables(vec!["API_KEY=test123".to_string()]),
+    )
+    .await;
 
     assert!(result.is_ok());
     let output = ui.get_output();
-    assert!(
-        output
-            .iter()
-            .any(|s| s.contains("Box deployed successfully!"))
-    );
+    assert!(output.iter().any(|s| s.contains("Deployed!")));
 }
 
 #[tokio::test]
@@ -1315,15 +1320,11 @@ command = "cargo build --release --target wasm32-wasip1"
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
-    let result = execute_with_deps(deps, vec![]).await;
+    let result = execute_with_deps(deps, default_deploy_args()).await;
 
     assert!(result.is_ok());
     let output = ui.get_output();
-    assert!(
-        output
-            .iter()
-            .any(|s| s.contains("Box deployed successfully!"))
-    );
+    assert!(output.iter().any(|s| s.contains("Deployed!")));
 }
 
 #[tokio::test]
@@ -1514,18 +1515,160 @@ command = "cargo build --release --target wasm32-wasip1"
     // Pass CLI variables that should override ftl.toml values
     let result = execute_with_deps(
         deps,
-        vec![
+        deploy_args_with_variables(vec![
             "auth_enabled=false".to_string(),
             "auth_provider_issuer=https://override.authkit.app".to_string(),
-        ],
+        ]),
     )
     .await;
 
     assert!(result.is_ok());
     let output = ui.get_output();
+    assert!(output.iter().any(|s| s.contains("Deployed!")));
+}
+
+// Helper function to create default DeployArgs for tests
+fn default_deploy_args() -> DeployArgs {
+    DeployArgs {
+        variables: vec![],
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+    }
+}
+
+// Helper function to create DeployArgs with variables
+fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
+    DeployArgs {
+        variables,
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+    }
+}
+
+#[tokio::test]
+async fn test_auth_config_updated_before_deployment() {
+    use std::sync::Mutex;
+
+    let mut fixture = TestFixture::new();
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+
+    // Track the order of API calls
+    let call_order = Arc::new(Mutex::new(vec![]));
+    let call_order_clone1 = call_order.clone();
+    let call_order_clone2 = call_order.clone();
+
+    // Mock: auth config update happens BEFORE deployment
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(move |app_id, request| {
+            call_order_clone1.lock().unwrap().push("update_auth_config");
+            assert_eq!(app_id, "12345678-1234-1234-1234-123456789012");
+            match request.mode {
+                types::UpdateAuthConfigRequestMode::Public => {}
+                _ => panic!("Expected public mode"),
+            }
+            // We don't care about the response structure for this test
+            // Just tracking that the call happened in the right order
+            // Return error to avoid dealing with complex generated types
+            Err(anyhow!("Test succeeded - auth config was called"))
+        });
+
+    // Mock: deployment happens AFTER auth config
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(move |_, _| {
+            call_order_clone2.lock().unwrap().push("create_deployment");
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: list apps returns existing app
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: get app status
+    fixture.api_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    let call_order_final = call_order.clone();
+    let deps = fixture.to_deps();
+
+    // Deploy with auth configuration
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: Some("public".to_string()),
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+
+    // The test will fail because auth config returns an error, but that's okay
+    // We're only interested in verifying the call order
+    assert!(result.is_err());
     assert!(
-        output
-            .iter()
-            .any(|s| s.contains("Box deployed successfully!"))
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("auth config was called")
     );
+
+    // Verify that auth config was updated BEFORE deployment (or attempted to)
+    let calls = call_order_final.lock().unwrap();
+    assert!(!calls.is_empty());
+    assert_eq!(
+        calls[0], "update_auth_config",
+        "Auth config should be updated first"
+    );
+    // Deployment won't happen because auth config failed, which is fine for this test
 }

@@ -37,24 +37,24 @@ fn test_transpile_minimal_config() {
 
 #[test]
 fn test_generate_temp_spin_toml_absolute_paths() {
-    use ftl_runtime::deps::FileSystem;
     use crate::test_helpers::MockFileSystemMock;
+    use ftl_runtime::deps::FileSystem;
     use std::sync::Arc;
-    
+
     // Use a real temporary directory for the test
     let temp_dir = tempfile::tempdir().unwrap();
     let project_path = temp_dir.path();
     let ftl_path = project_path.join("ftl.toml");
-    
+
     let mut fs_mock = MockFileSystemMock::new();
-    
+
     // Mock ftl.toml exists
     let ftl_path_clone = ftl_path.clone();
     fs_mock
         .expect_exists()
-        .withf(move |path| path == &ftl_path_clone)
+        .withf(move |path| *path == ftl_path_clone)
         .returning(|_| true);
-    
+
     // Mock reading ftl.toml with relative paths
     let ftl_content = r#"
 [project]
@@ -68,42 +68,50 @@ wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
 [tools.my-tool.build]
 command = "cargo build --release --target wasm32-wasip1"
 "#;
-    
+
     fs_mock
         .expect_read_to_string()
-        .withf(move |path| path == &ftl_path)
+        .withf(move |path| *path == ftl_path)
         .returning(move |_| Ok(ftl_content.to_string()));
-    
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs_mock);
-    
+
     // Generate temp spin.toml
     let result = generate_temp_spin_toml(&fs, project_path).unwrap();
     assert!(result.is_some());
-    
+
     let temp_path = result.unwrap();
-    
+
     // Read the generated spin.toml
     let spin_content = std::fs::read_to_string(&temp_path).unwrap();
-    
+
     // Verify that paths are absolute - they should start with /
     // Note: We can't check exact paths because canonicalize() may resolve symlinks
     // (e.g., /var -> /private/var on macOS)
-    
+
     // Check that wasm path is absolute
-    assert!(spin_content.contains("source = \"/"), 
-            "Expected wasm path to be absolute (start with /) in:\n{}", spin_content);
-    
+    assert!(
+        spin_content.contains("source = \"/"),
+        "Expected wasm path to be absolute (start with /) in:\n{spin_content}"
+    );
+
     // Check that the wasm path ends with the expected relative part
-    assert!(spin_content.contains("/my-tool/target/wasm32-wasip1/release/my_tool.wasm\""),
-            "Expected wasm path to contain the correct relative path in:\n{}", spin_content);
-    
+    assert!(
+        spin_content.contains("/my-tool/target/wasm32-wasip1/release/my_tool.wasm\""),
+        "Expected wasm path to contain the correct relative path in:\n{spin_content}"
+    );
+
     // Check that workdir is absolute
-    assert!(spin_content.contains("workdir = \"/"),
-            "Expected workdir to be absolute (start with /) in:\n{}", spin_content);
-    
+    assert!(
+        spin_content.contains("workdir = \"/"),
+        "Expected workdir to be absolute (start with /) in:\n{spin_content}"
+    );
+
     // Check that workdir ends with the expected relative part
-    assert!(spin_content.contains("/my-tool\""),
-            "Expected workdir to contain the correct relative path in:\n{}", spin_content);
+    assert!(
+        spin_content.contains("/my-tool\""),
+        "Expected workdir to contain the correct relative path in:\n{spin_content}"
+    );
 }
 
 #[test]

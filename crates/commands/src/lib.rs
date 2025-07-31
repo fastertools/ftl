@@ -20,7 +20,7 @@ pub mod test_helpers;
 
 // Re-export all commands at the crate root for easier access
 pub use commands::{
-    add, auth, r#box, build, deploy, init, login, logout, publish, setup, test, tools_cli as tools,
+    add, auth, build, deploy, r#eng, init, login, logout, publish, setup, test, tools_cli as tools,
     up, update,
 };
 

@@ -376,7 +376,7 @@ pub fn generate_temp_spin_toml(
                     .to_string(),
             );
         }
-        
+
         // Also make the wasm path absolute
         if !tool_config.wasm.starts_with('/') {
             tool_config.wasm = abs_project_path
