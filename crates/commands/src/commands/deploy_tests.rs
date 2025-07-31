@@ -800,7 +800,11 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json") || path.ends_with("pyproject.toml"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
@@ -1125,22 +1129,22 @@ version = "1.2.3"
 #[test]
 fn test_extract_component_version_default() {
     let mut fs = MockFileSystemMock::new();
-    
+
     // Mock: Cargo.toml doesn't exist
     fs.expect_exists()
         .with(eq(Path::new("Cargo.toml")))
         .returning(|_| false);
-    
+
     // Mock: package.json doesn't exist
     fs.expect_exists()
         .with(eq(Path::new("package.json")))
         .returning(|_| false);
-    
+
     // Mock: pyproject.toml doesn't exist
     fs.expect_exists()
         .with(eq(Path::new("pyproject.toml")))
         .returning(|_| false);
-    
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
     assert_eq!(version, "0.1.0");
@@ -1345,7 +1349,11 @@ command = "cargo build --release --target wasm32-wasip1"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json") || path.ends_with("pyproject.toml"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
@@ -1558,7 +1566,11 @@ command = "cargo build --release --target wasm32-wasip1"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json") || path.ends_with("pyproject.toml"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
