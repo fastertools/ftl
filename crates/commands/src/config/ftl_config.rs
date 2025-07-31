@@ -15,7 +15,7 @@ pub struct FtlConfig {
     #[garde(dive)]
     pub project: ProjectConfig,
 
-    /// Authentication configuration
+    /// Authorization configuration
     #[serde(default)]
     #[garde(dive)]
     pub auth: AuthConfig,
@@ -76,11 +76,11 @@ pub struct ProjectConfig {
     pub authors: Vec<String>,
 }
 
-/// Authentication configuration
+/// Authorization configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Validate)]
 #[garde(allow_unvalidated)]
 pub struct AuthConfig {
-    /// Whether authentication is enabled
+    /// Whether authorization is enabled
     #[serde(default)]
     pub enabled: bool,
 

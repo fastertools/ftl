@@ -10,7 +10,7 @@
       "$ref": "#/$defs/ProjectConfig"
     },
     "auth": {
-      "description": "Authentication configuration",
+      "description": "Authorization configuration",
       "$ref": "#/$defs/AuthConfig",
       "default": {
         "enabled": false,
@@ -77,16 +77,16 @@
       }
     },
     "AuthConfig": {
-      "description": "Authentication configuration",
+      "description": "Authorization configuration",
       "type": "object",
       "properties": {
         "enabled": {
-          "description": "Enable authentication for this MCP server",
+          "description": "Enable authorization for this MCP server",
           "type": "boolean",
           "default": false
         },
         "provider": {
-          "description": "Authentication provider type",
+          "description": "Authorization provider type",
           "type": "string",
           "default": ""
         },
