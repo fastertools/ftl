@@ -19,7 +19,7 @@ FTL is a polyglot framework for [Model Context Protocol](https://modelcontextpro
 
 Tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote tools with sub-millisecond cold starts and consistetntly low latency across geographic regions. Run `ftl eng login` to join the waitlist.
+FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote tools with sub-millisecond cold starts and consistently low latency across geographic regions. Run `ftl eng login` to join the waitlist.
 
 ## Why?
 
