@@ -50,8 +50,7 @@ const TELEMETRY_NOTICE: &str = r"
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  FTL CLI collects anonymous usage data to help improve the      │
-│  tool. This data is stored locally and shared with FTL to       │
-│  help us understand usage patterns and improve the platform.    │
+│  tool and understand usage patterns.                            │
 │                                                                 │
 │  We collect:                                                    │
 │  • Command usage (which commands are run)                       │

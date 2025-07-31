@@ -4,14 +4,13 @@ Privacy-first telemetry infrastructure for the FTL CLI.
 
 ## Overview
 
-This crate implements anonymous usage telemetry for FTL CLI. All telemetry data is stored locally on the user's machine and is never transmitted to external servers.
+This crate implements anonymous usage telemetry for FTL CLI to help improve the tool and understand usage patterns.
 
 ## Features
 
-- **Local-only storage**: All data stays on the user's machine
 - **Privacy by design**: No PII collection, automatic sanitization of sensitive data
 - **User control**: Easy opt-out via config or environment variable
-- **Transparent**: JSONL format for easy inspection
+- **Transparent**: Open source implementation
 - **First-run notice**: Users are informed about telemetry on first use
 
 ## Architecture
@@ -20,7 +19,7 @@ This crate implements anonymous usage telemetry for FTL CLI. All telemetry data 
 telemetry/
 ├── config.rs       # Telemetry configuration and settings
 ├── events.rs       # Event types and builders
-├── logger.rs       # Local file logging implementation with file locking
+├── logger.rs       # Telemetry logging implementation
 ├── notice.rs       # First-run notice system
 └── privacy.rs      # Privacy utilities for sanitizing data and filtering arguments
 ```
@@ -80,13 +79,9 @@ The telemetry system implements several privacy protections:
    - Email addresses
    - IP addresses (both IPv4 and IPv6)
 
-3. **No network transmission** - all data stays local
+3. **Minimal data collection** - only essential usage metrics
 
-4. **File locking** - prevents concurrent write corruption
-
-5. **Minimal data collection** - only essential usage metrics
-
-6. **User control** - easy opt-out mechanisms
+4. **User control** - easy opt-out mechanisms
 
 See [PRIVACY_AUDIT.md](./PRIVACY_AUDIT.md) for a detailed privacy analysis.
 

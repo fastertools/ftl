@@ -5,8 +5,6 @@
 ### 1. Data Collection Scope
 - ✅ Only collects anonymous usage data
 - ✅ No personally identifiable information (PII) collected
-- ✅ All data stored locally on user's machine
-- ✅ No external data transmission implemented
 
 ### 2. Sensitive Data Sanitization
 
@@ -20,11 +18,9 @@
 - ✅ IP addresses are redacted
   - Example: `192.168.1.100` → `[IP_REDACTED]`
 
-### 3. Data Storage
-- ✅ Stored in user's home directory under `~/.ftl/logs/<installation-id>/`
+### 3. Data Format
 - ✅ JSONL format for easy parsing and transparency
-- ✅ Daily rotation with configurable retention (default: 30 days)
-- ✅ No encryption (data is local-only and non-sensitive)
+- ✅ Open source implementation for full transparency
 
 ### 4. User Control
 - ✅ Opt-out via configuration file (`~/.ftl/config.toml`)
@@ -79,8 +75,8 @@
 
 ### 8. Compliance Summary
 
-✅ **GDPR Compliant**: No personal data collected, local-only storage
+✅ **GDPR Compliant**: No personal data collected
 ✅ **CCPA Compliant**: No sale or sharing of user data
-✅ **Privacy by Design**: Opt-in model with clear user control
+✅ **Privacy by Design**: Clear user control and transparency
 ✅ **Data Minimization**: Only essential usage metrics collected
-✅ **User Rights**: Full control over data collection and deletion
+✅ **User Rights**: Full control over data collection

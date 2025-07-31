@@ -258,9 +258,9 @@ Apache-2.0 - see [LICENSE](LICENSE) for details.
 
 FTL CLI collects anonymous usage data to help improve the tool. This telemetry is:
 
-- **Privacy-first**: All data is stored locally on your machine
-- **Anonymous**: No personally identifiable information is collected
-- **Transparent**: Data is stored in JSONL format at `~/.ftl/logs/<installation-id>/`
+- **Privacy-first**: No personally identifiable information is collected
+- **Anonymous**: All data is anonymized before collection
+- **Transparent**: You can inspect exactly what data is collected
 - **Optional**: You can disable telemetry at any time
 
 ### Disabling Telemetry
@@ -295,7 +295,7 @@ ftl telemetry status
 We do **not** collect:
 - File paths or project names
 - Command arguments that might contain sensitive data
-- Any network traffic or external data transmission
+- Any personally identifiable information
 
 For more details, see the [telemetry privacy audit](./crates/telemetry/PRIVACY_AUDIT.md).
 

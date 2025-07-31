@@ -68,7 +68,7 @@ FTL_TELEMETRY_DISABLED=1 ftl deploy
 
 
 Where the Data Goes
-Telemetry data is stored locally on your machine in `~/.ftl/logs/<installation-id>/` and shared with FTL to help us improve the platform. Local data is stored in JSONL format (one JSON object per line) with daily rotation and 30-day retention.
+Telemetry data is collected to help us improve the FTL platform. The data helps us understand usage patterns and prioritize features.
 
 Telemetry is enabled by default to help us understand usage patterns and improve FTL for everyone. You can disable it at any time using the methods described above.
 
@@ -82,10 +82,8 @@ We welcome you to inspect the source code for our telemetry collection in the `c
    - Email addresses
    - IP addresses
 
-2. **Local Storage**: All data is stored on your machine with optional sharing
+2. **Anonymous Collection**: All data is anonymized before collection
 
-3. **Transparent Format**: JSONL files are human-readable and can be inspected at any time
+3. **Transparent Implementation**: The telemetry code is open source and can be inspected
 
-4. **Easy Deletion**: Simply delete the `~/.ftl/logs/` directory to remove all telemetry data
-
-5. **Full Control**: Enable or disable telemetry at any time, with environment variable overrides for CI/CD environments
+4. **Full Control**: Enable or disable telemetry at any time, with environment variable overrides for CI/CD environments
