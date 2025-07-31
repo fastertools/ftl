@@ -118,6 +118,7 @@ version = "0.1.0"
 
 [tools.test-tool]
 path = "test"
+wasm = "test/test-tool.wasm"
 
 [tools.test-tool.build]
 command = "echo 'Building test tool'"
@@ -125,13 +126,25 @@ command = "echo 'Building test tool'"
             .to_string()
         });
 
+        // Clone content for both mocks
+        let content_for_transpiler = content.clone();
+        let content_for_build = content.clone();
+
         // Mock: read ftl.toml for temp spin.toml generation
         fixture
             .file_system
             .expect_read_to_string()
             .with(eq(Path::new("./ftl.toml")))
             .times(1)
-            .returning(move |_| Ok(content.clone()));
+            .returning(move |_| Ok(content_for_transpiler.clone()));
+
+        // Mock: read ftl.toml again to determine build profiles
+        fixture
+            .file_system
+            .expect_read_to_string()
+            .with(eq(Path::new("ftl.toml")))
+            .times(1)
+            .returning(move |_| Ok(content_for_build.clone()));
 
         // Note: We don't mock the temp file creation since it happens outside our FileSystem trait
     }
@@ -282,6 +295,34 @@ async fn test_deploy_wkg_not_found() {
     // Setup basic mocks including successful docker login
     setup_basic_mocks(&mut fixture);
     setup_docker_login_success(&mut fixture);
+    
+    // Mock: list apps returns empty (app doesn't exist)
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app succeeds
+    let app_id = uuid::Uuid::new_v4();
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(move |_| {
+            Ok(types::CreateAppResponse {
+                app_id,
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
 
     // Mock: wkg not found
     fixture
@@ -304,13 +345,41 @@ async fn test_deploy_repository_creation_failure() {
 
     // Setup all basic mocks
     setup_full_mocks(&mut fixture);
-
-    // Mock: repository creation fails
+    
+    // Mock: list apps returns empty (app doesn't exist)
     fixture
         .api_client
-        .expect_create_ecr_repository()
+        .expect_list_apps()
         .times(1)
-        .returning(|_| Err(anyhow::anyhow!("Repository creation failed")));
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app succeeds
+    let app_id = uuid::Uuid::new_v4();
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(move |_| {
+            Ok(types::CreateAppResponse {
+                app_id,
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: component update fails
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| Err(anyhow::anyhow!("Failed to update components")));
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, vec![]).await;
@@ -320,7 +389,7 @@ async fn test_deploy_repository_creation_failure() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Failed to create repository")
+            .contains("Failed to update components")
     );
 }
 
@@ -439,7 +508,10 @@ async fn test_deployment_timeout() {
         .api_client
         .expect_create_deployment()
         .times(1)
-        .returning(|_, _| {
+        .returning(|_, req| {
+            // Verify we have at least one component
+            assert!(!req.components.is_empty());
+            
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -525,7 +597,10 @@ async fn test_deployment_failed_status() {
         .api_client
         .expect_create_deployment()
         .times(1)
-        .returning(|_, _| {
+        .returning(|_, req| {
+            // Verify we have at least one component
+            assert!(!req.components.is_empty());
+            
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -552,7 +627,7 @@ async fn test_deployment_failed_status() {
     let result = execute_with_deps(deps, vec![]).await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Build failed"));
+    assert!(result.unwrap_err().to_string().contains("Box deployment failed: Build failed"));
 }
 
 // Helper functions to setup common mock scenarios
@@ -582,6 +657,7 @@ version = "0.1.0"
 
 [tools.test-tool]
 path = "test"
+wasm = "test/test-tool.wasm"
 
 [tools.test-tool.build]
 command = "echo 'Building test tool'"
@@ -661,15 +737,62 @@ fn setup_full_mocks(fixture: &mut TestFixture) {
 }
 
 fn setup_successful_push(fixture: &mut TestFixture) {
-    // Mock: create repository succeeds
+    // Mock: update components succeeds and returns repository URIs
     fixture
         .api_client
-        .expect_create_ecr_repository()
+        .expect_update_components()
         .times(1)
-        .returning(|_req| {
-            // Extract tool name from request
-            let tool_name = "api"; // For simplicity in test
-            Ok(test_repository_response(tool_name))
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string()),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Mock: wkg push succeeds (version tag only)
+    fixture
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
+}
+
+fn setup_successful_push_for_api(fixture: &mut TestFixture) {
+    // Mock: update components succeeds and returns repository URIs for "api" component
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "api".to_string(),
+                    description: None,
+                    repository_uri: Some("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string()),
+                    repository_name: Some("user/api".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["api".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
         });
 
     // Mock: wkg push succeeds (version tag only)
@@ -721,7 +844,10 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
         .api_client
         .expect_create_deployment()
         .times(1)
-        .returning(|_, _| {
+        .returning(|_, req| {
+            // Verify we have at least one component
+            assert!(!req.components.is_empty());
+            
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -1017,18 +1143,14 @@ version = "0.1.0"
 
 [auth]
 enabled = true
-provider = "authkit"
+
+[auth.authkit]
 issuer = "https://test.authkit.app"
 audience = "my-api"
-provider_name = "auth0"
-jwks_uri = "https://test.authkit.app/.well-known/jwks.json"
-authorize_endpoint = "https://test.authkit.app/authorize"
-token_endpoint = "https://test.authkit.app/token"
-userinfo_endpoint = "https://test.authkit.app/userinfo"
-allowed_domains = "example.com,test.com"
 
 [tools.api]
 path = "api"
+wasm = "api/target/wasm32-wasip1/release/api.wasm"
 allowed_outbound_hosts = ["https://*.amazonaws.com"]
 
 [tools.api.build]
@@ -1044,6 +1166,15 @@ command = "cargo build --release --target wasm32-wasip1"
         .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(move |_| Ok(ftl_content_clone.clone()));
+
+    // Mock: read ftl.toml again to determine build profiles
+    let ftl_content_for_build = ftl_content.clone();
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(ftl_content_for_build.clone()));
 
     // Mock: check for ftl.toml again when extracting auth variables
     fixture
@@ -1098,7 +1229,7 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(|_| Ok(()));
 
-    setup_successful_push(&mut fixture);
+    setup_successful_push_for_api(&mut fixture);
 
     // Verify auth variables are passed through to deployment request
     fixture
@@ -1154,11 +1285,10 @@ command = "cargo build --release --target wasm32-wasip1"
                 Some(&"my-api".to_string())
             );
 
-            // Check OIDC variables
-            assert!(req.variables.contains_key("auth_provider_name"));
-            assert_eq!(
-                req.variables.get("auth_provider_name"),
-                Some(&"auth0".to_string())
+            // Check that OIDC variables are not set (since we're using authkit)
+            assert!(
+                !req.variables.contains_key("auth_provider_name")
+                    || req.variables.get("auth_provider_name") == Some(&String::new())
             );
 
             Ok(types::CreateDeploymentResponse {
@@ -1217,12 +1347,14 @@ version = "0.1.0"
 
 [auth]
 enabled = true
-provider = "authkit"
+
+[auth.authkit]
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
 [tools.api]
 path = "api"
+wasm = "api/target/wasm32-wasip1/release/api.wasm"
 allowed_outbound_hosts = ["https://*.amazonaws.com"]
 
 [tools.api.build]
@@ -1238,6 +1370,15 @@ command = "cargo build --release --target wasm32-wasip1"
         .with(eq(Path::new("./ftl.toml")))
         .times(1)
         .returning(move |_| Ok(ftl_content_clone.clone()));
+
+    // Mock: read ftl.toml again to determine build profiles
+    let ftl_content_for_build = ftl_content.clone();
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(ftl_content_for_build.clone()));
 
     // Mock: check for ftl.toml again when extracting auth variables
     fixture
@@ -1292,7 +1433,7 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(|_| Ok(()));
 
-    setup_successful_push(&mut fixture);
+    setup_successful_push_for_api(&mut fixture);
 
     // Verify CLI variables override ftl.toml values
     fixture

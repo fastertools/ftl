@@ -32,10 +32,14 @@ Define your MCP tools with explicit build configurations:
 
 ```toml
 [tools.my-tool]
-path = "my-tool"             # Required: Path to tool directory
+path = "my-tool"             # Optional: Path to tool directory (defaults to tool name)
+wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"  # Required: Path to WASM output
 allowed_outbound_hosts = [   # Optional: Allowed outbound hosts
     "https://api.example.com"
 ]
+variables = {                # Optional: Tool-specific variables
+    "API_KEY" = "{{ api_key }}"
+}
 
 [tools.my-tool.build]        # Required: Build configuration
 command = "cargo build --target wasm32-wasip1 --release"  # Build command
@@ -44,12 +48,47 @@ watch = [                    # Optional: Paths to watch for changes
     "Cargo.toml"
 ]
 env = { RUSTFLAGS = "-C opt-level=z" }  # Optional: Environment variables
+
+[tools.my-tool.deploy]       # Optional: Deployment configuration
+profile = "release"          # Build profile to use for deployment
+name = "custom-name"         # Optional: Custom name suffix (full name: project-custom-name)
 ```
 
-The build configuration is always explicit, giving you full visibility and control:
-- **command**: The exact build command to run
-- **watch**: File patterns to watch in development mode
-- **env**: Environment variables to set during the build
+The configuration provides full control over your tools:
+- **path**: Tool directory (defaults to the tool name if not specified)
+- **wasm**: Path to the WebAssembly file produced by the build (required)
+- **build.command**: The exact build command to run
+- **build.watch**: File patterns to watch in development mode
+- **build.env**: Environment variables to set during the build
+- **profiles**: Optional build profiles for different environments
+- **up.profile**: Build profile to use for `ftl up`
+- **deploy.profile**: Build profile to use when deploying
+- **deploy.name**: Custom name for the deployed tool
+
+### Build Profiles
+
+For advanced use cases, you can define multiple build profiles:
+
+```toml
+[tools.my-tool.profiles.dev]
+command = "cargo build --target wasm32-wasip1"
+watch = ["src/**/*.rs", "Cargo.toml"]
+env = { RUST_LOG = "debug" }
+
+[tools.my-tool.profiles.release]
+command = "cargo build --target wasm32-wasip1 --release"
+env = { RUST_LOG = "warn" }
+
+[tools.my-tool.profiles.production]
+command = "cargo build --target wasm32-wasip1 --release"
+env = { RUST_LOG = "error", RUST_BACKTRACE = "1" }
+
+[tools.my-tool.up]
+profile = "dev"  # Use dev profile for ftl up
+
+[tools.my-tool.deploy]
+profile = "production"  # Use production profile for deployment
+```
 
 When you run `ftl add`, it will create the appropriate build configuration based on your chosen language:
 - **Rust**: Creates a cargo build configuration with wasm32-wasip1 target
@@ -57,22 +96,30 @@ When you run `ftl add`, it will create the appropriate build configuration based
 
 ### Authentication Section
 
+Authentication is configured with provider-specific subsections:
+
 ```toml
 [auth]
 enabled = false              # Required: Enable/disable authentication
-provider = "authkit"         # Required if enabled: Auth provider type
-issuer = "https://..."       # Required if enabled: OIDC issuer URL
-audience = "mcp-api"         # Required if enabled: Expected audience
 
-# Optional: OIDC-specific configuration
+# Option 1: AuthKit configuration
+[auth.authkit]
+issuer = "https://my-tenant.authkit.app"  # Required: AuthKit issuer URL
+audience = "mcp-api"                      # Optional: API audience
+
+# Option 2: OIDC configuration (mutually exclusive with authkit)
 [auth.oidc]
-provider_name = "My Auth"
-jwks_uri = "https://..."
-authorize_endpoint = "https://..."
-token_endpoint = "https://..."
-userinfo_endpoint = "https://..."
-allowed_domains = "example.com,other.com"
+issuer = "https://auth.example.com"       # Required: OIDC issuer URL
+audience = "api"                          # Optional: API audience  
+provider_name = "okta"                    # Required: Provider name
+jwks_uri = "https://.../.well-known/jwks.json"  # Required: JWKS endpoint
+authorize_endpoint = "https://.../authorize"    # Required: Auth endpoint
+token_endpoint = "https://.../token"            # Required: Token endpoint
+userinfo_endpoint = "https://.../userinfo"      # Optional: User info endpoint
+allowed_domains = "example.com,other.com"       # Optional: Allowed email domains
 ```
+
+**Note**: You must configure either `authkit` or `oidc`, but not both.
 
 ### Deployment Section
 
@@ -103,20 +150,31 @@ authors = ["Jane Doe <jane@example.com>"]
 
 [auth]
 enabled = true
-provider = "authkit"
+
+[auth.authkit]
 issuer = "https://my-tenant.authkit.app"
 audience = "weather-api"
 
 [tools.weather]
-type = "typescript"
-path = "weather-tool"
+path = "weather-tool"  # Optional, defaults to "weather"
+wasm = "weather-tool/dist/weather.wasm"
 allowed_outbound_hosts = ["https://api.openweathermap.org"]
+
+[tools.weather.build]
+command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json"]
 
+[tools.weather.deploy]
+profile = "release"
+name = "weather-api"  # Optional custom name
+
 [tools.forecast]
-type = "rust"
-path = "forecast-tool"
-build = "cargo build --release"
+wasm = "forecast/target/wasm32-wasip1/release/forecast.wasm"
+# path defaults to "forecast"
+
+[tools.forecast.build]
+command = "cargo build --target wasm32-wasip1 --release"
+watch = ["src/**/*.rs", "Cargo.toml"]
 
 [deployment]
 registry = "ghcr.io"

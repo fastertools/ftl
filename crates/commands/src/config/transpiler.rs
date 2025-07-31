@@ -65,9 +65,9 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     vars_table["auth_trace_header"] = create_default_var("X-Trace-Id");
 
     // Auth provider variables
-    vars_table["auth_provider_type"] = create_default_var(&ftl_config.auth.provider);
-    vars_table["auth_provider_issuer"] = create_default_var(&ftl_config.auth.issuer);
-    vars_table["auth_provider_audience"] = create_default_var(&ftl_config.auth.audience);
+    vars_table["auth_provider_type"] = create_default_var(ftl_config.auth.provider_type());
+    vars_table["auth_provider_issuer"] = create_default_var(ftl_config.auth.issuer());
+    vars_table["auth_provider_audience"] = create_default_var(ftl_config.auth.audience());
 
     // OIDC-specific variables
     if let Some(oidc) = &ftl_config.auth.oidc {
@@ -259,27 +259,8 @@ fn create_gateway_component(version: &str, validate_args: bool) -> Table {
 fn create_tool_component(name: &str, config: &ToolConfig) -> Table {
     let mut component = Table::new();
 
-    // Determine source path based on build command
-    let source_path = if config.build.command.contains("cargo") {
-        // Rust project - output goes to target/wasm32-wasip1/release/
-        let tool_basename = std::path::Path::new(&config.path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(name);
-        format!(
-            "{}/target/wasm32-wasip1/release/{}.wasm",
-            config.path,
-            tool_basename.replace('-', "_")
-        )
-    } else if config.build.command.contains("npm") || config.build.command.contains("node") {
-        // Node.js project - output typically goes to dist/
-        format!("{}/dist/{}.wasm", config.path, name)
-    } else {
-        // Unknown build system - assume output is in the tool directory
-        format!("{}/{}.wasm", config.path, name)
-    };
-
-    component["source"] = toml_edit::value(source_path);
+    // Use the explicit wasm path from config
+    component["source"] = toml_edit::value(&config.wasm);
 
     // Allowed outbound hosts
     let hosts = config
@@ -296,7 +277,8 @@ fn create_tool_component(name: &str, config: &ToolConfig) -> Table {
     build_table["command"] = toml_edit::value(&config.build.command);
 
     // Working directory - always use tool path
-    build_table["workdir"] = toml_edit::value(&config.path);
+    let tool_path = config.get_path(name);
+    build_table["workdir"] = toml_edit::value(&tool_path);
 
     // Watch paths
     if !config.build.watch.is_empty() {
@@ -384,10 +366,21 @@ pub fn generate_temp_spin_toml(
         .unwrap_or_else(|_| project_path.to_path_buf());
 
     // Update tool paths to be absolute
-    for tool_config in ftl_config.tools.values_mut() {
-        if !tool_config.path.starts_with('/') {
-            tool_config.path = abs_project_path
-                .join(&tool_config.path)
+    for (tool_name, tool_config) in &mut ftl_config.tools {
+        let tool_path = tool_config.get_path(tool_name);
+        if !tool_path.starts_with('/') {
+            tool_config.path = Some(
+                abs_project_path
+                    .join(&tool_path)
+                    .to_string_lossy()
+                    .to_string(),
+            );
+        }
+        
+        // Also make the wasm path absolute
+        if !tool_config.wasm.starts_with('/') {
+            tool_config.wasm = abs_project_path
+                .join(&tool_config.wasm)
                 .to_string_lossy()
                 .to_string();
         }

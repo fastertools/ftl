@@ -142,6 +142,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"
@@ -214,6 +215,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"
@@ -278,6 +280,7 @@ version = "0.1.0"
 
 [tools.frontend]
 path = "frontend"
+wasm = "frontend/dist/frontend.wasm"
 
 [tools.frontend.build]
 command = "npm run build"
@@ -349,12 +352,14 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"
 
 [tools.frontend]
 path = "frontend"
+wasm = "frontend/dist/frontend.wasm"
 
 [tools.frontend.build]
 command = "npm run build"
@@ -419,6 +424,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"
@@ -525,6 +531,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"

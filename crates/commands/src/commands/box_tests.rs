@@ -67,10 +67,15 @@ mod tests {
             unimplemented!()
         }
 
-        async fn create_ecr_repository(
+        async fn update_components(
             &self,
-            _request: &types::CreateEcrRepositoryRequest,
-        ) -> Result<types::CreateEcrRepositoryResponse> {
+            _app_id: &str,
+            _request: &types::UpdateComponentsRequest,
+        ) -> Result<types::UpdateComponentsResponse> {
+            unimplemented!()
+        }
+
+        async fn list_app_components(&self, _app_id: &str) -> Result<types::ListComponentsResponse> {
             unimplemented!()
         }
 

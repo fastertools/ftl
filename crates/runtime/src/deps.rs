@@ -99,11 +99,15 @@ pub trait FtlApiClient: Send + Sync {
         request: &types::CreateDeploymentRequest,
     ) -> Result<types::CreateDeploymentResponse>;
 
-    /// Create ECR repository
-    async fn create_ecr_repository(
+    /// List components for an app
+    async fn list_app_components(&self, app_id: &str) -> Result<types::ListComponentsResponse>;
+
+    /// Update components for an app (creates/updates/removes components and their repositories)
+    async fn update_components(
         &self,
-        request: &types::CreateEcrRepositoryRequest,
-    ) -> Result<types::CreateEcrRepositoryResponse>;
+        app_id: &str,
+        request: &types::UpdateComponentsRequest,
+    ) -> Result<types::UpdateComponentsResponse>;
 
     /// Create ECR token
     async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse>;
@@ -425,23 +429,41 @@ impl FtlApiClient for RealFtlApiClient {
             .map_err(|e| anyhow::anyhow!("Failed to create deployment: {}", e))
     }
 
-    async fn create_ecr_repository(
+    async fn update_components(
         &self,
-        request: &types::CreateEcrRepositoryRequest,
-    ) -> Result<types::CreateEcrRepositoryResponse> {
+        app_id: &str,
+        request: &types::UpdateComponentsRequest,
+    ) -> Result<types::UpdateComponentsResponse> {
         let auth = self
             .auth_token
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
 
         self.client
-            .create_ecr_repository()
+            .update_components()
             .authorization(format!("Bearer {auth}"))
+            .app_id(app_id)
             .body(request)
             .send()
             .await
             .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to create ECR repository: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to update components: {}", e))
+    }
+
+    async fn list_app_components(&self, app_id: &str) -> Result<types::ListComponentsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .list_app_components()
+            .authorization(format!("Bearer {auth}"))
+            .app_id(app_id)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to list components: {}", e))
     }
 
     async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {

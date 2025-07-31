@@ -135,8 +135,13 @@ type CreateDeploymentFn = Box<
         + Send
         + Sync,
 >;
-type CreateEcrRepositoryFn = Box<
-    dyn Fn(&types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>
+type UpdateComponentsFn = Box<
+    dyn Fn(&str, &types::UpdateComponentsRequest) -> Result<types::UpdateComponentsResponse>
+        + Send
+        + Sync,
+>;
+type ListComponentsFn = Box<
+    dyn Fn(&str) -> Result<types::ListComponentsResponse>
         + Send
         + Sync,
 >;
@@ -152,7 +157,8 @@ pub struct MockFtlApiClientMock {
     get_app: Arc<Mutex<Option<GetAppFn>>>,
     delete_app: Arc<Mutex<Option<DeleteAppFn>>>,
     create_deployment: Arc<Mutex<Option<CreateDeploymentFn>>>,
-    create_ecr_repository: Arc<Mutex<Option<CreateEcrRepositoryFn>>>,
+    update_components: Arc<Mutex<Option<UpdateComponentsFn>>>,
+    list_app_components: Arc<Mutex<Option<ListComponentsFn>>>,
     create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
 }
 
@@ -171,7 +177,8 @@ impl MockFtlApiClientMock {
             get_app: Arc::new(Mutex::new(None)),
             delete_app: Arc::new(Mutex::new(None)),
             create_deployment: Arc::new(Mutex::new(None)),
-            create_ecr_repository: Arc::new(Mutex::new(None)),
+            update_components: Arc::new(Mutex::new(None)),
+            list_app_components: Arc::new(Mutex::new(None)),
             create_ecr_token: Arc::new(Mutex::new(None)),
         }
     }
@@ -201,9 +208,14 @@ impl MockFtlApiClientMock {
         CreateDeploymentExpectation { mock: self }
     }
 
-    /// Sets up an expectation for the `create_ecr_repository` method
-    pub fn expect_create_ecr_repository(&mut self) -> CreateEcrRepositoryExpectation {
-        CreateEcrRepositoryExpectation { mock: self }
+    /// Sets up an expectation for the `update_components` method
+    pub fn expect_update_components(&mut self) -> UpdateComponentsExpectation {
+        UpdateComponentsExpectation { mock: self }
+    }
+
+    /// Sets up an expectation for the `list_app_components` method
+    pub fn expect_list_app_components(&mut self) -> ListAppComponentsExpectation {
+        ListAppComponentsExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `create_ecr_token` method
@@ -333,12 +345,12 @@ impl<'a> CreateDeploymentExpectation<'a> {
     }
 }
 
-/// Builder for setting up expectations on the `create_ecr_repository` method
-pub struct CreateEcrRepositoryExpectation<'a> {
+/// Builder for setting up expectations on the `update_components` method
+pub struct UpdateComponentsExpectation<'a> {
     mock: &'a mut MockFtlApiClientMock,
 }
 
-impl<'a> CreateEcrRepositoryExpectation<'a> {
+impl<'a> UpdateComponentsExpectation<'a> {
     /// Specifies how many times this expectation should be called (currently unused)
     #[must_use]
     pub fn times(self, _n: usize) -> Self {
@@ -348,12 +360,37 @@ impl<'a> CreateEcrRepositoryExpectation<'a> {
     /// Sets the function to be called when this expectation is matched
     pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn(&types::CreateEcrRepositoryRequest) -> Result<types::CreateEcrRepositoryResponse>
+        F: Fn(&str, &types::UpdateComponentsRequest) -> Result<types::UpdateComponentsResponse>
             + Send
             + Sync
             + 'static,
     {
-        *self.mock.create_ecr_repository.lock().unwrap() = Some(Box::new(f));
+        *self.mock.update_components.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Builder for setting up expectations on the `list_app_components` method
+pub struct ListAppComponentsExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> ListAppComponentsExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Sets the function to be called when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str) -> Result<types::ListComponentsResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.list_app_components.lock().unwrap() = Some(Box::new(f));
         self.mock
     }
 }
@@ -434,14 +471,23 @@ impl FtlApiClient for MockFtlApiClientMock {
         }
     }
 
-    async fn create_ecr_repository(
+    async fn update_components(
         &self,
-        request: &types::CreateEcrRepositoryRequest,
-    ) -> Result<types::CreateEcrRepositoryResponse> {
-        if let Some(ref f) = *self.create_ecr_repository.lock().unwrap() {
-            f(request)
+        app_id: &str,
+        request: &types::UpdateComponentsRequest,
+    ) -> Result<types::UpdateComponentsResponse> {
+        if let Some(ref f) = *self.update_components.lock().unwrap() {
+            f(app_id, request)
         } else {
-            Err(anyhow!("create_ecr_repository not mocked"))
+            Err(anyhow!("update_components not mocked"))
+        }
+    }
+
+    async fn list_app_components(&self, app_id: &str) -> Result<types::ListComponentsResponse> {
+        if let Some(ref f) = *self.list_app_components.lock().unwrap() {
+            f(app_id)
+        } else {
+            Err(anyhow!("list_app_components not mocked"))
         }
     }
 
@@ -906,31 +952,3 @@ pub fn test_ecr_credentials() -> types::CreateEcrTokenResponse {
     }
 }
 
-/// Creates a test ECR repository response for use in tests.
-///
-/// # Parameters
-/// * `tool_name` - The name of the tool/repository
-///
-/// # Returns
-/// A `CreateEcrRepositoryResponse` with:
-/// - Repository URI in the format: `123456789012.dkr.ecr.us-east-1.amazonaws.com/user/{tool_name}`
-/// - Repository name: `user/{tool_name}`
-/// - `already_exists`: false
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_runtime::test_helpers::test_repository_response;
-///
-/// let response = test_repository_response("my-app");
-/// assert_eq!(response.repository_name, "user/my-app");
-/// assert!(!response.already_exists);
-/// ```
-#[allow(dead_code)]
-pub fn test_repository_response(tool_name: &str) -> types::CreateEcrRepositoryResponse {
-    types::CreateEcrRepositoryResponse {
-        repository_uri: format!("123456789012.dkr.ecr.us-east-1.amazonaws.com/user/{tool_name}"),
-        repository_name: format!("user/{tool_name}"),
-        already_exists: false,
-    }
-}

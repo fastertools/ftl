@@ -11,18 +11,24 @@ authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 
 [auth]
 enabled = false
-provider = ""  # "authkit" or "oidc"
-issuer = ""
-audience = ""
 
-# OIDC-specific settings (only required for provider = "oidc")
-[auth.oidc]
-provider_name = ""
-jwks_uri = ""
-authorize_endpoint = ""
-token_endpoint = ""
-userinfo_endpoint = ""
-allowed_domains = ""  # comma-separated list
+# Uncomment and configure one of the following auth providers when enabling auth:
+
+# For AuthKit:
+# [auth.authkit]
+# issuer = "https://your-tenant.authkit.app"
+# audience = "mcp-api"  # optional
+
+# For OIDC (Auth0, Okta, etc.):
+# [auth.oidc]
+# issuer = "https://your-domain.auth0.com"
+# audience = "your-api-identifier"  # optional
+# provider_name = "auth0"
+# jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+# authorize_endpoint = "https://your-domain.auth0.com/authorize"
+# token_endpoint = "https://your-domain.auth0.com/oauth/token"
+# userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
+# allowed_domains = "*.auth0.com"  # optional
 
 # ========================================
 # Example configurations:
@@ -57,6 +63,7 @@ validate_arguments = true
 # Echo tool (Rust)
 [tools.echo-rs]
 path = "echo-rs"
+wasm = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
 allowed_outbound_hosts = []
 
 [tools.echo-rs.build]
@@ -66,6 +73,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Echo tool (TypeScript)
 [tools.echo-ts]
 path = "echo-ts"
+wasm = "echo-ts/dist/echo-ts.wasm"
 allowed_outbound_hosts = []
 
 [tools.echo-ts.build]
@@ -75,6 +83,7 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # Weather tool (Rust)
 [tools.weather-rs]
 path = "weather-rs"
+wasm = "weather-rs/target/wasm32-wasip1/release/weather_rs.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
 [tools.weather-rs.build]
@@ -84,6 +93,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Weather tool (TypeScript)
 [tools.weather-ts]
 path = "weather-ts"
+wasm = "weather-ts/dist/weather-ts.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
 [tools.weather-ts.build]
@@ -93,6 +103,7 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # Multi-tools example (Rust) - demonstrates multiple tools in one component
 [tools.multi-tools-rs]
 path = "multi-tools-rs"
+wasm = "multi-tools-rs/target/wasm32-wasip1/release/multi_tools_rs.wasm"
 allowed_outbound_hosts = []
 
 [tools.multi-tools-rs.build]
@@ -102,6 +113,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Multi-tools example (TypeScript) - demonstrates multiple tools in one component
 [tools.multi-tools-ts]
 path = "multi-tools-ts"
+wasm = "multi-tools-ts/dist/multi-tools-ts.wasm"
 allowed_outbound_hosts = []
 
 [tools.multi-tools-ts.build]

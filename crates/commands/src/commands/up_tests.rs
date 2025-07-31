@@ -290,6 +290,7 @@ version = "0.1.0"
 
 [tools.test-tool]
 path = "test"
+wasm = "test/test-tool.wasm"
 
 [tools.test-tool.build]
 command = "echo 'Building test tool'"
@@ -310,7 +311,7 @@ command = "echo 'Building test tool'"
         self.file_system
             .expect_read_to_string()
             .with(eq(Path::new("./ftl.toml")))
-            .times(1)
+            .times(1..=2)  // May be read for transpiler and build profiles
             .returning(move |_| Ok(content.clone()));
     }
 
@@ -565,6 +566,7 @@ version = "0.1.0"
 
 [tools.test-tool]
 path = "test"
+wasm = "test/test-tool.wasm"
 
 [tools.test-tool.build]
 command = "echo 'Building test tool'"
@@ -666,6 +668,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"
@@ -847,6 +850,7 @@ version = "0.1.0"
 
 [tools.backend]
 path = "backend"
+wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
 [tools.backend.build]
 command = "cargo build --target wasm32-wasi"

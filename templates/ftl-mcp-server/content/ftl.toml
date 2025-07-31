@@ -11,18 +11,24 @@ authors = ["{{authors}}"]
 
 [auth]
 enabled = false
-provider = ""  # "authkit" or "oidc"
-issuer = ""
-audience = ""
 
-# OIDC-specific settings (only required for provider = "oidc")
-[auth.oidc]
-provider_name = ""
-jwks_uri = ""
-authorize_endpoint = ""
-token_endpoint = ""
-userinfo_endpoint = ""
-allowed_domains = ""  # comma-separated list
+# Uncomment and configure one of the following auth providers when enabling auth:
+
+# For AuthKit:
+# [auth.authkit]
+# issuer = "https://your-tenant.authkit.app"
+# audience = "mcp-api"  # optional
+
+# For OIDC (Auth0, Okta, etc.):
+# [auth.oidc]
+# issuer = "https://your-domain.auth0.com"
+# audience = "your-api-identifier"  # optional
+# provider_name = "auth0"
+# jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+# authorize_endpoint = "https://your-domain.auth0.com/authorize"
+# token_endpoint = "https://your-domain.auth0.com/oauth/token"
+# userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
+# allowed_domains = "*.auth0.com"  # optional
 
 # ========================================
 # Example configurations:
@@ -58,6 +64,7 @@ validate_arguments = true
 # Example:
 # [tools.echo]
 # path = "echo"
+# wasm = "echo/target/wasm32-wasip1/release/echo.wasm"
 # allowed_outbound_hosts = []
 # 
 # [tools.echo.build]

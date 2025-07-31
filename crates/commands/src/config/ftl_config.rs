@@ -18,7 +18,6 @@ pub struct FtlConfig {
     /// Authentication configuration
     #[serde(default)]
     #[garde(dive)]
-    #[garde(custom(validate_auth_config))]
     pub auth: AuthConfig,
 
     /// Tool definitions
@@ -85,27 +84,42 @@ pub struct AuthConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Authentication provider type ("authkit" or "oidc")
+    /// `AuthKit` configuration (mutually exclusive with oidc)
     #[serde(default)]
-    pub provider: String,
+    #[garde(dive)]
+    pub authkit: Option<AuthKitConfig>,
 
-    /// Provider issuer URL
+    /// OIDC configuration (mutually exclusive with authkit)
     #[serde(default)]
+    #[garde(dive)]
+    pub oidc: Option<OidcConfig>,
+}
+
+/// AuthKit-specific configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct AuthKitConfig {
+    /// `AuthKit` issuer URL (e.g., `<https://my-tenant.authkit.app>`)
+    #[garde(length(min = 1))]
     pub issuer: String,
 
     /// API audience
     #[serde(default)]
+    #[garde(skip)]
     pub audience: String,
-
-    /// OIDC-specific settings
-    #[serde(flatten)]
-    #[garde(dive)]
-    pub oidc: Option<OidcConfig>,
 }
 
 /// OIDC-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct OidcConfig {
+    /// OIDC issuer URL
+    #[garde(length(min = 1))]
+    pub issuer: String,
+
+    /// API audience
+    #[serde(default)]
+    #[garde(skip)]
+    pub audience: String,
+
     /// Provider name (e.g., "auth0", "okta")
     #[garde(length(min = 1))]
     pub provider_name: String,
@@ -133,16 +147,51 @@ pub struct OidcConfig {
     pub allowed_domains: String,
 }
 
+/// Deployment configuration for a tool
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct DeployConfig {
+    /// Build profile to use for deployment (e.g., "release", "production")
+    #[garde(length(min = 1))]
+    pub profile: String,
+
+    /// Optional custom name suffix for the deployed tool
+    /// The full name will be {project-name}-{name}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub name: Option<String>,
+}
+
 /// Tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct ToolConfig {
     /// Path to tool directory relative to project root
+    /// Defaults to the tool name if not specified
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub path: Option<String>,
+
+    /// Path to the WASM file produced by the build
     #[garde(length(min = 1))]
-    pub path: String,
+    pub wasm: String,
 
     /// Build configuration
     #[garde(dive)]
     pub build: BuildConfig,
+
+    /// Build profiles (optional, for advanced multi-profile builds)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub profiles: Option<BuildProfiles>,
+
+    /// Up configuration for development mode
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub up: Option<UpConfig>,
+
+    /// Deployment configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[garde(skip)]
+    pub deploy: Option<DeployConfig>,
 
     /// Allowed outbound hosts for the tool
     #[serde(default)]
@@ -153,6 +202,40 @@ pub struct ToolConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     #[garde(skip)]
     pub variables: HashMap<String, String>,
+}
+
+/// Build profiles for a tool
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BuildProfiles {
+    /// Build profiles mapped by name
+    #[serde(flatten)]
+    pub profiles: HashMap<String, BuildProfile>,
+}
+
+/// A single build profile
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct BuildProfile {
+    /// Build command to execute
+    #[garde(length(min = 1))]
+    pub command: String,
+
+    /// Paths to watch for changes in development mode
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[garde(skip)]
+    pub watch: Vec<String>,
+
+    /// Environment variables to set during build
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[garde(skip)]
+    pub env: HashMap<String, String>,
+}
+
+/// Up configuration for development mode
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct UpConfig {
+    /// Build profile to use for 'ftl up'
+    #[garde(length(min = 1))]
+    pub profile: String,
 }
 
 /// Build configuration for a tool
@@ -218,24 +301,6 @@ impl Default for GatewayConfig {
 
 // Custom validation functions for garde
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn validate_auth_config(auth: &AuthConfig, _ctx: &()) -> garde::Result {
-    if auth.enabled {
-        if auth.provider.is_empty() {
-            return Err(garde::Error::new(
-                "provider must be specified when auth is enabled",
-            ));
-        }
-        if auth.issuer.is_empty() {
-            return Err(garde::Error::new(
-                "issuer must be specified when auth is enabled",
-            ));
-        }
-        // audience is now optional
-    }
-    Ok(())
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn validate_tools(tools: &HashMap<String, ToolConfig>, _ctx: &()) -> garde::Result {
     for (name, tool) in tools {
         // Validate tool names
@@ -260,15 +325,93 @@ fn validate_tools(tools: &HashMap<String, ToolConfig>, _ctx: &()) -> garde::Resu
     Ok(())
 }
 
+impl AuthConfig {
+    /// Get the provider type as a string
+    pub const fn provider_type(&self) -> &str {
+        if self.authkit.is_some() {
+            "authkit"
+        } else if self.oidc.is_some() {
+            "oidc"
+        } else {
+            ""
+        }
+    }
+
+    /// Get the issuer URL
+    pub fn issuer(&self) -> &str {
+        if let Some(authkit) = &self.authkit {
+            &authkit.issuer
+        } else if let Some(oidc) = &self.oidc {
+            &oidc.issuer
+        } else {
+            ""
+        }
+    }
+
+    /// Get the audience
+    pub fn audience(&self) -> &str {
+        if let Some(authkit) = &self.authkit {
+            &authkit.audience
+        } else if let Some(oidc) = &self.oidc {
+            &oidc.audience
+        } else {
+            ""
+        }
+    }
+}
+
 impl ToolConfig {
-    /// Get the build command
-    pub fn get_build_command(&self) -> &str {
+    /// Get the effective path for the tool (uses tool name if path not specified)
+    pub fn get_path(&self, tool_name: &str) -> String {
+        self.path.clone().unwrap_or_else(|| tool_name.to_string())
+    }
+
+    /// Get the build command for a specific profile
+    pub fn get_build_command(&self, profile: Option<&str>) -> &str {
+        if let Some(profile_name) = profile {
+            if let Some(profiles) = &self.profiles {
+                if let Some(profile) = profiles.profiles.get(profile_name) {
+                    return &profile.command;
+                }
+            }
+        }
+        // Fall back to default build command
         &self.build.command
     }
 
-    /// Get watch paths
-    pub fn get_watch_paths(&self) -> &[String] {
-        &self.build.watch
+    /// Get the build configuration for a specific profile
+    pub fn get_build_config(&self, profile: Option<&str>) -> BuildProfile {
+        if let Some(profile_name) = profile {
+            if let Some(profiles) = &self.profiles {
+                if let Some(profile) = profiles.profiles.get(profile_name) {
+                    return profile.clone();
+                }
+            }
+        }
+        // Fall back to default build config
+        BuildProfile {
+            command: self.build.command.clone(),
+            watch: self.build.watch.clone(),
+            env: self.build.env.clone(),
+        }
+    }
+
+    /// Get watch paths for a specific profile
+    pub fn get_watch_paths(&self, profile: Option<&str>) -> Vec<String> {
+        if let Some(profile_name) = profile {
+            if let Some(profiles) = &self.profiles {
+                if let Some(profile) = profiles.profiles.get(profile_name) {
+                    return profile.watch.clone();
+                }
+            }
+        }
+        // Fall back to default watch paths
+        self.build.watch.clone()
+    }
+
+    /// Get the profile to use for 'ftl up'
+    pub fn get_up_profile(&self) -> Option<&str> {
+        self.up.as_ref().map(|up| up.profile.as_str())
     }
 }
 
@@ -281,6 +424,23 @@ impl FtlConfig {
         config
             .validate()
             .map_err(|e| anyhow::anyhow!("Validation error: {}", e))?;
+
+        // Additional auth validation
+        if config.auth.enabled {
+            match (&config.auth.authkit, &config.auth.oidc) {
+                (None, None) => {
+                    return Err(anyhow::anyhow!(
+                        "Either 'authkit' or 'oidc' configuration must be provided when auth is enabled"
+                    ));
+                }
+                (Some(_), Some(_)) => {
+                    return Err(anyhow::anyhow!(
+                        "Only one of 'authkit' or 'oidc' can be configured, not both"
+                    ));
+                }
+                _ => {} // One provider configured, which is correct
+            }
+        }
 
         Ok(config)
     }
@@ -330,13 +490,14 @@ name = "123-invalid"
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Validation error"));
 
-        // Test empty tool path
+        // Test empty wasm path
         let content = r#"
 [project]
 name = "valid-name"
 
 [tools.my-tool]
-path = ""
+path = "my-tool"
+wasm = ""
 
 [tools.my-tool.build]
 command = "cargo build --target wasm32-wasip1 --release"
@@ -344,14 +505,13 @@ command = "cargo build --target wasm32-wasip1 --release"
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
 
-        // Test auth validation
+        // Test auth validation - auth enabled but no provider configured
         let content = r#"
 [project]
 name = "valid-name"
 
 [auth]
 enabled = true
-provider = ""
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
@@ -359,7 +519,7 @@ provider = ""
             result
                 .unwrap_err()
                 .to_string()
-                .contains("provider must be specified")
+                .contains("Either 'authkit' or 'oidc' configuration must be provided")
         );
     }
 
@@ -431,6 +591,7 @@ name = "test-project"
 
 [tools.{name}]
 path = "tool-path"
+wasm = "tool-path/output.wasm"
 
 [tools.{name}.build]
 command = "cargo build --target wasm32-wasip1 --release"
@@ -460,6 +621,7 @@ name = "test-project"
 
 [tools."{name}"]
 path = "tool-path"
+wasm = "tool-path/output.wasm"
 
 [tools."{name}".build]
 command = "cargo build --target wasm32-wasip1 --release"
@@ -472,44 +634,65 @@ command = "cargo build --target wasm32-wasip1 --release"
 
     #[test]
     fn test_auth_validation() {
-        // Test auth disabled - should pass with empty fields
+        // Test auth disabled - should pass with no provider config
         let content = r#"
 [project]
 name = "test-project"
 
 [auth]
 enabled = false
-provider = ""
-issuer = ""
-audience = ""
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_ok());
 
-        // Test auth enabled with all fields - should pass
+        // Test auth enabled with authkit - should pass
         let content = r#"
 [project]
 name = "test-project"
 
 [auth]
 enabled = true
-provider = "authkit"
-issuer = "https://example.com"
+
+[auth.authkit]
+issuer = "https://my-tenant.authkit.app"
 audience = "my-api"
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_ok());
+        let config = result.unwrap();
+        assert_eq!(config.auth.provider_type(), "authkit");
+        assert_eq!(config.auth.issuer(), "https://my-tenant.authkit.app");
+        assert_eq!(config.auth.audience(), "my-api");
 
-        // Test auth enabled with missing provider
+        // Test auth enabled with oidc - should pass
         let content = r#"
 [project]
 name = "test-project"
 
 [auth]
 enabled = true
-provider = ""
-issuer = "https://example.com"
-audience = "my-api"
+
+[auth.oidc]
+issuer = "https://auth.example.com"
+audience = "api"
+provider_name = "okta"
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+authorize_endpoint = "https://auth.example.com/authorize"
+token_endpoint = "https://auth.example.com/token"
+"#;
+        let result = FtlConfig::parse(content);
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        assert_eq!(config.auth.provider_type(), "oidc");
+        assert_eq!(config.auth.issuer(), "https://auth.example.com");
+
+        // Test auth enabled with no provider - should fail
+        let content = r#"
+[project]
+name = "test-project"
+
+[auth]
+enabled = true
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
@@ -517,19 +700,28 @@ audience = "my-api"
             result
                 .unwrap_err()
                 .to_string()
-                .contains("provider must be specified")
+                .contains("Either 'authkit' or 'oidc' configuration must be provided")
         );
 
-        // Test auth enabled with missing issuer
+        // Test auth enabled with both providers - should fail
         let content = r#"
 [project]
 name = "test-project"
 
 [auth]
 enabled = true
-provider = "authkit"
-issuer = ""
+
+[auth.authkit]
+issuer = "https://my-tenant.authkit.app"
 audience = "my-api"
+
+[auth.oidc]
+issuer = "https://auth.example.com"
+audience = "api"
+provider_name = "okta"
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+authorize_endpoint = "https://auth.example.com/authorize"
+token_endpoint = "https://auth.example.com/token"
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
@@ -537,22 +729,23 @@ audience = "my-api"
             result
                 .unwrap_err()
                 .to_string()
-                .contains("issuer must be specified")
+                .contains("Only one of 'authkit' or 'oidc' can be configured")
         );
 
-        // Test auth enabled with empty audience - should now pass
+        // Test authkit with missing required field
         let content = r#"
 [project]
 name = "test-project"
 
 [auth]
 enabled = true
-provider = "authkit"
-issuer = "https://example.com"
-audience = ""
+
+[auth.authkit]
+issuer = ""
+audience = "my-api"
 "#;
         let result = FtlConfig::parse(content);
-        assert!(result.is_ok());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -564,7 +757,8 @@ name = "test-project"
 
 [auth]
 enabled = true
-provider = "oidc"
+
+[auth.oidc]
 issuer = "https://example.com"
 audience = "my-api"
 provider_name = "okta"
@@ -578,9 +772,11 @@ allowed_domains = "example.com,test.com"
         assert!(result.is_ok());
         let config = result.unwrap();
         assert!(config.auth.oidc.is_some());
-        let oidc = config.auth.oidc.unwrap();
+        let oidc = config.auth.oidc.as_ref().unwrap();
         assert_eq!(oidc.provider_name, "okta");
         assert_eq!(oidc.jwks_uri, "https://example.com/.well-known/jwks.json");
+        assert_eq!(oidc.userinfo_endpoint, "https://example.com/oauth/userinfo");
+        assert_eq!(oidc.allowed_domains, "example.com,test.com");
     }
 
     #[test]
@@ -621,7 +817,7 @@ name = "test-project"
 
         // Check auth defaults
         assert!(!config.auth.enabled);
-        assert_eq!(config.auth.provider, "");
+        assert_eq!(config.auth.provider_type(), "");
 
         // Check gateway defaults
         assert_eq!(config.gateway.version, "0.0.9");
@@ -640,12 +836,14 @@ authors = ["John Doe <john@example.com>"]
 
 [auth]
 enabled = true
-provider = "authkit"
+
+[auth.authkit]
 issuer = "https://my-tenant.authkit.app"
 audience = "mcp-api"
 
 [tools.echo]
 path = "echo-rs"
+wasm = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
 allowed_outbound_hosts = []
 
 [tools.echo.build]
@@ -654,6 +852,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 
 [tools.weather]
 path = "weather-ts"
+wasm = "weather-ts/dist/weather.wasm"
 allowed_outbound_hosts = ["https://api.weather.com"]
 
 [tools.weather.build]
@@ -666,7 +865,7 @@ watch = ["src/**/*.ts", "package.json"]
         assert_eq!(config.project.name, "my-project");
         assert_eq!(config.project.version, "1.0.0");
         assert!(config.auth.enabled);
-        assert_eq!(config.auth.provider, "authkit");
+        assert_eq!(config.auth.provider_type(), "authkit");
         assert_eq!(config.tools.len(), 2);
         assert_eq!(
             config.tools["echo"].build.command,
@@ -686,18 +885,21 @@ name = "test-project"
 
 [tools.tool1]
 path = "tool1"
+wasm = "tool1/target/wasm32-wasip1/release/tool1.wasm"
 
 [tools.tool1.build]
 command = "cargo build --target wasm32-wasip1 --release"
 
 [tools.tool2]
 path = "tool2"
+wasm = "tool2/dist/tool2.wasm"
 
 [tools.tool2.build]
 command = "npm run build"
 
 [tools.tool3]
 path = "tool3"
+wasm = "tool3/dist/tool3.wasm"
 
 [tools.tool3.build]
 command = "npm run build"
@@ -738,12 +940,16 @@ command = "npm run build"
         tools.insert(
             "test-tool".to_string(),
             ToolConfig {
-                path: "test-tool".to_string(),
+                path: Some("test-tool".to_string()),
+                wasm: "test-tool/target/wasm32-wasip1/release/test_tool.wasm".to_string(),
                 build: BuildConfig {
                     command: "cargo build --target wasm32-wasip1 --release".to_string(),
                     watch: vec!["src/**/*.rs".to_string()],
                     env: HashMap::new(),
                 },
+                profiles: None,
+                up: None,
+                deploy: None,
                 allowed_outbound_hosts: vec![],
                 variables: HashMap::new(),
             },
@@ -784,6 +990,7 @@ debug = { default = "false" }
 
 [tools.my-tool]
 path = "my-tool"
+wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
 
 [tools.my-tool.build]
 command = "cargo build --target wasm32-wasip1 --release"
@@ -860,6 +1067,7 @@ name = "test-project"
 
 [tools.custom-build]
 path = "custom"
+wasm = "custom/dist/custom.wasm"
 
 [tools.custom-build.build]
 command = "npm run build:special"
@@ -882,6 +1090,7 @@ name = "test-project"
 
 [tools.watch-tool]
 path = "watch"
+wasm = "watch/target/wasm32-wasip1/release/watch_tool.wasm"
 
 [tools.watch-tool.build]
 command = "cargo build --target wasm32-wasip1 --release"
@@ -901,6 +1110,7 @@ provider = ""
 
 [tools."bad@name"]
 path = ""
+wasm = "output.wasm"
 
 [tools."bad@name".build]
 command = ""
@@ -921,6 +1131,7 @@ name = "test-project"
 
 [tools.minimal]
 path = "minimal-tool"
+wasm = "minimal-tool/output.wasm"
 
 [tools.minimal.build]
 command = "make build"
@@ -937,6 +1148,7 @@ name = "test-project"
 
 [tools.full]
 path = "full-tool"
+wasm = "full-tool/target/wasm32-wasip1/release/full_tool.wasm"
 
 [tools.full.build]
 command = "cargo build --release"
@@ -968,5 +1180,140 @@ path = "tool"
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
         // The error will be a TOML parse error about missing required field
+    }
+
+    #[test]
+    fn test_build_profiles() {
+        // Test tool with multiple build profiles
+        let content = r#"
+[project]
+name = "test-project"
+
+[tools.myapp]
+wasm = "myapp/target/wasm32-wasip1/release/myapp.wasm"
+
+[tools.myapp.build]
+command = "cargo build --target wasm32-wasip1"
+
+[tools.myapp.profiles.dev]
+command = "cargo build --target wasm32-wasip1"
+watch = ["src/**/*.rs", "Cargo.toml"]
+env = { RUST_LOG = "debug" }
+
+[tools.myapp.profiles.release]
+command = "cargo build --target wasm32-wasip1 --release"
+env = { RUST_LOG = "warn" }
+
+[tools.myapp.profiles.production]
+command = "cargo build --target wasm32-wasip1 --release"
+env = { RUST_LOG = "error", RUST_BACKTRACE = "1" }
+
+[tools.myapp.up]
+profile = "dev"
+
+[tools.myapp.deploy]
+profile = "production"
+"#;
+        let config = FtlConfig::parse(content).unwrap();
+
+        let tool = &config.tools["myapp"];
+
+        // Check profiles exist
+        assert!(tool.profiles.is_some());
+        let profiles = tool.profiles.as_ref().unwrap();
+        assert_eq!(profiles.profiles.len(), 3);
+
+        // Check dev profile
+        let dev = &profiles.profiles["dev"];
+        assert_eq!(dev.command, "cargo build --target wasm32-wasip1");
+        assert_eq!(dev.watch.len(), 2);
+        assert_eq!(dev.env.get("RUST_LOG"), Some(&"debug".to_string()));
+
+        // Check release profile
+        let release = &profiles.profiles["release"];
+        assert_eq!(
+            release.command,
+            "cargo build --target wasm32-wasip1 --release"
+        );
+        assert_eq!(release.env.get("RUST_LOG"), Some(&"warn".to_string()));
+
+        // Check production profile
+        let prod = &profiles.profiles["production"];
+        assert_eq!(prod.env.get("RUST_BACKTRACE"), Some(&"1".to_string()));
+
+        // Check up configuration
+        assert_eq!(tool.get_up_profile(), Some("dev"));
+
+        // Check deploy configuration
+        assert_eq!(tool.deploy.as_ref().unwrap().profile, "production");
+
+        // Test getting build commands for different profiles
+        assert_eq!(
+            tool.get_build_command(Some("dev")),
+            "cargo build --target wasm32-wasip1"
+        );
+        assert_eq!(
+            tool.get_build_command(Some("release")),
+            "cargo build --target wasm32-wasip1 --release"
+        );
+        assert_eq!(
+            tool.get_build_command(None),
+            "cargo build --target wasm32-wasip1"
+        ); // default
+    }
+
+    #[test]
+    fn test_deploy_configuration() {
+        // Test tool with deploy config
+        let content = r#"
+[project]
+name = "test-project"
+
+[tools.calc]
+path = "calc"
+wasm = "calc/target/wasm32-wasip1/release/calc.wasm"
+
+[tools.calc.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
+[tools.calc.deploy]
+profile = "release"
+name = "calculator"
+
+[tools.weather]
+path = "weather"
+wasm = "weather/dist/weather.wasm"
+
+[tools.weather.build]
+command = "npm run build"
+
+[tools.weather.deploy]
+profile = "production"
+"#;
+        let config = FtlConfig::parse(content).unwrap();
+
+        // Check calc tool with custom name
+        assert_eq!(
+            config.tools["calc"].deploy.as_ref().unwrap().profile,
+            "release"
+        );
+        assert_eq!(
+            config.tools["calc"].deploy.as_ref().unwrap().name,
+            Some("calculator".to_string())
+        );
+
+        // Check weather tool without custom name
+        assert_eq!(
+            config.tools["weather"].deploy.as_ref().unwrap().profile,
+            "production"
+        );
+        assert!(
+            config.tools["weather"]
+                .deploy
+                .as_ref()
+                .unwrap()
+                .name
+                .is_none()
+        );
     }
 }

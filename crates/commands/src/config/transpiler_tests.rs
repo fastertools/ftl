@@ -36,17 +36,92 @@ fn test_transpile_minimal_config() {
 }
 
 #[test]
+fn test_generate_temp_spin_toml_absolute_paths() {
+    use ftl_runtime::deps::FileSystem;
+    use crate::test_helpers::MockFileSystemMock;
+    use std::sync::Arc;
+    
+    // Use a real temporary directory for the test
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_path = temp_dir.path();
+    let ftl_path = project_path.join("ftl.toml");
+    
+    let mut fs_mock = MockFileSystemMock::new();
+    
+    // Mock ftl.toml exists
+    let ftl_path_clone = ftl_path.clone();
+    fs_mock
+        .expect_exists()
+        .withf(move |path| path == &ftl_path_clone)
+        .returning(|_| true);
+    
+    // Mock reading ftl.toml with relative paths
+    let ftl_content = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.my-tool]
+path = "my-tool"
+wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
+
+[tools.my-tool.build]
+command = "cargo build --release --target wasm32-wasip1"
+"#;
+    
+    fs_mock
+        .expect_read_to_string()
+        .withf(move |path| path == &ftl_path)
+        .returning(move |_| Ok(ftl_content.to_string()));
+    
+    let fs: Arc<dyn FileSystem> = Arc::new(fs_mock);
+    
+    // Generate temp spin.toml
+    let result = generate_temp_spin_toml(&fs, project_path).unwrap();
+    assert!(result.is_some());
+    
+    let temp_path = result.unwrap();
+    
+    // Read the generated spin.toml
+    let spin_content = std::fs::read_to_string(&temp_path).unwrap();
+    
+    // Verify that paths are absolute - they should start with /
+    // Note: We can't check exact paths because canonicalize() may resolve symlinks
+    // (e.g., /var -> /private/var on macOS)
+    
+    // Check that wasm path is absolute
+    assert!(spin_content.contains("source = \"/"), 
+            "Expected wasm path to be absolute (start with /) in:\n{}", spin_content);
+    
+    // Check that the wasm path ends with the expected relative part
+    assert!(spin_content.contains("/my-tool/target/wasm32-wasip1/release/my_tool.wasm\""),
+            "Expected wasm path to contain the correct relative path in:\n{}", spin_content);
+    
+    // Check that workdir is absolute
+    assert!(spin_content.contains("workdir = \"/"),
+            "Expected workdir to be absolute (start with /) in:\n{}", spin_content);
+    
+    // Check that workdir ends with the expected relative part
+    assert!(spin_content.contains("/my-tool\""),
+            "Expected workdir to contain the correct relative path in:\n{}", spin_content);
+}
+
+#[test]
 fn test_transpile_with_tools() {
     let mut tools = HashMap::new();
     tools.insert(
         "echo-tool".to_string(),
         ToolConfig {
-            path: "echo-tool".to_string(),
+            path: Some("echo-tool".to_string()),
+            wasm: "echo-tool/target/wasm32-wasip1/release/echo_tool.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec![],
             variables: HashMap::new(),
         },
@@ -54,12 +129,16 @@ fn test_transpile_with_tools() {
     tools.insert(
         "weather".to_string(),
         ToolConfig {
-            path: "weather-ts".to_string(),
+            path: Some("weather-ts".to_string()),
+            wasm: "weather-ts/dist/weather.wasm".to_string(),
             build: BuildConfig {
                 command: "npm run build:custom".to_string(),
                 watch: vec!["src/**/*.ts".to_string()],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec!["https://api.weather.com".to_string()],
             variables: HashMap::new(),
         },
@@ -102,12 +181,16 @@ fn test_transpile_with_variables() {
     tools.insert(
         "api-tool".to_string(),
         ToolConfig {
-            path: "api-tool".to_string(),
+            path: Some("api-tool".to_string()),
+            wasm: "api-tool/target/wasm32-wasip1/release/api_tool.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec![],
             variables,
         },
@@ -147,9 +230,10 @@ fn test_transpile_with_auth() {
         },
         auth: AuthConfig {
             enabled: true,
-            provider: "authkit".to_string(),
-            issuer: "https://my-tenant.authkit.app".to_string(),
-            audience: "mcp-api".to_string(),
+            authkit: Some(AuthKitConfig {
+                issuer: "https://my-tenant.authkit.app".to_string(),
+                audience: "mcp-api".to_string(),
+            }),
             oidc: None,
         },
         tools: HashMap::new(),
@@ -191,12 +275,16 @@ fn test_transpile_with_application_variables() {
     tools.insert(
         "api-consumer".to_string(),
         ToolConfig {
-            path: "api-consumer".to_string(),
+            path: Some("api-consumer".to_string()),
+            wasm: "api-consumer/target/wasm32-wasip1/release/api_consumer.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec!["{{ api_url }}".to_string()],
             variables: tool_vars,
         },
@@ -251,12 +339,16 @@ fn test_transpile_simple_variable_reference() {
     tools.insert(
         "hello".to_string(),
         ToolConfig {
-            path: "hello".to_string(),
+            path: Some("hello".to_string()),
+            wasm: "hello/target/wasm32-wasip1/release/hello.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec![],
             variables: tool_vars,
         },
@@ -388,12 +480,16 @@ fn test_transpile_variable_edge_cases() {
     tools.insert(
         "edge-case-tool".to_string(),
         ToolConfig {
-            path: "edge-tool".to_string(),
+            path: Some("edge-tool".to_string()),
+            wasm: "edge-tool/target/wasm32-wasip1/release/edge_tool.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
             },
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec![],
             variables: tool_vars,
         },

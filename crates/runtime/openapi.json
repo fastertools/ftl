@@ -44,9 +44,7 @@
         "operationId": "listApps",
         "summary": "List applications",
         "description": "Retrieves a paginated list of all applications for the authenticated user",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -141,9 +139,7 @@
         "operationId": "createApp",
         "summary": "Create a new application",
         "description": "Creates a new application resource. The app can then be deployed by calling the deployment endpoint.",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -226,9 +222,7 @@
         "operationId": "createDeployment",
         "summary": "Create a new deployment",
         "description": "Triggers a new deployment for an application. If the app does not exist, it will be created automatically. This operation is asynchronous and returns immediately while the deployment runs in the background.",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -315,9 +309,7 @@
         "operationId": "getApp",
         "summary": "Get application details",
         "description": "Retrieves detailed information for a specific application by ID",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -391,9 +383,7 @@
         "operationId": "deleteApp",
         "summary": "Delete an application",
         "description": "Permanently deletes an application and triggers cleanup on the provider",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -464,89 +454,12 @@
         }
       }
     },
-    "/v1/registry/repositories": {
-      "post": {
-        "operationId": "createEcrRepository",
-        "summary": "Create ECR repository",
-        "description": "Creates an ECR repository for storing container images for a specific tool in the authenticated tenant namespace",
-        "tags": [
-          "Registry"
-        ],
-        "parameters": [
-          {
-            "in": "header",
-            "name": "Authorization",
-            "schema": {
-              "description": "Bearer token for authentication",
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "description": "Bearer token for authentication"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateEcrRepositoryRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Repository created successfully or already exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateEcrRepositoryResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/registry/tokens": {
       "post": {
         "operationId": "createEcrToken",
         "summary": "Create ECR authorization token",
         "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories in the authenticated tenant namespace",
-        "tags": [
-          "Registry"
-        ],
+        "tags": ["Registry"],
         "parameters": [
           {
             "in": "header",
@@ -593,6 +506,176 @@
           }
         }
       }
+    },
+    "/v1/apps/{appId}/components": {
+      "get": {
+        "operationId": "listAppComponents",
+        "summary": "List components for an app",
+        "description": "Retrieves a list of all components for a specific application",
+        "tags": ["Apps"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "schema": {
+              "description": "Application ID (UUID)",
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Application ID (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of components retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListComponentsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateComponents",
+        "summary": "Update components for an app",
+        "description": "Sets the desired state of components for an application. Components not in the list will be removed. This is an idempotent operation.",
+        "tags": ["Apps"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "schema": {
+              "description": "Application ID (UUID)",
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Application ID (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateComponentsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Components updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateComponentsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -608,45 +691,40 @@
             "maxLength": 63
           }
         },
-        "required": [
-          "appName"
-        ]
+        "required": ["appName"]
       },
       "CreateDeploymentRequest": {
         "description": "Request body for creating a deployment",
         "type": "object",
         "properties": {
-          "tools": {
-            "description": "List of tools to deploy with the application",
+          "components": {
+            "description": "List of components to deploy with the application",
             "minItems": 1,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "name": {
-                  "description": "Tool name identifier",
+                "componentName": {
+                  "description": "Component name",
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 100
+                  "maxLength": 50
                 },
                 "tag": {
-                  "description": "Tool version tag",
+                  "description": "Component version tag",
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 128
                 },
                 "allowedHosts": {
-                  "description": "Allowed host patterns for the tool",
+                  "description": "Allowed host patterns for the component",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 }
               },
-              "required": [
-                "name",
-                "tag"
-              ]
+              "required": ["componentName", "tag"]
             }
           },
           "variables": {
@@ -657,24 +735,33 @@
             }
           }
         },
-        "required": [
-          "tools"
-        ]
+        "required": ["components"]
       },
-      "CreateEcrRepositoryRequest": {
-        "description": "Request body for creating an ECR repository",
+      "UpdateComponentsRequest": {
+        "description": "Request body for updating components",
         "type": "object",
         "properties": {
-          "toolName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50,
-            "pattern": "^[a-zA-Z0-9_-]+$"
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "componentName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z0-9_-]+$"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": ["componentName"]
+            }
           }
         },
-        "required": [
-          "toolName"
-        ]
+        "required": ["components"]
       },
       "ListAppsResponse": {
         "description": "List of applications with pagination",
@@ -695,14 +782,7 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "PENDING",
-                    "CREATING",
-                    "ACTIVE",
-                    "FAILED",
-                    "DELETING",
-                    "DELETED"
-                  ]
+                  "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
                 },
                 "providerUrl": {
                   "type": "string",
@@ -718,13 +798,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "appId",
-                "appName",
-                "status",
-                "createdAt",
-                "updatedAt"
-              ],
+              "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
               "additionalProperties": false
             }
           },
@@ -732,9 +806,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "apps"
-        ],
+        "required": ["apps"],
         "additionalProperties": false
       },
       "ErrorResponse": {
@@ -752,9 +824,7 @@
             "items": {}
           }
         },
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "additionalProperties": false
       },
       "CreateAppResponse": {
@@ -771,14 +841,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "CREATING",
-              "ACTIVE",
-              "FAILED",
-              "DELETING",
-              "DELETED"
-            ]
+            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
           },
           "createdAt": {
             "type": "string"
@@ -787,13 +850,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "appId",
-          "appName",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
+        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
         "additionalProperties": false
       },
       "CreateDeploymentResponse": {
@@ -821,13 +878,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "deploymentId",
-          "appId",
-          "appName",
-          "status",
-          "message"
-        ],
+        "required": ["deploymentId", "appId", "appName", "status", "message"],
         "additionalProperties": false
       },
       "App": {
@@ -844,14 +895,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "CREATING",
-              "ACTIVE",
-              "FAILED",
-              "DELETING",
-              "DELETED"
-            ]
+            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
           },
           "providerUrl": {
             "type": "string",
@@ -867,13 +911,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "appId",
-          "appName",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
+        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
         "additionalProperties": false
       },
       "DeleteAppResponse": {
@@ -884,30 +922,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "message"
-        ],
-        "additionalProperties": false
-      },
-      "CreateEcrRepositoryResponse": {
-        "description": "Response for successful repository creation",
-        "type": "object",
-        "properties": {
-          "repositoryUri": {
-            "type": "string"
-          },
-          "repositoryName": {
-            "type": "string"
-          },
-          "alreadyExists": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "repositoryUri",
-          "repositoryName",
-          "alreadyExists"
-        ],
+        "required": ["message"],
         "additionalProperties": false
       },
       "CreateEcrTokenResponse": {
@@ -931,13 +946,100 @@
             "type": "string"
           }
         },
-        "required": [
-          "registryUri",
-          "authorizationToken",
-          "proxyEndpoint",
-          "expiresAt",
-          "region"
-        ],
+        "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
+        "additionalProperties": false
+      },
+      "ListComponentsResponse": {
+        "description": "List of components for an app",
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          },
+          "appName": {
+            "type": "string"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "componentName": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "repositoryUri": {
+                  "type": "string"
+                },
+                "repositoryName": {
+                  "type": "string"
+                }
+              },
+              "required": ["componentName"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["appId", "appName", "components"],
+        "additionalProperties": false
+      },
+      "UpdateComponentsResponse": {
+        "description": "Response for successful components update",
+        "type": "object",
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "componentName": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "repositoryUri": {
+                  "type": "string"
+                },
+                "repositoryName": {
+                  "type": "string"
+                }
+              },
+              "required": ["componentName"],
+              "additionalProperties": false
+            }
+          },
+          "changes": {
+            "type": "object",
+            "properties": {
+              "created": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "updated": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["created", "updated", "removed"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["components", "changes"],
         "additionalProperties": false
       }
     },

@@ -86,6 +86,7 @@ pub async fn execute_with_deps(
 }
 
 /// Inner deployment logic separated for proper cleanup handling
+#[allow(clippy::too_many_lines)]
 async fn execute_deploy_inner(
     deps: Arc<DeployDependencies>,
     variables: Vec<String>,
@@ -96,13 +97,23 @@ async fn execute_deploy_inner(
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
+    // Parse ftl.toml to determine build profiles and deploy names
+    let ftl_content = deps.file_system.read_to_string(Path::new("ftl.toml"))?;
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+
+    // Determine which build profile to use for deployment
+    // For now, use release mode if any tool has deploy.profile = "release" or no profile specified
+    let use_release = ftl_config.tools.values().any(|tool| {
+        tool.deploy.as_ref().is_none_or(|d| d.profile == "release") // Default to release if no deploy config
+    });
+
     // Build the project first
     spinner.finish_and_clear();
     deps.ui
         .print_styled("→ Building project...", MessageStyle::Cyan);
     deps.ui.print("");
 
-    deps.build_executor.execute(None, true).await?;
+    deps.build_executor.execute(None, use_release).await?;
 
     deps.ui.print("");
 
@@ -145,10 +156,57 @@ async fn execute_deploy_inner(
     spinner.set_message("Logging into registry...");
     docker_login(&deps.command_executor, &ecr_creds).await?;
 
-    // Create repositories and push components to ECR
+    // Get or create the app first
+    spinner.set_message("Checking if box exists...");
+    let existing_apps = deps
+        .api_client
+        .list_apps(None, None, Some(&config.app_name))
+        .await
+        .map_err(|e| anyhow!("Failed to check existing apps: {}", e))?;
+
+    let app_id = if existing_apps.apps.is_empty() {
+        // Box doesn't exist, create it first
+        spinner.set_message("Creating box...");
+        let create_app_request = types::CreateAppRequest {
+            app_name: config.app_name
+                .as_str()
+                .try_into()
+                .map_err(|e| anyhow!("Invalid app name: {}", e))?,
+        };
+
+        let create_response = deps
+            .api_client
+            .create_app(&create_app_request)
+            .await
+            .map_err(|e| anyhow!("Failed to create box: {}", e))?;
+
+        create_response.app_id
+    } else {
+        // Box exists, use its ID
+        existing_apps.apps[0].app_id
+    };
+
+    // Create a mapping of tool names to their deploy names
+    let deploy_names: HashMap<String, String> = ftl_config
+        .tools
+        .iter()
+        .filter_map(|(name, tool)| {
+            tool.deploy
+                .as_ref()
+                .and_then(|d| d.name.as_ref())
+                .map(|deploy_name| (name.clone(), deploy_name.clone()))
+        })
+        .collect();
+
+    // Ensure components exist and push to ECR
     spinner.finish_and_clear();
-    let deployed_tools =
-        create_repositories_and_push_with_progress(&config.components, deps.clone()).await?;
+    let deployed_components = ensure_components_and_push(
+        &app_id.to_string(),
+        &config.components,
+        deploy_names,
+        deps.clone(),
+    )
+    .await?;
 
     // Parse variables from command line
     let mut parsed_variables = parse_variables(&variables)?;
@@ -175,8 +233,8 @@ async fn execute_deploy_inner(
 
     let deployment = deploy_to_ftl_with_progress(
         deps.clone(),
-        config.app_name,
-        deployed_tools,
+        app_id.to_string(),
+        deployed_components,
         parsed_variables,
         spinner,
     )
@@ -236,25 +294,19 @@ fn add_auth_variables_from_ftl(
         variables.insert("auth_enabled".to_string(), "true".to_string());
     }
 
-    if !config.auth.provider.is_empty() && !variables.contains_key("auth_provider_type") {
-        variables.insert(
-            "auth_provider_type".to_string(),
-            config.auth.provider.clone(),
-        );
+    let provider_type = config.auth.provider_type();
+    if !provider_type.is_empty() && !variables.contains_key("auth_provider_type") {
+        variables.insert("auth_provider_type".to_string(), provider_type.to_string());
     }
 
-    if !config.auth.issuer.is_empty() && !variables.contains_key("auth_provider_issuer") {
-        variables.insert(
-            "auth_provider_issuer".to_string(),
-            config.auth.issuer.clone(),
-        );
+    let issuer = config.auth.issuer();
+    if !issuer.is_empty() && !variables.contains_key("auth_provider_issuer") {
+        variables.insert("auth_provider_issuer".to_string(), issuer.to_string());
     }
 
-    if !config.auth.audience.is_empty() && !variables.contains_key("auth_provider_audience") {
-        variables.insert(
-            "auth_provider_audience".to_string(),
-            config.auth.audience.clone(),
-        );
+    let audience = config.auth.audience();
+    if !audience.is_empty() && !variables.contains_key("auth_provider_audience") {
+        variables.insert("auth_provider_audience".to_string(), audience.to_string());
     }
 
     // Add OIDC-specific variables if present
@@ -451,10 +503,12 @@ async fn docker_login(
 }
 
 #[allow(clippy::too_many_lines)]
-async fn create_repositories_and_push_with_progress(
+async fn ensure_components_and_push(
+    app_id: &str,
     components: &[ComponentInfo],
+    deploy_names: HashMap<String, String>,
     deps: Arc<DeployDependencies>,
-) -> Result<Vec<types::CreateDeploymentRequestToolsItem>> {
+) -> Result<Vec<types::CreateDeploymentRequestComponentsItem>> {
     // Check if wkg is available before starting
     deps.command_executor
         .check_command_exists("wkg")
@@ -463,6 +517,49 @@ async fn create_repositories_and_push_with_progress(
             "wkg not found. Install from: https://github.com/bytecodealliance/wasm-pkg-tools",
         )?;
 
+    // Step 1: Ensure all components exist with their repositories
+    deps.ui.print("→ Ensuring components and repositories...");
+    deps.ui.print("");
+    
+    // Build the update request with all components
+    let component_updates: Vec<_> = components.iter().map(|comp| {
+        let component_name = deploy_names
+            .get(&comp.name)
+            .cloned()
+            .unwrap_or_else(|| comp.name.clone());
+        
+        Ok(types::UpdateComponentsRequestComponentsItem {
+            component_name: component_name.as_str().try_into().map_err(|e| anyhow!("Invalid component name: {}", e))?,
+            description: None,
+        })
+    }).collect::<Result<Vec<_>>>()?;
+    
+    let update_request = types::UpdateComponentsRequest {
+        components: component_updates,
+    };
+    
+    // Update all components in one atomic operation
+    let update_response = deps.api_client
+        .update_components(app_id, &update_request)
+        .await
+        .map_err(|e| anyhow!("Failed to update components: {}", e))?;
+    
+    // Log what changed
+    if !update_response.changes.created.is_empty() {
+        deps.ui.print_styled(
+            &format!("  ✓ Created components: {}", update_response.changes.created.join(", ")),
+            MessageStyle::Success
+        );
+    }
+    if !update_response.changes.updated.is_empty() {
+        deps.ui.print_styled(
+            &format!("  ✓ Updated components: {}", update_response.changes.updated.join(", ")),
+            MessageStyle::Success
+        );
+    }
+    
+    // Step 2: Push all components to their repositories
+    deps.ui.print("");
     deps.ui.print(&format!(
         "→ Pushing {} components in parallel",
         components.len()
@@ -471,7 +568,7 @@ async fn create_repositories_and_push_with_progress(
 
     let multi_progress = deps.ui.create_multi_progress();
     let mut tasks = JoinSet::new();
-    let deployed_tools = Arc::new(Mutex::new(Vec::new()));
+    let deployed_components = Arc::new(Mutex::new(Vec::new()));
 
     // Track errors across all tasks
     let error_flag = Arc::new(Mutex::new(None::<String>));
@@ -479,15 +576,27 @@ async fn create_repositories_and_push_with_progress(
     // Limit concurrent operations
     let semaphore = Arc::new(Semaphore::new(4));
 
+    // Create a lookup map for component -> repository URI
+    let component_repos: HashMap<String, String> = update_response.components
+        .iter()
+        .filter_map(|c| {
+            c.repository_uri.as_ref().map(|uri| {
+                (c.component_name.clone(), uri.clone())
+            })
+        })
+        .collect();
+
     for component in components {
         let pb = multi_progress.add_spinner();
         pb.set_prefix(format!("[{}]", component.name));
-        pb.set_message("Verifying repository...");
+        pb.set_message("Preparing to push...");
         pb.enable_steady_tick(deps.clock.duration_from_millis(100));
 
         let component = component.clone();
+        let component_repos = component_repos.clone();
+        let deploy_names = deploy_names.clone();
         let deps = deps.clone();
-        let deployed_tools = Arc::clone(&deployed_tools);
+        let deployed_components = Arc::clone(&deployed_components);
         let error_flag = Arc::clone(&error_flag);
         let semaphore = Arc::clone(&semaphore);
 
@@ -503,30 +612,21 @@ async fn create_repositories_and_push_with_progress(
 
             let start = deps.clock.now();
 
-            // Create repository
-            pb.set_message("Verifying repository...");
-            let repo_response = match deps
-                .api_client
-                .create_ecr_repository(&types::CreateEcrRepositoryRequest {
-                    tool_name: component.name.as_str().try_into()?,
-                })
-                .await
-            {
-                Ok(resp) => resp,
-                Err(e) => {
-                    pb.finish_with_message(format!("✗ Failed to create repository: {e}"));
-                    let mut error_guard = error_flag.lock().await;
-                    if error_guard.is_none() {
-                        *error_guard =
-                            Some(format!("Component '{}' failed: {}", component.name, e));
-                    }
-                    return Err(anyhow!("Failed to create repository: {}", e));
-                }
-            };
+            // Get the deployed component name (with any overrides applied)
+            let component_name = deploy_names
+                .get(&component.name)
+                .cloned()
+                .unwrap_or_else(|| component.name.clone());
+
+            // Get repository URI from the update response
+            let repository_uri = component_repos
+                .get(&component_name)
+                .ok_or_else(|| anyhow!("Component '{}' not found in update response", component_name))?
+                .clone();
 
             // Push component with version tag
             pb.set_message(&format!("Pushing v{}...", component.version));
-            let versioned_tag = format!("{}:{}", repo_response.repository_uri, component.version);
+            let versioned_tag = format!("{}:{}", repository_uri, component.version);
             let output = deps
                 .command_executor
                 .execute(
@@ -550,19 +650,11 @@ async fn create_repositories_and_push_with_progress(
                 return Err(anyhow!(error));
             }
 
-            // Add to deployed tools
-            let mut tools = deployed_tools.lock().await;
-            tools.push(types::CreateDeploymentRequestToolsItem {
-                name: component
-                    .name
-                    .as_str()
-                    .try_into()
-                    .map_err(|e| anyhow!("Invalid tool name: {}", e))?,
-                tag: component
-                    .version
-                    .as_str()
-                    .try_into()
-                    .map_err(|e| anyhow!("Invalid tag: {}", e))?,
+            // Add to deployment request
+            let mut components = deployed_components.lock().await;
+            components.push(types::CreateDeploymentRequestComponentsItem {
+                component_name: component_name.as_str().try_into()?,
+                tag: component.version.as_str().try_into()?,
                 allowed_hosts: component.allowed_outbound_hosts.clone().unwrap_or_default(),
             });
 
@@ -588,7 +680,7 @@ async fn create_repositories_and_push_with_progress(
         return Err(e);
     }
 
-    let tools = Arc::try_unwrap(deployed_tools).unwrap().into_inner();
+    let components = Arc::try_unwrap(deployed_components).unwrap().into_inner();
 
     deps.ui.print("");
     deps.ui.print_styled(
@@ -596,7 +688,7 @@ async fn create_repositories_and_push_with_progress(
         MessageStyle::Success,
     );
 
-    Ok(tools)
+    Ok(components)
 }
 
 async fn poll_app_deployment_status_with_progress(
@@ -664,50 +756,19 @@ async fn poll_app_deployment_status_with_progress(
 
 async fn deploy_to_ftl_with_progress(
     deps: Arc<DeployDependencies>,
-    app_name: String,
-    tools: Vec<types::CreateDeploymentRequestToolsItem>,
+    app_id: String,
+    components: Vec<types::CreateDeploymentRequestComponentsItem>,
     variables: HashMap<String, String>,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
 ) -> Result<types::App> {
-    // First check if app exists
-    spinner.set_message("Checking if box exists...");
-    let existing_apps = deps
-        .api_client
-        .list_apps(None, None, Some(&app_name))
-        .await
-        .map_err(|e| {
-            spinner.finish_and_clear();
-            anyhow!("Failed to check existing apps: {}", e)
-        })?;
-
-    let app_id = if existing_apps.apps.is_empty() {
-        // Box doesn't exist, create it first
-        spinner.set_message("Creating box...");
-        let create_app_request = types::CreateAppRequest {
-            app_name: app_name
-                .as_str()
-                .try_into()
-                .map_err(|e| anyhow!("Invalid app name: {}", e))?,
-        };
-
-        let create_response = deps
-            .api_client
-            .create_app(&create_app_request)
-            .await
-            .map_err(|e| {
-                spinner.finish_and_clear();
-                anyhow!("Failed to create box: {}", e)
-            })?;
-
-        create_response.app_id
-    } else {
-        // Box exists, use its ID
-        existing_apps.apps[0].app_id
-    };
-
-    // Now create the deployment
+    // Create the deployment
     spinner.set_message("Creating box deployment...");
-    let deployment_request = types::CreateDeploymentRequest { tools, variables };
+
+    // Use new API format with components
+    let deployment_request = types::CreateDeploymentRequest {
+        components,
+        variables,
+    };
 
     let deployment_response = deps
         .api_client
