@@ -66,10 +66,17 @@ pub struct DeployDependencies {
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) -> Result<()> {
-    deps.ui.print_styled(
-        &format!("{} Deploying project to FTL Engine", "▶"),
-        MessageStyle::Bold,
-    );
+    if args.dry_run {
+        deps.ui.print_styled(
+            &format!("{} Deploying project to FTL Engine (DRY RUN)", "▶"),
+            MessageStyle::Bold,
+        );
+    } else {
+        deps.ui.print_styled(
+            &format!("{} Deploying project to FTL Engine", "▶"),
+            MessageStyle::Bold,
+        );
+    }
     deps.ui.print("");
 
     // Generate temporary spin.toml from ftl.toml
@@ -141,6 +148,41 @@ async fn execute_deploy_inner(
         return Err(anyhow!("No user components found in spin.toml"));
     }
 
+    // Create a mapping of tool names to their deploy names
+    let deploy_names: HashMap<String, String> = ftl_config
+        .tools
+        .iter()
+        .filter_map(|(name, tool)| {
+            tool.deploy
+                .as_ref()
+                .and_then(|d| d.name.as_ref())
+                .map(|deploy_name| (name.clone(), deploy_name.clone()))
+        })
+        .collect();
+
+    // Parse variables from command line
+    let mut parsed_variables = parse_variables(&args.variables)?;
+
+    // If we have ftl.toml, extract variables and auth configuration
+    if deps.file_system.exists(Path::new("ftl.toml")) {
+        add_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
+        add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
+    }
+
+    // If this is a dry run, display summary and exit
+    if args.dry_run {
+        spinner.finish_and_clear();
+        display_dry_run_summary(
+            &deps,
+            &config,
+            use_release,
+            &parsed_variables,
+            args.auth_mode.as_ref(),
+            &deploy_names,
+        );
+        return Ok(());
+    }
+
     // Get ECR credentials
     spinner.set_message("Getting registry credentials...");
     let ecr_creds = deps
@@ -184,35 +226,15 @@ async fn execute_deploy_inner(
         existing_apps.apps[0].app_id
     };
 
-    // Create a mapping of tool names to their deploy names
-    let deploy_names: HashMap<String, String> = ftl_config
-        .tools
-        .iter()
-        .filter_map(|(name, tool)| {
-            tool.deploy
-                .as_ref()
-                .and_then(|d| d.name.as_ref())
-                .map(|deploy_name| (name.clone(), deploy_name.clone()))
-        })
-        .collect();
-
     // Ensure components exist and push to ECR
     spinner.finish_and_clear();
     let deployed_components = ensure_components_and_push(
         &app_id.to_string(),
         &config.components,
-        deploy_names,
+        deploy_names.clone(),
         deps.clone(),
     )
     .await?;
-
-    // Parse variables from command line
-    let mut parsed_variables = parse_variables(&args.variables)?;
-
-    // If we have ftl.toml, extract auth configuration and add to variables
-    if deps.file_system.exists(Path::new("ftl.toml")) {
-        add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
-    }
 
     // Update auth configuration BEFORE deployment if provided
     if let Some(auth_mode) = &args.auth_mode {
@@ -253,6 +275,46 @@ async fn execute_deploy_inner(
             return Err(anyhow!("Failed to refresh authentication token: {}", e));
         }
     };
+
+    // Show deployment variables
+    deps.ui.print("");
+    if parsed_variables.is_empty() {
+        deps.ui
+            .print_styled("→ No variables to deploy", MessageStyle::Yellow);
+    } else {
+        deps.ui.print_styled(
+            &format!(
+                "→ Deploying with {} variable{}:",
+                parsed_variables.len(),
+                if parsed_variables.len() == 1 { "" } else { "s" }
+            ),
+            MessageStyle::Cyan,
+        );
+
+        // Sort variables for consistent display
+        let mut sorted_vars: Vec<_> = parsed_variables.iter().collect();
+        sorted_vars.sort_by_key(|(k, _)| k.as_str());
+
+        for (key, value) in sorted_vars {
+            // Check if this is a sensitive variable
+            let is_sensitive = is_sensitive_variable(key);
+
+            let display_value = if is_sensitive {
+                // Show first few chars for debugging, but redact the rest
+                if value.len() > 4 {
+                    format!("{}***", &value[..2])
+                } else {
+                    "***".to_string()
+                }
+            } else {
+                value.clone()
+            };
+
+            // Add a lock icon for sensitive variables
+            let icon = if is_sensitive { "🔒 " } else { "   " };
+            deps.ui.print(&format!("{icon}{key} = {display_value}"));
+        }
+    }
 
     let deployment = deploy_to_ftl_with_progress(
         deps.clone(),
@@ -301,7 +363,135 @@ pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> 
     Ok(parsed)
 }
 
-/// Update authentication configuration for a deployed app
+/// Check if a variable name indicates it contains sensitive data
+pub(crate) fn is_sensitive_variable(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+
+    // Common patterns for sensitive variable names
+    let sensitive_patterns = [
+        "token",
+        "key",
+        "secret",
+        "password",
+        "pwd",
+        "pass",
+        "auth",
+        "credential",
+        "cred",
+        "api_key",
+        "apikey",
+        "private",
+        "priv",
+        "cert",
+        "certificate",
+        "sign",
+        "jwt",
+        "bearer",
+        "oauth",
+        "access",
+        "refresh",
+    ];
+
+    // Check if the variable name contains any sensitive pattern
+    sensitive_patterns
+        .iter()
+        .any(|pattern| name_lower.contains(pattern))
+}
+
+/// Display dry-run summary of what would be deployed
+fn display_dry_run_summary(
+    deps: &Arc<DeployDependencies>,
+    config: &DeployConfig,
+    use_release: bool,
+    parsed_variables: &HashMap<String, String>,
+    auth_mode: Option<&String>,
+    deploy_names: &HashMap<String, String>,
+) {
+    deps.ui.print("");
+    deps.ui.print_styled(
+        "🔍 DRY RUN MODE - No changes will be made",
+        MessageStyle::Bold,
+    );
+    deps.ui.print("");
+
+    // Engine information
+    deps.ui
+        .print_styled("Engine Configuration:", MessageStyle::Cyan);
+    deps.ui.print(&format!("  Name: {}", config.app_name));
+    deps.ui.print(&format!(
+        "  Build Profile: {}",
+        if use_release { "release" } else { "debug" }
+    ));
+    deps.ui.print("");
+
+    // Components to deploy
+    deps.ui
+        .print_styled("Components to Deploy:", MessageStyle::Cyan);
+    for component in &config.components {
+        let deploy_name = deploy_names
+            .get(&component.name)
+            .cloned()
+            .unwrap_or_else(|| component.name.clone());
+
+        deps.ui
+            .print(&format!("  • {} (v{})", deploy_name, component.version));
+        deps.ui
+            .print(&format!("    Source: {}", component.source_path));
+        if let Some(hosts) = &component.allowed_outbound_hosts {
+            if !hosts.is_empty() {
+                deps.ui
+                    .print(&format!("    Allowed outbound hosts: {}", hosts.join(", ")));
+            }
+        }
+    }
+    deps.ui.print("");
+
+    // Variables
+    if !parsed_variables.is_empty() {
+        deps.ui.print_styled(
+            &format!("Variables ({}):", parsed_variables.len()),
+            MessageStyle::Cyan,
+        );
+
+        let mut sorted_vars: Vec<_> = parsed_variables.iter().collect();
+        sorted_vars.sort_by_key(|(k, _)| k.as_str());
+
+        for (key, value) in sorted_vars {
+            let is_sensitive = is_sensitive_variable(key);
+            let display_value = if is_sensitive {
+                if value.len() > 4 {
+                    format!("{}***", &value[..2])
+                } else {
+                    "***".to_string()
+                }
+            } else {
+                value.clone()
+            };
+
+            let icon = if is_sensitive { "🔒 " } else { "   " };
+            deps.ui.print(&format!("{icon}{key} = {display_value}"));
+        }
+        deps.ui.print("");
+    }
+
+    // Authorization configuration
+    if let Some(mode) = auth_mode {
+        deps.ui
+            .print_styled("Authorization Configuration:", MessageStyle::Cyan);
+        deps.ui.print(&format!("  Mode: {mode}"));
+        deps.ui.print("");
+    }
+
+    deps.ui.print_styled(
+        "✓ Dry run complete. No changes were made.",
+        MessageStyle::Success,
+    );
+    deps.ui.print("");
+    deps.ui
+        .print("To perform the actual deployment, run the command without --dry-run");
+}
+
+/// Update authorization configuration for a deployed app
 async fn update_auth_config(
     deps: Arc<DeployDependencies>,
     app_id: &str,
@@ -463,18 +653,45 @@ fn add_auth_variables_from_ftl(
     Ok(())
 }
 
+/// Add general variables from ftl.toml to the variables map
+fn add_variables_from_ftl(
+    file_system: &Arc<dyn FileSystem>,
+    variables: &mut HashMap<String, String>,
+) -> Result<()> {
+    use crate::config::ftl_config::{ApplicationVariable, FtlConfig};
+
+    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
+    let config = FtlConfig::parse(&content)?;
+
+    // Add application-level variables that have default values
+    // Required variables without defaults must be provided via CLI or env vars
+    for (name, var) in &config.variables {
+        // Only add if not already provided via command line
+        if !variables.contains_key(name) {
+            match var {
+                ApplicationVariable::Default { default } => {
+                    variables.insert(name.clone(), default.clone());
+                }
+                ApplicationVariable::Required { .. } => {
+                    // Required variables must be provided at runtime
+                    // We don't add them here, they'll be handled by Spin
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Parse deployment configuration from spin.toml
 pub fn parse_deploy_config(
     file_system: &Arc<dyn FileSystem>,
     manifest_path: &Path,
 ) -> Result<DeployConfig> {
-    // For temporary files, we need to read directly since FileSystem trait doesn't know about them
-    let content = if manifest_path.starts_with("/tmp") || manifest_path.starts_with("/var/folders")
-    {
-        std::fs::read_to_string(manifest_path).context("Failed to read temporary spin.toml")?
-    } else {
-        file_system.read_to_string(manifest_path)?
-    };
+    // Always use the FileSystem trait for consistency and testability
+    let content = file_system
+        .read_to_string(manifest_path)
+        .context("Failed to read spin.toml")?;
     let toml: toml::Value = toml::from_str(&content).context("Failed to parse spin.toml")?;
 
     let app_name = toml
@@ -925,6 +1142,8 @@ pub struct DeployArgs {
     pub auth_issuer: Option<String>,
     /// Custom auth audience
     pub auth_audience: Option<String>,
+    /// Run without making any changes (preview what would be deployed)
+    pub dry_run: bool,
 }
 
 // Build executor implementation

@@ -1090,6 +1090,27 @@ pub fn test_ecr_credentials() -> types::CreateEcrTokenResponse {
     }
 }
 
-// Note: test_component and test_component_repository functions removed as
-// Component and ComponentRepository types no longer exist in the new API.
-// Use types::CreateComponentResponse or types::ListComponentsResponseComponentsItem instead.
+/// Creates a test auth config response for use in tests.
+///
+/// This function returns a valid `AuthConfigResponse` with test values.
+///
+/// # Example
+///
+/// ```ignore
+/// use ftl_commands::test_helpers::test_auth_config_response;
+///
+/// let auth_response = test_auth_config_response();
+/// assert!(matches!(auth_response.mode, types::AuthConfigResponseMode::Public));
+/// ```
+pub fn test_auth_config_response() -> types::AuthConfigResponse {
+    types::AuthConfigResponse {
+        app_id: "app-12345".to_string(),
+        auth_config: types::AuthConfigResponseAuthConfig {
+            mode: types::AuthConfigResponseAuthConfigMode::Public,
+            custom_config: None,
+            allowed_users: vec![],
+            allowed_tenants: vec![],
+        },
+        updated_at: 1_234_567_890.0,
+    }
+}

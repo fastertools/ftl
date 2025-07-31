@@ -95,6 +95,63 @@ fn setup_project_file_mocks(fixture: &mut TestFixture, has_ftl_toml: bool) {
     setup_project_file_mocks_with_content(fixture, has_ftl_toml, None);
 }
 
+/// Setup for file system mocks that handles all ftl.toml access patterns
+/// This function sets up mocks for:
+/// 1. `generate_temp_spin_toml` checking ./ftl.toml
+/// 2. `generate_temp_spin_toml` reading ./ftl.toml  
+/// 3. deploy reading ftl.toml for `FtlConfig` parsing
+/// 4. variable loading checking and reading ftl.toml
+/// 5. `parse_deploy_config` reading the generated spin.toml
+/// 6. Component version file checks
+fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &str) {
+    // Parse ftl config to generate expected spin.toml content
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(ftl_toml_content).unwrap();
+    let expected_spin_content =
+        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+
+    // Mock for any existence check of ftl.toml (with or without ./ prefix)
+    let _ftl_content_for_exists = ftl_toml_content.to_string();
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| {
+            let path_str = path.to_string_lossy();
+            path_str == "./ftl.toml" || path_str == "ftl.toml"
+        })
+        .returning(move |path| {
+            let path_str = path.to_string_lossy();
+            path_str == "./ftl.toml" || path_str == "ftl.toml"
+        });
+
+    // Mock for any read of ftl.toml (with or without ./ prefix)
+    let ftl_content_for_read = ftl_toml_content.to_string();
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .withf(|path: &Path| {
+            let path_str = path.to_string_lossy();
+            path_str == "./ftl.toml" || path_str == "ftl.toml"
+        })
+        .returning(move |_| Ok(ftl_content_for_read.clone()));
+
+    // Mock for parse_deploy_config reading the generated spin.toml
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .withf(|path: &Path| path.to_string_lossy().ends_with("spin.toml"))
+        .returning(move |_| Ok(expected_spin_content.clone()));
+
+    // Mock component version file checks - handle all possible paths
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| {
+            let path_str = path.to_string_lossy();
+            path_str.contains("Cargo.toml") || path_str.contains("package.json")
+        })
+        .returning(|_| false);
+}
+
 /// Helper to set up project file mocks with custom ftl.toml content
 fn setup_project_file_mocks_with_content(
     fixture: &mut TestFixture,
@@ -146,7 +203,18 @@ command = "echo 'Building test tool'"
             .times(1)
             .returning(move |_| Ok(content_for_build.clone()));
 
-        // Note: We don't mock the temp file creation since it happens outside our FileSystem trait
+        // Generate expected spin.toml content and mock its reading
+        let ftl_config = crate::config::ftl_config::FtlConfig::parse(&content).unwrap();
+        let expected_spin_content =
+            crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+
+        // Mock: read generated spin.toml
+        fixture
+            .file_system
+            .expect_read_to_string()
+            .withf(|path: &Path| path.to_string_lossy().ends_with("spin.toml"))
+            .times(1)
+            .returning(move |_| Ok(expected_spin_content.clone()));
     }
     // No else clause - we always require ftl.toml now
 }
@@ -174,8 +242,17 @@ async fn test_deploy_no_ftl_toml() {
 async fn test_deploy_authentication_expired() {
     let mut fixture = TestFixture::new();
 
-    // Set up project files - no ftl.toml, but spin.toml exists
-    setup_project_file_mocks(&mut fixture, true);
+    // This test checks authentication failure with ftl.toml
+    let ftl_content = r#"[project]
+name = "test-app"
+version = "0.1.0"
+
+[tools.test-tool]
+wasm = "test.wasm"
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#;
+    setup_comprehensive_ftl_mocks(&mut fixture, ftl_content);
 
     // Mock: clock for progress bar
     fixture
@@ -645,12 +722,12 @@ fn setup_basic_mocks(fixture: &mut TestFixture) {
         .times(0..=1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml for auth variables extraction
+    // Mock: read ftl.toml for variables extraction (might be called twice - once for general variables, once for auth)
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(0..=1)
+        .times(0..=2)
         .returning(|_| {
             Ok(r#"[project]
 name = "test-project"
@@ -1189,13 +1266,13 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml again for auth variables extraction
+    // Mock: read ftl.toml for variables extraction (both general and auth)
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Called twice: once for general variables, once for auth variables
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1235,6 +1312,19 @@ command = "cargo build --release --target wasm32-wasip1"
         .returning(|_| Ok(()));
 
     setup_successful_push_for_api(&mut fixture);
+
+    // Generate expected spin.toml content and mock its reading
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
+    let expected_spin_content =
+        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+
+    // Mock: read generated spin.toml for parse_deploy_config
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .withf(|path: &Path| path.to_string_lossy().ends_with("spin.toml"))
+        .times(1)
+        .returning(move |_| Ok(expected_spin_content.clone()));
 
     // Verify auth variables are passed through to deployment request
     fixture
@@ -1389,13 +1479,13 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml again for auth variables extraction
+    // Mock: read ftl.toml for variables extraction (both general and auth)
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Called twice: once for general variables, once for auth variables
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1435,6 +1525,19 @@ command = "cargo build --release --target wasm32-wasip1"
         .returning(|_| Ok(()));
 
     setup_successful_push_for_api(&mut fixture);
+
+    // Generate expected spin.toml content and mock its reading
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
+    let expected_spin_content =
+        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+
+    // Mock: read generated spin.toml for parse_deploy_config
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .withf(|path: &Path| path.to_string_lossy().ends_with("spin.toml"))
+        .times(1)
+        .returning(move |_| Ok(expected_spin_content.clone()));
 
     // Verify CLI variables override ftl.toml values
     fixture
@@ -1536,6 +1639,7 @@ fn default_deploy_args() -> DeployArgs {
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
+        dry_run: false,
     }
 }
 
@@ -1548,6 +1652,7 @@ fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
+        dry_run: false,
     }
 }
 
@@ -1649,6 +1754,7 @@ async fn test_auth_config_updated_before_deployment() {
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
+        dry_run: false,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -1671,4 +1777,886 @@ async fn test_auth_config_updated_before_deployment() {
         "Auth config should be updated first"
     );
     // Deployment won't happen because auth config failed, which is fine for this test
+}
+
+#[test]
+#[allow(clippy::cognitive_complexity)]
+fn test_is_sensitive_variable() {
+    // Import the function from the parent module
+    use super::is_sensitive_variable;
+
+    // Test sensitive patterns
+    assert!(is_sensitive_variable("api_token"));
+    assert!(is_sensitive_variable("API_TOKEN"));
+    assert!(is_sensitive_variable("secret_key"));
+    assert!(is_sensitive_variable("password"));
+    assert!(is_sensitive_variable("my_password"));
+    assert!(is_sensitive_variable("pwd"));
+    assert!(is_sensitive_variable("auth_key"));
+    assert!(is_sensitive_variable("credential"));
+    assert!(is_sensitive_variable("api_key"));
+    assert!(is_sensitive_variable("apikey"));
+    assert!(is_sensitive_variable("private_key"));
+    assert!(is_sensitive_variable("priv_data"));
+    assert!(is_sensitive_variable("certificate"));
+    assert!(is_sensitive_variable("cert_data"));
+    assert!(is_sensitive_variable("signing_key"));
+    assert!(is_sensitive_variable("jwt_secret"));
+    assert!(is_sensitive_variable("bearer_token"));
+    assert!(is_sensitive_variable("oauth_secret"));
+    assert!(is_sensitive_variable("access_token"));
+    assert!(is_sensitive_variable("refresh_token"));
+    assert!(is_sensitive_variable("GITHUB_ACCESS_TOKEN"));
+    assert!(is_sensitive_variable("aws_secret_access_key"));
+
+    // Test non-sensitive patterns
+    assert!(!is_sensitive_variable("api_url"));
+    assert!(!is_sensitive_variable("environment"));
+    assert!(!is_sensitive_variable("debug_mode"));
+    assert!(!is_sensitive_variable("port"));
+    assert!(!is_sensitive_variable("host"));
+    assert!(!is_sensitive_variable("timeout"));
+    assert!(!is_sensitive_variable("max_retries"));
+    assert!(!is_sensitive_variable("api_version"));
+}
+
+#[tokio::test]
+async fn test_deploy_with_sensitive_variables() {
+    let mut fixture = TestFixture::new();
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+    setup_successful_deployment(&mut fixture);
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    // Deploy with various sensitive and non-sensitive variables
+    let args = DeployArgs {
+        variables: vec![
+            "api_token=super-secret-token".to_string(),
+            "api_url=https://api.example.com".to_string(),
+            "database_password=db-pass-123".to_string(),
+            "environment=production".to_string(),
+            "jwt_secret=jwt-secret-value".to_string(),
+            "debug_mode=false".to_string(),
+        ],
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    let output = ui.get_output();
+
+    // Check that sensitive variables are redacted in output
+    assert!(!output.iter().any(|s| s.contains("super-secret-token")));
+    assert!(!output.iter().any(|s| s.contains("db-pass-123")));
+    assert!(!output.iter().any(|s| s.contains("jwt-secret-value")));
+
+    // Check that partial values might be shown (first 2 chars)
+    assert!(output.iter().any(|s| s.contains("su***"))); // api_token
+    assert!(output.iter().any(|s| s.contains("db***"))); // database_password
+    assert!(output.iter().any(|s| s.contains("jw***"))); // jwt_secret
+
+    // Check that non-sensitive variables are shown in full
+    assert!(output.iter().any(|s| s.contains("https://api.example.com")));
+    assert!(output.iter().any(|s| s.contains("production")));
+    assert!(output.iter().any(|s| s.contains("false")));
+
+    // Check that lock icons are shown for sensitive vars
+    assert!(output.iter().any(|s| s.contains("🔒 api_token")));
+    assert!(output.iter().any(|s| s.contains("🔒 database_password")));
+    assert!(output.iter().any(|s| s.contains("🔒 jwt_secret")));
+
+    // Check that non-sensitive vars don't have lock icons
+    assert!(output.iter().any(|s| s.contains("   api_url")));
+    assert!(output.iter().any(|s| s.contains("   environment")));
+    assert!(output.iter().any(|s| s.contains("   debug_mode")));
+}
+
+#[tokio::test]
+async fn test_deploy_with_short_sensitive_values() {
+    let mut fixture = TestFixture::new();
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+    setup_successful_deployment(&mut fixture);
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    // Deploy with short sensitive values (4 chars or less)
+    let args = DeployArgs {
+        variables: vec![
+            "key=abc".to_string(),
+            "token=xyz".to_string(),
+            "secret=1234".to_string(),
+        ],
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    let output = ui.get_output();
+
+    // Check that short sensitive values are fully redacted
+    assert!(!output.iter().any(|s| s.contains("abc")));
+    assert!(!output.iter().any(|s| s.contains("xyz")));
+    assert!(!output.iter().any(|s| s.contains("1234")));
+
+    // Should show *** for short values
+    assert!(output.iter().any(|s| s.contains("key = ***")));
+    assert!(output.iter().any(|s| s.contains("token = ***")));
+    assert!(output.iter().any(|s| s.contains("secret = ***")));
+}
+
+#[tokio::test]
+async fn test_deploy_dry_run() {
+    let mut fixture = TestFixture::new();
+
+    // Setup project file mocks
+    setup_project_file_mocks(&mut fixture, true);
+
+    // Mock: check for ftl.toml when extracting variables
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: read ftl.toml for variables extraction (both general and auth)
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(2)  // Called twice: once for general variables, once for auth variables
+        .returning(|_| {
+            Ok(r#"[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.test-tool]
+path = "test"
+wasm = "test/test-tool.wasm"
+
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#
+            .to_string())
+        });
+
+    // Mock: component version files don't exist (use default)
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .returning(|_| false);
+
+    // Mock: clock for progress bar
+    fixture
+        .clock
+        .expect_duration_from_millis()
+        .returning(Duration::from_millis);
+
+    // Build executor succeeds
+
+    // Mock: credentials succeed (for authentication check)
+    fixture
+        .credentials_provider
+        .expect_get_or_refresh_credentials()
+        .times(1)
+        .returning(|| Ok(test_credentials()));
+
+    // No API calls should be made in dry-run mode
+    // No ECR token creation, no docker login, no app creation, etc.
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    // Deploy with dry-run flag
+    let args = DeployArgs {
+        variables: vec![
+            "api_token=test-token-123".to_string(),
+            "api_url=https://api.example.com".to_string(),
+            "debug_mode=true".to_string(),
+        ],
+        auth_mode: Some("public".to_string()),
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    let output = ui.get_output();
+
+    // Check that dry-run mode is indicated
+    assert!(output.iter().any(|s| s.contains("DRY RUN MODE")));
+    assert!(output.iter().any(|s| s.contains("No changes will be made")));
+
+    // Check engine configuration
+    assert!(output.iter().any(|s| s.contains("Engine Configuration:")));
+    assert!(output.iter().any(|s| s.contains("Name: test-project")));
+    assert!(output.iter().any(|s| s.contains("Build Profile: release")));
+
+    // Check components section
+    assert!(output.iter().any(|s| s.contains("Components to Deploy:")));
+    assert!(output.iter().any(|s| s.contains("test-tool")));
+
+    // Check variables section with proper redaction
+    assert!(output.iter().any(|s| s.contains("Variables (3):")));
+    assert!(output.iter().any(|s| s.contains("🔒 api_token = te***")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("   api_url = https://api.example.com"))
+    );
+    assert!(output.iter().any(|s| s.contains("   debug_mode = true")));
+
+    // Check auth configuration
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Authorization Configuration:"))
+    );
+    assert!(output.iter().any(|s| s.contains("Mode: public")));
+
+    // Check completion message
+    assert!(output.iter().any(|s| s.contains("Dry run complete")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("run the command without --dry-run"))
+    );
+
+    // Make sure no deployment success message appears
+    assert!(!output.iter().any(|s| s.contains("Deployed!")));
+    assert!(!output.iter().any(|s| s.contains("MCP URL:")));
+}
+
+#[tokio::test]
+async fn test_deploy_dry_run_no_variables() {
+    let mut fixture = TestFixture::new();
+
+    // Setup project file mocks
+    setup_project_file_mocks(&mut fixture, true);
+
+    // Mock: check for ftl.toml when extracting variables
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| true);
+
+    // Mock: read ftl.toml for variables extraction (both general and auth)
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(2)  // Called twice: once for general variables, once for auth variables
+        .returning(|_| {
+            Ok(r#"[project]
+name = "test-project"
+version = "0.1.0"
+
+[tools.test-tool]
+path = "test"
+wasm = "test/test-tool.wasm"
+
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#
+            .to_string())
+        });
+
+    // Mock: component version files don't exist (use default)
+    fixture
+        .file_system
+        .expect_exists()
+        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .returning(|_| false);
+
+    // Mock: clock for progress bar
+    fixture
+        .clock
+        .expect_duration_from_millis()
+        .returning(Duration::from_millis);
+
+    // Mock: credentials succeed
+    fixture
+        .credentials_provider
+        .expect_get_or_refresh_credentials()
+        .times(1)
+        .returning(|| Ok(test_credentials()));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    // Deploy with dry-run flag but no variables
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    let output = ui.get_output();
+
+    // Should not show variables section when there are none
+    assert!(!output.iter().any(|s| s.contains("Variables")));
+
+    // Should not show auth section when not configured
+    assert!(
+        !output
+            .iter()
+            .any(|s| s.contains("Authorization Configuration:"))
+    );
+}
+
+#[tokio::test]
+async fn test_deploy_auth_mode_user_only() {
+    let mut fixture = TestFixture::new();
+
+    // Setup all basic mocks
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+    setup_successful_deployment(&mut fixture);
+
+    // Mock: update auth config is called
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
+    // Mock: create app returns specific ID
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    let deps = fixture.to_deps();
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: Some("user-only".to_string()),
+        auth_users: Some("user1,user2,user3".to_string()),
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_deploy_auth_mode_custom() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+    setup_successful_deployment(&mut fixture);
+
+    // Mock: update auth config with custom configuration
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    let deps = fixture.to_deps();
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: Some("custom".to_string()),
+        auth_users: None,
+        auth_provider: Some("authkit".to_string()),
+        auth_issuer: Some("https://auth.example.com".to_string()),
+        auth_audience: Some("my-api".to_string()),
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_deploy_auth_mode_custom_missing_required() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+
+    // Mock: list apps
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    let deps = fixture.to_deps();
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: Some("custom".to_string()),
+        auth_users: None,
+        auth_provider: Some("authkit".to_string()),
+        auth_issuer: None, // Missing required issuer
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Custom auth mode requires --auth-provider and --auth-issuer")
+    );
+}
+
+#[tokio::test]
+async fn test_deploy_invalid_auth_mode() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+
+    // Mock: list apps
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    let deps = fixture.to_deps();
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: Some("invalid-mode".to_string()),
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid auth mode")
+    );
+}
+
+#[tokio::test]
+async fn test_deploy_with_deploy_name_override() {
+    let mut fixture = TestFixture::new();
+
+    let ftl_toml_content = r#"[project]
+name = "test-app"
+version = "0.1.0"
+
+[tools.my-component]
+path = "my-component"
+wasm = "my-component/target/wasm32-wasip1/release/my_component.wasm"
+
+[tools.my-component.deploy]
+name = "custom-deployed-name"
+profile = "release"
+
+[tools.my-component.build]
+command = "cargo build --release"
+"#;
+
+    // Use comprehensive mock setup
+    setup_comprehensive_ftl_mocks(&mut fixture, ftl_toml_content);
+
+    // Setup remaining mocks
+    fixture
+        .clock
+        .expect_duration_from_millis()
+        .returning(Duration::from_millis);
+
+    fixture
+        .clock
+        .expect_duration_from_secs()
+        .returning(Duration::from_secs);
+
+    fixture.clock.expect_now().returning(Instant::now);
+
+    fixture
+        .credentials_provider
+        .expect_get_or_refresh_credentials()
+        .returning(|| Ok(test_credentials()));
+
+    setup_docker_login_success(&mut fixture);
+
+    fixture
+        .command_executor
+        .expect_check_command_exists()
+        .with(eq("wkg"))
+        .times(1)
+        .returning(|_| Ok(()));
+
+    // Mock: update components should receive the custom deploy name
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "custom-deployed-name".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/custom-deployed-name"
+                            .to_string(),
+                    ),
+                    repository_name: Some("user/custom-deployed-name".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["custom-deployed-name".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Rest of the deployment mocks
+    fixture
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
+
+    setup_successful_deployment(&mut fixture);
+
+    let deps = fixture.to_deps();
+    let result = execute_with_deps(deps, default_deploy_args()).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_deploy_build_profile_debug() {
+    let mut fixture = TestFixture::new();
+
+    let ftl_toml_content = r#"[project]
+name = "test-app"
+version = "0.1.0"
+
+[tools.debug-component]
+path = "debug-component"
+wasm = "debug-component/target/wasm32-wasip1/debug/debug_component.wasm"
+
+[tools.debug-component.deploy]
+profile = "debug"
+
+[tools.debug-component.build]
+command = "cargo build"
+"#;
+
+    // Use comprehensive mock setup
+    setup_comprehensive_ftl_mocks(&mut fixture, ftl_toml_content);
+
+    fixture
+        .clock
+        .expect_duration_from_millis()
+        .returning(Duration::from_millis);
+
+    fixture
+        .credentials_provider
+        .expect_get_or_refresh_credentials()
+        .returning(|| Ok(test_credentials()));
+
+    // Mock build executor to verify debug mode is used
+    let build_executor = Arc::new(MockBuildExecutor::new());
+    let build_executor_clone = build_executor.clone();
+
+    let deps = Arc::new(DeployDependencies {
+        file_system: Arc::new(fixture.file_system),
+        command_executor: Arc::new(fixture.command_executor),
+        api_client: Arc::new(fixture.api_client),
+        clock: Arc::new(fixture.clock),
+        credentials_provider: Arc::new(fixture.credentials_provider),
+        ui: fixture.ui,
+        build_executor: build_executor_clone,
+        async_runtime: Arc::new(fixture.async_runtime),
+    });
+
+    // Dry run to test profile detection without full deployment
+    let args = DeployArgs {
+        variables: vec![],
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    // In debug mode, use_release should be false
+    // This would be better tested with a custom build executor that tracks the release flag
+}
+
+#[tokio::test]
+async fn test_deploy_required_variables_from_ftl() {
+    let mut fixture = TestFixture::new();
+
+    let ftl_toml_content = r#"[project]
+name = "test-app"
+version = "0.1.0"
+
+[variables]
+api_key = { required = true }
+database_url = { required = true }
+optional_var = { default = "default-value" }
+
+[tools.test-tool]
+path = "test"
+wasm = "test/test-tool.wasm"
+
+[tools.test-tool.build]
+command = "echo 'Building test tool'"
+"#;
+
+    // Use comprehensive mock setup
+    setup_comprehensive_ftl_mocks(&mut fixture, ftl_toml_content);
+
+    fixture
+        .clock
+        .expect_duration_from_millis()
+        .returning(Duration::from_millis);
+
+    fixture
+        .credentials_provider
+        .expect_get_or_refresh_credentials()
+        .returning(|| Ok(test_credentials()));
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+
+    // Dry run to check variable handling
+    let args = DeployArgs {
+        variables: vec!["api_key=provided-key".to_string()], // Only provide one required var
+        auth_mode: None,
+        auth_users: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
+
+    let output = ui.get_output();
+    // Should have the provided required var and the default
+    assert!(output.iter().any(|s| s.contains("api_key = pr***")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("optional_var = default-value"))
+    );
+    // Should NOT have database_url since it's required but not provided
+    assert!(!output.iter().any(|s| s.contains("database_url")));
+}
+
+#[tokio::test]
+async fn test_parse_variables_edge_cases() {
+    // Test empty value
+    let vars = vec!["KEY=".to_string()];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(parsed.get("KEY"), Some(&String::new()));
+
+    // Test value with multiple equals signs
+    let vars = vec!["URL=https://example.com?key=value&other=123".to_string()];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(
+        parsed.get("URL"),
+        Some(&"https://example.com?key=value&other=123".to_string())
+    );
+
+    // Test whitespace handling
+    let vars = vec![" KEY = value ".to_string()];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(parsed.get("KEY"), Some(&"value".to_string()));
+
+    // Test special characters in value
+    let vars = vec!["KEY=!@#$%^&*()[]{}".to_string()];
+    let parsed = parse_variables(&vars).unwrap();
+    assert_eq!(parsed.get("KEY"), Some(&"!@#$%^&*()[]{}".to_string()));
+}
+
+#[tokio::test]
+async fn test_deploy_partial_component_push_failure() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+
+    // Mock: list apps
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: update components succeeds
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Mock: wkg push fails
+    fixture
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: false,
+                stdout: vec![],
+                stderr: b"Failed to push component: Network error".to_vec(),
+            })
+        });
+
+    let deps = fixture.to_deps();
+    let result = execute_with_deps(deps, default_deploy_args()).await;
+
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Failed to push"));
 }

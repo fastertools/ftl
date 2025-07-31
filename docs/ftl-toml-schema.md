@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `ftl.toml` file is the primary configuration file for FTL projects. It defines your project metadata, tools, authentication settings, and deployment configuration.
+The `ftl.toml` file is the primary configuration file for FTL projects. It defines your project metadata, tools, authorization settings, and deployment configuration.
 
 ## Schema
 
@@ -11,7 +11,7 @@ The `ftl.toml` file is the primary configuration file for FTL projects. It defin
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `project` | object | Yes | Project metadata |
-| `auth` | object | No | Authentication configuration |
+| `auth` | object | No | Authorization configuration |
 | `tools` | object | No | Tool definitions |
 | `deployment` | object | No | Deployment settings |
 | `gateway` | object | No | Gateway component configuration |
@@ -94,13 +94,13 @@ When you run `ftl add`, it will create the appropriate build configuration based
 - **Rust**: Creates a cargo build configuration with wasm32-wasip1 target
 - **TypeScript/JavaScript**: Creates an npm build configuration
 
-### Authentication Section
+### Authorization Section
 
-Authentication is configured with provider-specific subsections:
+Authorization is configured with provider-specific subsections:
 
 ```toml
 [auth]
-enabled = false              # Required: Enable/disable authentication
+enabled = false              # Required: Enable/disable authorization
 
 # Option 1: AuthKit configuration
 [auth.authkit]
@@ -200,7 +200,7 @@ If you have an existing `spin.toml`, you can migrate to `ftl.toml` by:
 
 1. Extract project metadata to `[project]` section
 2. Move tool components to `[tools]` section
-3. Configure authentication in `[auth]` section
+3. Configure authorization in `[auth]` section
 4. Remove Spin-specific configuration (triggers, variables, etc.)
 
 The FTL CLI will automatically generate the appropriate `spin.toml` when needed.

@@ -189,6 +189,10 @@ enum EngCommand {
         /// Custom auth audience
         #[arg(long, value_name = "AUDIENCE", requires = "auth_provider")]
         auth_audience: Option<String>,
+
+        /// Run without making any changes (preview what would be deployed)
+        #[arg(long)]
+        dry_run: bool,
     },
     /// List all engines
     List {
@@ -571,6 +575,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
             auth_provider,
             auth_issuer,
             auth_audience,
+            dry_run,
         } => {
             let deploy_args = ftl_commands::deploy::DeployArgs {
                 variables: variable,
@@ -579,6 +584,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
                 auth_provider,
                 auth_issuer,
                 auth_audience,
+                dry_run,
             };
             ftl_commands::deploy::execute(deploy_args).await
         }

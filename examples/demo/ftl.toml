@@ -60,6 +60,22 @@ version = "0.0.9"
 authorizer_version = "0.0.9"
 validate_arguments = true
 
+# ========================================
+# Application Variables
+# ========================================
+# These variables can be used by tools and overridden at runtime
+# using environment variables with the SPIN_VARIABLE_ prefix
+
+[variables]
+# Variables with default values.
+# These are NOT accessible to any tool components unless you explicitly configure them for that component.
+# See [tools.variables-demo] for an example.
+# For the demo, we provide a default token so it runs without configuration.
+api_token = { default = "demo-token-12345" }
+api_url = { default = "https://api.example.com" }
+api_version = { default = "v2" }
+environment = { default = "staging" }
+
 # Echo tool (Rust)
 [tools.echo-rs]
 path = "echo-rs"
@@ -119,3 +135,15 @@ allowed_outbound_hosts = []
 [tools.multi-tools-ts.build]
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# Variables demo (Rust) - demonstrates using Spin variables
+[tools.variables-demo]
+path = "variables-demo-rs"
+wasm = "variables-demo-rs/target/wasm32-wasip1/release/variables_demo_rs.wasm"
+# This tool uses the application variables defined above
+variables = { api_token = "{{ api_token }}", api_url = "{{ api_url }}", api_version = "{{ api_version }}", environment = "{{ environment }}" }
+allowed_outbound_hosts = []
+
+[tools.variables-demo.build]
+command = "cargo build --target wasm32-wasip1 --release"
+watch = ["src/**/*.rs", "Cargo.toml"]
