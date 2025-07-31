@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a polyglot framework for [Model Context Protocol](https://modelcontextprotocol.io) servers. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for adding capabilities to AI agents with performant, sandboxed, remote-ready tools.
+FTL is a framework for polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for adding capabilities to AI agents with performant, sandboxed, remote-ready tools.
 
 Tools can be authored in multiple [source languages](./sdk/README.md) and run on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
@@ -122,7 +122,7 @@ FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](http
 <details>
 <summary><strong>⤵ Edge deployments on FTL Engine</strong></summary>
 
-FTL Engine is an end-to-end platform for running remote tools called by AI agents. It offers a distributed and flexible edge computing alternative to centralized MCP gateways and generic servers running language-specific MCP SDKs. FTL Engines are powerful enough to do meaningful work themselves and snappy enough to serve as fast proxies to other servers. Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
+FTL Engine is an end-to-end platform for running remote tools called by AI agents. Tools deployed on FTL engines are powerful enough to do meaningful work themselves and snappy enough to serve as fast proxies to other servers. Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
 
 - Tools cold start in under half a millisecond, automatically scale up to meet demand, and scale down to zero.
 - Cost scales simply and predictably with invocations. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out of the problem. Engine specs are fixed and scaling is completely horizontal and automatic.
@@ -167,6 +167,9 @@ Try it out with your MCP client
     }
   }
 }
+```
+```bash
+claude mcp add -t http faster-tools http://127.0.0.1:3000/mcp
 ```
 
 ### Ready to deploy?
@@ -241,7 +244,7 @@ graph TB
 - Tool components are individually isolated WebAssembly components with their own sandboxes.
 - Tool components are composed together with the FTL gateway components and run as a single MCP server process on the host.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
-- Cross-component calls happen in memory with no network latency, while maintaining security boundaries.
+- Cross-component calls happen in memory with no network latency, while maintaining secure boundaries.
 
 ## Contributing
 
