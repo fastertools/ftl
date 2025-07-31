@@ -10,6 +10,26 @@ use toml_edit::{Array, ArrayOfTables, InlineTable, Item, Table, Value};
 /// Default Spin manifest version
 const SPIN_MANIFEST_VERSION: i64 = 2;
 
+/// Parse a registry URI into a Spin source configuration
+/// Example: "ghcr.io/myorg/my-component:1.0.0" -> {registry: "ghcr.io", package: "myorg:my-component", version: "1.0.0"}
+fn parse_registry_uri_to_source(uri: &str) -> Item {
+    let mut source = InlineTable::new();
+
+    // Split by the last colon to separate version tag
+    if let Some((image, version)) = uri.rsplit_once(':') {
+        // Split the image part by the first slash to get registry and package
+        if let Some((registry, package)) = image.split_once('/') {
+            // Convert package from "owner/name" format to "owner:name" format for Spin
+            let package = package.replace('/', ":");
+            source.insert("registry", Value::from(registry));
+            source.insert("package", Value::from(package));
+            source.insert("version", Value::from(version));
+        }
+    }
+
+    Item::Value(Value::InlineTable(source))
+}
+
 /// Transpile an FTL configuration to Spin TOML format
 #[allow(clippy::too_many_lines)]
 pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
@@ -108,23 +128,13 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     ));
 
     // Add MCP authorizer component
-    let authorizer_version = if ftl_config.gateway.authorizer_version.is_empty() {
-        "0.0.9"
-    } else {
-        &ftl_config.gateway.authorizer_version
-    };
-    components["mcp"] = Item::Table(create_mcp_component(authorizer_version));
+    components["mcp"] = Item::Table(create_mcp_component(&ftl_config.mcp.authorizer));
 
     // Add gateway endpoint and component
     http_triggers.push(create_http_trigger("", "ftl-mcp-gateway", true));
-    let gateway_version = if ftl_config.gateway.version.is_empty() {
-        "0.0.9"
-    } else {
-        &ftl_config.gateway.version
-    };
     components["ftl-mcp-gateway"] = Item::Table(create_gateway_component(
-        gateway_version,
-        ftl_config.gateway.validate_arguments,
+        &ftl_config.mcp.gateway,
+        ftl_config.mcp.validate_arguments,
     ));
 
     // Add tool components
@@ -193,15 +203,23 @@ fn create_http_trigger(route: &str, component: &str, private: bool) -> Table {
 }
 
 /// Create MCP authorizer component configuration
-fn create_mcp_component(version: &str) -> Table {
+fn create_mcp_component(registry_uri: &str) -> Table {
     let mut component = Table::new();
 
-    // Source configuration
-    let mut source = InlineTable::new();
-    source.insert("registry", Value::from("ghcr.io"));
-    source.insert("package", Value::from("fastertools:mcp-authorizer"));
-    source.insert("version", Value::from(version));
-    component["source"] = Item::Value(Value::InlineTable(source));
+    // Parse the registry URI to determine if it's a full URI or needs to be built
+    let source_value = if registry_uri.contains(':') && registry_uri.contains('/') {
+        // Full registry URI provided (e.g., "ghcr.io/myorg/mcp-authorizer:1.0.0")
+        parse_registry_uri_to_source(registry_uri)
+    } else {
+        // Legacy: just a version number, build the default URI
+        let mut source = InlineTable::new();
+        source.insert("registry", Value::from("ghcr.io"));
+        source.insert("package", Value::from("fastertools:mcp-authorizer"));
+        source.insert("version", Value::from(registry_uri));
+        Item::Value(Value::InlineTable(source))
+    };
+
+    component["source"] = source_value;
 
     // Allowed hosts
     let mut hosts = Array::new();
@@ -231,15 +249,23 @@ fn create_mcp_component(version: &str) -> Table {
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(version: &str, validate_args: bool) -> Table {
+fn create_gateway_component(registry_uri: &str, validate_args: bool) -> Table {
     let mut component = Table::new();
 
-    // Source configuration
-    let mut source = InlineTable::new();
-    source.insert("registry", Value::from("ghcr.io"));
-    source.insert("package", Value::from("fastertools:mcp-gateway"));
-    source.insert("version", Value::from(version));
-    component["source"] = Item::Value(Value::InlineTable(source));
+    // Parse the registry URI to determine if it's a full URI or needs to be built
+    let source_value = if registry_uri.contains(':') && registry_uri.contains('/') {
+        // Full registry URI provided (e.g., "ghcr.io/myorg/mcp-gateway:1.0.0")
+        parse_registry_uri_to_source(registry_uri)
+    } else {
+        // Legacy: just a version number, build the default URI
+        let mut source = InlineTable::new();
+        source.insert("registry", Value::from("ghcr.io"));
+        source.insert("package", Value::from("fastertools:mcp-gateway"));
+        source.insert("version", Value::from(registry_uri));
+        Item::Value(Value::InlineTable(source))
+    };
+
+    component["source"] = source_value;
 
     // Allowed hosts
     let mut hosts = Array::new();

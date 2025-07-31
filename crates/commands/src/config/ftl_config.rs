@@ -25,10 +25,10 @@ pub struct FtlConfig {
     #[garde(custom(validate_tools))]
     pub tools: HashMap<String, ToolConfig>,
 
-    /// Gateway component configuration
+    /// MCP component configuration
     #[serde(default)]
     #[garde(dive)]
-    pub gateway: GatewayConfig,
+    pub mcp: McpConfig,
 
     /// Application-level variables
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -256,17 +256,19 @@ pub struct BuildConfig {
     pub env: HashMap<String, String>,
 }
 
-/// Gateway component configuration
+/// MCP component configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[garde(allow_unvalidated)]
-pub struct GatewayConfig {
-    /// Gateway component version
-    #[serde(default = "default_gateway_version")]
-    pub version: String,
+pub struct McpConfig {
+    /// Gateway component registry URI
+    /// Example: "ghcr.io/fastertools/mcp-gateway:0.0.9"
+    #[serde(default = "default_gateway_uri")]
+    pub gateway: String,
 
-    /// MCP authorizer component version
-    #[serde(default = "default_authorizer_version")]
-    pub authorizer_version: String,
+    /// MCP authorizer component registry URI
+    /// Example: "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+    #[serde(default = "default_authorizer_uri")]
+    pub authorizer: String,
 
     /// Whether to validate tool arguments
     #[serde(default = "default_true")]
@@ -277,23 +279,23 @@ fn default_version() -> String {
     "0.1.0".to_string()
 }
 
-fn default_gateway_version() -> String {
-    "0.0.9".to_string()
+fn default_gateway_uri() -> String {
+    "ghcr.io/fastertools/mcp-gateway:0.0.9".to_string()
 }
 
-fn default_authorizer_version() -> String {
-    "0.0.9".to_string()
+fn default_authorizer_uri() -> String {
+    "ghcr.io/fastertools/mcp-authorizer:0.0.9".to_string()
 }
 
 const fn default_true() -> bool {
     true
 }
 
-impl Default for GatewayConfig {
+impl Default for McpConfig {
     fn default() -> Self {
         Self {
-            version: default_gateway_version(),
-            authorizer_version: default_authorizer_version(),
+            gateway: default_gateway_uri(),
+            authorizer: default_authorizer_uri(),
             validate_arguments: default_true(),
         }
     }
@@ -819,10 +821,13 @@ name = "test-project"
         assert!(!config.auth.enabled);
         assert_eq!(config.auth.provider_type(), "");
 
-        // Check gateway defaults
-        assert_eq!(config.gateway.version, "0.0.9");
-        assert_eq!(config.gateway.authorizer_version, "0.0.9");
-        assert!(config.gateway.validate_arguments);
+        // Check MCP defaults
+        assert_eq!(config.mcp.gateway, "ghcr.io/fastertools/mcp-gateway:0.0.9");
+        assert_eq!(
+            config.mcp.authorizer,
+            "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+        );
+        assert!(config.mcp.validate_arguments);
     }
 
     #[test]
@@ -923,7 +928,7 @@ command = "npm run build"
             },
             auth: AuthConfig::default(),
             tools: HashMap::new(),
-            gateway: GatewayConfig::default(),
+            mcp: McpConfig::default(),
             variables: HashMap::new(),
         };
 
@@ -964,7 +969,7 @@ command = "npm run build"
             },
             auth: AuthConfig::default(),
             tools,
-            gateway: GatewayConfig::default(),
+            mcp: McpConfig::default(),
             variables: HashMap::new(),
         };
 

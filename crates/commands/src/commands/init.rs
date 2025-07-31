@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 
-use crate::config::ftl_config::{AuthConfig, FtlConfig, GatewayConfig, ProjectConfig};
+use crate::config::ftl_config::{AuthConfig, FtlConfig, McpConfig, ProjectConfig};
 use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
 use ftl_runtime::deps::{
     CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
@@ -168,7 +168,7 @@ fn create_ftl_project(
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 

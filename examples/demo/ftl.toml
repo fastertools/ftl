@@ -4,10 +4,22 @@ version = "0.1.0"
 description = "FTL MCP server for hosting MCP tools"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 
+[mcp]
+# You can specify registry URIs for custom MCP authorizer and gateway components:
+# gateway = "ghcr.io/myorg/custom-mcp-gateway:1.0.0"
+# authorizer = "ghcr.io/myorg/custom-mcp-authorizer:1.0.0"
+# Components from private repos can be accessed via `docker login`.
+# See https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
+# Default components:
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.9"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+# If true, the gateway component should automatically validate tool call arguments based on tool schema.
+validate_arguments = true
+
 # ========================================
-# Auth Gateway Configuration
+# Access control configuration
 # ========================================
-# Authentication is DISABLED by default. To enable, set auth_enabled = true
+# Access control is DISABLED by default. To enable, set auth_enabled = true
 
 [auth]
 enabled = false
@@ -55,22 +67,19 @@ enabled = false
 #   userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
 #   allowed_domains = "*.auth0.com"  # optional
 
-[gateway]
-version = "0.0.9"
-authorizer_version = "0.0.9"
-validate_arguments = true
-
 # ========================================
 # Application Variables
 # ========================================
 # These variables can be used by tools and overridden at runtime
-# using environment variables with the SPIN_VARIABLE_ prefix
+# using environment variables with the SPIN_VARIABLE_ prefix.
+# Variables with names indicating sensitivity e.g. 'key', 'secret', will be handled securely.
+# NEVER store actual secret values in ftl.toml!
 
 [variables]
 # Variables with default values.
 # These are NOT accessible to any tool components unless you explicitly configure them for that component.
 # See [tools.variables-demo] for an example.
-# For the demo, we provide a default token so it runs without configuration.
+# For the demo, we provide a default token value so it runs without runtime configuration.
 api_token = { default = "demo-token-12345" }
 api_url = { default = "https://api.example.com" }
 api_version = { default = "v2" }

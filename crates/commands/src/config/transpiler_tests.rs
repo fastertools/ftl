@@ -15,7 +15,7 @@ fn test_transpile_minimal_config() {
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -161,7 +161,7 @@ fn test_transpile_with_tools() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -213,7 +213,7 @@ fn test_transpile_with_variables() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -245,7 +245,7 @@ fn test_transpile_with_auth() {
             oidc: None,
         },
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -258,6 +258,40 @@ fn test_transpile_with_auth() {
         result.contains("auth_provider_issuer = { default = \"https://my-tenant.authkit.app\" }")
     );
     assert!(result.contains("auth_provider_audience = { default = \"mcp-api\" }"));
+}
+
+#[test]
+fn test_transpile_with_custom_gateway_uris() {
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "custom-gateway-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig::default(),
+        tools: HashMap::new(),
+        mcp: McpConfig {
+            gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
+            authorizer: "ghcr.io/myorg/custom-authorizer:2.0.0".to_string(),
+            validate_arguments: true,
+        },
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Check that custom URIs are properly parsed into source configurations
+    assert!(result.contains("[[trigger.http]]"));
+    assert!(result.contains("component = \"mcp\""));
+    assert!(result.contains("component = \"ftl-mcp-gateway\""));
+
+    // Verify the source configurations are correct
+    assert!(result.contains("[component.mcp]"));
+    assert!(result.contains("source = { registry = \"ghcr.io\", package = \"myorg:custom-authorizer\", version = \"2.0.0\" }"));
+
+    assert!(result.contains("[component.ftl-mcp-gateway]"));
+    assert!(result.contains("source = { registry = \"ghcr.io\", package = \"myorg:custom-gateway\", version = \"2.0.0\" }"));
 }
 
 #[test]
@@ -307,7 +341,7 @@ fn test_transpile_with_application_variables() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
@@ -371,7 +405,7 @@ fn test_transpile_simple_variable_reference() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
@@ -414,7 +448,7 @@ fn test_transpile_multiple_variable_types() {
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
@@ -438,7 +472,7 @@ fn test_transpile_empty_variables() {
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -512,7 +546,7 @@ fn test_transpile_variable_edge_cases() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
