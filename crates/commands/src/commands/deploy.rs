@@ -798,6 +798,20 @@ pub fn extract_component_version(
         }
     }
 
+    // Try go.mod for Go projects
+    let go_mod_path = component_dir.join("go.mod");
+    if file_system.exists(&go_mod_path) {
+        let go_mod_content = file_system.read_to_string(&go_mod_path)?;
+        // Go modules don't have a standard version field in go.mod
+        // Look for a version comment pattern: // Version: vX.Y.Z
+        if let Some(version_line) = go_mod_content.lines().find(|line| line.contains("// Version:")) {
+            if let Some(version_str) = version_line.split("// Version:").nth(1) {
+                let version = version_str.trim().trim_start_matches('v');
+                return Ok(version.to_string());
+            }
+        }
+    }
+
     // Default to 0.1.0 if no version found
     Ok("0.1.0".to_string())
 }

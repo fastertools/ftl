@@ -524,6 +524,11 @@ version = "1.2.3"
         .with(eq(Path::new("api/pyproject.toml")))
         .returning(|_| false);
 
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("api/go.mod")))
+        .returning(|_| false);
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "api", "api/api.wasm").unwrap();
     assert_eq!(version, "1.2.3");
@@ -549,6 +554,11 @@ async fn test_parse_package_json_version() {
     // Mock: pyproject.toml doesn't exist
     fs.expect_exists()
         .with(eq(Path::new("worker/pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("worker/go.mod")))
         .returning(|_| false);
 
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
@@ -585,9 +595,54 @@ version = "3.0.0"
             .to_string())
         });
 
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("python-tool/go.mod")))
+        .returning(|_| false);
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "python-tool", "python-tool/app.wasm").unwrap();
     assert_eq!(version, "3.0.0");
+}
+
+#[tokio::test]
+async fn test_parse_go_mod_version() {
+    let mut fs = MockFileSystemMock::new();
+
+    // Mock: Cargo.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/Cargo.toml")))
+        .returning(|_| false);
+
+    // Mock: package.json doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/package.json")))
+        .returning(|_| false);
+
+    // Mock: pyproject.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod exists
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/go.mod")))
+        .returning(|_| true);
+    fs.expect_read_to_string()
+        .with(eq(Path::new("go-tool/go.mod")))
+        .returning(|_| {
+            Ok(r#"module github.com/example/go-tool
+
+go 1.21
+
+// Version: v4.0.0
+"#
+            .to_string())
+        });
+
+    let fs: Arc<dyn FileSystem> = Arc::new(fs);
+    let version = extract_component_version(&fs, "go-tool", "go-tool/main.wasm").unwrap();
+    assert_eq!(version, "4.0.0");
 }
 
 #[tokio::test]
@@ -804,6 +859,7 @@ command = "echo 'Building test tool'"
             path.ends_with("Cargo.toml")
                 || path.ends_with("package.json")
                 || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
         })
         .returning(|_| false);
 
@@ -1145,6 +1201,11 @@ fn test_extract_component_version_default() {
         .with(eq(Path::new("pyproject.toml")))
         .returning(|_| false);
 
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go.mod")))
+        .returning(|_| false);
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
     assert_eq!(version, "0.1.0");
@@ -1353,6 +1414,7 @@ command = "cargo build --release --target wasm32-wasip1"
             path.ends_with("Cargo.toml")
                 || path.ends_with("package.json")
                 || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
         })
         .returning(|_| false);
 
@@ -1570,6 +1632,7 @@ command = "cargo build --release --target wasm32-wasip1"
             path.ends_with("Cargo.toml")
                 || path.ends_with("package.json")
                 || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
         })
         .returning(|_| false);
 
