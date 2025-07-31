@@ -268,17 +268,29 @@ func camelToSnake(s string) string {
 //
 //	func main() {}
 func CreateTools(tools map[string]ToolDefinition) {
+	// Capture tools in closure
+	toolsCopy := make(map[string]ToolDefinition)
+	for k, v := range tools {
+		toolsCopy[k] = v
+	}
+	
 	spinhttp.Handle(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		method := r.Method
 
 		// Log request for debugging
-		fmt.Printf("[DEBUG] Method: %s, Path: '%s', URI: '%s'\n", method, path, r.RequestURI)
+		fmt.Printf("[DEBUG] Method: %s, Path: '%s', URI: '%s', Tools count: %d\n", method, path, r.RequestURI, len(toolsCopy))
+		
+		// Debug: Print tool names
+		for key := range toolsCopy {
+			fmt.Printf("[DEBUG] Tool key: %s\n", key)
+		}
 
 		// Handle GET / - return tool metadata
 		if method == "GET" && (path == "/" || path == "") {
-			metadata := make([]ToolMetadata, 0, len(tools))
-			for key, tool := range tools {
+			fmt.Printf("[DEBUG] Handling GET request for tools metadata, found %d tools\n", len(toolsCopy))
+			metadata := make([]ToolMetadata, 0, len(toolsCopy))
+			for key, tool := range toolsCopy {
 				// Use explicit name if provided, otherwise convert from key
 				toolName := tool.Name
 				if toolName == "" {
@@ -313,7 +325,7 @@ func CreateTools(tools map[string]ToolDefinition) {
 
 			// Find the tool by name
 			var toolEntry *ToolDefinition
-			for key, tool := range tools {
+			for key, tool := range toolsCopy {
 				effectiveName := tool.Name
 				if effectiveName == "" {
 					effectiveName = camelToSnake(key)

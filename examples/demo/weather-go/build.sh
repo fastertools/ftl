@@ -8,5 +8,5 @@ if ! command -v tinygo &> /dev/null; then
     exit 1
 fi
 
-# Build with TinyGo
-tinygo build -o dist/weather-go.wasm -target=wasi main.go
+# Build with TinyGo using Spin-specific flags
+tinygo build -target=wasip1 -gc=leaking -buildmode=c-shared -no-debug -o dist/weather-go.wasm main.go

@@ -112,12 +112,6 @@ func wordCountHandler(input map[string]interface{}) ftl.ToolResponse {
 		caseSensitive = cs
 	}
 	
-	// Normalize text if case-insensitive
-	processedText := text
-	if !caseSensitive {
-		processedText = strings.ToLower(text)
-	}
-	
 	// Count words
 	words := strings.Fields(text)
 	wordCount := len(words)
