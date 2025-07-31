@@ -339,12 +339,13 @@ type UpdateComponentsFn = Box<
         + Send
         + Sync,
 >;
-type ListComponentsFn = Box<
-    dyn Fn(&str) -> Result<types::ListComponentsResponse>
+type ListComponentsFn = Box<dyn Fn(&str) -> Result<types::ListComponentsResponse> + Send + Sync>;
+type CreateEcrTokenFn = Box<dyn Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
+type UpdateAuthConfigFn = Box<
+    dyn Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
         + Send
         + Sync,
 >;
-type CreateEcrTokenFn = Box<dyn Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
 
 /// Manual mock implementation for `FtlApiClient` due to mockall issues with async traits and references.
 ///
@@ -359,6 +360,7 @@ pub struct MockFtlApiClientMock {
     update_components: Arc<Mutex<Option<UpdateComponentsFn>>>,
     list_app_components: Arc<Mutex<Option<ListComponentsFn>>>,
     create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
+    update_auth_config: Arc<Mutex<Option<UpdateAuthConfigFn>>>,
 }
 
 impl Default for MockFtlApiClientMock {
@@ -379,6 +381,7 @@ impl MockFtlApiClientMock {
             update_components: Arc::new(Mutex::new(None)),
             list_app_components: Arc::new(Mutex::new(None)),
             create_ecr_token: Arc::new(Mutex::new(None)),
+            update_auth_config: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -420,6 +423,11 @@ impl MockFtlApiClientMock {
     /// Set up expectation for `create_ecr_token` method
     pub fn expect_create_ecr_token(&mut self) -> CreateEcrTokenExpectation {
         CreateEcrTokenExpectation { mock: self }
+    }
+
+    /// Set up expectation for `update_auth_config` method
+    pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation {
+        UpdateAuthConfigExpectation { mock: self }
     }
 }
 
@@ -584,10 +592,7 @@ impl<'a> ListAppComponentsExpectation<'a> {
     /// Set the function to call when this expectation is matched
     pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn(&str) -> Result<types::ListComponentsResponse>
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(&str) -> Result<types::ListComponentsResponse> + Send + Sync + 'static,
     {
         *self.mock.list_app_components.lock().unwrap() = Some(Box::new(f));
         self.mock
@@ -612,6 +617,31 @@ impl<'a> CreateEcrTokenExpectation<'a> {
         F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
     {
         *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `update_auth_config` method
+pub struct UpdateAuthConfigExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> UpdateAuthConfigExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.update_auth_config.lock().unwrap() = Some(Box::new(f));
         self.mock
     }
 }
@@ -695,6 +725,18 @@ impl FtlApiClient for MockFtlApiClientMock {
             f()
         } else {
             Err(anyhow!("create_ecr_token not mocked"))
+        }
+    }
+
+    async fn update_auth_config(
+        &self,
+        app_id: &str,
+        request: &types::UpdateAuthConfigRequest,
+    ) -> Result<types::AuthConfigResponse> {
+        if let Some(ref f) = *self.update_auth_config.lock().unwrap() {
+            f(app_id, request)
+        } else {
+            Err(anyhow!("update_auth_config not mocked"))
         }
     }
 }

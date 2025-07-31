@@ -4,7 +4,7 @@ This guide explains how to handle secrets and sensitive configuration in FTL pro
 
 ## How Secrets Work in FTL
 
-FTL leverages Spin's variable system for managing secrets. When you deploy to FTL Boxes (which uses Fermyon's platform under the hood), secrets are handled through deployment-time variables.
+FTL leverages Spin's variable system for managing secrets. When you deploy to FTL Engine (which uses Fermyon's platform under the hood), secrets are handled through deployment-time variables.
 
 ### Key Concepts
 
@@ -74,10 +74,10 @@ spin up
 
 ### During Deployment
 
-When deploying to FTL Boxes, provide secrets via `--variable` flags:
+When deploying to FTL Engine, provide secrets via `--variable` flags:
 
 ```bash
-ftl box deploy \
+ftl eng deploy \
   --variable API_KEY="production-key-xyz789" \
   --variable DATABASE_PASSWORD="prod-db-password" \
   --variable JWT_SECRET="prod-signing-secret"
@@ -153,7 +153,7 @@ To update a secret after deployment, simply redeploy with the new value:
 
 ```bash
 # Deploy with updated secret
-ftl box deploy --variable API_KEY="new-production-key-abc123"
+ftl eng deploy --variable API_KEY="new-production-key-abc123"
 ```
 
 The platform will update the variable and restart your application with the new value.
@@ -211,7 +211,7 @@ cache_ttl = "{{ cache_ttl_seconds }}"
 
 Deploy with:
 ```bash
-ftl box deploy --variable OPENWEATHER_API_KEY="your-actual-api-key"
+ftl eng deploy --variable OPENWEATHER_API_KEY="your-actual-api-key"
 ```
 
 ## Limitations

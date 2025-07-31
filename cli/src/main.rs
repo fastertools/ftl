@@ -35,8 +35,8 @@ enum Commands {
     Registry(RegistryArgs),
     /// Manage pre-built tool components
     Tools(ToolsArgs),
-    /// Manage remote tools on FTL Boxes
-    Box(BoxArgs),
+    /// Manage remote tools on FTL Engine
+    Eng(EngArgs),
 }
 
 // Simple command wrappers - just forward arguments
@@ -138,14 +138,14 @@ struct TestArgs {
 // Complex commands with subcommands
 
 #[derive(Debug, Args)]
-struct BoxArgs {
+struct EngArgs {
     #[command(subcommand)]
-    command: BoxCommand,
+    command: EngCommand,
 }
 
 #[derive(Debug, Clone, Subcommand)]
-enum BoxCommand {
-    /// Log in to FTL Boxes
+enum EngCommand {
+    /// Log in to FTL Engine
     Login {
         /// Don't open browser automatically
         #[arg(long)]
@@ -157,37 +157,57 @@ enum BoxCommand {
         #[arg(long, hide = true)]
         client_id: Option<String>,
     },
-    /// Log out from FTL Boxes
+    /// Log out from FTL Engine
     Logout,
     /// Manage authentication
     Auth {
         #[command(subcommand)]
-        command: BoxAuthCommand,
+        command: EngAuthCommand,
     },
-    /// Deploy a box to FTL Boxes
+    /// Deploy an engine to FTL Engine
     Deploy {
         /// Variable(s) to be passed to the app
         #[arg(long, value_name = "KEY=VALUE")]
         variable: Vec<String>,
+
+        /// Set authentication mode (public, ftl-account, user-only, custom)
+        #[arg(long, value_name = "MODE")]
+        auth_mode: Option<String>,
+
+        /// Allowed users for user-only mode (comma-separated)
+        #[arg(long, value_name = "USER_IDS", requires = "auth_mode")]
+        auth_users: Option<String>,
+
+        /// Custom auth provider (authkit, auth0, oidc)
+        #[arg(long, value_name = "PROVIDER", requires = "auth_mode")]
+        auth_provider: Option<String>,
+
+        /// Custom auth issuer URL
+        #[arg(long, value_name = "URL", requires = "auth_provider")]
+        auth_issuer: Option<String>,
+
+        /// Custom auth audience
+        #[arg(long, value_name = "AUDIENCE", requires = "auth_provider")]
+        auth_audience: Option<String>,
     },
-    /// List all boxes
+    /// List all engines
     List {
         /// Output format
         #[arg(short, long, value_enum, default_value = "table")]
         format: OutputFormat,
     },
-    /// Get box status
+    /// Get engine status
     Status {
-        /// Box ID or name
-        box_id: String,
+        /// Engine ID or name
+        engine_id: String,
         /// Output format
         #[arg(short, long, value_enum, default_value = "table")]
         format: OutputFormat,
     },
-    /// Delete a box
+    /// Delete an engine
     Delete {
-        /// Box ID or name
-        box_id: String,
+        /// Engine ID or name
+        engine_id: String,
         /// Force deletion without confirmation
         #[arg(short, long)]
         force: bool,
@@ -195,7 +215,7 @@ enum BoxCommand {
 }
 
 #[derive(Debug, Clone, Subcommand)]
-enum BoxAuthCommand {
+enum EngAuthCommand {
     /// Show authentication status
     Status,
 }
@@ -402,16 +422,16 @@ impl From<TestArgs> for ftl_commands::test::TestArgs {
     }
 }
 
-// Box command conversions
-impl From<BoxAuthCommand> for ftl_commands::auth::AuthCommand {
-    fn from(cmd: BoxAuthCommand) -> Self {
+// Eng command conversions
+impl From<EngAuthCommand> for ftl_commands::auth::AuthCommand {
+    fn from(cmd: EngAuthCommand) -> Self {
         match cmd {
-            BoxAuthCommand::Status => Self::Status,
+            EngAuthCommand::Status => Self::Status,
         }
     }
 }
 
-impl From<OutputFormat> for ftl_commands::r#box::OutputFormat {
+impl From<OutputFormat> for ftl_commands::r#eng::OutputFormat {
     fn from(fmt: OutputFormat) -> Self {
         match fmt {
             OutputFormat::Table => Self::Table,
@@ -520,9 +540,9 @@ impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
     }
 }
 
-async fn handle_box_command(args: BoxArgs) -> Result<()> {
+async fn handle_eng_command(args: EngArgs) -> Result<()> {
     match args.command {
-        BoxCommand::Login {
+        EngCommand::Login {
             no_browser,
             authkit_domain,
             client_id,
@@ -534,47 +554,59 @@ async fn handle_box_command(args: BoxArgs) -> Result<()> {
             };
             ftl_commands::login::execute(login_args).await
         }
-        BoxCommand::Logout => {
+        EngCommand::Logout => {
             let logout_args = ftl_commands::logout::LogoutArgs {};
             ftl_commands::logout::execute(logout_args).await
         }
-        BoxCommand::Auth { command } => {
+        EngCommand::Auth { command } => {
             let auth_args = ftl_commands::auth::AuthArgs {
                 command: command.into(),
             };
             ftl_commands::auth::execute(auth_args).await
         }
-        BoxCommand::Deploy { variable } => {
+        EngCommand::Deploy {
+            variable,
+            auth_mode,
+            auth_users,
+            auth_provider,
+            auth_issuer,
+            auth_audience,
+        } => {
             let deploy_args = ftl_commands::deploy::DeployArgs {
                 variables: variable,
+                auth_mode,
+                auth_users,
+                auth_provider,
+                auth_issuer,
+                auth_audience,
             };
             ftl_commands::deploy::execute(deploy_args).await
         }
-        BoxCommand::List { format } => {
-            let box_args = ftl_commands::r#box::BoxArgs {
-                command: ftl_commands::r#box::BoxCommand::List {
+        EngCommand::List { format } => {
+            let eng_args = ftl_commands::r#eng::EngineArgs {
+                command: ftl_commands::r#eng::EngineCommand::List {
                     format: format.into(),
                 },
             };
-            ftl_commands::r#box::execute(box_args).await
+            ftl_commands::r#eng::execute(eng_args).await
         }
-        BoxCommand::Status { box_id, format } => {
-            let box_args = ftl_commands::r#box::BoxArgs {
-                command: ftl_commands::r#box::BoxCommand::Status {
-                    app_id: box_id,
+        EngCommand::Status { engine_id, format } => {
+            let eng_args = ftl_commands::r#eng::EngineArgs {
+                command: ftl_commands::r#eng::EngineCommand::Status {
+                    app_id: engine_id,
                     format: format.into(),
                 },
             };
-            ftl_commands::r#box::execute(box_args).await
+            ftl_commands::r#eng::execute(eng_args).await
         }
-        BoxCommand::Delete { box_id, force } => {
-            let box_args = ftl_commands::r#box::BoxArgs {
-                command: ftl_commands::r#box::BoxCommand::Delete {
-                    app_id: box_id,
+        EngCommand::Delete { engine_id, force } => {
+            let eng_args = ftl_commands::r#eng::EngineArgs {
+                command: ftl_commands::r#eng::EngineCommand::Delete {
+                    app_id: engine_id,
                     force,
                 },
             };
-            ftl_commands::r#box::execute(box_args).await
+            ftl_commands::r#eng::execute(eng_args).await
         }
     }
 }
@@ -601,6 +633,6 @@ async fn main() -> Result<()> {
         Commands::Test(args) => ftl_commands::test::execute(args.into()).await,
         Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
-        Commands::Box(args) => handle_box_command(args).await,
+        Commands::Eng(args) => handle_eng_command(args).await,
     }
 }

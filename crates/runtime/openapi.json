@@ -676,6 +676,102 @@
           }
         }
       }
+    },
+    "/v1/apps/{appId}/auth-config": {
+      "put": {
+        "operationId": "updateAuthConfig",
+        "summary": "Update authentication configuration",
+        "description": "Updates the authentication configuration for an application. This determines who can access the MCP endpoint and how authentication is performed.",
+        "tags": ["Apps"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "schema": {
+              "description": "Application ID (UUID)",
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Application ID (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuthConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication configuration updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -762,6 +858,50 @@
           }
         },
         "required": ["components"]
+      },
+      "UpdateAuthConfigRequest": {
+        "description": "Request body for updating authentication configuration",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["public", "ftl-account", "user-only", "custom"]
+          },
+          "customConfig": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "issuer": {
+                "type": "string",
+                "minLength": 1
+              },
+              "audience": {
+                "type": "string"
+              },
+              "jwksUri": {
+                "type": "string"
+              }
+            },
+            "required": ["provider", "issuer"]
+          },
+          "allowedUsers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowedTenants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["mode"]
       },
       "ListAppsResponse": {
         "description": "List of applications with pagination",
@@ -1040,6 +1180,65 @@
           }
         },
         "required": ["components", "changes"],
+        "additionalProperties": false
+      },
+      "AuthConfigResponse": {
+        "description": "Response for successful auth config update",
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "authConfig": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["public", "ftl-account", "user-only", "custom"]
+              },
+              "customConfig": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "issuer": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "audience": {
+                    "type": "string"
+                  },
+                  "jwksUri": {
+                    "type": "string"
+                  }
+                },
+                "required": ["provider", "issuer"],
+                "additionalProperties": false
+              },
+              "allowedUsers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowedTenants": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["mode"],
+            "additionalProperties": false
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": ["appId", "authConfig", "updatedAt"],
         "additionalProperties": false
       }
     },

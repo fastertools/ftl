@@ -1,4 +1,4 @@
-//! Box management commands
+//! Engine management commands
 
 use std::sync::Arc;
 
@@ -8,8 +8,8 @@ use uuid;
 use ftl_runtime::api_client::types;
 use ftl_runtime::deps::{FtlApiClient, MessageStyle, UserInterface};
 
-/// Dependencies for the box command
-pub struct BoxDependencies {
+/// Dependencies for the engine command
+pub struct EngDependencies {
     /// User interface for output and interaction
     pub ui: Arc<dyn UserInterface>,
     /// API client for making requests to the FTL service
@@ -26,12 +26,12 @@ pub enum OutputFormat {
 }
 
 /// Execute the list subcommand
-pub async fn list_with_deps(format: OutputFormat, deps: &Arc<BoxDependencies>) -> Result<()> {
+pub async fn list_with_deps(format: OutputFormat, deps: &Arc<EngDependencies>) -> Result<()> {
     let response = deps.api_client.list_apps(None, None, None).await?;
 
     if response.apps.is_empty() {
         deps.ui
-            .print_styled("No boxes found.", MessageStyle::Yellow);
+            .print_styled("No engines found.", MessageStyle::Yellow);
         return Ok(());
     }
 
@@ -45,30 +45,33 @@ pub async fn list_with_deps(format: OutputFormat, deps: &Arc<BoxDependencies>) -
 
 /// Execute the status subcommand
 pub async fn status_with_deps(
-    box_id: &str,
+    engine_id: &str,
     format: OutputFormat,
-    deps: &Arc<BoxDependencies>,
+    deps: &Arc<EngDependencies>,
 ) -> Result<()> {
     // Try to parse as UUID first
-    let box_info = if uuid::Uuid::parse_str(box_id).is_ok() {
+    let engine_info = if uuid::Uuid::parse_str(engine_id).is_ok() {
         // It's a valid UUID, use get_app
-        deps.api_client.get_app(box_id).await?
+        deps.api_client.get_app(engine_id).await?
     } else {
-        // Not a UUID, assume it's a box name and use list_apps with name filter
-        let response = deps.api_client.list_apps(None, None, Some(box_id)).await?;
+        // Not a UUID, assume it's a engine name and use list_apps with name filter
+        let response = deps
+            .api_client
+            .list_apps(None, None, Some(engine_id))
+            .await?;
 
         if response.apps.is_empty() {
-            return Err(anyhow!("Box '{}' not found", box_id));
+            return Err(anyhow!("Engine '{}' not found", engine_id));
         }
 
-        // Use list_apps with name filter to find the box, then get full details
-        let box_uuid = &response.apps[0].app_id.to_string();
-        deps.api_client.get_app(box_uuid).await?
+        // Use list_apps with name filter to find the engine, then get full details
+        let engine_uuid = &response.apps[0].app_id.to_string();
+        deps.api_client.get_app(engine_uuid).await?
     };
 
     match format {
-        OutputFormat::Table => display_box_status_table(&box_info, deps),
-        OutputFormat::Json => display_box_status_json(&box_info, deps)?,
+        OutputFormat::Table => display_engine_status_table(&engine_info, deps),
+        OutputFormat::Json => display_engine_status_json(&engine_info, deps)?,
     }
 
     Ok(())
@@ -76,35 +79,38 @@ pub async fn status_with_deps(
 
 /// Execute the delete subcommand
 pub async fn delete_with_deps(
-    box_id: &str,
+    engine_id: &str,
     force: bool,
-    deps: &Arc<BoxDependencies>,
+    deps: &Arc<EngDependencies>,
 ) -> Result<()> {
     // Get app status first to show what will be deleted
     // Try to parse as UUID first
-    let box_info = if uuid::Uuid::parse_str(box_id).is_ok() {
+    let engine_info = if uuid::Uuid::parse_str(engine_id).is_ok() {
         // It's a valid UUID, use get_app
-        deps.api_client.get_app(box_id).await?
+        deps.api_client.get_app(engine_id).await?
     } else {
-        // Not a UUID, assume it's a box name and use list_apps with name filter
-        let response = deps.api_client.list_apps(None, None, Some(box_id)).await?;
+        // Not a UUID, assume it's a engine name and use list_apps with name filter
+        let response = deps
+            .api_client
+            .list_apps(None, None, Some(engine_id))
+            .await?;
 
         if response.apps.is_empty() {
-            return Err(anyhow!("Box '{}' not found", box_id));
+            return Err(anyhow!("Engine '{}' not found", engine_id));
         }
 
-        // Use list_apps with name filter to find the box, then get full details
-        let box_uuid = &response.apps[0].app_id.to_string();
-        deps.api_client.get_app(box_uuid).await?
+        // Use list_apps with name filter to find the engine, then get full details
+        let engine_uuid = &response.apps[0].app_id.to_string();
+        deps.api_client.get_app(engine_uuid).await?
     };
 
     deps.ui
-        .print_styled("Box to be deleted:", MessageStyle::Yellow);
-    let name = &box_info.app_name;
-    let id = &box_info.app_id;
+        .print_styled("Engine to be deleted:", MessageStyle::Yellow);
+    let name = &engine_info.app_name;
+    let id = &engine_info.app_id;
     deps.ui.print(&format!("  Name: {name}"));
     deps.ui.print(&format!("  ID: {id}"));
-    if let Some(url) = &box_info.provider_url {
+    if let Some(url) = &engine_info.provider_url {
         deps.ui.print(&format!("  URL: {url}"));
     }
     deps.ui.print("");
@@ -123,12 +129,13 @@ pub async fn delete_with_deps(
         }
     }
 
-    deps.ui.print_styled("Deleting box...", MessageStyle::Cyan);
+    deps.ui
+        .print_styled("Deleting engine...", MessageStyle::Cyan);
 
     // Always use the UUID for deletion
     let response = deps
         .api_client
-        .delete_app(&box_info.app_id.to_string())
+        .delete_app(&engine_info.app_id.to_string())
         .await?;
 
     let msg = &response.message;
@@ -140,7 +147,7 @@ pub async fn delete_with_deps(
 
 // Helper functions
 
-fn display_apps_table(apps: &[types::ListAppsResponseAppsItem], deps: &Arc<BoxDependencies>) {
+fn display_apps_table(apps: &[types::ListAppsResponseAppsItem], deps: &Arc<EngDependencies>) {
     deps.ui.print("");
 
     for app in apps {
@@ -161,63 +168,63 @@ fn display_apps_table(apps: &[types::ListAppsResponseAppsItem], deps: &Arc<BoxDe
     }
 
     let count = apps.len();
-    let plural = if count == 1 { "" } else { "es" };
-    deps.ui.print(&format!("Total: {count} box{plural}"));
+    let plural = if count == 1 { "" } else { "s" };
+    deps.ui.print(&format!("Total: {count} engine{plural}"));
 }
 
 fn display_apps_json(
     apps: &[types::ListAppsResponseAppsItem],
-    deps: &Arc<BoxDependencies>,
+    deps: &Arc<EngDependencies>,
 ) -> Result<()> {
     let json = serde_json::to_string_pretty(&apps)?;
     deps.ui.print(&json);
     Ok(())
 }
 
-fn display_box_status_table(box_info: &types::App, deps: &Arc<BoxDependencies>) {
+fn display_engine_status_table(engine_info: &types::App, deps: &Arc<EngDependencies>) {
     deps.ui.print("");
-    deps.ui.print_styled("Box Details", MessageStyle::Bold);
-    let name = &box_info.app_name;
+    deps.ui.print_styled("Engine Details", MessageStyle::Bold);
+    let name = &engine_info.app_name;
     deps.ui.print(&format!("  Name:         {name}"));
-    let id = &box_info.app_id;
+    let id = &engine_info.app_id;
     deps.ui.print(&format!("  ID:           {id}"));
 
-    let status_text = box_info.status.to_string();
+    let status_text = engine_info.status.to_string();
     deps.ui.print(&format!("  Status:       {status_text}"));
 
-    if let Some(url) = &box_info.provider_url {
+    if let Some(url) = &engine_info.provider_url {
         deps.ui.print(&format!("  URL:          {url}"));
     }
 
-    if let Some(error) = &box_info.provider_error {
+    if let Some(error) = &engine_info.provider_error {
         deps.ui
             .print_styled(&format!("  Error:        {error}"), MessageStyle::Red);
     }
 
     deps.ui
-        .print(&format!("  Created:      {}", box_info.created_at));
+        .print(&format!("  Created:      {}", engine_info.created_at));
     deps.ui
-        .print(&format!("  Updated:      {}", box_info.updated_at));
+        .print(&format!("  Updated:      {}", engine_info.updated_at));
 
     deps.ui.print("");
 }
 
-fn display_box_status_json(box_info: &types::App, deps: &Arc<BoxDependencies>) -> Result<()> {
-    let json = serde_json::to_string_pretty(box_info)?;
+fn display_engine_status_json(engine_info: &types::App, deps: &Arc<EngDependencies>) -> Result<()> {
+    let json = serde_json::to_string_pretty(engine_info)?;
     deps.ui.print(&json);
     Ok(())
 }
 
-/// Box command arguments (matches CLI parser)
+/// Engine command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
-pub struct BoxArgs {
+pub struct EngineArgs {
     /// Subcommand
-    pub command: BoxCommand,
+    pub command: EngineCommand,
 }
 
 /// Application subcommands
 #[derive(Debug, Clone)]
-pub enum BoxCommand {
+pub enum EngineCommand {
     /// List all applications
     List {
         /// Output format
@@ -250,8 +257,8 @@ impl OutputFormat {
     }
 }
 
-/// Execute the box command with default dependencies
-pub async fn execute(args: BoxArgs) -> Result<()> {
+/// Execute the engine command with default dependencies
+pub async fn execute(args: EngineArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
     use ftl_runtime::deps::{CredentialsProvider, RealCredentialsProvider, RealFtlApiClient};
 
@@ -260,7 +267,7 @@ pub async fn execute(args: BoxArgs) -> Result<()> {
     let credentials = credentials_provider.get_or_refresh_credentials().await?;
 
     let ui = Arc::new(RealUserInterface);
-    let deps = Arc::new(BoxDependencies {
+    let deps = Arc::new(EngDependencies {
         ui: ui.clone(),
         api_client: Arc::new(RealFtlApiClient::new_with_auth(
             ftl_runtime::api_client::Client::new(ftl_runtime::config::DEFAULT_API_BASE_URL),
@@ -269,12 +276,12 @@ pub async fn execute(args: BoxArgs) -> Result<()> {
     });
 
     match args.command {
-        BoxCommand::List { format } => list_with_deps(format, &deps).await,
-        BoxCommand::Status { app_id, format } => status_with_deps(&app_id, format, &deps).await,
-        BoxCommand::Delete { app_id, force } => delete_with_deps(&app_id, force, &deps).await,
+        EngineCommand::List { format } => list_with_deps(format, &deps).await,
+        EngineCommand::Status { app_id, format } => status_with_deps(&app_id, format, &deps).await,
+        EngineCommand::Delete { app_id, force } => delete_with_deps(&app_id, force, &deps).await,
     }
 }
 
 #[cfg(test)]
-#[path = "box_tests.rs"]
+#[path = "eng_tests.rs"]
 mod tests;

@@ -111,6 +111,13 @@ pub trait FtlApiClient: Send + Sync {
 
     /// Create ECR token
     async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse>;
+
+    /// Update authentication configuration for an app
+    async fn update_auth_config(
+        &self,
+        app_id: &str,
+        request: &types::UpdateAuthConfigRequest,
+    ) -> Result<types::AuthConfigResponse>;
 }
 
 /// Time/clock operations
@@ -479,6 +486,27 @@ impl FtlApiClient for RealFtlApiClient {
             .await
             .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to create ECR token: {}", e))
+    }
+
+    async fn update_auth_config(
+        &self,
+        app_id: &str,
+        request: &types::UpdateAuthConfigRequest,
+    ) -> Result<types::AuthConfigResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .update_auth_config()
+            .app_id(app_id)
+            .authorization(format!("Bearer {auth}"))
+            .body(request)
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to update auth config: {}", e))
     }
 }
 

@@ -37,7 +37,7 @@ pub struct ComponentInfo {
 
 /// Deploy configuration
 pub struct DeployConfig {
-    /// Box name from spin.toml
+    /// Engine name from spin.toml
     pub app_name: String,
     /// Components to deploy
     pub components: Vec<ComponentInfo>,
@@ -65,11 +65,11 @@ pub struct DeployDependencies {
 
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
-pub async fn execute_with_deps(
-    deps: Arc<DeployDependencies>,
-    variables: Vec<String>,
-) -> Result<()> {
-    deps.ui.print(&format!("{} {} Deploying box", "▶", "FTL"));
+pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) -> Result<()> {
+    deps.ui.print_styled(
+        &format!("{} Deploying project to FTL Engine", "▶"),
+        MessageStyle::Bold,
+    );
     deps.ui.print("");
 
     // Generate temporary spin.toml from ftl.toml
@@ -82,14 +82,14 @@ pub async fn execute_with_deps(
 
     // Run the deployment with the manifest path
     // Clean up is handled by tempfile crate when temp_spin_toml goes out of scope
-    execute_deploy_inner(deps.clone(), variables, manifest_path, true).await
+    execute_deploy_inner(deps.clone(), args, manifest_path, true).await
 }
 
 /// Inner deployment logic separated for proper cleanup handling
 #[allow(clippy::too_many_lines)]
 async fn execute_deploy_inner(
     deps: Arc<DeployDependencies>,
-    variables: Vec<String>,
+    args: DeployArgs,
     manifest_path: PathBuf,
     _is_temp_manifest: bool,
 ) -> Result<()> {
@@ -109,9 +109,6 @@ async fn execute_deploy_inner(
 
     // Build the project first
     spinner.finish_and_clear();
-    deps.ui
-        .print_styled("→ Building project...", MessageStyle::Cyan);
-    deps.ui.print("");
 
     deps.build_executor.execute(None, use_release).await?;
 
@@ -157,7 +154,7 @@ async fn execute_deploy_inner(
     docker_login(&deps.command_executor, &ecr_creds).await?;
 
     // Get or create the app first
-    spinner.set_message("Checking if box exists...");
+    spinner.set_message("Checking if engine exists...");
     let existing_apps = deps
         .api_client
         .list_apps(None, None, Some(&config.app_name))
@@ -165,10 +162,11 @@ async fn execute_deploy_inner(
         .map_err(|e| anyhow!("Failed to check existing apps: {}", e))?;
 
     let app_id = if existing_apps.apps.is_empty() {
-        // Box doesn't exist, create it first
-        spinner.set_message("Creating box...");
+        // Engine doesn't exist, create it first
+        spinner.set_message("Creating engine...");
         let create_app_request = types::CreateAppRequest {
-            app_name: config.app_name
+            app_name: config
+                .app_name
                 .as_str()
                 .try_into()
                 .map_err(|e| anyhow!("Invalid app name: {}", e))?,
@@ -178,7 +176,7 @@ async fn execute_deploy_inner(
             .api_client
             .create_app(&create_app_request)
             .await
-            .map_err(|e| anyhow!("Failed to create box: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create engine: {}", e))?;
 
         create_response.app_id
     } else {
@@ -209,18 +207,43 @@ async fn execute_deploy_inner(
     .await?;
 
     // Parse variables from command line
-    let mut parsed_variables = parse_variables(&variables)?;
+    let mut parsed_variables = parse_variables(&args.variables)?;
 
     // If we have ftl.toml, extract auth configuration and add to variables
     if deps.file_system.exists(Path::new("ftl.toml")) {
         add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
     }
 
+    // Update auth configuration BEFORE deployment if provided
+    if let Some(auth_mode) = &args.auth_mode {
+        deps.ui.print("");
+        deps.ui.print_styled(
+            "→ Configuring MCP authorization settings...",
+            MessageStyle::Cyan,
+        );
+
+        update_auth_config(
+            deps.clone(),
+            &app_id.to_string(),
+            auth_mode,
+            args.auth_users.as_ref(),
+            args.auth_provider.as_ref(),
+            args.auth_issuer.as_ref(),
+            args.auth_audience.as_ref(),
+        )
+        .await?;
+
+        deps.ui.print_styled(
+            &format!("✓ MCP authorization set to: {auth_mode}"),
+            MessageStyle::Warning,
+        );
+    }
+
     // Deploy to FTL
     deps.ui.print("");
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
-    spinner.set_message("Starting box deployment...");
+    spinner.set_message("Starting engine deployment...");
 
     // Refresh credentials before deployment in case the token expired
     let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
@@ -242,8 +265,7 @@ async fn execute_deploy_inner(
 
     // Display results
     deps.ui.print("");
-    deps.ui
-        .print_styled("✓ Box deployed successfully!", MessageStyle::Success);
+    deps.ui.print_styled("✓ Deployed!", MessageStyle::Success);
     if let Some(deployment_url) = deployment.provider_url {
         deps.ui.print("");
         deps.ui.print(&format!("  MCP URL: {deployment_url}"));
@@ -277,6 +299,88 @@ pub fn parse_variables(variables: &[String]) -> Result<HashMap<String, String>> 
     }
 
     Ok(parsed)
+}
+
+/// Update authentication configuration for a deployed app
+async fn update_auth_config(
+    deps: Arc<DeployDependencies>,
+    app_id: &str,
+    auth_mode: &str,
+    auth_users: Option<&String>,
+    auth_provider: Option<&String>,
+    auth_issuer: Option<&String>,
+    auth_audience: Option<&String>,
+) -> Result<()> {
+    use types::UpdateAuthConfigRequestMode;
+
+    let mode = match auth_mode {
+        "public" => UpdateAuthConfigRequestMode::Public,
+        "ftl-account" => UpdateAuthConfigRequestMode::FtlAccount,
+        "user-only" => UpdateAuthConfigRequestMode::UserOnly,
+        "custom" => UpdateAuthConfigRequestMode::Custom,
+        _ => {
+            return Err(anyhow!(
+                "Invalid auth mode: {}. Must be one of: public, ftl-account, user-only, custom",
+                auth_mode
+            ));
+        }
+    };
+
+    let mut allowed_users = vec![];
+    let mut custom_config = None;
+
+    // Handle different auth modes
+    match auth_mode {
+        "public" | "ftl-account" => {
+            // No additional config needed
+        }
+        "user-only" => {
+            if let Some(users) = auth_users {
+                allowed_users = users
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+        }
+        "custom" => {
+            if auth_provider.is_none() || auth_issuer.is_none() {
+                return Err(anyhow!(
+                    "Custom auth mode requires --auth-provider and --auth-issuer"
+                ));
+            }
+
+            custom_config = Some(types::UpdateAuthConfigRequestCustomConfig {
+                provider: auth_provider
+                    .unwrap()
+                    .clone()
+                    .try_into()
+                    .map_err(|_| anyhow!("Invalid provider name"))?,
+                issuer: auth_issuer
+                    .unwrap()
+                    .clone()
+                    .try_into()
+                    .map_err(|_| anyhow!("Invalid issuer URL"))?,
+                audience: auth_audience.cloned(),
+                jwks_uri: None,
+            });
+        }
+        _ => unreachable!(), // Already handled above
+    }
+
+    let request = types::UpdateAuthConfigRequest {
+        mode,
+        custom_config,
+        allowed_users,
+        allowed_tenants: vec![],
+    };
+
+    deps.api_client
+        .update_auth_config(app_id, &request)
+        .await
+        .map_err(|e| anyhow!("Failed to update auth config: {}", e))?;
+
+    Ok(())
 }
 
 /// Add auth-related variables from ftl.toml to the variables map
@@ -518,46 +622,57 @@ async fn ensure_components_and_push(
         )?;
 
     // Step 1: Ensure all components exist with their repositories
-    deps.ui.print("→ Ensuring components and repositories...");
-    deps.ui.print("");
-    
+    //
     // Build the update request with all components
-    let component_updates: Vec<_> = components.iter().map(|comp| {
-        let component_name = deploy_names
-            .get(&comp.name)
-            .cloned()
-            .unwrap_or_else(|| comp.name.clone());
-        
-        Ok(types::UpdateComponentsRequestComponentsItem {
-            component_name: component_name.as_str().try_into().map_err(|e| anyhow!("Invalid component name: {}", e))?,
-            description: None,
+    let component_updates: Vec<_> = components
+        .iter()
+        .map(|comp| {
+            let component_name = deploy_names
+                .get(&comp.name)
+                .cloned()
+                .unwrap_or_else(|| comp.name.clone());
+
+            Ok(types::UpdateComponentsRequestComponentsItem {
+                component_name: component_name
+                    .as_str()
+                    .try_into()
+                    .map_err(|e| anyhow!("Invalid component name: {}", e))?,
+                description: None,
+            })
         })
-    }).collect::<Result<Vec<_>>>()?;
-    
+        .collect::<Result<Vec<_>>>()?;
+
     let update_request = types::UpdateComponentsRequest {
         components: component_updates,
     };
-    
+
     // Update all components in one atomic operation
-    let update_response = deps.api_client
+    let update_response = deps
+        .api_client
         .update_components(app_id, &update_request)
         .await
         .map_err(|e| anyhow!("Failed to update components: {}", e))?;
-    
+
     // Log what changed
     if !update_response.changes.created.is_empty() {
         deps.ui.print_styled(
-            &format!("  ✓ Created components: {}", update_response.changes.created.join(", ")),
-            MessageStyle::Success
+            &format!(
+                "  ✓ Created components: {}",
+                update_response.changes.created.join(", ")
+            ),
+            MessageStyle::Success,
         );
     }
     if !update_response.changes.updated.is_empty() {
         deps.ui.print_styled(
-            &format!("  ✓ Updated components: {}", update_response.changes.updated.join(", ")),
-            MessageStyle::Success
+            &format!(
+                "  ✓ Updated components: {}",
+                update_response.changes.updated.join(", ")
+            ),
+            MessageStyle::Success,
         );
     }
-    
+
     // Step 2: Push all components to their repositories
     deps.ui.print("");
     deps.ui.print(&format!(
@@ -577,12 +692,13 @@ async fn ensure_components_and_push(
     let semaphore = Arc::new(Semaphore::new(4));
 
     // Create a lookup map for component -> repository URI
-    let component_repos: HashMap<String, String> = update_response.components
+    let component_repos: HashMap<String, String> = update_response
+        .components
         .iter()
         .filter_map(|c| {
-            c.repository_uri.as_ref().map(|uri| {
-                (c.component_name.clone(), uri.clone())
-            })
+            c.repository_uri
+                .as_ref()
+                .map(|uri| (c.component_name.clone(), uri.clone()))
         })
         .collect();
 
@@ -621,7 +737,12 @@ async fn ensure_components_and_push(
             // Get repository URI from the update response
             let repository_uri = component_repos
                 .get(&component_name)
-                .ok_or_else(|| anyhow!("Component '{}' not found in update response", component_name))?
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Component '{}' not found in update response",
+                        component_name
+                    )
+                })?
                 .clone();
 
             // Push component with version tag
@@ -702,25 +823,25 @@ async fn poll_app_deployment_status_with_progress(
     loop {
         if attempts >= max_attempts {
             spinner.finish_and_clear();
-            return Err(anyhow!("Box deployment timeout after 5 minutes"));
+            return Err(anyhow!("Engine deployment timeout after 5 minutes"));
         }
 
         let app = match deps.api_client.get_app(app_id).await {
             Ok(app) => app,
             Err(e) => {
                 spinner.finish_and_clear();
-                return Err(anyhow!("Failed to get box status: {}", e));
+                return Err(anyhow!("Failed to get engine status: {}", e));
             }
         };
 
         // Update spinner message based on status
         let status_msg = match &app.status {
-            types::AppStatus::Pending => "Initializing box deployment...",
-            types::AppStatus::Creating => "Deploying box...",
-            types::AppStatus::Active => "Box deployment succeeded!",
-            types::AppStatus::Failed => "Box deployment failed",
-            types::AppStatus::Deleting => "Box is being deleted",
-            types::AppStatus::Deleted => "Box has been deleted",
+            types::AppStatus::Pending => "Initializing engine deployment...",
+            types::AppStatus::Creating => "Deploying engine...",
+            types::AppStatus::Active => "Engine deployment succeeded!",
+            types::AppStatus::Failed => "Engine deployment failed",
+            types::AppStatus::Deleting => "Engine is being deleted",
+            types::AppStatus::Deleted => "Engine has been deleted",
         };
 
         spinner.set_message(status_msg);
@@ -735,13 +856,13 @@ async fn poll_app_deployment_status_with_progress(
                 let error_msg = app
                     .provider_error
                     .as_deref()
-                    .unwrap_or("Box deployment failed")
+                    .unwrap_or("Engine deployment failed")
                     .to_string();
-                return Err(anyhow!("Box deployment failed: {}", error_msg));
+                return Err(anyhow!("Engine deployment failed: {}", error_msg));
             }
             types::AppStatus::Deleted | types::AppStatus::Deleting => {
                 spinner.finish_and_clear();
-                return Err(anyhow!("Box was deleted during deployment"));
+                return Err(anyhow!("Engine was deleted during deployment"));
             }
             types::AppStatus::Pending | types::AppStatus::Creating => {
                 // Continue polling for pending/creating statuses
@@ -762,7 +883,7 @@ async fn deploy_to_ftl_with_progress(
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
 ) -> Result<types::App> {
     // Create the deployment
-    spinner.set_message("Creating box deployment...");
+    spinner.set_message("Creating engine deployment...");
 
     // Use new API format with components
     let deployment_request = types::CreateDeploymentRequest {
@@ -776,16 +897,16 @@ async fn deploy_to_ftl_with_progress(
         .await
         .map_err(|e| {
             spinner.finish_and_clear();
-            anyhow!("Failed to create box deployment: {}", e)
+            anyhow!("Failed to create engine deployment: {}", e)
         })?;
 
     // Update spinner with deployment ID
     spinner.set_message(&format!(
-        "Box deployment {} in progress...",
+        "Engine deployment {} in progress...",
         &deployment_response.deployment_id
     ));
 
-    // Poll the box status to know when deployment is complete
+    // Poll the engine status to know when deployment is complete
     poll_app_deployment_status_with_progress(deps, &app_id.to_string(), spinner).await
 }
 
@@ -794,6 +915,16 @@ async fn deploy_to_ftl_with_progress(
 pub struct DeployArgs {
     /// Variable(s) to be passed to the app (KEY=VALUE format)
     pub variables: Vec<String>,
+    /// Authentication mode to set for the deployed app
+    pub auth_mode: Option<String>,
+    /// Allowed users for user-only mode (comma-separated)
+    pub auth_users: Option<String>,
+    /// Custom auth provider (authkit, auth0, oidc)
+    pub auth_provider: Option<String>,
+    /// Custom auth issuer URL
+    pub auth_issuer: Option<String>,
+    /// Custom auth audience
+    pub auth_audience: Option<String>,
 }
 
 // Build executor implementation
@@ -842,7 +973,7 @@ pub async fn execute(args: DeployArgs) -> Result<()> {
         async_runtime: Arc::new(RealAsyncRuntime),
     });
 
-    execute_with_deps(deps, args.variables).await
+    execute_with_deps(deps, args).await
 }
 
 #[cfg(test)]

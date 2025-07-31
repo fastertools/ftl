@@ -29,7 +29,7 @@ spin up
 ## 3. Deployment (CLI Arguments)
 
 ```bash
-ftl box deploy --variable API_KEY="prod-key-xyz789"
+ftl eng deploy --variable API_KEY="prod-key-xyz789"
 ```
 
 **What happens:**
@@ -123,7 +123,7 @@ api_key = "{{ stripe_key }}"
      env:
        DB_PASS: ${{ secrets.DATABASE_PASSWORD }}
      run: |
-       ftl box deploy --variable DATABASE_PASSWORD="$DB_PASS"
+       ftl eng deploy --variable DATABASE_PASSWORD="$DB_PASS"
    ```
    - Secret pulled from GitHub/GitLab secrets
    - Transmitted securely to FTL
@@ -141,7 +141,7 @@ api_key = "{{ stripe_key }}"
 
 5. **Updating secrets:**
    ```bash
-   ftl box deploy --variable DATABASE_PASSWORD="new-pass-456"
+   ftl eng deploy --variable DATABASE_PASSWORD="new-pass-456"
    ```
    - Old value replaced atomically
    - No need to modify code
