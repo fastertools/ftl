@@ -88,12 +88,12 @@ pub fn should_show_notice() -> Result<bool> {
 
     // Check if notice has been shown
     let config = Config::load()?;
-    
+
     // Try to get the notice config - if it fails to deserialize, treat as first run
     let Ok(Some(notice_config)) = config.get_section::<NoticeConfig>() else {
         return Ok(true); // No config or malformed config means show notice
     };
-    
+
     // Show notice if not shown before or version has changed
     Ok(!notice_config.notice_shown || notice_config.notice_version != NOTICE_VERSION)
 }

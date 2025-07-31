@@ -314,10 +314,7 @@ mod tests {
 
         // In concurrent scenarios, some events might end up on the same line
         // What matters is that all 10 events were logged
-        assert_eq!(
-            json_count, 10,
-            "Expected 10 JSON objects, got {json_count}"
-        );
+        assert_eq!(json_count, 10, "Expected 10 JSON objects, got {json_count}");
 
         // No cleanup needed - temp dir will be removed automatically
     }

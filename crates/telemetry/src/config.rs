@@ -29,8 +29,10 @@ const fn default_retention_days() -> u32 {
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
-        let log_directory = dirs::home_dir()
-            .map_or_else(|| PathBuf::from(".ftl").join("logs"), |h| h.join(".ftl").join("logs"));
+        let log_directory = dirs::home_dir().map_or_else(
+            || PathBuf::from(".ftl").join("logs"),
+            |h| h.join(".ftl").join("logs"),
+        );
 
         Self {
             enabled: true,
@@ -55,8 +57,10 @@ impl TelemetryConfig {
         let mut telemetry_config = config.get_section::<Self>()?.unwrap_or_default();
 
         // Set the log directory based on home
-        telemetry_config.log_directory = dirs::home_dir()
-            .map_or_else(|| PathBuf::from(".ftl").join("logs"), |h| h.join(".ftl").join("logs"));
+        telemetry_config.log_directory = dirs::home_dir().map_or_else(
+            || PathBuf::from(".ftl").join("logs"),
+            |h| h.join(".ftl").join("logs"),
+        );
 
         Ok(telemetry_config)
     }

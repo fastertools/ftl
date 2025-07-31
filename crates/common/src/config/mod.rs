@@ -144,8 +144,9 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         // Ensure the directory exists
         if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create config directory at {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Failed to create config directory at {}", parent.display())
+            })?;
         }
 
         // Serialize to pretty TOML
