@@ -229,11 +229,11 @@ impl TestFixture {
             .times(1)
             .returning(|_| true);
 
-        // Read ftl.toml content
+        // Read ftl.toml content - may be read multiple times (transpiler + build profiles)
         self.file_system
             .expect_read_to_string()
             .with(eq(ftl_path))
-            .times(1)
+            .times(1..=2)
             .returning(|_| {
                 Ok(r#"
 [project]
@@ -242,6 +242,7 @@ version = "0.1.0"
 
 [tools.test-tool]
 path = "test-tool"
+wasm = "test-tool/target/wasm32-wasip1/release/test_tool.wasm"
 
 [tools.test-tool.build]
 command = "cargo build --release --target wasm32-wasip1"

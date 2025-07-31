@@ -109,46 +109,74 @@
     "OidcConfig": {
       "description": "OIDC-specific configuration",
       "type": "object",
-      "required": ["provider_name", "jwks_uri", "authorize_endpoint", "token_endpoint", "userinfo_endpoint", "allowed_domains"],
+      "required": ["issuer", "provider_name", "jwks_uri", "authorize_endpoint", "token_endpoint"],
       "properties": {
+        "issuer": {
+          "description": "OIDC issuer URL",
+          "type": "string"
+        },
+        "audience": {
+          "description": "API audience",
+          "type": "string",
+          "default": ""
+        },
         "provider_name": {
-          "description": "Display name for the OIDC provider",
+          "description": "Provider name (e.g., 'auth0', 'okta')",
           "type": "string"
         },
         "jwks_uri": {
-          "description": "JWKS endpoint URL",
+          "description": "JWKS URI for token validation",
           "type": "string"
         },
         "authorize_endpoint": {
-          "description": "Authorization endpoint URL",
+          "description": "OAuth authorization endpoint",
           "type": "string"
         },
         "token_endpoint": {
-          "description": "Token endpoint URL",
+          "description": "OAuth token endpoint",
           "type": "string"
         },
         "userinfo_endpoint": {
-          "description": "Userinfo endpoint URL",
-          "type": "string"
+          "description": "User info endpoint for retrieving user details",
+          "type": "string",
+          "default": ""
         },
         "allowed_domains": {
           "description": "Comma-separated list of allowed email domains",
-          "type": "string"
+          "type": "string",
+          "default": ""
         }
-      }
+      },
+      "additionalProperties": false
     },
     "ToolConfig": {
       "description": "Tool configuration",
       "type": "object",
-      "required": ["path", "build"],
+      "required": ["wasm", "build"],
       "properties": {
         "path": {
-          "description": "Path to tool directory (relative to project root)",
+          "description": "Path to tool directory (defaults to tool name if not specified)",
+          "type": "string"
+        },
+        "wasm": {
+          "description": "Path to the WASM file produced by the build",
           "type": "string"
         },
         "build": {
           "description": "Build configuration",
           "$ref": "#/$defs/BuildConfig"
+        },
+        "profiles": {
+          "description": "Build profiles (optional, for advanced multi-profile builds)",
+          "$ref": "#/$defs/BuildProfiles"
+        },
+        "up": {
+          "description": "Up configuration for development mode",
+          "$ref": "#/$defs/UpConfig"
+        },
+        "deploy": {
+          "description": "Deployment configuration",
+          "$ref": "#/$defs/DeployConfig"
         },
         "allowed_outbound_hosts": {
           "description": "Allowed outbound hosts for the tool",
@@ -177,8 +205,38 @@
           "description": "Build command to execute",
           "type": "string"
         },
-        "workdir": {
-          "description": "Working directory for the build command (relative to tool path)",
+        "watch": {
+          "description": "Paths to watch for changes in development mode",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "env": {
+          "description": "Environment variables to set during build",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "BuildProfiles": {
+      "description": "Build profiles for a tool",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/BuildProfile"
+      }
+    },
+    "BuildProfile": {
+      "description": "A single build profile",
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "description": "Build command to execute",
           "type": "string"
         },
         "watch": {
@@ -196,6 +254,32 @@
             "type": "string"
           },
           "default": {}
+        }
+      }
+    },
+    "UpConfig": {
+      "description": "Up configuration for development mode",
+      "type": "object",
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "description": "Build profile to use for 'ftl up'",
+          "type": "string"
+        }
+      }
+    },
+    "DeployConfig": {
+      "description": "Deployment configuration for a tool",
+      "type": "object",
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "description": "Build profile to use for deployment (e.g., \"release\", \"production\")",
+          "type": "string"
+        },
+        "name": {
+          "description": "Optional custom name suffix for the deployed tool",
+          "type": "string"
         }
       }
     },

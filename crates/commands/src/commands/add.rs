@@ -222,32 +222,43 @@ fn update_ftl_toml(
     let mut config = FtlConfig::parse(&content)?;
 
     // Create build configuration with explicit defaults based on language
-    let build = match language {
-        Language::Rust => BuildConfig {
-            command: "cargo build --target wasm32-wasip1 --release".to_string(),
-            workdir: None,
-            watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
-            env: HashMap::new(),
-        },
-        Language::TypeScript | Language::JavaScript => BuildConfig {
-            command: "npm install && npm run build".to_string(),
-            workdir: None,
-            watch: vec![
-                "src/**/*.ts".to_string(),
-                "src/**/*.js".to_string(),
-                "package.json".to_string(),
-                "tsconfig.json".to_string(),
-            ],
-            env: HashMap::new(),
-        },
+    let (build, wasm_path) = match language {
+        Language::Rust => {
+            let wasm_filename = component_name.replace('-', "_");
+            (
+                BuildConfig {
+                    command: "cargo build --target wasm32-wasip1 --release".to_string(),
+                    watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
+                    env: HashMap::new(),
+                },
+                format!("{component_name}/target/wasm32-wasip1/release/{wasm_filename}.wasm"),
+            )
+        }
+        Language::TypeScript | Language::JavaScript => (
+            BuildConfig {
+                command: "npm install && npm run build".to_string(),
+                watch: vec![
+                    "src/**/*.ts".to_string(),
+                    "src/**/*.js".to_string(),
+                    "package.json".to_string(),
+                    "tsconfig.json".to_string(),
+                ],
+                env: HashMap::new(),
+            },
+            format!("{component_name}/dist/{component_name}.wasm"),
+        ),
     };
 
     // Add the new tool
     config.tools.insert(
         component_name.to_string(),
         ToolConfig {
-            path: component_name.to_string(),
+            path: Some(component_name.to_string()),
+            wasm: wasm_path,
             build,
+            profiles: None,
+            up: None,
+            deploy: None,
             allowed_outbound_hosts: vec![],
             variables: HashMap::new(),
         },

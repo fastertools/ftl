@@ -722,13 +722,16 @@ fn add_tools_to_ftl_toml(deps: &Arc<ToolsDependencies>, tools: &[ResolvedTool]) 
         config.tools.insert(
             tool_name.clone(),
             ToolConfig {
-                path: tool_name.clone(),
+                path: Some(tool_name.clone()),
+                wasm: format!("{tool_name}/{tool_name}.wasm"),
                 build: BuildConfig {
                     command: format!("echo 'Using prebuilt {} tool from registry'", tool.name),
-                    workdir: None,
                     watch: vec![],
                     env: HashMap::new(),
                 },
+                profiles: None,
+                up: None,
+                deploy: None,
                 allowed_outbound_hosts: vec![],
                 variables: HashMap::new(),
             },
