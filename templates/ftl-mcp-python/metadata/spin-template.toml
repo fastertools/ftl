@@ -1,0 +1,9 @@
+manifest_version = "1"
+id = "ftl-mcp-python"
+description = "Python FTL MCP tool component"
+tags = ["mcp", "http", "python", "ftl", "tool"]
+
+[add_component]
+skip_files = ["spin.toml", "README.md", ".gitignore"]
+[add_component.snippets]
+component = "component.txt"

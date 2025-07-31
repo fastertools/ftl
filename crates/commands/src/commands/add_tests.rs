@@ -466,6 +466,120 @@ async fn test_add_javascript_mapped_to_typescript() {
     assert!(result.is_ok());
 }
 
+#[tokio::test]
+async fn test_add_success_python() {
+    let mut fixture = TestFixture::new();
+
+    setup_basic_add_mocks(&mut fixture);
+
+    // Mock: spin add succeeds with Python template
+    fixture
+        .command_executor
+        .expect_execute()
+        .times(1)
+        .returning(|_, args| {
+            if args.contains(&"add") 
+                && args.contains(&"-t") 
+                && args.contains(&"ftl-mcp-python")
+                && args.contains(&"-f")  // temp spin.toml path
+                && args.contains(&"my-python-tool")
+            {
+                Ok(CommandOutput {
+                    success: true,
+                    stdout: b"Tool added successfully".to_vec(),
+                    stderr: vec![],
+                })
+            } else {
+                panic!("Unexpected command: {args:?}");
+            }
+        });
+
+    setup_ftl_toml_mocks(&mut fixture);
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+    let result = execute_with_deps(
+        AddConfig {
+            name: Some("my-python-tool".to_string()),
+            language: Some("python".to_string()),
+            git: None,
+            branch: None,
+            dir: None,
+            tar: None,
+        },
+        deps,
+    )
+    .await;
+
+    assert!(result.is_ok());
+
+    // Verify success message
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Python tool added successfully"))
+    );
+    assert!(output.iter().any(|s| s.contains("my-python-tool/src/main.py")));
+}
+
+#[tokio::test]
+async fn test_add_success_go() {
+    let mut fixture = TestFixture::new();
+
+    setup_basic_add_mocks(&mut fixture);
+
+    // Mock: spin add succeeds with Go template
+    fixture
+        .command_executor
+        .expect_execute()
+        .times(1)
+        .returning(|_, args| {
+            if args.contains(&"add") 
+                && args.contains(&"-t") 
+                && args.contains(&"ftl-mcp-go")
+                && args.contains(&"-f")  // temp spin.toml path
+                && args.contains(&"my-go-tool")
+            {
+                Ok(CommandOutput {
+                    success: true,
+                    stdout: b"Tool added successfully".to_vec(),
+                    stderr: vec![],
+                })
+            } else {
+                panic!("Unexpected command: {args:?}");
+            }
+        });
+
+    setup_ftl_toml_mocks(&mut fixture);
+
+    let ui = fixture.ui.clone();
+    let deps = fixture.to_deps();
+    let result = execute_with_deps(
+        AddConfig {
+            name: Some("my-go-tool".to_string()),
+            language: Some("go".to_string()),
+            git: None,
+            branch: None,
+            dir: None,
+            tar: None,
+        },
+        deps,
+    )
+    .await;
+
+    assert!(result.is_ok());
+
+    // Verify success message
+    let output = ui.get_output();
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("Go tool added successfully"))
+    );
+    assert!(output.iter().any(|s| s.contains("my-go-tool/main.go")));
+}
+
 // Helper functions
 fn setup_basic_add_mocks(fixture: &mut TestFixture) {
     // Mock: ftl.toml exists
