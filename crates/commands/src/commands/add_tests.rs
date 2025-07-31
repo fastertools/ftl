@@ -520,7 +520,11 @@ async fn test_add_success_python() {
             .iter()
             .any(|s| s.contains("Python tool added successfully"))
     );
-    assert!(output.iter().any(|s| s.contains("my-python-tool/src/main.py")));
+    assert!(
+        output
+            .iter()
+            .any(|s| s.contains("my-python-tool/src/main.py"))
+    );
 }
 
 #[tokio::test]

@@ -251,7 +251,9 @@ fn update_ftl_toml(
         ),
         Language::Python => (
             BuildConfig {
-                command: format!("componentize-py -w spin-http componentize {component_name}/src/main.py -o {component_name}/app.wasm"),
+                command: format!(
+                    "componentize-py -w spin-http componentize {component_name}/src/main.py -o {component_name}/app.wasm"
+                ),
                 watch: vec!["src/**/*.py".to_string(), "pyproject.toml".to_string()],
                 env: HashMap::new(),
             },
@@ -259,7 +261,9 @@ fn update_ftl_toml(
         ),
         Language::Go => (
             BuildConfig {
-                command: format!("tinygo build -target=wasi -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"),
+                command: format!(
+                    "tinygo build -target=wasi -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
+                ),
                 watch: vec!["*.go".to_string(), "go.mod".to_string()],
                 env: HashMap::new(),
             },
