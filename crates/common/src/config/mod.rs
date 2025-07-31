@@ -28,19 +28,22 @@
 //!     }
 //! }
 //!
-//! // Load or create config
-//! let mut config = Config::load()?;
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Load or create config
+//!     let mut config = Config::load()?;
 //!
-//! // Get a section
-//! let telemetry = config.get_section::<TelemetryConfig>()?;
+//!     // Get a section
+//!     let telemetry = config.get_section::<TelemetryConfig>()?;
 //!
-//! // Update a section
-//! let new_telemetry = TelemetryConfig {
-//!     installation_id: "some-id".to_string(),
-//!     enabled: true,
-//! };
-//! config.set_section(new_telemetry)?;
-//! config.save()?;
+//!     // Update a section
+//!     let new_telemetry = TelemetryConfig {
+//!         installation_id: "some-id".to_string(),
+//!         enabled: true,
+//!     };
+//!     config.set_section(new_telemetry)?;
+//!     config.save()?;
+//!     Ok(())
+//! }
 //! ```
 
 use std::collections::HashMap;
