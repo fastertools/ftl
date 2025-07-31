@@ -631,12 +631,12 @@ async fn test_parse_go_mod_version() {
     fs.expect_read_to_string()
         .with(eq(Path::new("go-tool/go.mod")))
         .returning(|_| {
-            Ok(r#"module github.com/example/go-tool
+            Ok(r"module github.com/example/go-tool
 
 go 1.21
 
 // Version: v4.0.0
-"#
+"
             .to_string())
         });
 
