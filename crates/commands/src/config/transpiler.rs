@@ -1,349 +1,391 @@
 //! Transpiler for converting ftl.toml to spin.toml format
+//!
+//! This module uses type-safe schemas for both FTL and Spin configurations,
+//! ensuring robust and accurate transpilation between formats.
 
-use super::ftl_config::{FtlConfig, ToolConfig};
+use super::ftl_config::{ApplicationVariable, FtlConfig, ToolConfig};
+use super::spin_config::{
+    ComponentBuildConfig, ComponentConfig, ComponentSource, HttpTrigger, RouteConfig, SpinConfig,
+    SpinVariable, TriggerConfig,
+};
 use anyhow::{Context, Result};
 use ftl_runtime::deps::FileSystem;
-use std::fmt::Write;
+use std::collections::HashMap;
 use std::sync::Arc;
-use toml_edit::{Array, ArrayOfTables, InlineTable, Item, Table, Value};
-
-/// Default Spin manifest version
-const SPIN_MANIFEST_VERSION: i64 = 2;
 
 /// Parse a registry URI into a Spin source configuration
-/// Example: "ghcr.io/myorg/my-component:1.0.0" -> {registry: "ghcr.io", package: "myorg:my-component", version: "1.0.0"}
-fn parse_registry_uri_to_source(uri: &str) -> Item {
-    let mut source = InlineTable::new();
-
+/// Example: "ghcr.io/myorg/my-component:1.0.0" -> `ComponentSource::Registry`
+fn parse_registry_uri_to_source(uri: &str) -> ComponentSource {
     // Split by the last colon to separate version tag
     if let Some((image, version)) = uri.rsplit_once(':') {
         // Split the image part by the first slash to get registry and package
         if let Some((registry, package)) = image.split_once('/') {
             // Convert package from "owner/name" format to "owner:name" format for Spin
             let package = package.replace('/', ":");
-            source.insert("registry", Value::from(registry));
-            source.insert("package", Value::from(package));
-            source.insert("version", Value::from(version));
+            return ComponentSource::Registry {
+                registry: registry.to_string(),
+                package,
+                version: version.to_string(),
+            };
         }
     }
 
-    Item::Value(Value::InlineTable(source))
+    // If parsing fails, return as a local path (shouldn't happen with valid URIs)
+    ComponentSource::Local(uri.to_string())
 }
 
-/// Transpile an FTL configuration to Spin TOML format
+/// Transpile an FTL configuration to Spin configuration
 #[allow(clippy::too_many_lines)]
 pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
-    let mut doc = toml_edit::DocumentMut::new();
+    // Create the base Spin configuration
+    let mut spin_config = SpinConfig::new(ftl_config.project.name.clone());
 
-    // Set manifest version
-    doc["spin_manifest_version"] = toml_edit::value(SPIN_MANIFEST_VERSION);
+    // Set application metadata
+    spin_config
+        .application
+        .version
+        .clone_from(&ftl_config.project.version);
+    spin_config
+        .application
+        .description
+        .clone_from(&ftl_config.project.description);
+    spin_config
+        .application
+        .authors
+        .clone_from(&ftl_config.project.authors);
 
-    // Build application section
-    let mut app_table = Table::new();
-    app_table["name"] = toml_edit::value(&ftl_config.project.name);
-    app_table["version"] = toml_edit::value(&ftl_config.project.version);
+    // Build variables
+    let mut variables = HashMap::new();
 
-    if !ftl_config.project.authors.is_empty() {
-        let mut authors = Array::new();
-        for author in &ftl_config.project.authors {
-            authors.push(author.as_str());
-        }
-        app_table["authors"] = toml_edit::value(authors);
-    }
-
-    if !ftl_config.project.description.is_empty() {
-        app_table["description"] = toml_edit::value(&ftl_config.project.description);
-    }
-
-    doc["application"] = Item::Table(app_table);
-
-    // Build variables section
-    let mut vars_table = Table::new();
-
-    // Add application-level variables first
+    // Add application-level variables
     for (name, var) in &ftl_config.variables {
-        match var {
-            crate::config::ftl_config::ApplicationVariable::Default { default } => {
-                vars_table[name] = create_default_var(default);
+        let spin_var = match var {
+            ApplicationVariable::Default { default } => SpinVariable::Default {
+                default: default.clone(),
+            },
+            ApplicationVariable::Required { required: _ } => {
+                SpinVariable::Required { required: true }
             }
-            crate::config::ftl_config::ApplicationVariable::Required { required: _ } => {
-                // For required variables, we create an empty default
-                // Spin will enforce the requirement at runtime
-                vars_table[name] = create_required_var();
-            }
-        }
+        };
+        variables.insert(name.clone(), spin_var);
     }
 
-    // Tool components variable
+    // Add system variables
     let tool_names = ftl_config.tool_components().join(",");
-    vars_table["tool_components"] = create_default_var(&tool_names);
+    variables.insert(
+        "tool_components".to_string(),
+        SpinVariable::Default {
+            default: tool_names,
+        },
+    );
 
     // Auth variables
-    vars_table["auth_enabled"] = create_default_var(&ftl_config.auth.enabled.to_string());
-    vars_table["auth_gateway_url"] =
-        create_default_var("http://ftl-mcp-gateway.spin.internal/mcp-internal");
-    vars_table["auth_trace_header"] = create_default_var("X-Trace-Id");
+    variables.insert(
+        "auth_enabled".to_string(),
+        SpinVariable::Default {
+            default: ftl_config.auth.enabled.to_string(),
+        },
+    );
+    variables.insert(
+        "auth_gateway_url".to_string(),
+        SpinVariable::Default {
+            default: "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string(),
+        },
+    );
+    variables.insert(
+        "auth_trace_header".to_string(),
+        SpinVariable::Default {
+            default: "X-Trace-Id".to_string(),
+        },
+    );
 
     // Auth provider variables
-    vars_table["auth_provider_type"] = create_default_var(ftl_config.auth.provider_type());
-    vars_table["auth_provider_issuer"] = create_default_var(ftl_config.auth.issuer());
-    vars_table["auth_provider_audience"] = create_default_var(ftl_config.auth.audience());
+    variables.insert(
+        "auth_provider_type".to_string(),
+        SpinVariable::Default {
+            default: ftl_config.auth.provider_type().to_string(),
+        },
+    );
+    variables.insert(
+        "auth_provider_issuer".to_string(),
+        SpinVariable::Default {
+            default: ftl_config.auth.issuer().to_string(),
+        },
+    );
+    variables.insert(
+        "auth_provider_audience".to_string(),
+        SpinVariable::Default {
+            default: ftl_config.auth.audience().to_string(),
+        },
+    );
 
     // OIDC-specific variables
     if let Some(oidc) = &ftl_config.auth.oidc {
-        vars_table["auth_provider_name"] = create_default_var(&oidc.provider_name);
-        vars_table["auth_provider_jwks_uri"] = create_default_var(&oidc.jwks_uri);
-        vars_table["auth_provider_authorize_endpoint"] =
-            create_default_var(&oidc.authorize_endpoint);
-        vars_table["auth_provider_token_endpoint"] = create_default_var(&oidc.token_endpoint);
-        vars_table["auth_provider_userinfo_endpoint"] = create_default_var(&oidc.userinfo_endpoint);
-        vars_table["auth_provider_allowed_domains"] = create_default_var(&oidc.allowed_domains);
+        variables.insert(
+            "auth_provider_name".to_string(),
+            SpinVariable::Default {
+                default: oidc.provider_name.clone(),
+            },
+        );
+        variables.insert(
+            "auth_provider_jwks_uri".to_string(),
+            SpinVariable::Default {
+                default: oidc.jwks_uri.clone(),
+            },
+        );
+        variables.insert(
+            "auth_provider_authorize_endpoint".to_string(),
+            SpinVariable::Default {
+                default: oidc.authorize_endpoint.clone(),
+            },
+        );
+        variables.insert(
+            "auth_provider_token_endpoint".to_string(),
+            SpinVariable::Default {
+                default: oidc.token_endpoint.clone(),
+            },
+        );
+        variables.insert(
+            "auth_provider_userinfo_endpoint".to_string(),
+            SpinVariable::Default {
+                default: oidc.userinfo_endpoint.clone(),
+            },
+        );
+        variables.insert(
+            "auth_provider_allowed_domains".to_string(),
+            SpinVariable::Default {
+                default: oidc.allowed_domains.clone(),
+            },
+        );
     } else {
         // Set empty defaults for OIDC variables
-        vars_table["auth_provider_name"] = create_default_var("");
-        vars_table["auth_provider_jwks_uri"] = create_default_var("");
-        vars_table["auth_provider_authorize_endpoint"] = create_default_var("");
-        vars_table["auth_provider_token_endpoint"] = create_default_var("");
-        vars_table["auth_provider_userinfo_endpoint"] = create_default_var("");
-        vars_table["auth_provider_allowed_domains"] = create_default_var("");
+        let oidc_vars = [
+            "auth_provider_name",
+            "auth_provider_jwks_uri",
+            "auth_provider_authorize_endpoint",
+            "auth_provider_token_endpoint",
+            "auth_provider_userinfo_endpoint",
+            "auth_provider_allowed_domains",
+        ];
+        for var in &oidc_vars {
+            variables.insert(
+                (*var).to_string(),
+                SpinVariable::Default {
+                    default: String::new(),
+                },
+            );
+        }
     }
 
-    doc["variables"] = Item::Table(vars_table);
+    spin_config.variables = variables;
 
-    // Build HTTP triggers and components
-    let mut http_triggers = ArrayOfTables::new();
-    let mut components = Table::new();
-
-    // Add main MCP endpoint
-    http_triggers.push(create_http_trigger("/mcp", "mcp", false));
-    http_triggers.push(create_http_trigger(
-        "/.well-known/oauth-protected-resource",
-        "mcp",
-        false,
-    ));
-    http_triggers.push(create_http_trigger(
-        "/.well-known/oauth-authorization-server",
-        "mcp",
-        false,
-    ));
+    // Build components
+    let mut components = HashMap::new();
 
     // Add MCP authorizer component
-    components["mcp"] = Item::Table(create_mcp_component(&ftl_config.mcp.authorizer));
+    components.insert(
+        "mcp".to_string(),
+        create_mcp_component(&ftl_config.mcp.authorizer),
+    );
 
-    // Add gateway endpoint and component
-    http_triggers.push(create_http_trigger("", "ftl-mcp-gateway", true));
-    components["ftl-mcp-gateway"] = Item::Table(create_gateway_component(
-        &ftl_config.mcp.gateway,
-        ftl_config.mcp.validate_arguments,
-    ));
+    // Add gateway component
+    components.insert(
+        "ftl-mcp-gateway".to_string(),
+        create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
+    );
 
     // Add tool components
     for (tool_name, tool_config) in &ftl_config.tools {
-        http_triggers.push(create_http_trigger("", tool_name, true));
-        components[tool_name] = Item::Table(create_tool_component(tool_name, tool_config));
+        components.insert(
+            tool_name.clone(),
+            create_tool_component(tool_name, tool_config),
+        );
     }
 
-    // Add components to document
-    doc["component"] = Item::Table(components);
+    spin_config.component = components;
 
-    // For triggers, we need to manually build the TOML to get [[trigger.http]] format
-    let mut toml_string = doc.to_string();
+    // Build triggers
+    let mut triggers = TriggerConfig {
+        http: Vec::new(),
+        redis: Vec::new(),
+    };
 
-    // Add the trigger.http array manually
-    toml_string.push('\n');
-    for trigger in &http_triggers {
-        toml_string.push_str("[[trigger.http]]\n");
-        for (key, value) in trigger {
-            let value_str = match value {
-                Item::Value(v) => v.to_string(),
-                _ => value.to_string(),
-            };
-            let _ = writeln!(&mut toml_string, "{key} = {value_str}");
-        }
-        toml_string.push('\n');
+    // Add main MCP endpoint
+    triggers.http.push(HttpTrigger {
+        route: RouteConfig::Path("/mcp".to_string()),
+        component: "mcp".to_string(),
+        executor: None,
+    });
+
+    // Add OAuth endpoints
+    triggers.http.push(HttpTrigger {
+        route: RouteConfig::Path("/.well-known/oauth-protected-resource".to_string()),
+        component: "mcp".to_string(),
+        executor: None,
+    });
+    triggers.http.push(HttpTrigger {
+        route: RouteConfig::Path("/.well-known/oauth-authorization-server".to_string()),
+        component: "mcp".to_string(),
+        executor: None,
+    });
+
+    // Add gateway endpoint
+    triggers.http.push(HttpTrigger {
+        route: RouteConfig::Private { private: true },
+        component: "ftl-mcp-gateway".to_string(),
+        executor: None,
+    });
+
+    // Add tool endpoints
+    for tool_name in ftl_config.tools.keys() {
+        triggers.http.push(HttpTrigger {
+            route: RouteConfig::Private { private: true },
+            component: tool_name.clone(),
+            executor: None,
+        });
     }
 
-    Ok(toml_string)
-}
-
-/// Create a variable with default value
-fn create_default_var(value: &str) -> Item {
-    let mut inline_table = InlineTable::new();
-    inline_table.insert("default", Value::from(value));
-    Item::Value(Value::InlineTable(inline_table))
-}
-
-/// Create a required variable (no default value)
-fn create_required_var() -> Item {
-    let mut inline_table = InlineTable::new();
-    inline_table.insert("required", Value::from(true));
-    Item::Value(Value::InlineTable(inline_table))
-}
-
-/// Create an HTTP trigger configuration
-fn create_http_trigger(route: &str, component: &str, private: bool) -> Table {
-    let mut trigger = Table::new();
-    trigger.set_implicit(true);
-
-    if private {
-        let mut route_table = InlineTable::new();
-        route_table.insert("private", Value::from(true));
-        trigger["route"] = Item::Value(Value::InlineTable(route_table));
-    } else if !route.is_empty() {
-        trigger["route"] = toml_edit::value(route);
-    } else {
-        let mut route_table = InlineTable::new();
-        route_table.insert("private", Value::from(true));
-        trigger["route"] = Item::Value(Value::InlineTable(route_table));
-    }
-
-    trigger["component"] = toml_edit::value(component);
-
-    trigger
+    // Generate the TOML with triggers
+    spin_config.to_toml_string_with_triggers(&triggers)
 }
 
 /// Create MCP authorizer component configuration
-fn create_mcp_component(registry_uri: &str) -> Table {
-    let mut component = Table::new();
+fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
+    let source = parse_registry_uri_to_source(registry_uri);
 
-    // Parse the registry URI to determine if it's a full URI or needs to be built
-    let source_value = if registry_uri.contains(':') && registry_uri.contains('/') {
-        // Full registry URI provided (e.g., "ghcr.io/myorg/mcp-authorizer:1.0.0")
-        parse_registry_uri_to_source(registry_uri)
-    } else {
-        // Legacy: just a version number, build the default URI
-        let mut source = InlineTable::new();
-        source.insert("registry", Value::from("ghcr.io"));
-        source.insert("package", Value::from("fastertools:mcp-authorizer"));
-        source.insert("version", Value::from(registry_uri));
-        Item::Value(Value::InlineTable(source))
-    };
+    let allowed_hosts = vec![
+        "http://*.spin.internal".to_string(),
+        "https://*.authkit.app".to_string(),
+    ];
 
-    component["source"] = source_value;
+    let mut variables = HashMap::new();
+    variables.insert("auth_enabled".to_string(), "{{ auth_enabled }}".to_string());
+    variables.insert(
+        "auth_gateway_url".to_string(),
+        "{{ auth_gateway_url }}".to_string(),
+    );
+    variables.insert(
+        "auth_trace_header".to_string(),
+        "{{ auth_trace_header }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_type".to_string(),
+        "{{ auth_provider_type }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_issuer".to_string(),
+        "{{ auth_provider_issuer }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_audience".to_string(),
+        "{{ auth_provider_audience }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_name".to_string(),
+        "{{ auth_provider_name }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_jwks_uri".to_string(),
+        "{{ auth_provider_jwks_uri }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_authorize_endpoint".to_string(),
+        "{{ auth_provider_authorize_endpoint }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_token_endpoint".to_string(),
+        "{{ auth_provider_token_endpoint }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_userinfo_endpoint".to_string(),
+        "{{ auth_provider_userinfo_endpoint }}".to_string(),
+    );
+    variables.insert(
+        "auth_provider_allowed_domains".to_string(),
+        "{{ auth_provider_allowed_domains }}".to_string(),
+    );
 
-    // Allowed hosts
-    let mut hosts = Array::new();
-    hosts.push("http://*.spin.internal");
-    hosts.push("https://*.authkit.app");
-    component["allowed_outbound_hosts"] = toml_edit::value(hosts);
-
-    // Variables
-    let mut vars = Table::new();
-    vars["auth_enabled"] = toml_edit::value("{{ auth_enabled }}");
-    vars["auth_gateway_url"] = toml_edit::value("{{ auth_gateway_url }}");
-    vars["auth_trace_header"] = toml_edit::value("{{ auth_trace_header }}");
-    vars["auth_provider_type"] = toml_edit::value("{{ auth_provider_type }}");
-    vars["auth_provider_issuer"] = toml_edit::value("{{ auth_provider_issuer }}");
-    vars["auth_provider_audience"] = toml_edit::value("{{ auth_provider_audience }}");
-    vars["auth_provider_name"] = toml_edit::value("{{ auth_provider_name }}");
-    vars["auth_provider_jwks_uri"] = toml_edit::value("{{ auth_provider_jwks_uri }}");
-    vars["auth_provider_authorize_endpoint"] =
-        toml_edit::value("{{ auth_provider_authorize_endpoint }}");
-    vars["auth_provider_token_endpoint"] = toml_edit::value("{{ auth_provider_token_endpoint }}");
-    vars["auth_provider_userinfo_endpoint"] =
-        toml_edit::value("{{ auth_provider_userinfo_endpoint }}");
-    vars["auth_provider_allowed_domains"] = toml_edit::value("{{ auth_provider_allowed_domains }}");
-    component["variables"] = Item::Table(vars);
-
-    component
+    ComponentConfig {
+        description: String::new(),
+        source,
+        files: Vec::new(),
+        exclude_files: Vec::new(),
+        allowed_outbound_hosts: allowed_hosts,
+        key_value_stores: Vec::new(),
+        environment: HashMap::new(),
+        build: None,
+        variables,
+        dependencies_inherit_configuration: false,
+        dependencies: HashMap::new(),
+    }
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(registry_uri: &str, validate_args: bool) -> Table {
-    let mut component = Table::new();
+fn create_gateway_component(registry_uri: &str, validate_args: bool) -> ComponentConfig {
+    let source = parse_registry_uri_to_source(registry_uri);
 
-    // Parse the registry URI to determine if it's a full URI or needs to be built
-    let source_value = if registry_uri.contains(':') && registry_uri.contains('/') {
-        // Full registry URI provided (e.g., "ghcr.io/myorg/mcp-gateway:1.0.0")
-        parse_registry_uri_to_source(registry_uri)
-    } else {
-        // Legacy: just a version number, build the default URI
-        let mut source = InlineTable::new();
-        source.insert("registry", Value::from("ghcr.io"));
-        source.insert("package", Value::from("fastertools:mcp-gateway"));
-        source.insert("version", Value::from(registry_uri));
-        Item::Value(Value::InlineTable(source))
-    };
+    let allowed_hosts = vec!["http://*.spin.internal".to_string()];
 
-    component["source"] = source_value;
+    let mut variables = HashMap::new();
+    variables.insert(
+        "tool_components".to_string(),
+        "{{ tool_components }}".to_string(),
+    );
+    variables.insert("validate_arguments".to_string(), validate_args.to_string());
 
-    // Allowed hosts
-    let mut hosts = Array::new();
-    hosts.push("http://*.spin.internal");
-    component["allowed_outbound_hosts"] = toml_edit::value(hosts);
-
-    // Variables
-    let mut vars = Table::new();
-    vars["tool_components"] = toml_edit::value("{{ tool_components }}");
-    vars["validate_arguments"] = toml_edit::value(validate_args.to_string());
-    component["variables"] = Item::Table(vars);
-
-    component
+    ComponentConfig {
+        description: String::new(),
+        source,
+        files: Vec::new(),
+        exclude_files: Vec::new(),
+        allowed_outbound_hosts: allowed_hosts,
+        key_value_stores: Vec::new(),
+        environment: HashMap::new(),
+        build: None,
+        variables,
+        dependencies_inherit_configuration: false,
+        dependencies: HashMap::new(),
+    }
 }
 
 /// Create tool component configuration
-fn create_tool_component(name: &str, config: &ToolConfig) -> Table {
-    let mut component = Table::new();
+fn create_tool_component(name: &str, config: &ToolConfig) -> ComponentConfig {
+    let source = ComponentSource::Local(config.wasm.clone());
 
-    // Use the explicit wasm path from config
-    component["source"] = toml_edit::value(&config.wasm);
-
-    // Allowed outbound hosts
-    let hosts = config
+    let allowed_hosts = config
         .allowed_outbound_hosts
         .iter()
-        .map(std::string::String::as_str)
-        .collect::<Array>();
-    component["allowed_outbound_hosts"] = toml_edit::value(hosts);
+        .map(String::clone)
+        .collect();
 
-    // Build configuration - always present now
-    let mut build_table = Table::new();
-
-    // Build command
-    build_table["command"] = toml_edit::value(&config.build.command);
-
-    // Working directory - always use tool path
+    // Build configuration
     let tool_path = config.get_path(name);
-    build_table["workdir"] = toml_edit::value(&tool_path);
+    let build = Some(ComponentBuildConfig {
+        command: config.build.command.clone(),
+        workdir: tool_path,
+        watch: config.build.watch.clone(),
+        environment: config.build.env.clone(),
+    });
 
-    // Watch paths
-    if !config.build.watch.is_empty() {
-        let watch_array: Array = config.build.watch.iter().map(String::as_str).collect();
-        build_table["watch"] = toml_edit::value(watch_array);
+    // Variables - pass through as-is (including template references)
+    let variables = config.variables.clone();
+
+    ComponentConfig {
+        description: String::new(),
+        source,
+        files: Vec::new(),
+        exclude_files: Vec::new(),
+        allowed_outbound_hosts: allowed_hosts,
+        key_value_stores: Vec::new(),
+        environment: HashMap::new(),
+        build,
+        variables,
+        dependencies_inherit_configuration: false,
+        dependencies: HashMap::new(),
     }
-
-    // Environment variables
-    if !config.build.env.is_empty() {
-        let mut env_table = Table::new();
-        for (key, value) in &config.build.env {
-            env_table[key] = toml_edit::value(value);
-        }
-        build_table["environment"] = Item::Table(env_table);
-    }
-
-    component["build"] = Item::Table(build_table);
-
-    // Variables
-    if !config.variables.is_empty() {
-        let mut vars_table = Table::new();
-        for (key, value) in &config.variables {
-            // Check if the value is a template reference (e.g., {{ api_token }})
-            if value.starts_with("{{") && value.ends_with("}}") {
-                // It's a template reference, pass it through as-is
-                vars_table[key] = toml_edit::value(value);
-            } else {
-                // It's a static value, keep as-is
-                vars_table[key] = toml_edit::value(value);
-            }
-        }
-        component["variables"] = Item::Table(vars_table);
-    }
-
-    component
 }
 
 /// Check if ftl.toml exists and transpile it to spin.toml if needed
-/// This function is kept for backward compatibility but now writes to project directory
 pub fn ensure_spin_toml(file_system: &Arc<dyn FileSystem>, path: &std::path::Path) -> Result<()> {
     let ftl_toml_path = path.join("ftl.toml");
     let spin_toml_path = path.join("spin.toml");
