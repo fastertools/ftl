@@ -186,14 +186,15 @@ mod tests {
         // The function should correctly detect CI environment
         // In CI, this should return true; locally it should return false
         let in_ci = is_ci_environment();
-        
+
         // Check if we're actually in CI by looking for common CI env vars
-        let expected_ci = std::env::var("CI").is_ok() 
+        let expected_ci = std::env::var("CI").is_ok()
             || std::env::var("GITHUB_ACTIONS").is_ok()
             || std::env::var("CONTINUOUS_INTEGRATION").is_ok();
-        
-        assert_eq!(in_ci, expected_ci, 
-            "is_ci_environment() returned {} but expected {} based on environment",
-            in_ci, expected_ci);
+
+        assert_eq!(
+            in_ci, expected_ci,
+            "is_ci_environment() returned {in_ci} but expected {expected_ci} based on environment"
+        );
     }
 }
