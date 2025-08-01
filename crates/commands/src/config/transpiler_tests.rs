@@ -1,8 +1,17 @@
-//! Tests for ftl.toml to spin.toml transpiler
+//! Comprehensive tests for ftl.toml to spin.toml transpiler
+//!
+//! These tests ensure complete accuracy and robustness of the transpilation
+//! between type-safe FTL and Spin configurations.
 
 use super::*;
 use crate::config::ftl_config::*;
+use crate::config::spin_config::SpinConfig;
 use std::collections::HashMap;
+
+/// Helper function to parse generated spin.toml and validate it
+fn validate_spin_toml(spin_toml: &str) -> Result<SpinConfig> {
+    SpinConfig::parse(spin_toml)
+}
 
 #[test]
 fn test_transpile_minimal_config() {
@@ -15,7 +24,7 @@ fn test_transpile_minimal_config() {
         },
         auth: AuthConfig::default(),
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -31,8 +40,17 @@ fn test_transpile_minimal_config() {
     assert!(result.contains("[variables]"));
     assert!(result.contains("tool_components"));
     assert!(result.contains("[[trigger.http]]"));
+
+    // Auth is disabled by default, gateway is named "mcp"
     assert!(result.contains("[component.mcp]"));
-    assert!(result.contains("[component.ftl-mcp-gateway]"));
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
+
+    // Validate the generated TOML can be parsed
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert_eq!(spin_config.spin_manifest_version, 2);
+    assert_eq!(spin_config.application.name, "test-project");
+    assert_eq!(spin_config.application.version, "0.1.0");
+    assert_eq!(spin_config.application.description, "Test project");
 }
 
 #[test]
@@ -161,7 +179,7 @@ fn test_transpile_with_tools() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -177,6 +195,20 @@ fn test_transpile_with_tools() {
     assert!(result.contains("weather-ts/dist/weather.wasm"));
     assert!(result.contains("npm run build:custom"));
     assert!(result.contains("https://api.weather.com"));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(spin_config.component.contains_key("echo-tool"));
+    assert!(spin_config.component.contains_key("weather"));
+
+    // Verify tool components variable
+    assert!(spin_config.variables.contains_key("tool_components"));
+    if let SpinVariable::Default { default } = &spin_config.variables["tool_components"] {
+        assert!(default.contains("echo-tool"));
+        assert!(default.contains("weather"));
+    } else {
+        panic!("tool_components should be a default variable");
+    }
 }
 
 #[test]
@@ -213,7 +245,7 @@ fn test_transpile_with_variables() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -225,6 +257,12 @@ fn test_transpile_with_variables() {
     assert!(result.contains("[component.api-tool.variables]"));
     assert!(result.contains("API_KEY = \"test-key\""));
     assert!(result.contains("DEBUG = \"true\""));
+
+    // Validate and check component variables
+    let spin_config = validate_spin_toml(&result).unwrap();
+    let api_tool = &spin_config.component["api-tool"];
+    assert_eq!(api_tool.variables["API_KEY"], "test-key");
+    assert_eq!(api_tool.variables["DEBUG"], "true");
 }
 
 #[test]
@@ -245,7 +283,7 @@ fn test_transpile_with_auth() {
             oidc: None,
         },
         tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
@@ -258,6 +296,125 @@ fn test_transpile_with_auth() {
         result.contains("auth_provider_issuer = { default = \"https://my-tenant.authkit.app\" }")
     );
     assert!(result.contains("auth_provider_audience = { default = \"mcp-api\" }"));
+
+    // Validate and check auth variables
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "true"
+    ));
+    assert!(matches!(
+        &spin_config.variables["auth_provider_type"],
+        SpinVariable::Default { default } if default == "authkit"
+    ));
+}
+
+#[test]
+fn test_transpile_with_oidc_auth() {
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "oidc-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: true,
+            authkit: None,
+            oidc: Some(OidcConfig {
+                issuer: "https://auth.example.com".to_string(),
+                audience: "api".to_string(),
+                provider_name: "okta".to_string(),
+                jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
+                authorize_endpoint: "https://auth.example.com/authorize".to_string(),
+                token_endpoint: "https://auth.example.com/token".to_string(),
+                userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
+                allowed_domains: "example.com,test.com".to_string(),
+            }),
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Check OIDC configuration
+    assert!(result.contains("auth_enabled = { default = \"true\" }"));
+    assert!(result.contains("auth_provider_type = { default = \"oidc\" }"));
+    assert!(result.contains("auth_provider_name = { default = \"okta\" }"));
+    assert!(result.contains(
+        "auth_provider_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
+    ));
+    assert!(
+        result.contains("auth_provider_allowed_domains = { default = \"example.com,test.com\" }")
+    );
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["auth_provider_type"],
+        SpinVariable::Default { default } if default == "oidc"
+    ));
+}
+
+#[test]
+fn test_transpile_with_custom_gateway_uris() {
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "custom-gateway-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig::default(),
+        tools: HashMap::new(),
+        mcp: McpConfig {
+            gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
+            authorizer: "ghcr.io/myorg/custom-authorizer:2.0.0".to_string(),
+            validate_arguments: true,
+        },
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with custom gateway URIs:\n{result}");
+
+    // Check that custom URIs are properly parsed into source configurations
+    assert!(result.contains("[[trigger.http]]"));
+
+    // Auth is disabled by default, gateway is named "mcp"
+    assert!(result.contains("component = \"mcp\""));
+    assert!(!result.contains("component = \"ftl-mcp-gateway\""));
+
+    // Gateway component should exist with custom URI (named "mcp")
+    assert!(result.contains("[component.mcp]"));
+    assert!(result.contains("[component.mcp.source]"));
+    assert!(result.contains("package = \"myorg:custom-gateway\""));
+    assert!(result.contains("version = \"2.0.0\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Gateway component exists as "mcp" (auth disabled)
+    assert!(spin_config.component.contains_key("mcp"));
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Gateway component should exist with custom source
+    let gateway_component = &spin_config.component["mcp"];
+    if let ComponentSource::Registry {
+        registry,
+        package,
+        version,
+    } = &gateway_component.source
+    {
+        assert_eq!(registry, "ghcr.io");
+        assert_eq!(package, "myorg:custom-gateway");
+        assert_eq!(version, "2.0.0");
+    } else {
+        panic!("Gateway component should have registry source");
+    }
 }
 
 #[test]
@@ -307,7 +464,7 @@ fn test_transpile_with_application_variables() {
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
@@ -327,171 +484,423 @@ fn test_transpile_with_application_variables() {
 
     // Check allowed_outbound_hosts with template
     assert!(result.contains("allowed_outbound_hosts = [\"{{ api_url }}\"]"));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["api_token"],
+        SpinVariable::Required { required: true }
+    ));
+    assert!(matches!(
+        &spin_config.variables["api_url"],
+        SpinVariable::Default { default } if default == "https://api.example.com"
+    ));
 }
 
 #[test]
-fn test_transpile_simple_variable_reference() {
-    // Test the exact scenario we just tested - a simple app variable with tool reference
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity)]
+fn test_transpile_complete_example() {
+    // Create a complete FTL configuration with all features
     let mut app_vars = HashMap::new();
     app_vars.insert(
-        "foo_user".to_string(),
+        "database_url".to_string(),
+        ApplicationVariable::Required { required: true },
+    );
+    app_vars.insert(
+        "log_level".to_string(),
         ApplicationVariable::Default {
-            default: "foo guy".to_string(),
+            default: "info".to_string(),
         },
     );
 
     let mut tools = HashMap::new();
-    let mut tool_vars = HashMap::new();
-    tool_vars.insert("user".to_string(), "{{ foo_user }}".to_string());
+
+    // Tool 1: Database tool with environment variables
+    let mut db_vars = HashMap::new();
+    db_vars.insert("db_url".to_string(), "{{ database_url }}".to_string());
+    db_vars.insert("pool_size".to_string(), "10".to_string());
+
+    let mut db_env = HashMap::new();
+    db_env.insert("RUST_LOG".to_string(), "debug".to_string());
 
     tools.insert(
-        "hello".to_string(),
+        "database".to_string(),
         ToolConfig {
-            path: Some("hello".to_string()),
-            wasm: "hello/target/wasm32-wasip1/release/hello.wasm".to_string(),
+            path: Some("tools/database".to_string()),
+            wasm: "tools/database/target/wasm32-wasip1/release/database.wasm".to_string(),
             build: BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
+                env: db_env,
+            },
+            profiles: None,
+            up: None,
+            deploy: None,
+            allowed_outbound_hosts: vec!["postgres://db.example.com:5432".to_string()],
+            variables: db_vars,
+        },
+    );
+
+    // Tool 2: API tool with multiple allowed hosts
+    let mut api_tool_vars = HashMap::new();
+    api_tool_vars.insert("api_key".to_string(), "{{ api_key }}".to_string());
+    api_tool_vars.insert("log_level".to_string(), "{{ log_level }}".to_string());
+
+    tools.insert(
+        "api-client".to_string(),
+        ToolConfig {
+            path: Some("tools/api".to_string()),
+            wasm: "tools/api/dist/api.wasm".to_string(),
+            build: BuildConfig {
+                command: "npm run build".to_string(),
+                watch: vec!["src/**/*.ts".to_string(), "package.json".to_string()],
                 env: HashMap::new(),
             },
             profiles: None,
             up: None,
             deploy: None,
+            allowed_outbound_hosts: vec![
+                "https://api.example.com".to_string(),
+                "https://backup.example.com".to_string(),
+                "*://cdn.example.com:*".to_string(),
+            ],
+            variables: api_tool_vars,
+        },
+    );
+
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "complete-example".to_string(),
+            version: "2.1.0".to_string(),
+            description: "A complete example with all features".to_string(),
+            authors: vec![
+                "John Doe <john@example.com>".to_string(),
+                "Jane Smith <jane@example.com>".to_string(),
+            ],
+        },
+        auth: AuthConfig {
+            enabled: true,
+            authkit: Some(AuthKitConfig {
+                issuer: "https://example.authkit.app".to_string(),
+                audience: "complete-example-api".to_string(),
+            }),
+            oidc: None,
+        },
+        tools,
+        mcp: McpConfig {
+            gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
+            authorizer: "ghcr.io/example/auth:3.0.0".to_string(),
+            validate_arguments: false,
+        },
+        variables: app_vars,
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated complete TOML:\n{result}");
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Check application metadata
+    assert_eq!(spin_config.application.name, "complete-example");
+    assert_eq!(spin_config.application.version, "2.1.0");
+    assert_eq!(
+        spin_config.application.description,
+        "A complete example with all features"
+    );
+    assert_eq!(spin_config.application.authors.len(), 2);
+
+    // Check all components exist
+    assert!(spin_config.component.contains_key("mcp"));
+    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(spin_config.component.contains_key("database"));
+    assert!(spin_config.component.contains_key("api-client"));
+
+    // Check database component details
+    let db_component = &spin_config.component["database"];
+    assert_eq!(db_component.allowed_outbound_hosts.len(), 1);
+    assert_eq!(
+        db_component.allowed_outbound_hosts[0],
+        "postgres://db.example.com:5432"
+    );
+    assert!(db_component.build.is_some());
+    let db_build = db_component.build.as_ref().unwrap();
+    assert_eq!(db_build.environment["RUST_LOG"], "debug");
+
+    // Check API component details
+    let api_component = &spin_config.component["api-client"];
+    assert_eq!(api_component.allowed_outbound_hosts.len(), 3);
+    assert!(
+        api_component
+            .allowed_outbound_hosts
+            .contains(&"https://api.example.com".to_string())
+    );
+
+    // Check variables
+    assert!(matches!(
+        &spin_config.variables["database_url"],
+        SpinVariable::Required { required: true }
+    ));
+    assert!(matches!(
+        &spin_config.variables["log_level"],
+        SpinVariable::Default { default } if default == "info"
+    ));
+
+    // Check auth is properly configured
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "true"
+    ));
+    assert!(matches!(
+        &spin_config.variables["auth_provider_type"],
+        SpinVariable::Default { default } if default == "authkit"
+    ));
+}
+
+#[test]
+fn test_transpile_with_build_profiles() {
+    // Test transpilation of tools with build profiles
+    let mut tools = HashMap::new();
+
+    let mut profiles = HashMap::new();
+    profiles.insert(
+        "dev".to_string(),
+        BuildProfile {
+            command: "cargo build --target wasm32-wasip1".to_string(),
+            watch: vec!["src/**/*.rs".to_string()],
+            env: HashMap::from([("RUST_LOG".to_string(), "debug".to_string())]),
+        },
+    );
+    profiles.insert(
+        "release".to_string(),
+        BuildProfile {
+            command: "cargo build --target wasm32-wasip1 --release".to_string(),
+            watch: vec![],
+            env: HashMap::from([("RUST_LOG".to_string(), "warn".to_string())]),
+        },
+    );
+
+    tools.insert(
+        "profiled-tool".to_string(),
+        ToolConfig {
+            path: Some("profiled".to_string()),
+            wasm: "profiled/target/wasm32-wasip1/release/profiled.wasm".to_string(),
+            build: BuildConfig {
+                command: "cargo build --target wasm32-wasip1".to_string(),
+                watch: vec!["src/**/*.rs".to_string()],
+                env: HashMap::new(),
+            },
+            profiles: Some(BuildProfiles { profiles }),
+            up: Some(UpConfig {
+                profile: "dev".to_string(),
+            }),
+            deploy: Some(DeployConfig {
+                profile: "release".to_string(),
+                name: None,
+            }),
             allowed_outbound_hosts: vec![],
+            variables: HashMap::new(),
+        },
+    );
+
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "profile-test".to_string(),
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig::default(),
+        tools,
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // The transpiler currently uses the default build config
+    // Profiles are handled at build time, not in the manifest
+    assert!(result.contains("[component.profiled-tool.build]"));
+    assert!(result.contains("command = \"cargo build --target wasm32-wasip1\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(spin_config.component.contains_key("profiled-tool"));
+}
+
+#[test]
+fn test_transpile_with_special_characters() {
+    // Test handling of special characters in various fields
+    let mut app_vars = HashMap::new();
+    app_vars.insert(
+        "special-var-name".to_string(),
+        ApplicationVariable::Default {
+            default: "value with \"quotes\" and 'apostrophes'".to_string(),
+        },
+    );
+
+    let mut tools = HashMap::new();
+    let mut tool_vars = HashMap::new();
+    tool_vars.insert("path".to_string(), "/path/with spaces/file.txt".to_string());
+    tool_vars.insert(
+        "url".to_string(),
+        "https://example.com/api?key=value&foo=bar".to_string(),
+    );
+
+    tools.insert(
+        "special-chars".to_string(),
+        ToolConfig {
+            path: Some("tools/special".to_string()),
+            wasm: "tools/special/output.wasm".to_string(),
+            build: BuildConfig {
+                command: "npm run build -- --config=\"production\"".to_string(),
+                watch: vec!["src/**/*.{ts,tsx}".to_string()],
+                env: HashMap::from([
+                    ("NODE_ENV".to_string(), "production".to_string()),
+                    (
+                        "API_URL".to_string(),
+                        "https://api.example.com/v1".to_string(),
+                    ),
+                ]),
+            },
+            profiles: None,
+            up: None,
+            deploy: None,
+            allowed_outbound_hosts: vec!["https://api.example.com:8443".to_string()],
             variables: tool_vars,
         },
     );
 
     let config = FtlConfig {
         project: ProjectConfig {
-            name: "vartest".to_string(),
+            name: "special-chars-test".to_string(),
             version: "0.1.0".to_string(),
-            description: "FTL MCP server for hosting MCP tools".to_string(),
-            authors: vec![],
+            description: "Testing \"special\" characters & symbols".to_string(),
+            authors: vec!["Author <test@example.com> (Company & Co.)".to_string()],
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
+        mcp: McpConfig::default(),
         variables: app_vars,
     };
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    // Check application variable
-    assert!(result.contains("[variables]"));
-    assert!(result.contains("foo_user = { default = \"foo guy\" }"));
+    // Validate the generated TOML can handle special characters
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert_eq!(
+        spin_config.application.description,
+        "Testing \"special\" characters & symbols"
+    );
 
-    // Check component variable reference
-    assert!(result.contains("[component.hello.variables]"));
-    assert!(result.contains("user = \"{{ foo_user }}\""));
+    // Check that variables are properly escaped
+    if let SpinVariable::Default { default } = &spin_config.variables["special-var-name"] {
+        assert_eq!(default, "value with \"quotes\" and 'apostrophes'");
+    } else {
+        panic!("special-var-name should be a default variable");
+    }
 }
 
 #[test]
-fn test_transpile_multiple_variable_types() {
-    // Test mixing required and default variables
-    let mut app_vars = HashMap::new();
-    app_vars.insert(
-        "required_secret".to_string(),
-        ApplicationVariable::Required { required: true },
-    );
-    app_vars.insert(
-        "optional_setting".to_string(),
-        ApplicationVariable::Default {
-            default: "default_value".to_string(),
-        },
-    );
-    app_vars.insert(
-        "another_required".to_string(),
-        ApplicationVariable::Required { required: true },
-    );
-
+fn test_transpile_empty_collections() {
+    // Test handling of empty collections
     let config = FtlConfig {
         project: ProjectConfig {
-            name: "test-project".to_string(),
+            name: "empty-test".to_string(),
             version: "0.1.0".to_string(),
-            description: String::new(),
-            authors: vec![],
+            description: String::new(), // Empty description
+            authors: vec![],            // Empty authors
         },
         auth: AuthConfig::default(),
-        tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
-        variables: app_vars,
+        tools: HashMap::new(), // No tools
+        mcp: McpConfig::default(),
+        variables: HashMap::new(), // No variables
     };
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    // All variables should be in the [variables] section
-    assert!(result.contains("required_secret = { required = true }"));
-    assert!(result.contains("optional_setting = { default = \"default_value\" }"));
-    assert!(result.contains("another_required = { required = true }"));
+    // Should still generate valid TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert_eq!(spin_config.application.name, "empty-test");
+    assert!(spin_config.application.description.is_empty());
+    assert!(spin_config.application.authors.is_empty());
+
+    // Auth is disabled by default, gateway is named "mcp"
+    assert!(spin_config.component.contains_key("mcp"));
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Should have system variables but no custom ones
+    assert!(spin_config.variables.contains_key("tool_components"));
+    assert!(spin_config.variables.contains_key("auth_enabled"));
 }
 
 #[test]
-fn test_transpile_empty_variables() {
-    // Test that empty variables are handled correctly
-    let config = FtlConfig {
-        project: ProjectConfig {
-            name: "test-project".to_string(),
-            version: "0.1.0".to_string(),
-            description: String::new(),
-            authors: vec![],
-        },
-        auth: AuthConfig::default(),
-        tools: HashMap::new(),
-        gateway: GatewayConfig::default(),
-        variables: HashMap::new(),
-    };
+fn test_registry_uri_parsing() {
+    // Test various registry URI formats
+    let test_cases = vec![
+        (
+            "ghcr.io/myorg/my-tool:1.0.0",
+            ComponentSource::Registry {
+                registry: "ghcr.io".to_string(),
+                package: "myorg:my-tool".to_string(),
+                version: "1.0.0".to_string(),
+            },
+        ),
+        (
+            "docker.io/namespace/component:v2.1.0-beta",
+            ComponentSource::Registry {
+                registry: "docker.io".to_string(),
+                package: "namespace:component".to_string(),
+                version: "v2.1.0-beta".to_string(),
+            },
+        ),
+        (
+            "registry.example.com:5000/org/suborg/tool:latest",
+            ComponentSource::Registry {
+                registry: "registry.example.com:5000".to_string(),
+                package: "org:suborg:tool".to_string(),
+                version: "latest".to_string(),
+            },
+        ),
+    ];
 
-    let result = transpile_ftl_to_spin(&config).unwrap();
-
-    // Should still have [variables] section
-    assert!(result.contains("[variables]"));
-    // Should have default auth variables but no custom application variables
-    assert!(result.contains("auth_enabled = { default = \"false\" }"));
-    // Should not have any custom application variables
-    assert!(!result.contains("foo_user"));
-    assert!(!result.contains("api_token"));
+    for (uri, expected) in test_cases {
+        let result = parse_registry_uri_to_source(uri);
+        match (result, expected) {
+            (
+                ComponentSource::Registry {
+                    registry: r1,
+                    package: p1,
+                    version: v1,
+                },
+                ComponentSource::Registry {
+                    registry: r2,
+                    package: p2,
+                    version: v2,
+                },
+            ) => {
+                assert_eq!(r1, r2, "Registry mismatch for URI: {uri}");
+                assert_eq!(p1, p2, "Package mismatch for URI: {uri}");
+                assert_eq!(v1, v2, "Version mismatch for URI: {uri}");
+            }
+            _ => panic!("Unexpected parse result for URI: {uri}"),
+        }
+    }
 }
 
 #[test]
-fn test_transpile_variable_edge_cases() {
-    // Test edge cases like special characters in variable names/values
-    let mut app_vars = HashMap::new();
-    app_vars.insert(
-        "MULTI_WORD_VAR".to_string(),
-        ApplicationVariable::Default {
-            default: "value with spaces".to_string(),
-        },
-    );
-    app_vars.insert(
-        "var-with-dashes".to_string(),
-        ApplicationVariable::Default {
-            default: "dash-value".to_string(),
-        },
-    );
-    app_vars.insert(
-        "var_with_underscores".to_string(),
-        ApplicationVariable::Required { required: true },
-    );
-
+fn test_http_trigger_generation() {
+    // Test that HTTP triggers are correctly generated
     let mut tools = HashMap::new();
-    let mut tool_vars = HashMap::new();
-    // Test that tool can reference these variables
-    tool_vars.insert("config1".to_string(), "{{ MULTI_WORD_VAR }}".to_string());
-    tool_vars.insert("config2".to_string(), "{{ var-with-dashes }}".to_string());
-    tool_vars.insert(
-        "config3".to_string(),
-        "{{ var_with_underscores }}".to_string(),
-    );
-    tool_vars.insert("literal".to_string(), "not a template".to_string());
-
     tools.insert(
-        "edge-case-tool".to_string(),
+        "tool1".to_string(),
         ToolConfig {
-            path: Some("edge-tool".to_string()),
-            wasm: "edge-tool/target/wasm32-wasip1/release/edge_tool.wasm".to_string(),
+            path: Some("tool1".to_string()),
+            wasm: "tool1/output.wasm".to_string(),
             build: BuildConfig {
-                command: "cargo build --target wasm32-wasip1 --release".to_string(),
+                command: "make".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
             },
@@ -499,33 +908,269 @@ fn test_transpile_variable_edge_cases() {
             up: None,
             deploy: None,
             allowed_outbound_hosts: vec![],
-            variables: tool_vars,
+            variables: HashMap::new(),
+        },
+    );
+    tools.insert(
+        "tool2".to_string(),
+        ToolConfig {
+            path: Some("tool2".to_string()),
+            wasm: "tool2/output.wasm".to_string(),
+            build: BuildConfig {
+                command: "make".to_string(),
+                watch: vec![],
+                env: HashMap::new(),
+            },
+            profiles: None,
+            up: None,
+            deploy: None,
+            allowed_outbound_hosts: vec![],
+            variables: HashMap::new(),
         },
     );
 
     let config = FtlConfig {
         project: ProjectConfig {
-            name: "test-project".to_string(),
+            name: "trigger-test".to_string(),
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
         },
         auth: AuthConfig::default(),
         tools,
-        gateway: GatewayConfig::default(),
-        variables: app_vars,
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
     };
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    // Check app variables
-    assert!(result.contains("MULTI_WORD_VAR = { default = \"value with spaces\" }"));
-    assert!(result.contains("var-with-dashes = { default = \"dash-value\" }"));
-    assert!(result.contains("var_with_underscores = { required = true }"));
+    // Check trigger generation
+    assert!(result.contains("[[trigger.http]]"));
+    assert!(result.contains("route = \"/mcp\""));
 
-    // Check component variables
-    assert!(result.contains("config1 = \"{{ MULTI_WORD_VAR }}\""));
-    assert!(result.contains("config2 = \"{{ var-with-dashes }}\""));
-    assert!(result.contains("config3 = \"{{ var_with_underscores }}\""));
-    assert!(result.contains("literal = \"not a template\""));
+    // Auth is disabled by default, so OAuth endpoints should NOT be present
+    assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
+    assert!(!result.contains("route = \"/.well-known/oauth-authorization-server\""));
+
+    // Count private route triggers (2 tools = 2, gateway is not private when auth is disabled)
+    let private_count = result.matches("route = { private = true }").count();
+    assert_eq!(private_count, 2);
+
+    // Each tool should have a trigger
+    let tool1_triggers = result.matches("component = \"tool1\"").count();
+    let tool2_triggers = result.matches("component = \"tool2\"").count();
+    assert_eq!(tool1_triggers, 1);
+    assert_eq!(tool2_triggers, 1);
+}
+
+#[test]
+fn test_auth_disabled_omits_authorizer() {
+    // Test that when auth is disabled, the authorizer component is completely omitted
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "no-auth-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: false,
+            authkit: None,
+            oidc: None,
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth disabled:\n{result}");
+
+    // Check that auth is disabled
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
+
+    // Check that gateway exists as "mcp" component (no separate authorizer)
+    assert!(result.contains("[component.mcp]")); // This is the gateway when auth disabled
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
+
+    // Check that OAuth endpoints are NOT present
+    assert!(!result.contains("/.well-known/oauth-protected-resource"));
+    assert!(!result.contains("/.well-known/oauth-authorization-server"));
+
+    // Check that auth variables are NOT included (except auth_enabled)
+    assert!(!result.contains("auth_provider_type"));
+    assert!(!result.contains("auth_provider_issuer"));
+    assert!(!result.contains("auth_provider_audience"));
+    assert!(!result.contains("auth_provider_name"));
+    assert!(!result.contains("auth_provider_jwks_uri"));
+    assert!(!result.contains("auth_gateway_url"));
+    assert!(!result.contains("auth_trace_header"));
+
+    // Check that /mcp route points directly to gateway (named "mcp")
+    assert!(result.contains("route = \"/mcp\""));
+    assert!(result.contains("component = \"mcp\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify that gateway exists as "mcp" component
+    assert!(spin_config.component.contains_key("mcp"));
+
+    // Verify that ftl-mcp-gateway component doesn't exist
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Verify auth_enabled is false
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "false"
+    ));
+}
+
+#[test]
+fn test_auth_enabled_includes_authorizer() {
+    // Test that when auth is enabled, all auth components are included
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "auth-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: true,
+            authkit: Some(AuthKitConfig {
+                issuer: "https://example.authkit.app".to_string(),
+                audience: "test-api".to_string(),
+            }),
+            oidc: None,
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth enabled:\n{result}");
+
+    // Check that auth is enabled
+    assert!(result.contains("auth_enabled = { default = \"true\" }"));
+
+    // Check that MCP authorizer component IS present
+    assert!(result.contains("[component.mcp]"));
+
+    // Check that OAuth endpoints ARE present
+    assert!(result.contains("/.well-known/oauth-protected-resource"));
+    assert!(result.contains("/.well-known/oauth-authorization-server"));
+
+    // Check that auth variables ARE included
+    assert!(result.contains("auth_provider_type"));
+    assert!(result.contains("auth_provider_issuer"));
+    assert!(result.contains("auth_provider_audience"));
+    assert!(result.contains("auth_gateway_url"));
+    assert!(result.contains("auth_trace_header"));
+
+    // Check that /mcp route points to authorizer
+    let mcp_route_matches: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
+    assert!(!mcp_route_matches.is_empty(), "Should have /mcp route");
+
+    // Find the component for the /mcp route
+    let mcp_route_pos = mcp_route_matches[0].0;
+    let after_route = &result[mcp_route_pos..];
+    assert!(after_route.contains("component = \"mcp\""));
+
+    // Check that gateway has private route
+    assert!(result.contains("route = { private = true }"));
+    assert!(result.contains("component = \"ftl-mcp-gateway\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify that mcp component exists
+    assert!(spin_config.component.contains_key("mcp"));
+
+    // Verify that gateway component exists
+    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Verify auth_enabled is true
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "true"
+    ));
+}
+
+#[test]
+fn test_auth_disabled_with_tools() {
+    // Test that tools work correctly when auth is disabled
+    let mut tools = HashMap::new();
+    tools.insert(
+        "my-tool".to_string(),
+        ToolConfig {
+            path: Some("my-tool".to_string()),
+            wasm: "my-tool/output.wasm".to_string(),
+            build: BuildConfig {
+                command: "make".to_string(),
+                watch: vec![],
+                env: HashMap::new(),
+            },
+            profiles: None,
+            up: None,
+            deploy: None,
+            allowed_outbound_hosts: vec!["https://api.example.com".to_string()],
+            variables: HashMap::new(),
+        },
+    );
+
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "no-auth-with-tools".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: false,
+            authkit: None,
+            oidc: None,
+        },
+        tools,
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth disabled and tools:\n{result}");
+
+    // Check that auth is disabled
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
+
+    // Check that gateway exists as "mcp" (no separate authorizer)
+    assert!(result.contains("[component.mcp]"));
+
+    // Check that ftl-mcp-gateway component doesn't exist
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
+
+    // Check that tool component exists
+    assert!(result.contains("[component.my-tool]"));
+
+    // Check that /mcp route points directly to gateway
+    let mcp_routes: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
+    assert_eq!(mcp_routes.len(), 1, "Should have exactly one /mcp route");
+
+    // Verify it's followed by gateway component named "mcp"
+    let after_mcp = &result[mcp_routes[0].0..];
+    assert!(after_mcp.contains("component = \"mcp\""));
+
+    // Check that tool has private route
+    assert!(result.contains("component = \"my-tool\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify components
+    assert!(spin_config.component.contains_key("mcp")); // Gateway is named "mcp"
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(spin_config.component.contains_key("my-tool"));
 }
