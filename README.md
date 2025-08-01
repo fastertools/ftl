@@ -297,7 +297,7 @@ We do **not** collect:
 - Command arguments that might contain sensitive data
 - Any personally identifiable information
 
-For more details, see the [telemetry privacy audit](./crates/telemetry/PRIVACY_AUDIT.md).
+For more details, see the [telemetry documentation](./TELEMETRY.md).
 
 ## Acknowledgments
 
