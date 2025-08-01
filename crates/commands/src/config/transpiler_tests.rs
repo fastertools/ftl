@@ -40,8 +40,10 @@ fn test_transpile_minimal_config() {
     assert!(result.contains("[variables]"));
     assert!(result.contains("tool_components"));
     assert!(result.contains("[[trigger.http]]"));
+
+    // Auth is disabled by default, gateway is named "mcp"
     assert!(result.contains("[component.mcp]"));
-    assert!(result.contains("[component.ftl-mcp-gateway]"));
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
 
     // Validate the generated TOML can be parsed
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -381,34 +383,37 @@ fn test_transpile_with_custom_gateway_uris() {
 
     // Check that custom URIs are properly parsed into source configurations
     assert!(result.contains("[[trigger.http]]"));
-    assert!(result.contains("component = \"mcp\""));
-    assert!(result.contains("component = \"ftl-mcp-gateway\""));
 
-    // Verify the source configurations are correct
+    // Auth is disabled by default, gateway is named "mcp"
+    assert!(result.contains("component = \"mcp\""));
+    assert!(!result.contains("component = \"ftl-mcp-gateway\""));
+
+    // Gateway component should exist with custom URI (named "mcp")
     assert!(result.contains("[component.mcp]"));
     assert!(result.contains("[component.mcp.source]"));
-    assert!(result.contains("registry = \"ghcr.io\""));
-    assert!(result.contains("package = \"myorg:custom-authorizer\""));
-    assert!(result.contains("version = \"2.0.0\""));
-
-    assert!(result.contains("[component.ftl-mcp-gateway]"));
-    assert!(result.contains("[component.ftl-mcp-gateway.source]"));
     assert!(result.contains("package = \"myorg:custom-gateway\""));
+    assert!(result.contains("version = \"2.0.0\""));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
-    let mcp_component = &spin_config.component["mcp"];
+
+    // Gateway component exists as "mcp" (auth disabled)
+    assert!(spin_config.component.contains_key("mcp"));
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Gateway component should exist with custom source
+    let gateway_component = &spin_config.component["mcp"];
     if let ComponentSource::Registry {
         registry,
         package,
         version,
-    } = &mcp_component.source
+    } = &gateway_component.source
     {
         assert_eq!(registry, "ghcr.io");
-        assert_eq!(package, "myorg:custom-authorizer");
+        assert_eq!(package, "myorg:custom-gateway");
         assert_eq!(version, "2.0.0");
     } else {
-        panic!("MCP component should have registry source");
+        panic!("Gateway component should have registry source");
     }
 }
 
@@ -822,9 +827,9 @@ fn test_transpile_empty_collections() {
     assert!(spin_config.application.description.is_empty());
     assert!(spin_config.application.authors.is_empty());
 
-    // Should still have default MCP components
+    // Auth is disabled by default, gateway is named "mcp"
     assert!(spin_config.component.contains_key("mcp"));
-    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
     // Should have system variables but no custom ones
     assert!(spin_config.variables.contains_key("tool_components"));
@@ -942,16 +947,230 @@ fn test_http_trigger_generation() {
     // Check trigger generation
     assert!(result.contains("[[trigger.http]]"));
     assert!(result.contains("route = \"/mcp\""));
-    assert!(result.contains("route = \"/.well-known/oauth-protected-resource\""));
-    assert!(result.contains("route = \"/.well-known/oauth-authorization-server\""));
 
-    // Count private route triggers (gateway + 2 tools = 3)
+    // Auth is disabled by default, so OAuth endpoints should NOT be present
+    assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
+    assert!(!result.contains("route = \"/.well-known/oauth-authorization-server\""));
+
+    // Count private route triggers (2 tools = 2, gateway is not private when auth is disabled)
     let private_count = result.matches("route = { private = true }").count();
-    assert_eq!(private_count, 3);
+    assert_eq!(private_count, 2);
 
     // Each tool should have a trigger
     let tool1_triggers = result.matches("component = \"tool1\"").count();
     let tool2_triggers = result.matches("component = \"tool2\"").count();
     assert_eq!(tool1_triggers, 1);
     assert_eq!(tool2_triggers, 1);
+}
+
+#[test]
+fn test_auth_disabled_omits_authorizer() {
+    // Test that when auth is disabled, the authorizer component is completely omitted
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "no-auth-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: false,
+            authkit: None,
+            oidc: None,
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth disabled:\n{result}");
+
+    // Check that auth is disabled
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
+
+    // Check that gateway exists as "mcp" component (no separate authorizer)
+    assert!(result.contains("[component.mcp]")); // This is the gateway when auth disabled
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
+
+    // Check that OAuth endpoints are NOT present
+    assert!(!result.contains("/.well-known/oauth-protected-resource"));
+    assert!(!result.contains("/.well-known/oauth-authorization-server"));
+
+    // Check that auth variables are NOT included (except auth_enabled)
+    assert!(!result.contains("auth_provider_type"));
+    assert!(!result.contains("auth_provider_issuer"));
+    assert!(!result.contains("auth_provider_audience"));
+    assert!(!result.contains("auth_provider_name"));
+    assert!(!result.contains("auth_provider_jwks_uri"));
+    assert!(!result.contains("auth_gateway_url"));
+    assert!(!result.contains("auth_trace_header"));
+
+    // Check that /mcp route points directly to gateway (named "mcp")
+    assert!(result.contains("route = \"/mcp\""));
+    assert!(result.contains("component = \"mcp\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify that gateway exists as "mcp" component
+    assert!(spin_config.component.contains_key("mcp"));
+
+    // Verify that ftl-mcp-gateway component doesn't exist
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Verify auth_enabled is false
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "false"
+    ));
+}
+
+#[test]
+fn test_auth_enabled_includes_authorizer() {
+    // Test that when auth is enabled, all auth components are included
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "auth-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: true,
+            authkit: Some(AuthKitConfig {
+                issuer: "https://example.authkit.app".to_string(),
+                audience: "test-api".to_string(),
+            }),
+            oidc: None,
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth enabled:\n{result}");
+
+    // Check that auth is enabled
+    assert!(result.contains("auth_enabled = { default = \"true\" }"));
+
+    // Check that MCP authorizer component IS present
+    assert!(result.contains("[component.mcp]"));
+
+    // Check that OAuth endpoints ARE present
+    assert!(result.contains("/.well-known/oauth-protected-resource"));
+    assert!(result.contains("/.well-known/oauth-authorization-server"));
+
+    // Check that auth variables ARE included
+    assert!(result.contains("auth_provider_type"));
+    assert!(result.contains("auth_provider_issuer"));
+    assert!(result.contains("auth_provider_audience"));
+    assert!(result.contains("auth_gateway_url"));
+    assert!(result.contains("auth_trace_header"));
+
+    // Check that /mcp route points to authorizer
+    let mcp_route_matches: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
+    assert!(!mcp_route_matches.is_empty(), "Should have /mcp route");
+
+    // Find the component for the /mcp route
+    let mcp_route_pos = mcp_route_matches[0].0;
+    let after_route = &result[mcp_route_pos..];
+    assert!(after_route.contains("component = \"mcp\""));
+
+    // Check that gateway has private route
+    assert!(result.contains("route = { private = true }"));
+    assert!(result.contains("component = \"ftl-mcp-gateway\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify that mcp component exists
+    assert!(spin_config.component.contains_key("mcp"));
+
+    // Verify that gateway component exists
+    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+
+    // Verify auth_enabled is true
+    assert!(matches!(
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "true"
+    ));
+}
+
+#[test]
+fn test_auth_disabled_with_tools() {
+    // Test that tools work correctly when auth is disabled
+    let mut tools = HashMap::new();
+    tools.insert(
+        "my-tool".to_string(),
+        ToolConfig {
+            path: Some("my-tool".to_string()),
+            wasm: "my-tool/output.wasm".to_string(),
+            build: BuildConfig {
+                command: "make".to_string(),
+                watch: vec![],
+                env: HashMap::new(),
+            },
+            profiles: None,
+            up: None,
+            deploy: None,
+            allowed_outbound_hosts: vec!["https://api.example.com".to_string()],
+            variables: HashMap::new(),
+        },
+    );
+
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "no-auth-with-tools".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: false,
+            authkit: None,
+            oidc: None,
+        },
+        tools,
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with auth disabled and tools:\n{result}");
+
+    // Check that auth is disabled
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
+
+    // Check that gateway exists as "mcp" (no separate authorizer)
+    assert!(result.contains("[component.mcp]"));
+
+    // Check that ftl-mcp-gateway component doesn't exist
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
+
+    // Check that tool component exists
+    assert!(result.contains("[component.my-tool]"));
+
+    // Check that /mcp route points directly to gateway
+    let mcp_routes: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
+    assert_eq!(mcp_routes.len(), 1, "Should have exactly one /mcp route");
+
+    // Verify it's followed by gateway component named "mcp"
+    let after_mcp = &result[mcp_routes[0].0..];
+    assert!(after_mcp.contains("component = \"mcp\""));
+
+    // Check that tool has private route
+    assert!(result.contains("component = \"my-tool\""));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+
+    // Verify components
+    assert!(spin_config.component.contains_key("mcp")); // Gateway is named "mcp"
+    assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(spin_config.component.contains_key("my-tool"));
 }

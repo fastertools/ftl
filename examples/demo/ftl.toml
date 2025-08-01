@@ -24,11 +24,12 @@ validate_arguments = true
 [auth]
 enabled = false
 
+
 # Uncomment and configure one of the following auth providers when enabling auth:
 
 # For AuthKit:
-# [auth.authkit]
-# issuer = "https://your-tenant.authkit.app"
+[auth.authkit]
+issuer = "https://divine-lion-50-staging.authkit.app"
 # audience = "mcp-api"  # optional
 
 # For OIDC (Auth0, Okta, etc.):
