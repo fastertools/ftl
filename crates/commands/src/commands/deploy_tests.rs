@@ -147,7 +147,10 @@ fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &s
         .expect_exists()
         .withf(|path: &Path| {
             let path_str = path.to_string_lossy();
-            path_str.contains("Cargo.toml") || path_str.contains("package.json")
+            path_str.contains("Cargo.toml")
+                || path_str.contains("package.json")
+                || path_str.contains("pyproject.toml")
+                || path_str.contains("go.mod")
         })
         .returning(|_| false);
 }
@@ -2101,7 +2104,12 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bar
@@ -2229,7 +2237,12 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bar
