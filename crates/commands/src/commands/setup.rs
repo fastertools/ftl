@@ -66,7 +66,9 @@ pub fn templates_with_deps(
         let output_str = String::from_utf8_lossy(&list_output.stdout);
         let has_ftl_templates = output_str.contains("ftl-mcp-server")
             || output_str.contains("ftl-mcp-rust")
-            || output_str.contains("ftl-mcp-ts");
+            || output_str.contains("ftl-mcp-ts")
+            || output_str.contains("ftl-mcp-python")
+            || output_str.contains("ftl-mcp-go");
 
         if has_ftl_templates {
             deps.ui.print_styled(

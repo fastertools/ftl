@@ -12,6 +12,11 @@ spin add -t ftl-mcp-ts
 
 # Add a Rust tool
 spin add -t ftl-mcp-rust
+
+# Add a Python tool
+spin add -t ftl-mcp-python
+
+# For Go tools, see the included examples
 ```
 
 ## Running the Server

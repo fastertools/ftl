@@ -106,6 +106,26 @@ allowed_outbound_hosts = []
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
+# Echo tool (Python)
+[tools.echo-py]
+path = "echo-py"
+wasm = "echo-py/dist/app.wasm"
+allowed_outbound_hosts = []
+
+[tools.echo-py.build]
+command = "bash build.sh"
+watch = ["app.py", "pyproject.toml"]
+
+# Echo tool (Go)
+[tools.echo-go]
+path = "echo-go"
+wasm = "echo-go/dist/echo-go.wasm"
+allowed_outbound_hosts = []
+
+[tools.echo-go.build]
+command = "bash build.sh"
+watch = ["main.go", "go.mod"]
+
 # Weather tool (Rust)
 [tools.weather-rs]
 path = "weather-rs"
@@ -126,6 +146,26 @@ allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.o
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
+# Weather tool (Python)
+[tools.weather-py]
+path = "weather-py"
+wasm = "weather-py/dist/app.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[tools.weather-py.build]
+command = "bash build.sh"
+watch = ["app.py", "pyproject.toml"]
+
+# Weather tool (Go)
+[tools.weather-go]
+path = "weather-go"
+wasm = "weather-go/dist/weather-go.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[tools.weather-go.build]
+command = "bash build.sh"
+watch = ["main.go", "go.mod"]
+
 # Multi-tools example (Rust) - demonstrates multiple tools in one component
 [tools.multi-tools-rs]
 path = "multi-tools-rs"
@@ -145,6 +185,26 @@ allowed_outbound_hosts = []
 [tools.multi-tools-ts.build]
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# Multi-tools example (Python) - demonstrates multiple tools in one component
+[tools.multi-tools-py]
+path = "multi-tools-py"
+wasm = "multi-tools-py/dist/app.wasm"
+allowed_outbound_hosts = []
+
+[tools.multi-tools-py.build]
+command = "bash build.sh"
+watch = ["app.py", "pyproject.toml"]
+
+# Multi-tools example (Go) - demonstrates multiple tools in one component
+[tools.multi-tools-go]
+path = "multi-tools-go"
+wasm = "multi-tools-go/dist/multi-tools-go.wasm"
+allowed_outbound_hosts = []
+
+[tools.multi-tools-go.build]
+command = "bash build.sh"
+watch = ["main.go", "go.mod"]
 
 # Variables demo (Rust) - demonstrates using Spin variables
 [tools.variables-demo]

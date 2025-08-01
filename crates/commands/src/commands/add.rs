@@ -72,6 +72,8 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     let template_id = match selected_language {
         Language::Rust => "ftl-mcp-rust",
         Language::TypeScript | Language::JavaScript => "ftl-mcp-ts",
+        Language::Python => "ftl-mcp-python",
+        Language::Go => "ftl-mcp-go",
     };
 
     // Check if custom template source is provided
@@ -247,6 +249,26 @@ fn update_ftl_toml(
             },
             format!("{component_name}/dist/{component_name}.wasm"),
         ),
+        Language::Python => (
+            BuildConfig {
+                command: format!(
+                    "componentize-py -w spin-http componentize {component_name}/src/main.py -o {component_name}/app.wasm"
+                ),
+                watch: vec!["src/**/*.py".to_string(), "pyproject.toml".to_string()],
+                env: HashMap::new(),
+            },
+            format!("{component_name}/app.wasm"),
+        ),
+        Language::Go => (
+            BuildConfig {
+                command: format!(
+                    "tinygo build -target=wasi -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
+                ),
+                watch: vec!["*.go".to_string(), "go.mod".to_string()],
+                env: HashMap::new(),
+            },
+            format!("{component_name}/main.wasm"),
+        ),
     };
 
     // Add the new tool
@@ -277,6 +299,8 @@ fn print_success_message(ui: &Arc<dyn UserInterface>, component_name: &str, lang
     let main_file = match language {
         Language::Rust => format!("{component_name}/src/lib.rs"),
         Language::JavaScript | Language::TypeScript => format!("{component_name}/src/index.ts"),
+        Language::Python => format!("{component_name}/src/main.py"),
+        Language::Go => format!("{component_name}/main.go"),
     };
 
     ui.print("");

@@ -7,7 +7,11 @@
     "build": "npm run typecheck && esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && mkdir -p dist && j2w -i build/bundle.js -o dist/weather-ts.wasm",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["mcp", "ftl", "tool"],
+  "keywords": [
+    "mcp",
+    "ftl",
+    "tool"
+  ],
   "author": "bowlofarugula <bowlofarugula@gmail.com>",
   "license": "Apache-2.0",
   "devDependencies": {

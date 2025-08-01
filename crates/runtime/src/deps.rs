@@ -533,55 +533,63 @@ pub struct RealCredentialsProvider;
 #[async_trait]
 impl CredentialsProvider for RealCredentialsProvider {
     async fn get_or_refresh_credentials(&self) -> Result<StoredCredentials> {
-        use keyring::Entry;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use keyring::Entry;
 
-        // Try to get stored credentials
-        let entry = Entry::new("ftl-cli", "default")
-            .map_err(|e| anyhow::anyhow!("Failed to access keyring: {}", e))?;
+            // Try to get stored credentials
+            let entry = Entry::new("ftl-cli", "default")
+                .map_err(|e| anyhow::anyhow!("Failed to access keyring: {}", e))?;
 
-        let json = entry
-            .get_password()
-            .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))?;
+            let json = entry
+                .get_password()
+                .map_err(|e| anyhow::anyhow!("Failed to retrieve credentials: {}", e))?;
 
-        let credentials: StoredCredentials = serde_json::from_str(&json)
-            .map_err(|e| anyhow::anyhow!("Failed to parse stored credentials: {}", e))?;
+            let credentials: StoredCredentials = serde_json::from_str(&json)
+                .map_err(|e| anyhow::anyhow!("Failed to parse stored credentials: {}", e))?;
 
-        // Check if token is expired or about to expire (within 30 seconds)
-        if let Some(expires_at) = credentials.expires_at {
-            let now = Utc::now();
-            let buffer = chrono::Duration::seconds(30);
+            // Check if token is expired or about to expire (within 30 seconds)
+            if let Some(expires_at) = credentials.expires_at {
+                let now = Utc::now();
+                let buffer = chrono::Duration::seconds(30);
 
-            if expires_at < now + buffer {
-                // Token is expired or about to expire, try to refresh
-                if let Some(refresh_token) = credentials.refresh_token.clone() {
-                    match self
-                        .refresh_access_token(&credentials.authkit_domain, &refresh_token)
-                        .await
-                    {
-                        Ok(new_credentials) => {
-                            // Store updated credentials
-                            let updated_json = serde_json::to_string(&new_credentials)?;
-                            entry.set_password(&updated_json).map_err(|e| {
-                                anyhow::anyhow!("Failed to store updated credentials: {}", e)
-                            })?;
-                            return Ok(new_credentials);
-                        }
-                        Err(e) => {
-                            // Log refresh error but continue with existing token if not fully expired
-                            if expires_at < now {
-                                return Err(anyhow::anyhow!(
-                                    "Token expired and refresh failed: {}",
-                                    e
-                                ));
+                if expires_at < now + buffer {
+                    // Token is expired or about to expire, try to refresh
+                    if let Some(refresh_token) = credentials.refresh_token.clone() {
+                        match self
+                            .refresh_access_token(&credentials.authkit_domain, &refresh_token)
+                            .await
+                        {
+                            Ok(new_credentials) => {
+                                // Store updated credentials
+                                let updated_json = serde_json::to_string(&new_credentials)?;
+                                entry.set_password(&updated_json).map_err(|e| {
+                                    anyhow::anyhow!("Failed to store updated credentials: {}", e)
+                                })?;
+                                return Ok(new_credentials);
                             }
-                            // Otherwise continue with existing token
+                            Err(e) => {
+                                // Log refresh error but continue with existing token if not fully expired
+                                if expires_at < now {
+                                    return Err(anyhow::anyhow!(
+                                        "Token expired and refresh failed: {}",
+                                        e
+                                    ));
+                                }
+                                // Otherwise continue with existing token
+                            }
                         }
                     }
                 }
             }
+
+            Ok(credentials)
         }
 
-        Ok(credentials)
+        #[cfg(target_arch = "wasm32")]
+        {
+            Err(anyhow::anyhow!("Credentials storage not supported on WASM"))
+        }
     }
 }
 

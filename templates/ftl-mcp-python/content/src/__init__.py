@@ -1,0 +1,1 @@
+"""{{project-name | kebab_case}} - An FTL MCP tool."""

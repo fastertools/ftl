@@ -147,7 +147,10 @@ fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &s
         .expect_exists()
         .withf(|path: &Path| {
             let path_str = path.to_string_lossy();
-            path_str.contains("Cargo.toml") || path_str.contains("package.json")
+            path_str.contains("Cargo.toml")
+                || path_str.contains("package.json")
+                || path_str.contains("pyproject.toml")
+                || path_str.contains("go.mod")
         })
         .returning(|_| false);
 }
@@ -514,6 +517,21 @@ version = "1.2.3"
             .to_string())
         });
 
+    // Mock: package.json doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("api/package.json")))
+        .returning(|_| false);
+
+    // Mock: pyproject.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("api/pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("api/go.mod")))
+        .returning(|_| false);
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "api", "api/api.wasm").unwrap();
     assert_eq!(version, "1.2.3");
@@ -536,9 +554,98 @@ async fn test_parse_package_json_version() {
         .with(eq(Path::new("worker/package.json")))
         .returning(|_| Ok(r#"{"name": "worker", "version": "2.0.0"}"#.to_string()));
 
+    // Mock: pyproject.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("worker/pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("worker/go.mod")))
+        .returning(|_| false);
+
     let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "worker", "worker/worker.wasm").unwrap();
     assert_eq!(version, "2.0.0");
+}
+
+#[tokio::test]
+async fn test_parse_pyproject_toml_version() {
+    let mut fs = MockFileSystemMock::new();
+
+    // Mock: Cargo.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("python-tool/Cargo.toml")))
+        .returning(|_| false);
+
+    // Mock: package.json doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("python-tool/package.json")))
+        .returning(|_| false);
+
+    // Mock: pyproject.toml exists
+    fs.expect_exists()
+        .with(eq(Path::new("python-tool/pyproject.toml")))
+        .returning(|_| true);
+    fs.expect_read_to_string()
+        .with(eq(Path::new("python-tool/pyproject.toml")))
+        .returning(|_| {
+            Ok(r#"
+[project]
+name = "python-tool"
+version = "3.0.0"
+"#
+            .to_string())
+        });
+
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("python-tool/go.mod")))
+        .returning(|_| false);
+
+    let fs: Arc<dyn FileSystem> = Arc::new(fs);
+    let version = extract_component_version(&fs, "python-tool", "python-tool/app.wasm").unwrap();
+    assert_eq!(version, "3.0.0");
+}
+
+#[tokio::test]
+async fn test_parse_go_mod_version() {
+    let mut fs = MockFileSystemMock::new();
+
+    // Mock: Cargo.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/Cargo.toml")))
+        .returning(|_| false);
+
+    // Mock: package.json doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/package.json")))
+        .returning(|_| false);
+
+    // Mock: pyproject.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod exists
+    fs.expect_exists()
+        .with(eq(Path::new("go-tool/go.mod")))
+        .returning(|_| true);
+    fs.expect_read_to_string()
+        .with(eq(Path::new("go-tool/go.mod")))
+        .returning(|_| {
+            Ok(r"module github.com/example/go-tool
+
+go 1.21
+
+// Version: v4.0.0
+"
+            .to_string())
+        });
+
+    let fs: Arc<dyn FileSystem> = Arc::new(fs);
+    let version = extract_component_version(&fs, "go-tool", "go-tool/main.wasm").unwrap();
+    assert_eq!(version, "4.0.0");
 }
 
 #[tokio::test]
@@ -751,7 +858,12 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
@@ -1075,7 +1187,29 @@ version = "1.2.3"
 
 #[test]
 fn test_extract_component_version_default() {
-    let fs: Arc<dyn FileSystem> = Arc::new(MockFileSystem::new());
+    let mut fs = MockFileSystemMock::new();
+
+    // Mock: Cargo.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("Cargo.toml")))
+        .returning(|_| false);
+
+    // Mock: package.json doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("package.json")))
+        .returning(|_| false);
+
+    // Mock: pyproject.toml doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("pyproject.toml")))
+        .returning(|_| false);
+
+    // Mock: go.mod doesn't exist
+    fs.expect_exists()
+        .with(eq(Path::new("go.mod")))
+        .returning(|_| false);
+
+    let fs: Arc<dyn FileSystem> = Arc::new(fs);
     let version = extract_component_version(&fs, "test", "test.wasm").unwrap();
     assert_eq!(version, "0.1.0");
 }
@@ -1279,7 +1413,12 @@ command = "cargo build --release --target wasm32-wasip1"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
@@ -1492,7 +1631,12 @@ command = "cargo build --release --target wasm32-wasip1"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bars
@@ -1960,7 +2104,12 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bar
@@ -2088,7 +2237,12 @@ command = "echo 'Building test tool'"
     fixture
         .file_system
         .expect_exists()
-        .withf(|path: &Path| path.ends_with("Cargo.toml") || path.ends_with("package.json"))
+        .withf(|path: &Path| {
+            path.ends_with("Cargo.toml")
+                || path.ends_with("package.json")
+                || path.ends_with("pyproject.toml")
+                || path.ends_with("go.mod")
+        })
         .returning(|_| false);
 
     // Mock: clock for progress bar

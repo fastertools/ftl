@@ -14,10 +14,15 @@ Language-specific SDKs for building MCP (Model Context Protocol) tools.
 - **Status**: Stable
 - **Features**: Full TypeScript types, tree-shaking support, zero dependencies
 
-## Coming Soon
+### [Python](./python)
+- **Package**: `ftl-sdk` on [PyPI](https://pypi.org/project/ftl-sdk)
+- **Status**: Alpha
+- **Features**: Zero dependencies (only spin-sdk), Python 3.10+ support, type hints
 
-- **Python SDK** - MCP tools in Python
-- **Go SDK** - High-performance MCP tools
+### [Go](./go)
+- **Package**: `github.com/fastertools/ftl-cli/sdk/go`
+- **Status**: Alpha
+- **Features**: TinyGo WASI support, zero external dependencies, idiomatic Go API
 
 ## Quick Start
 
