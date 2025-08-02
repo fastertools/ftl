@@ -1,13 +1,15 @@
 """
-{{project-name | title_case}} - An FTL MCP tool written in Python.
+{{project-name}} - An FTL MCP tool written in Python.
 
 This tool demonstrates how to create MCP tools using the FTL Python SDK.
 """
 
-from ftl_sdk import create_tools, ToolResponse
+from typing import Any, Dict
+
+from ftl_sdk import ToolResponse, create_tools
 
 
-def example_tool_handler(input_data):
+def example_tool_handler(input_data: Dict[str, Any]) -> ToolResponse:
     """
     Example tool handler that processes messages.
     
@@ -17,7 +19,7 @@ def example_tool_handler(input_data):
     Returns:
         ToolResponse with the processed result
     """
-    message = input_data.get('message', '')
+    message = input_data.get("message", "")
     # TODO: Implement your tool logic here
     return ToolResponse.text(f"Processed: {message}")
 

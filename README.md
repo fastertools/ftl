@@ -135,6 +135,15 @@ FTL Engine is an end-to-end platform for running remote tools called by AI agent
 FTL Engine is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl eng login` command to join the waitlist.
 </details>
 
+## Prerequisites
+
+To build tools in different languages, you'll need the corresponding toolchains:
+
+- **Rust**: `cargo` (via [rustup](https://rustup.rs/))
+- **TypeScript/JavaScript**: `node` and `npm` (via [Node.js](https://nodejs.org/))
+- **Python**: `python3` and `componentize-py` (install with `pip install componentize-py`)
+- **Go**: `go` and `tinygo` (via [Go](https://golang.org/) and [TinyGo](https://tinygo.org/))
+
 ## Quick Start
 
 Install `ftl`
@@ -253,51 +262,6 @@ We welcome contributions and discussion. Please see the [Contributing Guide](CON
 ## License
 
 Apache-2.0 - see [LICENSE](LICENSE) for details.
-
-## Telemetry
-
-FTL CLI collects anonymous usage data to help improve the tool. This telemetry is:
-
-- **Privacy-first**: No personally identifiable information is collected
-- **Anonymous**: All data is anonymized before collection
-- **Transparent**: You can inspect exactly what data is collected
-- **Optional**: You can disable telemetry at any time
-
-### Disabling Telemetry
-
-You can disable telemetry in two ways:
-
-1. **Via configuration file**:
-   ```bash
-   ftl telemetry disable
-   ```
-
-2. **Via environment variable**:
-   ```bash
-   export FTL_TELEMETRY_DISABLED=1
-   ```
-
-### Viewing Telemetry Status
-
-To see your current telemetry settings:
-
-```bash
-ftl telemetry status
-```
-
-### What Data is Collected?
-
-- Command names and execution times
-- Success/failure status (with sanitized error messages)
-- FTL version, OS, and architecture
-- Installation ID (randomly generated UUID)
-
-We do **not** collect:
-- File paths or project names
-- Command arguments that might contain sensitive data
-- Any personally identifiable information
-
-For more details, see the [telemetry documentation](./TELEMETRY.md).
 
 ## Acknowledgments
 

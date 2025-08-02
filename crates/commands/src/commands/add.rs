@@ -193,13 +193,13 @@ fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) ->
 
         Language::from_str(mapped_lang).map_err(|_| {
             anyhow::anyhow!(
-                "Invalid language: {}. Valid options are: rust, typescript, javascript",
+                "Invalid language: {}. Valid options are: rust, typescript, javascript, python, go",
                 lang_str
             )
         })
     } else {
         // Interactive language selection
-        let languages = vec!["rust", "typescript"];
+        let languages = vec!["rust", "typescript", "python", "go"];
         let selection = ui.prompt_select("Select programming language", &languages, 0)?;
         Language::from_str(languages[selection])
             .map_err(|e| anyhow::anyhow!("Failed to parse language: {}", e))
@@ -262,7 +262,7 @@ fn update_ftl_toml(
         Language::Go => (
             BuildConfig {
                 command: format!(
-                    "tinygo build -target=wasi -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
+                    "tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
                 ),
                 watch: vec!["*.go".to_string(), "go.mod".to_string()],
                 env: HashMap::new(),

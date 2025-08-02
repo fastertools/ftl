@@ -8,10 +8,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
-	spinhttp "github.com/fermyon/spin/sdk/go/v2/http"
+	spinhttp "github.com/spinframework/spin-go-sdk/http"
 )
+
+// isDebugEnabled checks if debug logging is enabled via environment variable
+func isDebugEnabled() bool {
+	return os.Getenv("FTL_DEBUG") == "true"
+}
+
+// secureLog provides controlled debug logging without exposing sensitive data
+func secureLog(format string, args ...interface{}) {
+	if isDebugEnabled() {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
+}
+
+// sanitizePath removes potentially sensitive query parameters from path logging
+func sanitizePath(path string) string {
+	if idx := strings.Index(path, "?"); idx != -1 {
+		return path[:idx] + "?[REDACTED]"
+	}
+	return path
+}
 
 // ToolMetadata represents tool metadata returned by GET requests
 type ToolMetadata struct {
@@ -267,28 +288,63 @@ func camelToSnake(s string) string {
 //	}
 //
 //	func main() {}
+
+// safeWriteError writes an error response with proper headers and status
+func safeWriteError(w http.ResponseWriter, message string, statusCode int) {
+	// Ensure headers are set before writing status
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	errorResponse := map[string]interface{}{
+		"error": message,
+		"code":  statusCode,
+	}
+
+	// Use encoder to prevent JSON marshaling panics
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(errorResponse); err != nil {
+		// Fallback to plain text if JSON encoding fails
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(w, "Internal Server Error: %d", statusCode)
+	}
+}
+
 func CreateTools(tools map[string]ToolDefinition) {
-	// Capture tools in closure
+	// Validate tools input to prevent runtime issues
+	if tools == nil {
+		tools = make(map[string]ToolDefinition)
+	}
+
+	// Capture tools in closure with validation
 	toolsCopy := make(map[string]ToolDefinition)
 	for k, v := range tools {
+		// Skip invalid entries to prevent runtime issues
+		if k == "" {
+			continue
+		}
 		toolsCopy[k] = v
 	}
-	
+
 	spinhttp.Handle(func(w http.ResponseWriter, r *http.Request) {
+		// Defensive programming: validate request before processing
+		if r == nil {
+			safeWriteError(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 
-		// Log request for debugging
-		fmt.Printf("[DEBUG] Method: %s, Path: '%s', URI: '%s', Tools count: %d\n", method, path, r.RequestURI, len(toolsCopy))
-		
-		// Debug: Print tool names
-		for key := range toolsCopy {
-			fmt.Printf("[DEBUG] Tool key: %s\n", key)
+		// Secure logging for debugging (only logs when FTL_DEBUG=true)
+		secureLog("Method: %s, Path: '%s', Tools count: %d", method, sanitizePath(path), len(toolsCopy))
+
+		// Debug: Log tool count only (tool names could be sensitive)
+		if isDebugEnabled() {
+			secureLog("Available tools: %d registered", len(toolsCopy))
 		}
 
 		// Handle GET / - return tool metadata
 		if method == "GET" && (path == "/" || path == "") {
-			fmt.Printf("[DEBUG] Handling GET request for tools metadata, found %d tools\n", len(toolsCopy))
+			secureLog("Handling GET request for tools metadata, found %d tools", len(toolsCopy))
 			metadata := make([]ToolMetadata, 0, len(toolsCopy))
 			for key, tool := range toolsCopy {
 				// Use explicit name if provided, otherwise convert from key
@@ -315,7 +371,10 @@ func CreateTools(tools map[string]ToolDefinition) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(metadata)
+			if err := json.NewEncoder(w).Encode(metadata); err != nil {
+				safeWriteError(w, "Failed to encode response", http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 
@@ -339,7 +398,9 @@ func CreateTools(tools map[string]ToolDefinition) {
 			if toolEntry == nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(404)
-				json.NewEncoder(w).Encode(Error(fmt.Sprintf("Tool '%s' not found", toolName)))
+				if err := json.NewEncoder(w).Encode(Error(fmt.Sprintf("Tool '%s' not found", toolName))); err != nil {
+					safeWriteError(w, "Tool not found", http.StatusNotFound)
+				}
 				return
 			}
 
@@ -354,7 +415,10 @@ func CreateTools(tools map[string]ToolDefinition) {
 			result := toolEntry.Handler(input)
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			if err := json.NewEncoder(w).Encode(result); err != nil {
+				safeWriteError(w, "Failed to encode tool result", http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 
@@ -362,12 +426,14 @@ func CreateTools(tools map[string]ToolDefinition) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Allow", "GET, POST")
 		w.WriteHeader(405)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"error": map[string]interface{}{
 				"code":    -32601,
 				"message": "Method not allowed",
 			},
-		})
+		}); err != nil {
+			safeWriteError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 }
 

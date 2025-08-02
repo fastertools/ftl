@@ -90,7 +90,7 @@ class ToolContent:
 
 def _camel_to_snake(name: str) -> str:
     """Convert camelCase to snake_case."""
-    result = []
+    result: List[str] = []
     for i, char in enumerate(name):
         if char.isupper() and i > 0:
             result.append('_')
@@ -139,7 +139,7 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
             
             # Handle GET / - return tool metadata
             if method == "GET" and (path == "/" or path == ""):
-                metadata = []
+                metadata: List[Dict[str, Any]] = []
                 for key, tool in tools.items():
                     # Use explicit name if provided, otherwise convert from key
                     tool_name = tool.get("name", _camel_to_snake(key))
@@ -154,7 +154,7 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
                     })
                 
                 # Remove None values from metadata
-                clean_metadata = []
+                clean_metadata: List[Dict[str, Any]] = []
                 for item in metadata:
                     clean_item = {k: v for k, v in item.items() if v is not None}
                     clean_metadata.append(clean_item)
@@ -170,7 +170,7 @@ def create_tools(tools: Dict[str, Dict[str, Any]]) -> type:
                 tool_name = path.lstrip('/')
                 
                 # Find the tool by name
-                tool_entry = None
+                tool_entry: Optional[Dict[str, Any]] = None
                 for key, tool in tools.items():
                     effective_name = tool.get("name", _camel_to_snake(key))
                     if effective_name == tool_name:
