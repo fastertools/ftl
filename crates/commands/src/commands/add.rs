@@ -262,7 +262,7 @@ fn update_ftl_toml(
         Language::Go => (
             BuildConfig {
                 command: format!(
-                    "tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
+                    "tinygo build -target=wasip1 -gc=leaking -buildmode=c-shared -no-debug -o main.wasm ."
                 ),
                 watch: vec!["*.go".to_string(), "go.mod".to_string()],
                 env: HashMap::new(),
