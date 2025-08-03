@@ -5,6 +5,7 @@ This module provides a modern, decorator-based API for creating MCP tools
 that compile to WebAssembly, following the FastMCP patterns.
 """
 
+import asyncio
 import inspect
 import json
 from collections.abc import Callable
@@ -12,10 +13,12 @@ from functools import wraps
 from typing import Any, TypeVar, Union, get_type_hints
 
 from spin_sdk import http
-from spin_sdk.http import Request, Response
+from spin_sdk.http import Request, Response, PollLoop
 
 # Import response utilities
 from .response import ToolResponse
+# Import validation utilities
+from .validation import OutputSchemaGenerator
 
 # Type definitions
 T = TypeVar('T')
@@ -93,14 +96,26 @@ class FTL:
             # Generate input schema from parameters
             input_schema = self._generate_input_schema(signature, hints)
             
+            # Generate output schema from return type annotation
+            return_type = hints.get('return', None)
+            output_schema = None
+            if return_type is not None:
+                output_schema = OutputSchemaGenerator.generate_from_type(return_type)
+            
             # Store the tool definition
-            self._tools[tool_name] = {
+            tool_definition = {
                 "name": tool_name,
                 "description": tool_description,
                 "inputSchema": input_schema,
                 "annotations": annotations,
-                "handler": self._create_handler_wrapper(f, hints)
+                "handler": self._create_handler_wrapper(f, hints, output_schema)
             }
+            
+            # Only add outputSchema if it was generated
+            if output_schema is not None:
+                tool_definition["outputSchema"] = output_schema
+                
+            self._tools[tool_name] = tool_definition
             
             # Store the original function for direct access
             self._tool_functions[tool_name] = f
@@ -189,6 +204,66 @@ class FTL:
         # Default mapping
         return type_map.get(python_type, {"type": "object"})
     
+    def _validate_output_against_schema(self, output: Any, schema: dict[str, Any] | None) -> Any:
+        """
+        Validate output against its schema and apply wrapping if needed.
+        
+        This method ensures that outputs match their declared schemas and
+        automatically wraps primitive values in {"result": value} format
+        when indicated by the x-ftl-wrapped flag.
+        
+        Args:
+            output: The raw output from the tool function
+            schema: The output schema (may be None if no return type)
+            
+        Returns:
+            The validated/wrapped output
+            
+        Raises:
+            ValueError: If output doesn't match the declared schema
+        """
+        if not schema:
+            return output
+            
+        schema_type = schema.get('type')
+        
+        # Handle wrapped primitives (x-ftl-wrapped indicates MCP wrapping needed)
+        if schema.get('x-ftl-wrapped') and schema_type == 'object':
+            # This means we're expecting a primitive wrapped in {"result": value}
+            # First validate the primitive type
+            expected_primitive_schema = schema.get('properties', {}).get('result', {})
+            expected_type = expected_primitive_schema.get('type')
+            
+            # Validate primitive type before wrapping
+            if expected_type == 'string' and not isinstance(output, str):
+                raise ValueError(f'Expected string, got {type(output).__name__}')
+            elif expected_type == 'integer' and not isinstance(output, int):
+                raise ValueError(f'Expected integer, got {type(output).__name__}')
+            elif expected_type == 'number' and not isinstance(output, (int, float)):
+                raise ValueError(f'Expected number, got {type(output).__name__}')
+            elif expected_type == 'boolean' and not isinstance(output, bool):
+                raise ValueError(f'Expected boolean, got {type(output).__name__}')
+            
+            if not isinstance(output, dict) or 'result' not in output:
+                # Auto-wrap the primitive value
+                return {'result': output}
+        
+        # Basic type validation
+        if schema_type == 'string' and not isinstance(output, str):
+            raise ValueError(f'Expected string, got {type(output).__name__}')
+        elif schema_type == 'integer' and not isinstance(output, int):
+            raise ValueError(f'Expected integer, got {type(output).__name__}')
+        elif schema_type == 'number' and not isinstance(output, (int, float)):
+            raise ValueError(f'Expected number, got {type(output).__name__}')
+        elif schema_type == 'boolean' and not isinstance(output, bool):
+            raise ValueError(f'Expected boolean, got {type(output).__name__}')
+        elif schema_type == 'object' and not isinstance(output, dict):
+            raise ValueError(f'Expected object/dict, got {type(output).__name__}')
+        elif schema_type == 'array' and not isinstance(output, list):
+            raise ValueError(f'Expected array/list, got {type(output).__name__}')
+            
+        return output
+    
     def _convert_result_to_toolresult(self, result: Any) -> dict[str, Any]:
         """
         Convert any function return value to MCP response format.
@@ -205,6 +280,15 @@ class FTL:
         # If already in MCP format, pass through
         if isinstance(result, dict) and "content" in result:
             return result
+        
+        # Check if result was wrapped by validation (for primitives)
+        if isinstance(result, dict) and "result" in result and len(result) == 1:
+            # This is a wrapped primitive - extract the value for text content
+            wrapped_value = result["result"]
+            if isinstance(wrapped_value, str):
+                return ToolResponse.with_structured(wrapped_value, result)
+            else:
+                return ToolResponse.with_structured(str(wrapped_value), result)
         
         # Handle different return types automatically
         if isinstance(result, str):
@@ -226,21 +310,45 @@ class FTL:
             # Everything else -> string representation
             return ToolResponse.text(str(result))
     
-    def _create_handler_wrapper(self, func: Callable, hints: dict[str, type]) -> Callable[[dict[str, Any]], dict[str, Any]]:
-        """Create a wrapper that converts MCP input to function parameters."""
-        @wraps(func)
-        def wrapper(input_data: dict[str, Any]) -> dict[str, Any]:
-            try:
-                # Call the original function with input data as kwargs
-                result = func(**input_data)
-                
-                # Automatically convert any return type to MCP format
-                return self._convert_result_to_toolresult(result)
-                    
-            except Exception as e:
-                return ToolResponse.error(f"Tool execution failed: {str(e)}")
+    def _create_handler_wrapper(self, func: Callable, hints: dict[str, type], output_schema: dict[str, Any] | None) -> Callable[[dict[str, Any]], dict[str, Any]]:
+        """Create a wrapper that converts MCP input to function parameters and validates output."""
         
-        return wrapper
+        # Check if the function is async
+        if inspect.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(input_data: dict[str, Any]) -> dict[str, Any]:
+                try:
+                    # Call the async function with await
+                    result = await func(**input_data)
+                    
+                    # Validate and potentially wrap the output according to schema
+                    validated_result = self._validate_output_against_schema(result, output_schema)
+                    
+                    # Automatically convert any return type to MCP format
+                    return self._convert_result_to_toolresult(validated_result)
+                        
+                except Exception as e:
+                    return ToolResponse.error(f"Tool execution failed: {str(e)}")
+            
+            return async_wrapper
+        else:
+            # Original sync wrapper code
+            @wraps(func)
+            def wrapper(input_data: dict[str, Any]) -> dict[str, Any]:
+                try:
+                    # Call the original function with input data as kwargs
+                    result = func(**input_data)
+                    
+                    # Validate and potentially wrap the output according to schema
+                    validated_result = self._validate_output_against_schema(result, output_schema)
+                    
+                    # Automatically convert any return type to MCP format
+                    return self._convert_result_to_toolresult(validated_result)
+                        
+                except Exception as e:
+                    return ToolResponse.error(f"Tool execution failed: {str(e)}")
+            
+            return wrapper
     
     def create_handler(self) -> type:
         """
@@ -272,12 +380,18 @@ class FTL:
                 if method == "GET" and (path == "/" or path == ""):
                     metadata: list[dict[str, Any]] = []
                     for tool_name, tool in tools.items():
-                        metadata.append({
+                        tool_metadata = {
                             "name": tool_name,
                             "description": tool.get("description", ""),
                             "inputSchema": tool.get("inputSchema", {"type": "object"}),
                             "annotations": tool.get("annotations")
-                        })
+                        }
+                        
+                        # Add outputSchema if present
+                        if "outputSchema" in tool:
+                            tool_metadata["outputSchema"] = tool["outputSchema"]
+                            
+                        metadata.append(tool_metadata)
                     
                     # Remove None values
                     clean_metadata = [
@@ -308,7 +422,16 @@ class FTL:
                         body = request.body.decode("utf-8") if request.body else "{}"
                         input_data = json.loads(body)
                         handler = tools[tool_name]["handler"]
+                        
+                        # Execute handler
                         result = handler(input_data)
+                        
+                        # If it's a coroutine, we need to run it
+                        if inspect.iscoroutine(result):
+                            # Use WASM-compatible PollLoop for async execution
+                            loop = PollLoop()
+                            asyncio.set_event_loop(loop)
+                            result = loop.run_until_complete(result)
                         
                         return Response(
                             200,

@@ -223,13 +223,13 @@ fn update_ftl_toml(
     // Parse config
     let mut config = FtlConfig::parse(&content)?;
 
-    // Create build configuration with explicit defaults based on language
+    // Create build configuration with standardized make commands
     let (build, wasm_path) = match language {
         Language::Rust => {
             let wasm_filename = component_name.replace('-', "_");
             (
                 BuildConfig {
-                    command: "cargo build --target wasm32-wasip1 --release".to_string(),
+                    command: "make build".to_string(),
                     watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                     env: HashMap::new(),
                 },
@@ -238,7 +238,7 @@ fn update_ftl_toml(
         }
         Language::TypeScript | Language::JavaScript => (
             BuildConfig {
-                command: "npm install && npm run build".to_string(),
+                command: "make build".to_string(),
                 watch: vec![
                     "src/**/*.ts".to_string(),
                     "src/**/*.js".to_string(),
@@ -251,9 +251,7 @@ fn update_ftl_toml(
         ),
         Language::Python => (
             BuildConfig {
-                command: format!(
-                    "componentize-py -w spin-http componentize {component_name}/src/main.py -o {component_name}/app.wasm"
-                ),
+                command: "make build".to_string(),
                 watch: vec!["src/**/*.py".to_string(), "pyproject.toml".to_string()],
                 env: HashMap::new(),
             },
@@ -261,9 +259,7 @@ fn update_ftl_toml(
         ),
         Language::Go => (
             BuildConfig {
-                command: format!(
-                    "tinygo build -target=wasip1 -gc=leaking -buildmode=c-shared -no-debug -o main.wasm ."
-                ),
+                command: "make build".to_string(),
                 watch: vec!["*.go".to_string(), "go.mod".to_string()],
                 env: HashMap::new(),
             },

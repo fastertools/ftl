@@ -41,8 +41,8 @@ clean:
 build: clean
 	@echo "Building WebAssembly module..."
 	@which tinygo > /dev/null || (echo "TinyGo not found. Please install from https://tinygo.org" && exit 1)
-	tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o app.wasm main.go
-	@echo "Built: app.wasm"
+	tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o main.wasm main.go
+	@echo "Built: main.wasm"
 
 # Run all quality checks
 quality: fmt lint test

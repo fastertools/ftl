@@ -36,9 +36,11 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 ## Overview
 
 This SDK provides:
+- Decorator-based API for easy tool creation (v0.2.0+)
+- Automatic JSON Schema generation from type hints
+- Support for both sync and async functions (v0.2.0+)
+- Automatic return value conversion to MCP format
 - Zero-dependency implementation (only requires `spin-sdk`)
-- Python type hints for the MCP protocol
-- `create_tools` helper for building multiple tools per component
 - Full compatibility with Spin WebAssembly components
 - Seamless deployment to Fermyon Cloud
 
@@ -54,22 +56,18 @@ This SDK provides:
 ### 1. Create a new Python tool
 
 ```python
-from ftl_sdk import create_tools, ToolResponse
+from ftl_sdk import FTL
 
-# Define your tool handler
-Handler = create_tools({
-    "echo": {
-        "description": "Echo back the input",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {"type": "string", "description": "The message to echo"}
-            },
-            "required": ["message"]
-        },
-        "handler": lambda input: ToolResponse.text(f"Echo: {input['message']}")
-    }
-})
+# Create FTL application instance
+ftl = FTL()
+
+@ftl.tool
+def echo(message: str) -> str:
+    """Echo back the input."""
+    return f"Echo: {message}"
+
+# Create the Spin handler
+Handler = ftl.create_handler()
 ```
 
 ### 2. Configure Spin
@@ -113,30 +111,43 @@ spin aka deploy
 
 ## API Reference
 
-### `create_tools(tools)`
+### Decorator-based API (v0.2.0+)
 
-Creates a Spin HTTP handler for multiple MCP tools.
+#### `FTL` Class
 
 ```python
-Handler = create_tools({
-    "tool_name": {
-        "description": "Tool description",
-        "inputSchema": {...},  # JSON Schema
-        "handler": tool_function,
-        # Optional:
-        "name": "override_name",  # Override tool name
-        "outputSchema": {...},    # Output JSON Schema
-        "annotations": {...},     # Tool behavior hints
-        "_meta": {...}           # Tool metadata
-    }
-})
+ftl = FTL()
 ```
 
-The returned Handler is a Spin `IncomingHandler` class that:
+Creates an FTL application instance for registering tools.
+
+#### `@ftl.tool` Decorator
+
+```python
+@ftl.tool
+def my_tool(param: str) -> str:
+    """Tool description."""
+    return result
+
+# With custom name and annotations
+@ftl.tool(name="custom_name", annotations={"priority": "high"})
+def another_tool(data: dict) -> dict:
+    return {"processed": data}
+```
+
+The decorator:
+- Automatically generates JSON Schema from type hints
+- Extracts docstring as tool description
+- Handles both sync and async functions
+- Validates output against return type annotation
+
+#### `ftl.create_handler()`
+
+Creates a Spin HTTP handler that:
 - Returns tool metadata on GET / requests
 - Routes to specific tools on POST /{tool_name} requests
-- Automatically converts camelCase to snake_case for tool names
-- Handles errors gracefully
+- Handles async/await for async tool functions
+- Automatically converts return values to MCP format
 
 ### `ToolResponse` Helper Methods
 
@@ -177,78 +188,108 @@ if is_text_content(content):
 
 ## Examples
 
-### Multi-Tool Component
+### Basic Tools
 
 ```python
-from ftl_sdk import create_tools, ToolResponse
+from ftl_sdk import FTL
 
-Handler = create_tools({
-    "echo": {
-        "description": "Echo the input",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"message": {"type": "string"}},
-            "required": ["message"]
-        },
-        "handler": lambda input: ToolResponse.text(f"Echo: {input['message']}")
-    },
-    
-    "reverseText": {
-        "name": "reverse",  # Override to keep it as "reverse"
-        "description": "Reverse the input text",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"text": {"type": "string"}},
-            "required": ["text"]
-        },
-        "handler": lambda input: ToolResponse.text(input["text"][::-1])
-    },
-    
-    "wordCount": {
-        "description": "Count words in text",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"text": {"type": "string"}},
-            "required": ["text"]
-        },
-        "handler": lambda input: ToolResponse.with_structured(
-            f"Word count: {len(input['text'].split())}",
-            {"count": len(input["text"].split())}
-        )
+ftl = FTL()
+
+@ftl.tool
+def echo(message: str) -> str:
+    """Echo the input."""
+    return f"Echo: {message}"
+
+@ftl.tool
+def reverse_text(text: str) -> str:
+    """Reverse the input text."""
+    return text[::-1]
+
+@ftl.tool
+def word_count(text: str) -> dict:
+    """Count words in text."""
+    count = len(text.split())
+    return {"text": text, "word_count": count}
+
+Handler = ftl.create_handler()
+```
+
+### Async Tools (v0.2.0+)
+
+```python
+import asyncio
+from ftl_sdk import FTL
+
+ftl = FTL()
+
+@ftl.tool
+async def fetch_data(url: str) -> dict:
+    """Fetch data from URL asynchronously."""
+    # Simulate async HTTP request
+    await asyncio.sleep(0.1)
+    return {
+        "url": url,
+        "status": "success",
+        "data": {"example": "data"}
     }
-})
+
+@ftl.tool
+async def process_items(items: list[str]) -> dict:
+    """Process items with async operations."""
+    results = []
+    for item in items:
+        # Simulate async processing
+        await asyncio.sleep(0.01)
+        results.append(item.upper())
+    
+    return {
+        "original": items,
+        "processed": results,
+        "count": len(results)
+    }
+
+# Mix sync and async tools
+@ftl.tool
+def sync_add(a: int, b: int) -> int:
+    """Add two numbers synchronously."""
+    return a + b
+
+Handler = ftl.create_handler()
 ```
 
 ### Error Handling
 
 ```python
-def safe_divide(input):
-    try:
-        a = input["a"]
-        b = input["b"]
-        if b == 0:
-            return ToolResponse.error("Cannot divide by zero")
-        return ToolResponse.text(f"Result: {a / b}")
-    except KeyError as e:
-        return ToolResponse.error(f"Missing required field: {e}")
-    except Exception as e:
-        return ToolResponse.error(f"Unexpected error: {e}")
+from ftl_sdk import FTL
 
-Handler = create_tools({
-    "divide": {
-        "description": "Divide two numbers",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "a": {"type": "number"},
-                "b": {"type": "number"}
-            },
-            "required": ["a", "b"]
-        },
-        "handler": safe_divide
-    }
-})
+ftl = FTL()
+
+@ftl.tool
+def divide(a: float, b: float) -> float:
+    """Divide two numbers."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+
+# Async error handling
+@ftl.tool
+async def validate_data(data: dict) -> dict:
+    """Validate data asynchronously."""
+    if "required_field" not in data:
+        raise KeyError("Missing required field: required_field")
+    
+    # Simulate async validation
+    await asyncio.sleep(0.05)
+    
+    if not isinstance(data["required_field"], str):
+        raise TypeError("required_field must be a string")
+    
+    return {"status": "valid", "data": data}
+
+Handler = ftl.create_handler()
 ```
+
+The FTL framework automatically catches exceptions and returns them as error responses.
 
 ## Development
 
@@ -477,6 +518,41 @@ mypy src
 | SDK Version | Python Version | Status |
 |-------------|----------------|--------|
 | 0.1.x       | 3.10+          | Active |
+
+## Limitations
+
+- **1ms execution limit**: WebAssembly components have a 1ms execution time limit per invocation
+- **No streaming**: The WebAssembly architecture doesn't support streaming responses
+- **Synchronous I/O**: While async/await syntax is supported, I/O operations are still synchronous under the hood due to WASM constraints
+
+## Migration from v0.1.x
+
+The v0.2.0 release introduces a new decorator-based API. The old `create_tools` function is still available for backwards compatibility, but we recommend migrating to the new API:
+
+```python
+# Old API (v0.1.x)
+from ftl_sdk import create_tools, ToolResponse
+
+Handler = create_tools({
+    "echo": {
+        "description": "Echo the input",
+        "inputSchema": {...},
+        "handler": lambda input: ToolResponse.text(f"Echo: {input['message']}")
+    }
+})
+
+# New API (v0.2.0+)
+from ftl_sdk import FTL
+
+ftl = FTL()
+
+@ftl.tool
+def echo(message: str) -> str:
+    """Echo the input."""
+    return f"Echo: {message}"
+
+Handler = ftl.create_handler()
+```
 
 ## Changelog
 

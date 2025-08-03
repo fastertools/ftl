@@ -5,7 +5,7 @@ description = "An FTL MCP tool written in Python"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "ftl-sdk>=0.1.0",
+    # ftl-sdk is installed separately in Makefile
     # Add your project dependencies here
 ]
 
@@ -34,6 +34,9 @@ exclude = [
     ".pytest_cache/",
     ".coverage",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
 # Black configuration
 [tool.black]

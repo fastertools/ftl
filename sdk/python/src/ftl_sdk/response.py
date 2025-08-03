@@ -54,236 +54,82 @@ class ToolResponse:
 
 class ToolResult:
     """
-    Enhanced tool result builder with fluent API for FastMCP-style responses.
+    FastMCP-style tool result with simple constructor API.
     
-    Provides a chainable interface for building rich MCP responses with multiple
-    content types, structured data, and proper error handling.
-    
-    Example:
-        # Simple text response
-        return ToolResult().text("Hello world")
+    Examples:
+        # Simple text content
+        return ToolResult("Hello world")
         
-        # Rich response with multiple content types
-        return (ToolResult()
-                .text("Process completed")
-                .add_text("Details: Processing finished successfully")
-                .with_structured({"status": "success", "count": 42})
-                .with_progress(90))
+        # Structured content only
+        return ToolResult(structured_content={"status": "success", "count": 42})
         
-        # Error response
-        return ToolResult().error("Something went wrong", details={"code": 500})
+        # Both content and structured content
+        return ToolResult("Process completed", {"status": "success"})
+        
+        # List of content blocks
+        return ToolResult([
+            {"type": "text", "text": "Result"},
+            {"type": "image", "data": "base64...", "mimeType": "image/png"}
+        ])
     """
     
-    def __init__(self):
-        """Initialize a new ToolResult builder."""
-        self._content: List[Dict[str, Any]] = []
-        self._structured_content: Optional[Any] = None
-        self._is_error: bool = False
-        self._progress: Optional[float] = None
-        self._meta: Optional[Dict[str, Any]] = None
-    
-    def text(self, text: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+    def __init__(self, content: Union[str, List[Dict[str, Any]], Dict[str, Any], None] = None, 
+                 structured_content: Optional[Any] = None):
         """
-        Add text content to the response.
+        Initialize a ToolResult with content and/or structured content.
         
         Args:
-            text: The text content
-            annotations: Optional annotations for the content
+            content: Content for the response. Can be:
+                    - str: Will be converted to text content
+                    - List[Dict]: List of MCP content blocks
+                    - Dict: Single MCP content block
+                    - None: No content (structured_content must be provided)
+            structured_content: Optional structured data for the response
             
-        Returns:
-            Self for chaining
+        Raises:
+            ValueError: If both content and structured_content are None
         """
-        content = ToolContent.text(text, annotations)
-        self._content.append(content)
-        return self
+        if content is None and structured_content is None:
+            raise ValueError("Either content or structured_content must be provided")
+        elif content is None:
+            content = structured_content
+        
+        self.content = self._convert_to_content(content)
+        self.structured_content: Optional[Dict[str, Any]] = structured_content
     
-    def add_text(self, text: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+    def _convert_to_content(self, content: Union[str, List[Dict[str, Any]], Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Add additional text content (alias for text() for clarity in chaining).
+        Convert various content types to MCP content block list.
         
         Args:
-            text: The text content
-            annotations: Optional annotations for the content
+            content: Content to convert
             
         Returns:
-            Self for chaining
+            List of MCP content blocks
         """
-        return self.text(text, annotations)
+        if isinstance(content, str):
+            # String -> text content block
+            return [ToolContent.text(content)]
+        elif isinstance(content, list):
+            # List -> assume it's already a list of content blocks
+            return content
+        elif isinstance(content, dict):
+            # Dict -> assume it's a single content block
+            return [content]
+        else:
+            # Fallback: convert to string
+            return [ToolContent.text(str(content))]
     
-    def image(self, data: str, mime_type: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+    def to_mcp_result(self) -> Union[List[Dict[str, Any]], tuple[List[Dict[str, Any]], Dict[str, Any]]]:
         """
-        Add image content to the response.
-        
-        Args:
-            data: Base64-encoded image data
-            mime_type: MIME type of the image
-            annotations: Optional annotations for the content
-            
-        Returns:
-            Self for chaining
-        """
-        content = ToolContent.image(data, mime_type, annotations)
-        self._content.append(content)
-        return self
-    
-    def audio(self, data: str, mime_type: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
-        """
-        Add audio content to the response.
-        
-        Args:
-            data: Base64-encoded audio data
-            mime_type: MIME type of the audio
-            annotations: Optional annotations for the content
-            
-        Returns:
-            Self for chaining
-        """
-        content = ToolContent.audio(data, mime_type, annotations)
-        self._content.append(content)
-        return self
-    
-    def resource(self, resource: Dict[str, Any], annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
-        """
-        Add resource content to the response.
-        
-        Args:
-            resource: Resource definition
-            annotations: Optional annotations for the content
-            
-        Returns:
-            Self for chaining
-        """
-        content = ToolContent.resource(resource, annotations)
-        self._content.append(content)
-        return self
-    
-    def with_structured(self, structured: Any) -> 'ToolResult':
-        """
-        Add structured content to the response.
-        
-        Args:
-            structured: Any JSON-serializable structured data
-            
-        Returns:
-            Self for chaining
-        """
-        self._structured_content = structured
-        return self
-    
-    def with_progress(self, progress: float) -> 'ToolResult':
-        """
-        Add progress information to the response.
-        
-        Args:
-            progress: Progress value (0.0 to 100.0)
-            
-        Returns:
-            Self for chaining
-        """
-        self._progress = max(0.0, min(100.0, progress))
-        return self
-    
-    def with_meta(self, meta: Dict[str, Any]) -> 'ToolResult':
-        """
-        Add metadata to the response.
-        
-        Args:
-            meta: Metadata dictionary
-            
-        Returns:
-            Self for chaining
-        """
-        if self._meta is None:
-            self._meta = {}
-        self._meta.update(meta)
-        return self
-    
-    def error(self, message: str, details: Optional[Dict[str, Any]] = None) -> 'ToolResult':
-        """
-        Mark this result as an error.
-        
-        Args:
-            message: Error message
-            details: Optional error details
-            
-        Returns:
-            Self for chaining
-        """
-        self._is_error = True
-        self._content.append(ToolContent.text(message))
-        
-        if details:
-            self.with_structured({"error_details": details})
-        
-        return self
-    
-    def build(self) -> Dict[str, Any]:
-        """
-        Build the final MCP response dictionary.
+        Convert to MCP result format (FastMCP compatibility).
         
         Returns:
-            MCP-compliant response dictionary
+            Content blocks, or tuple of (content blocks, structured content)
         """
-        result: Dict[str, Any] = {}
-        
-        # Add content if any
-        if self._content:
-            result["content"] = self._content
-        
-        # Add structured content if provided
-        if self._structured_content is not None:
-            result["structuredContent"] = self._structured_content
-        
-        # Add error flag if this is an error
-        if self._is_error:
-            result["isError"] = True
-        
-        # Add progress if provided
-        if self._progress is not None:
-            result["progress"] = self._progress
-        
-        # Add metadata if provided
-        if self._meta:
-            result["_meta"] = self._meta
-        
-        return result
-    
-    def __call__(self) -> Dict[str, Any]:
-        """
-        Allow the ToolResult to be called like a function to build the response.
-        
-        Returns:
-            MCP-compliant response dictionary
-        """
-        return self.build()
-    
-    # Static factory methods for convenience
-    @staticmethod
-    def simple_text(text: str) -> Dict[str, Any]:
-        """
-        Create a simple text response (convenience method).
-        
-        Args:
-            text: The text content
-            
-        Returns:
-            MCP-compliant response dictionary
-        """
-        return ToolResult().text(text).build()
-    
-    @staticmethod
-    def simple_error(message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Create a simple error response (convenience method).
-        
-        Args:
-            message: Error message
-            details: Optional error details
-            
-        Returns:
-            MCP-compliant response dictionary
-        """
-        return ToolResult().error(message, details).build()
+        if self.structured_content is None:
+            return self.content
+        return self.content, self.structured_content
 
 
 class ToolContent:

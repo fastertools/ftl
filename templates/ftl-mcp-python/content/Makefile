@@ -44,8 +44,20 @@ clean:
 
 build: clean
 	@echo "Building WebAssembly module..."
-	@which componentize-py > /dev/null || (echo "componentize-py not found. Run 'make install-dev' first." && exit 1)
-	componentize-py -w spin-http componentize src/main.py -o app.wasm
+	@if [ ! -d "venv" ]; then \
+		echo "Creating Python virtual environment..."; \
+		python3 -m venv venv; \
+	fi
+	@echo "Installing dependencies..."
+	@. venv/bin/activate && pip install --upgrade pip --quiet
+	@. venv/bin/activate && pip install componentize-py --quiet
+	@. venv/bin/activate && pip install -e . --quiet
+	@# TODO: Replace with published ftl-sdk when available
+	@. venv/bin/activate && pip install -e /Users/coreyryan/data/mashh/ftl-cli/sdk/python --quiet 2>/dev/null || \
+		echo "Warning: Could not install ftl-sdk from local path. Please install manually."
+	@echo "Building WASM component..."
+	@. venv/bin/activate && componentize-py -w spin-http componentize src.main -p . -p /Users/coreyryan/data/mashh/ftl-cli/sdk/python/src -o app.wasm
+	@echo "✓ Build successful!"
 
 # Development workflow
 dev: install-dev

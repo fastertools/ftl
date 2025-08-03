@@ -4,53 +4,55 @@
 This tool demonstrates how to create MCP tools using the FTL Python SDK.
 """
 
-from typing import Any, Dict
+from ftl_sdk import FTL
 
-from ftl_sdk import ToolResponse, create_tools
+# Create FTL application instance
+ftl = FTL()
 
 
-def example_tool_handler(input_data: Dict[str, Any]) -> ToolResponse:
+@ftl.tool
+def example_tool(message: str) -> str:
     """
-    Example tool handler that processes messages.
+    Example tool that processes messages.
     
-    Args:
-        input_data: Dictionary containing the tool input
-        
-    Returns:
-        ToolResponse with the processed result
+    Replace with your actual tool implementation.
     """
-    message = input_data.get("message", "")
     # TODO: Implement your tool logic here
-    return ToolResponse.text(f"Processed: {message}")
+    return f"Processed: {message}"
 
 
-# Create the handler with your tools
-Handler = create_tools({
-    # Replace 'exampleTool' with your actual tool name
-    "exampleTool": {
-        "description": "An example tool that processes messages",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "The input message to process"
-                }
-            },
-            "required": ["message"]
-        },
-        "handler": example_tool_handler
-    }
-    
-    # Add more tools here as needed:
-    # "anotherTool": {
-    #     "description": "Another tool description",
-    #     "inputSchema": {
-    #         "type": "object",
-    #         "properties": {
-    #             "param": {"type": "string"}
-    #         }
-    #     },
-    #     "handler": another_handler
-    # }
-})
+# Example: Add more tools with type hints
+# @ftl.tool
+# def another_tool(text: str, count: int = 1) -> dict:
+#     """Another example tool that returns structured data."""
+#     return {
+#         "original": text,
+#         "repeated": text * count,
+#         "count": count
+#     }
+
+
+# Example: Async tool (if needed)
+# @ftl.tool
+# async def async_tool(items: list[str]) -> dict:
+#     """Example async tool that processes items concurrently."""
+#     import asyncio
+#     
+#     async def process_item(item: str) -> str:
+#         # Process each item (CPU-bound work)
+#         return f"processed_{item}"
+#     
+#     # Create concurrent tasks
+#     tasks = [asyncio.create_task(process_item(item)) for item in items]
+#     
+#     # Wait for all tasks to complete
+#     results = await asyncio.gather(*tasks)
+#     
+#     return {"items": items, "results": results, "count": len(results)}
+#     
+#     # Note: WASM limitations - asyncio.sleep() is not supported
+#     # Async is useful for concurrent task coordination, not I/O delays
+
+
+# Create the Spin handler
+IncomingHandler = ftl.create_handler()

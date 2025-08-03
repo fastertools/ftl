@@ -1,27 +1,43 @@
 """Tests for {{project-name}} MCP tool."""
 
 import pytest
-from src.main import example_tool_handler
+from src.main import example_tool
 
 
-def test_example_tool_handler():
-    """Test the example tool handler."""
+def test_example_tool():
+    """Test the example tool."""
     # Test with a message
-    result = example_tool_handler({"message": "Hello, World!"})
-    assert result.content == "Processed: Hello, World!"
+    result = example_tool("Hello, World!")
+    assert result == "Processed: Hello, World!"
     
-    # Test with empty input
-    result = example_tool_handler({})
-    assert result.content == "Processed: "
+    # Test with empty message
+    result = example_tool("")
+    assert result == "Processed: "
     
-    # Test with missing message key
-    result = example_tool_handler({"other": "value"})
-    assert result.content == "Processed: "
+    # Test with special characters
+    result = example_tool("Test@123!")
+    assert result == "Processed: Test@123!"
 
 
 # Add more tests here as you implement your tools
-# Example async test (if needed):
+# Example test for dict return:
+# def test_another_tool():
+#     from src.main import another_tool
+#     result = another_tool("hello", 3)
+#     assert result == {
+#         "original": "hello",
+#         "repeated": "hellohellohello",
+#         "count": 3
+#     }
+
+
+# Example async test (if using async tools):
 # @pytest.mark.asyncio
 # async def test_async_tool():
-#     result = await async_tool_handler({"param": "value"})
-#     assert result.content == "Expected output"
+#     from src.main import async_tool
+#     result = await async_tool(["item1", "item2", "item3"])
+#     assert result == {
+#         "items": ["item1", "item2", "item3"],
+#         "results": ["processed_item1", "processed_item2", "processed_item3"],
+#         "count": 3
+#     }

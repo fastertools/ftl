@@ -6,6 +6,7 @@ from .ftl import FTL, tool
 # Response and content helpers
 from .response import (
     ToolResponse,
+    ToolResult,
     ToolContent,
     create_tools,
     is_text_content,
@@ -22,6 +23,7 @@ __all__ = [
     "tool",
     # Response helpers
     "ToolResponse",
+    "ToolResult",
     "ToolContent",
     "create_tools",
     # Content type guards
