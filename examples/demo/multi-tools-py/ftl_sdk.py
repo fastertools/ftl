@@ -1,1 +1,0 @@
-../../../sdk/python/src/ftl_sdk.py
