@@ -64,7 +64,7 @@ jobs:
 
     - name: Run tests
       working-directory: sdk/go
-      run: go test -v -race -coverprofile=coverage.out ./...
+      run: go test -v -race -coverprofile=coverage.out -tags test ./...
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
