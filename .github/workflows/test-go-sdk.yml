@@ -30,9 +30,9 @@ jobs:
         go-version: ${{ matrix.go-version }}
 
     - name: Install TinyGo
-      run: |
-        wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
-        sudo dpkg -i tinygo_0.31.2_amd64.deb
+      uses: acifani/setup-tinygo@v2
+      with:
+        tinygo-version: '0.33.0'  # Supports Go 1.21 and 1.22
 
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -77,6 +77,12 @@ jobs:
     - name: Verify TinyGo compatibility
       working-directory: sdk/go
       run: |
+        # Verify TinyGo installation
+        echo "TinyGo version:"
+        tinygo version
+        echo "Available targets:"
+        tinygo targets | grep wasip1 || echo "wasip1 target not found"
+        
         # Create a test file that imports the SDK
         cat > test_build.go << 'EOF'
         package main
@@ -98,7 +104,14 @@ jobs:
         EOF
         
         # Try to build with TinyGo
-        tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o test.wasm test_build.go
+        echo "Building with TinyGo..."
+        if tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o test.wasm test_build.go; then
+          echo "✅ TinyGo build successful"
+          ls -la test.wasm
+        else
+          echo "❌ TinyGo build failed"
+          exit 1
+        fi
         
         # Clean up
         rm test_build.go test.wasm
