@@ -2,53 +2,92 @@
 
 ## Core Settings
 
-- `mcp_gateway_url` (string, required) - MCP gateway URL to forward requests to
-- `mcp_trace_header` (string, default: "x-trace-id") - Header name for request tracing
+- `mcp_gateway_url` (string, default: "http://mcp-gateway.spin.internal") - MCP gateway URL to forward authenticated requests
+- `mcp_trace_header` (string, default: "x-trace-id") - Header name for request tracing (case-insensitive)
+- `mcp_provider_type` (string, default: "jwt") - Authentication provider type: "jwt" or "static"
 
-## JWT Provider Settings
+## JWT Provider Settings (when mcp_provider_type = "jwt")
 
-- `mcp_jwt_issuer` (string, required) - JWT token issuer URL (must be HTTPS)
-- `mcp_jwt_audience` (string, optional) - Expected audience for JWT validation
-- `mcp_jwt_jwks_uri` (string, optional*) - JWKS endpoint for key discovery
-- `mcp_jwt_public_key` (string, optional*) - Static RSA public key in PEM format
+### Required (one of the following)
+- `mcp_jwt_jwks_uri` (string) - JWKS endpoint URL for dynamic key discovery
+- `mcp_jwt_public_key` (string) - Static RSA public key in PEM format
 
-*One of `mcp_jwt_jwks_uri` or `mcp_jwt_public_key` is required
+Note: For AuthKit domains (.authkit.app, .workos.com), JWKS URI is automatically derived from the issuer.
 
-## OAuth Discovery Settings (optional)
+### Optional
+- `mcp_jwt_issuer` (string, default: "") - Expected token issuer. Empty string disables issuer validation.
+- `mcp_jwt_audience` (string, default: "") - Expected audience. Empty string disables audience validation.
+- `mcp_jwt_algorithm` (string, default: "") - Signing algorithm (e.g., RS256, ES256). Empty uses default validation.
+- `mcp_jwt_required_scopes` (string, default: "") - Comma-separated list of required scopes
 
-- `mcp_oauth_authorize_endpoint` (string, optional) - OAuth authorization endpoint
-- `mcp_oauth_token_endpoint` (string, optional) - OAuth token endpoint
-- `mcp_oauth_userinfo_endpoint` (string, optional) - OAuth userinfo endpoint
+## Static Provider Settings (when mcp_provider_type = "static")
+
+- `mcp_static_tokens` (string, required) - Static token definitions
+  - Format: `token:client_id:sub:scope1,scope2[:expires_at]`
+  - Multiple tokens separated by semicolons
+  - Example: `dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600`
+
+## OAuth Discovery Settings (optional, JWT provider only)
+
+- `mcp_oauth_authorize_endpoint` (string, default: "") - OAuth authorization endpoint
+- `mcp_oauth_token_endpoint` (string, default: "") - OAuth token endpoint  
+- `mcp_oauth_userinfo_endpoint` (string, default: "") - OAuth userinfo endpoint
 
 ## Design Principles
 
-1. **Prefix all variables with `mcp_`** to avoid conflicts
-2. **Flat structure** - no complex provider types, just direct configuration
-3. **Clear naming** - `jwt_` prefix for JWT-specific, `oauth_` for OAuth endpoints
-4. **Minimal required fields** - only issuer and one key source required
-5. **Secure by default** - authentication always required, HTTPS enforced
+1. **Provider-based configuration** - Switch between JWT and static token providers
+2. **Automatic JWKS discovery** - AuthKit domains get JWKS URI auto-derived
+3. **Optional validation** - Issuer and audience validation can be disabled
+4. **Scope-based authorization** - Enforce required scopes on all requests
+5. **Development friendly** - Static token provider for local development
 
 ## Example Configurations
 
-### With JWKS Discovery
+### WorkOS AuthKit (Recommended)
 ```toml
-mcp_jwt_issuer = "https://auth.example.com"
-mcp_jwt_jwks_uri = "https://auth.example.com/.well-known/jwks.json"
-mcp_jwt_audience = "my-api"
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = "https://your-tenant.authkit.app"
+# JWKS URI auto-derived as: https://your-tenant.authkit.app/oauth2/jwks
+mcp_jwt_required_scopes = "mcp:read,mcp:write"
 ```
 
-### With Static Public Key
+### Auth0
 ```toml
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = "https://your-domain.auth0.com/"
+mcp_jwt_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+mcp_jwt_audience = "your-api-identifier"
+```
+
+### Static Public Key
+```toml
+mcp_provider_type = "jwt"
 mcp_jwt_issuer = "https://auth.example.com"
 mcp_jwt_public_key = """
------BEGIN PUBLIC KEY-----
+-----BEGIN RSA PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
------END PUBLIC KEY-----
+-----END RSA PUBLIC KEY-----
 """
 ```
 
-### AuthKit (Automatic JWKS Discovery)
+### Development with Static Tokens
 ```toml
-mcp_jwt_issuer = "https://tenant.authkit.app"
-# JWKS URI will be derived as https://tenant.authkit.app/.well-known/jwks.json
+mcp_provider_type = "static"
+mcp_static_tokens = "test-token:test-client:test-user:read,write"
+mcp_jwt_required_scopes = "read"
 ```
+
+### No Issuer Validation (Legacy Support)
+```toml
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = ""  # Empty string disables issuer validation
+mcp_jwt_jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+```
+
+## Security Notes
+
+- All issuer and JWKS URLs must use HTTPS (enforced)
+- Static tokens should only be used in development
+- Required scopes are validated using subset checking
+- Token expiration is always enforced
+- JWKS responses are cached for 5 minutes

@@ -1,66 +1,138 @@
-# FTL MCP Authorizer
+# MCP Authorizer
 
-A lightweight JWT authentication gateway for Model Context Protocol (MCP) servers, designed specifically for Fermyon Spin and WebAssembly deployment.
+A high-performance JWT authentication gateway for Model Context Protocol (MCP) servers, built for Fermyon Spin and WebAssembly deployment.
 
 ## Overview
 
-The FTL MCP Authorizer provides OAuth 2.0 bearer token authentication for MCP endpoints. It validates JWT tokens against configured OIDC providers and injects user context into MCP requests. Built for serverless WebAssembly environments, it uses Spin's Key-Value store for JWKS caching.
+The MCP Authorizer provides OAuth 2.0 bearer token authentication for MCP endpoints. It validates JWT tokens using JWKS or static public keys, enforces scope-based authorization, and forwards authenticated requests to internal MCP gateways.
 
-```
-MCP Client → FTL MCP Authorizer → FTL MCP Gateway → Tool Components
-             (Bearer Token Auth)    (Internal)        (WASM)
-```
+## Features
 
-## Key Features
-
-- **JWT/OIDC Authentication**: Validates tokens from any OIDC-compliant provider
-- **Multi-Provider Support**: Configure multiple providers (AuthKit, Auth0, Okta, etc.)
+- **JWT Authentication**: Validates tokens using JWKS endpoints or static public keys
+- **Scope-Based Authorization**: Enforce required scopes for API access
+- **WorkOS AuthKit**: Out-of-the-box support with automatic JWKS discovery
+- **Static Token Provider**: Development mode with predefined tokens
 - **OAuth 2.0 Discovery**: Standard-compliant metadata endpoints
-- **JWKS Caching**: 5-minute cache in KV store reduces provider API calls
-- **Serverless Native**: Zero in-memory state, built for Fermyon Spin
-- **MCP Integration**: Automatic user context injection into MCP initialize requests
+- **JWKS Caching**: 5-minute cache reduces provider API calls
+- **Optional Issuer Validation**: Support for tokens without issuer claims
 
 ## Configuration
 
-Configure using Spin variables (environment variables):
+Configure via Spin variables (environment variables with `MCP_` prefix):
 
 ### Core Settings
 
 ```toml
+# MCP gateway URL to forward authenticated requests
+mcp_gateway_url = "http://mcp-gateway.spin.internal"  # default
+
+# Header name for request tracing
+mcp_trace_header = "x-trace-id"  # default
+
+# Provider type: "jwt" or "static"
+mcp_provider_type = "jwt"  # default
+```
+
+### JWT Provider Configuration
+
+```toml
+# Issuer URL (optional - empty string disables issuer validation)
+mcp_jwt_issuer = "https://your-tenant.authkit.app"
+
+# JWKS URI for key discovery (auto-derived for AuthKit domains)
+mcp_jwt_jwks_uri = "https://your-tenant.authkit.app/oauth2/jwks"
+
+# OR static public key in PEM format (choose one: jwks_uri OR public_key)
+mcp_jwt_public_key = """
+-----BEGIN RSA PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END RSA PUBLIC KEY-----
+"""
+
+# Expected audience (optional - omit to skip validation)
+mcp_jwt_audience = "your-api-audience"
+
+# Signing algorithm (optional - defaults to RS256)
+mcp_jwt_algorithm = "RS256"
+
+# Required scopes (comma-separated, optional)
+mcp_jwt_required_scopes = "read,write"
+
+# OAuth endpoints for discovery (optional)
+mcp_oauth_authorize_endpoint = "https://your-tenant.authkit.app/oauth2/authorize"
+mcp_oauth_token_endpoint = "https://your-tenant.authkit.app/oauth2/token"
+mcp_oauth_userinfo_endpoint = "https://your-tenant.authkit.app/oauth2/userinfo"
+```
+
+### Static Token Provider (Development)
+
+```toml
+mcp_provider_type = "static"
+
+# Format: token:client_id:sub:scope1,scope2[:expires_at]
+# Multiple tokens separated by semicolons
+mcp_static_tokens = "dev-token-1:client1:user1:read,write;dev-token-2:client2:user2:admin:1735689600"
+
+# Required scopes (optional)
+mcp_jwt_required_scopes = "read"
+```
+
+## Configuration Examples
+
+### WorkOS AuthKit
+
+```toml
 [component.mcp-authorizer.variables]
-# Enable/disable authentication (default: false)
-auth_enabled = "true"
-
-# Internal MCP gateway URL
-auth_gateway_url = "http://ftl-mcp-gateway.spin.internal/mcp-internal"
-
-# Trace ID header for request correlation
-auth_trace_header = "X-Trace-Id"
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = "https://your-tenant.authkit.app"
+# JWKS URI auto-derived as: https://your-tenant.authkit.app/oauth2/jwks
 ```
 
-### AuthKit Provider
+### Auth0
 
 ```toml
-auth_provider_type = "authkit"
-auth_provider_issuer = "https://your-domain.authkit.app"
-auth_provider_audience = "your-api-audience"  # Optional
+[component.mcp-authorizer.variables]
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = "https://your-domain.auth0.com/"
+mcp_jwt_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+mcp_jwt_audience = "your-api-identifier"
 ```
 
-### Generic OIDC Provider
+### Development with Static Tokens
 
 ```toml
-auth_provider_type = "oidc"
-auth_provider_name = "auth0"
-auth_provider_issuer = "https://your-domain.auth0.com"
-auth_provider_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
-auth_provider_audience = "your-api-audience"  # Optional
-auth_provider_authorize_endpoint = "https://your-domain.auth0.com/authorize"
-auth_provider_token_endpoint = "https://your-domain.auth0.com/oauth/token"
-auth_provider_userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # Optional
-auth_provider_allowed_domains = "*.auth0.com"  # Comma-separated list
+[component.mcp-authorizer.variables]
+mcp_provider_type = "static"
+mcp_static_tokens = "test-token:test-client:test-user:read,write"
 ```
 
-## Complete Example
+## Authentication Flow
+
+1. **Token Extraction**: Bearer token from `Authorization` header
+2. **Token Validation**:
+   - For JWT: Verify signature using JWKS or public key
+   - Check issuer (if configured)
+   - Check audience (if configured)
+   - Check expiration
+   - Validate required scopes
+   - For Static: Lookup token and check expiration/scopes
+3. **Request Forwarding**: Add auth context headers and forward to gateway
+   - `x-auth-client-id`: Client identifier
+   - `x-auth-user-id`: User identifier (subject)
+   - `x-auth-issuer`: Token issuer
+   - `x-auth-scopes`: Space-separated scopes
+
+## OAuth 2.0 Discovery Endpoints
+
+The authorizer implements standard OAuth 2.0 discovery:
+
+- `GET /.well-known/oauth-protected-resource` - RFC 9728 protected resource metadata
+- `GET /.well-known/oauth-authorization-server` - Authorization server metadata
+- `GET /.well-known/openid-configuration` - OpenID Connect configuration
+
+These endpoints require no authentication and enable automatic client configuration.
+
+## Complete spin.toml Example
 
 ```toml
 spin_manifest_version = 2
@@ -69,159 +141,87 @@ spin_manifest_version = 2
 name = "mcp-with-auth"
 version = "0.1.0"
 
-# MCP Authorizer
 [[trigger.http]]
-route = "/mcp"
+route = "/..."
 component = "mcp-authorizer"
 
 [component.mcp-authorizer]
-source = "target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm"
+source = "ftl_mcp_authorizer.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*"]
 key_value_stores = ["default"]
 
 [component.mcp-authorizer.variables]
-auth_enabled = "true"
-auth_gateway_url = "http://ftl-mcp-gateway.spin.internal/mcp-internal"
-auth_provider_type = "authkit"
-auth_provider_issuer = "https://your-tenant.authkit.app"
-auth_provider_audience = "mcp-api"
-
-# MCP Gateway - internal endpoint
-[[trigger.http]]
-route = "/mcp-internal"
-component = "ftl-mcp-gateway"
-
-[component.ftl-mcp-gateway]
-source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
-allowed_outbound_hosts = ["http://*.spin.internal"]
+mcp_gateway_url = "http://mcp-gateway.spin.internal"
+mcp_provider_type = "jwt"
+mcp_jwt_issuer = "https://your-tenant.authkit.app"
+mcp_jwt_required_scopes = "mcp:read,mcp:write"
 ```
 
-## Authentication Flow
-
-1. **Client Request**: MCP client sends request with `Authorization: Bearer <token>`
-2. **Token Extraction**: Authorizer extracts bearer token from header
-3. **JWKS Verification**: 
-   - Fetches JWKS from provider (with 5-minute caching)
-   - Validates JWT signature using public key
-   - Checks issuer, audience, and expiration
-4. **Context Injection**: Injects user info into MCP initialize requests:
-   ```json
-   {
-     "_authContext": {
-       "authenticated_user": "user123",
-       "email": "user@example.com",
-       "provider": "authkit"
-     }
-   }
-   ```
-5. **Request Forwarding**: Forwards authenticated request to MCP gateway
-
-## OAuth Discovery Endpoints
-
-The authorizer implements standard OAuth 2.0 discovery:
-
-- `GET /.well-known/oauth-protected-resource` - Resource server metadata
-- `GET /.well-known/oauth-authorization-server` - Authorization server metadata
-
-These endpoints enable MCP clients to discover authentication requirements automatically.
-
-## Development
-
-### Prerequisites
-- Rust with `wasm32-wasip1` target
-- Spin CLI v2.0+
-
-### Building
-```bash
-# Add WASM target
-rustup target add wasm32-wasip1
-
-# Build
-cargo build --target wasm32-wasip1 --release
-
-# Run tests
-cargo test
-```
-
-### Testing Authentication
+## Testing
 
 ```bash
-# Start the server
-spin up
-
-# Test unauthenticated (returns 401)
+# Test without authentication (returns 401)
 curl -i http://localhost:3000/mcp
 
-# Response includes OAuth discovery:
+# Response includes WWW-Authenticate header:
 # WWW-Authenticate: Bearer error="unauthorized", 
 #   error_description="Missing authorization header",
-#   resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"
+#   resource_metadata="https://localhost:3000/.well-known/oauth-protected-resource"
 
 # Test with JWT token
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' \
      http://localhost:3000/mcp
+
+# Check discovery endpoints
+curl http://localhost:3000/.well-known/oauth-protected-resource
+curl http://localhost:3000/.well-known/oauth-authorization-server
 ```
 
 ## Error Responses
 
-The authorizer returns standard OAuth 2.0 error responses:
+Standard OAuth 2.0 error responses:
 
 | Status | Error | Description |
 |--------|-------|-------------|
 | 401 | `unauthorized` | Missing authorization header |
-| 401 | `invalid_token` | Token validation failed |
-| 500 | `server_error` | Internal server error |
+| 401 | `invalid_token` | Token validation failed (expired, invalid signature, etc.) |
+| 500 | `server_error` | Configuration or internal error |
 
-## Security
+## Security Considerations
 
-- **HTTPS Only**: Provider URLs must use HTTPS
-- **No Secrets**: All verification uses public keys from JWKS
-- **Automatic Expiration**: Cached JWKS expires after 5 minutes
-- **Standard Compliance**: Follows OAuth 2.0 and OpenID Connect specifications
+- **HTTPS Required**: All issuer and JWKS URLs must use HTTPS
+- **No Secrets**: Only public keys are used for verification
+- **Scope Enforcement**: Required scopes are validated on every request
+- **Token Expiration**: Expired tokens are automatically rejected
+- **JWKS Caching**: 5-minute TTL prevents frequent key fetches
 
-## Architecture
+## Building
 
-The authorizer follows MCP and OAuth standards:
-
-```
-src/
-├── lib.rs              # Main request handler
-├── token_verifier.rs   # JWT verification logic
-├── providers.rs        # Provider abstractions
-├── metadata.rs         # OAuth discovery endpoints
-├── proxy.rs           # MCP gateway forwarding
-├── kv.rs              # KV store for JWKS caching
-├── config.rs          # Configuration management
-└── logging.rs         # Structured logging
-```
-
-## Testing
-
-The MCP authorizer includes a comprehensive test suite with parity to FastMCP's JWT provider tests. See [tests/README.md](tests/README.md) for detailed testing documentation.
-
-### Quick Test
 ```bash
-# Run integration tests
-pip install -r tests/requirements.txt
-python tests/run_integration_tests.py
+# Add WASM target
+rustup target add wasm32-wasip1
+
+# Build the component
+spin build
+
+# Run tests
+spin test
 ```
 
 ## Troubleshooting
 
-### "No authentication providers configured"
-- Ensure `auth_provider_type` is set to "authkit" or "oidc"
-- Check all required provider variables are set
+### "Either mcp_jwt_jwks_uri or mcp_jwt_public_key must be provided"
+- For JWKS: Set `mcp_jwt_jwks_uri` to your provider's JWKS endpoint
+- For static key: Set `mcp_jwt_public_key` with RSA public key in PEM format
+- For AuthKit: Just set `mcp_jwt_issuer` - JWKS URI is auto-derived
 
-### "Failed to fetch JWKS"
-- Verify `allowed_outbound_hosts` includes provider domains
-- Check JWKS URI is accessible and returns valid JSON
+### "Cannot specify both mcp_jwt_jwks_uri and mcp_jwt_public_key"
+- Choose either JWKS (dynamic) or public key (static), not both
+- Clear the unused variable or set it to empty string
 
-### "Invalid audience"
-- Set `auth_provider_audience` to expected value
-- Or omit for no audience validation
-
-## License
-
-Apache-2.0
+### "Token missing required scopes"
+- Ensure token includes all scopes listed in `mcp_jwt_required_scopes`
+- Token scopes can be in `scope` or `scp` claim
+- Required scopes use comma separation, token scopes use space separation
