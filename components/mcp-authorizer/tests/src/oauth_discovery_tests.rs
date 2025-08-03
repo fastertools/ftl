@@ -45,7 +45,7 @@ fn test_oauth_protected_resource_metadata() {
         .expect("OAuth metadata should be valid JSON");
     
     // Verify required fields
-    assert!(json["resource"].is_string(), "Must have resource URL");
+    assert!(json["resource"].is_array(), "Must have resource URLs array");
     assert!(json["authorization_servers"].is_array(), "Must have authorization_servers array");
     assert!(json["authentication_methods"]["bearer"]["required"].is_boolean());
 }

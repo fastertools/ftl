@@ -173,9 +173,19 @@ impl McpGateway {
         let response = InitializeResponse {
             protocol_version: McpProtocolVersion::V1,
             capabilities: ServerCapabilities {
-                tools: Some(serde_json::json!({})),
-                resources: Some(serde_json::json!({})),
-                prompts: Some(serde_json::json!({})),
+                tools: Some(serde_json::json!({
+                    "listChanged": true
+                })),
+                resources: Some(serde_json::json!({
+                    "subscribe": false,
+                    "listChanged": false
+                })),
+                prompts: Some(serde_json::json!({
+                    "listChanged": false
+                })),
+                experimental_capabilities: Some(serde_json::json!({
+                    "logging": {}
+                })),
             },
             server_info: self.config.server_info.clone(),
             instructions: Some(
@@ -423,7 +433,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     let config = GatewayConfig {
         server_info: ServerInfo {
             name: "ftl-mcp-gateway".to_string(),
-            version: "0.0.3".to_string(),
+            version: "0.0.4".to_string(),
         },
         validate_arguments,
     };

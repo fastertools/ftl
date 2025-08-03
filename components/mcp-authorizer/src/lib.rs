@@ -43,12 +43,14 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     // Authenticate the request - auth is always required
     match authenticate(&req, &config).await {
         Ok(auth_context) => {
+            // Log successful authentication
+            eprintln!("AUTH_SUCCESS path={} client_id={}", req.path(), auth_context.client_id);
             // Forward authenticated request
             forward_request(req, &config, auth_context, trace_id).await
         }
         Err(auth_error) => {
-            // Log the error for debugging
-            eprintln!("Authentication error: {:?}", auth_error);
+            // Log the error with more context
+            eprintln!("AUTH_ERROR path={} error={:?}", req.path(), auth_error);
             // Return authentication error
             Ok(create_error_response(auth_error, &req, &config, trace_id))
         }

@@ -26,3 +26,4 @@ spin.toml
 # OS
 .DS_Store
 Thumbs.db
+.spin-aka/

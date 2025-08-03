@@ -60,7 +60,8 @@ fn test_authkit_protected_resource_metadata() {
     let metadata: serde_json::Value = serde_json::from_slice(&body).unwrap();
     
     // Verify protected resource metadata
-    assert_eq!(metadata["resource"], "https://mcp.example.com");
+    assert!(metadata["resource"].is_array(), "resource should be an array");
+    assert_eq!(metadata["resource"][0], "https://mcp.example.com/mcp");
     assert_eq!(metadata["authorization_servers"][0], "https://test-project.authkit.app");
     assert_eq!(metadata["bearer_methods_supported"], json!(["header"]));
 }

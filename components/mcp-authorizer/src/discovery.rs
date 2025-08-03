@@ -5,6 +5,38 @@ use serde_json::json;
 
 use crate::config::Config;
 
+/// Get resource URLs based on the request
+fn get_resource_urls(req: &Request) -> Vec<String> {
+    // Try multiple header names for the host
+    let host = req.headers()
+        .find(|(name, _)| name.eq_ignore_ascii_case("host"))
+        .or_else(|| req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host")))
+        .or_else(|| req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-original-host")))
+        .and_then(|(_, value)| value.as_str());
+    
+    if let Some(host_header) = host {
+        // Determine scheme based on X-Forwarded-Proto or host
+        let scheme = req.headers()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto"))
+            .and_then(|(_, value)| value.as_str())
+            .unwrap_or_else(|| {
+                if host_header.starts_with("localhost") || host_header.starts_with("127.0.0.1") {
+                    "http"
+                } else {
+                    "https"
+                }
+            });
+        
+        vec![format!("{}://{}/mcp", scheme, host_header)]
+    } else {
+        // Fallback to localhost for development
+        vec![
+            "http://localhost:3000/mcp".to_string(),
+            "http://127.0.0.1:3000/mcp".to_string()
+        ]
+    }
+}
+
 /// Handle OAuth protected resource metadata endpoint
 pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Option<String>) -> Response {
     // Build metadata based on provider type
@@ -24,10 +56,7 @@ pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Optio
             };
             
             json!({
-                "resource": [
-                    "http://localhost:3000/mcp",
-                    "http://127.0.0.1:3000/mcp"
-                ],
+                "resource": get_resource_urls(req),
                 "authorization_servers": authorization_servers,
                 "bearer_methods_supported": ["header"],
                 "authentication_methods": {
@@ -40,10 +69,7 @@ pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Optio
         }
         crate::config::Provider::Static(_) => {
             json!({
-                "resource": [
-                    "http://localhost:3000/mcp",
-                    "http://127.0.0.1:3000/mcp"
-                ],
+                "resource": get_resource_urls(req),
                 "authorization_servers": [],
                 "bearer_methods_supported": ["header"],
                 "authentication_methods": {

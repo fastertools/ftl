@@ -127,7 +127,34 @@ pub async fn verify(token: &str, provider: &JWTProvider, store: &Store) -> Resul
     }
     
     // Decode and validate token
-    let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
+    let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
+        Ok(data) => data,
+        Err(e) => {
+            // Provide more specific error messages for common issues
+            return match e.kind() {
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                    eprintln!("TOKEN_ERROR type=expired");
+                    Err(AuthError::ExpiredToken)
+                },
+                jsonwebtoken::errors::ErrorKind::InvalidIssuer => {
+                    eprintln!("TOKEN_ERROR type=invalid_issuer");
+                    Err(AuthError::InvalidIssuer)
+                },
+                jsonwebtoken::errors::ErrorKind::InvalidAudience => {
+                    eprintln!("TOKEN_ERROR type=invalid_audience");
+                    Err(AuthError::InvalidAudience)
+                },
+                jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                    eprintln!("TOKEN_ERROR type=invalid_signature");
+                    Err(AuthError::InvalidSignature)
+                },
+                _ => {
+                    eprintln!("TOKEN_ERROR type=other detail={:?}", e);
+                    Err(AuthError::InvalidToken(e.to_string()))
+                }
+            };
+        }
+    };
     let claims = token_data.claims;
     
     // Extract scopes
