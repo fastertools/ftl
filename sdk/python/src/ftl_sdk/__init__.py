@@ -1,5 +1,15 @@
 """FTL SDK for Python - Build MCP tools that compile to WebAssembly."""
 
+# Python 3.10 compatibility shim for spin-sdk
+import sys
+if sys.version_info < (3, 11):
+    try:
+        from typing import Self
+    except ImportError:
+        from typing_extensions import Self
+        import typing
+        typing.Self = Self
+
 # Core API
 from .ftl import FTL
 
