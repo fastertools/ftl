@@ -189,6 +189,43 @@ class FTL:
         # Default mapping
         return type_map.get(python_type, {"type": "object"})
     
+    def _convert_result_to_toolresult(self, result: Any) -> dict[str, Any]:
+        """
+        Convert any function return value to MCP response format.
+        
+        This implements FastMCP-style automatic conversion where functions
+        can return basic Python types and the framework handles MCP formatting.
+        
+        Args:
+            result: Any return value from a tool function
+            
+        Returns:
+            Dict in MCP response format with content and optional structured_content
+        """
+        # If already in MCP format, pass through
+        if isinstance(result, dict) and "content" in result:
+            return result
+        
+        # Handle different return types automatically
+        if isinstance(result, str):
+            # String -> text content
+            return ToolResponse.text(result)
+        elif isinstance(result, (dict, list)):
+            # Structured data -> both text and structured content
+            return ToolResponse.with_structured(
+                json.dumps(result, indent=2),
+                result
+            )
+        elif isinstance(result, (int, float, bool)):
+            # Basic types -> convert to string content
+            return ToolResponse.text(str(result))
+        elif result is None:
+            # None -> empty text content
+            return ToolResponse.text("")
+        else:
+            # Everything else -> string representation
+            return ToolResponse.text(str(result))
+    
     def _create_handler_wrapper(self, func: Callable, hints: dict[str, type]) -> Callable[[dict[str, Any]], dict[str, Any]]:
         """Create a wrapper that converts MCP input to function parameters."""
         @wraps(func)
@@ -197,22 +234,8 @@ class FTL:
                 # Call the original function with input data as kwargs
                 result = func(**input_data)
                 
-                # Convert result to MCP response format
-                if isinstance(result, dict) and "content" in result:
-                    # Already in MCP format
-                    return result
-                elif isinstance(result, str):
-                    # Simple string response
-                    return ToolResponse.text(result)
-                elif isinstance(result, dict | list):
-                    # Structured data response
-                    return ToolResponse.with_structured(
-                        json.dumps(result, indent=2),
-                        result
-                    )
-                else:
-                    # Convert to string
-                    return ToolResponse.text(str(result))
+                # Automatically convert any return type to MCP format
+                return self._convert_result_to_toolresult(result)
                     
             except Exception as e:
                 return ToolResponse.error(f"Tool execution failed: {str(e)}")

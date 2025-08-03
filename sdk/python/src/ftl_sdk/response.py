@@ -52,6 +52,240 @@ class ToolResponse:
         }
 
 
+class ToolResult:
+    """
+    Enhanced tool result builder with fluent API for FastMCP-style responses.
+    
+    Provides a chainable interface for building rich MCP responses with multiple
+    content types, structured data, and proper error handling.
+    
+    Example:
+        # Simple text response
+        return ToolResult().text("Hello world")
+        
+        # Rich response with multiple content types
+        return (ToolResult()
+                .text("Process completed")
+                .add_text("Details: Processing finished successfully")
+                .with_structured({"status": "success", "count": 42})
+                .with_progress(90))
+        
+        # Error response
+        return ToolResult().error("Something went wrong", details={"code": 500})
+    """
+    
+    def __init__(self):
+        """Initialize a new ToolResult builder."""
+        self._content: List[Dict[str, Any]] = []
+        self._structured_content: Optional[Any] = None
+        self._is_error: bool = False
+        self._progress: Optional[float] = None
+        self._meta: Optional[Dict[str, Any]] = None
+    
+    def text(self, text: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Add text content to the response.
+        
+        Args:
+            text: The text content
+            annotations: Optional annotations for the content
+            
+        Returns:
+            Self for chaining
+        """
+        content = ToolContent.text(text, annotations)
+        self._content.append(content)
+        return self
+    
+    def add_text(self, text: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Add additional text content (alias for text() for clarity in chaining).
+        
+        Args:
+            text: The text content
+            annotations: Optional annotations for the content
+            
+        Returns:
+            Self for chaining
+        """
+        return self.text(text, annotations)
+    
+    def image(self, data: str, mime_type: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Add image content to the response.
+        
+        Args:
+            data: Base64-encoded image data
+            mime_type: MIME type of the image
+            annotations: Optional annotations for the content
+            
+        Returns:
+            Self for chaining
+        """
+        content = ToolContent.image(data, mime_type, annotations)
+        self._content.append(content)
+        return self
+    
+    def audio(self, data: str, mime_type: str, annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Add audio content to the response.
+        
+        Args:
+            data: Base64-encoded audio data
+            mime_type: MIME type of the audio
+            annotations: Optional annotations for the content
+            
+        Returns:
+            Self for chaining
+        """
+        content = ToolContent.audio(data, mime_type, annotations)
+        self._content.append(content)
+        return self
+    
+    def resource(self, resource: Dict[str, Any], annotations: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Add resource content to the response.
+        
+        Args:
+            resource: Resource definition
+            annotations: Optional annotations for the content
+            
+        Returns:
+            Self for chaining
+        """
+        content = ToolContent.resource(resource, annotations)
+        self._content.append(content)
+        return self
+    
+    def with_structured(self, structured: Any) -> 'ToolResult':
+        """
+        Add structured content to the response.
+        
+        Args:
+            structured: Any JSON-serializable structured data
+            
+        Returns:
+            Self for chaining
+        """
+        self._structured_content = structured
+        return self
+    
+    def with_progress(self, progress: float) -> 'ToolResult':
+        """
+        Add progress information to the response.
+        
+        Args:
+            progress: Progress value (0.0 to 100.0)
+            
+        Returns:
+            Self for chaining
+        """
+        self._progress = max(0.0, min(100.0, progress))
+        return self
+    
+    def with_meta(self, meta: Dict[str, Any]) -> 'ToolResult':
+        """
+        Add metadata to the response.
+        
+        Args:
+            meta: Metadata dictionary
+            
+        Returns:
+            Self for chaining
+        """
+        if self._meta is None:
+            self._meta = {}
+        self._meta.update(meta)
+        return self
+    
+    def error(self, message: str, details: Optional[Dict[str, Any]] = None) -> 'ToolResult':
+        """
+        Mark this result as an error.
+        
+        Args:
+            message: Error message
+            details: Optional error details
+            
+        Returns:
+            Self for chaining
+        """
+        self._is_error = True
+        self._content.append(ToolContent.text(message))
+        
+        if details:
+            self.with_structured({"error_details": details})
+        
+        return self
+    
+    def build(self) -> Dict[str, Any]:
+        """
+        Build the final MCP response dictionary.
+        
+        Returns:
+            MCP-compliant response dictionary
+        """
+        result: Dict[str, Any] = {}
+        
+        # Add content if any
+        if self._content:
+            result["content"] = self._content
+        
+        # Add structured content if provided
+        if self._structured_content is not None:
+            result["structuredContent"] = self._structured_content
+        
+        # Add error flag if this is an error
+        if self._is_error:
+            result["isError"] = True
+        
+        # Add progress if provided
+        if self._progress is not None:
+            result["progress"] = self._progress
+        
+        # Add metadata if provided
+        if self._meta:
+            result["_meta"] = self._meta
+        
+        return result
+    
+    def __call__(self) -> Dict[str, Any]:
+        """
+        Allow the ToolResult to be called like a function to build the response.
+        
+        Returns:
+            MCP-compliant response dictionary
+        """
+        return self.build()
+    
+    # Static factory methods for convenience
+    @staticmethod
+    def simple_text(text: str) -> Dict[str, Any]:
+        """
+        Create a simple text response (convenience method).
+        
+        Args:
+            text: The text content
+            
+        Returns:
+            MCP-compliant response dictionary
+        """
+        return ToolResult().text(text).build()
+    
+    @staticmethod
+    def simple_error(message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Create a simple error response (convenience method).
+        
+        Args:
+            message: Error message
+            details: Optional error details
+            
+        Returns:
+            MCP-compliant response dictionary
+        """
+        return ToolResult().error(message, details).build()
+
+
 class ToolContent:
     """Helper class for creating different types of content."""
     
