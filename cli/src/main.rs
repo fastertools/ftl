@@ -356,7 +356,6 @@ enum ToolsCommand {
     },
 }
 
-
 // Conversion implementations
 
 impl From<InitArgs> for ftl_commands::init::InitArgs {
@@ -545,7 +544,6 @@ impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
     }
 }
 
-
 async fn handle_eng_command(args: EngArgs) -> Result<()> {
     match args.command {
         EngCommand::Login {
@@ -619,7 +617,6 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
     }
 }
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -629,11 +626,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-
-
     let cli = Cli::parse();
-
-
 
     // Execute the command
     let result = match cli.command {
@@ -649,7 +642,6 @@ async fn main() -> Result<()> {
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
         Commands::Eng(args) => handle_eng_command(args).await,
     };
-
 
     result
 }

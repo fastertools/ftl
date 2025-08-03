@@ -12,13 +12,13 @@ func TestIsDebugEnabled(t *testing.T) {
 	if isDebugEnabled() {
 		t.Error("Expected isDebugEnabled() to return false when FTL_DEBUG is empty")
 	}
-	
+
 	// Test with debug enabled
 	t.Setenv("FTL_DEBUG", "true")
 	if !isDebugEnabled() {
 		t.Error("Expected isDebugEnabled() to return true when FTL_DEBUG=true")
 	}
-	
+
 	// Test with invalid value
 	t.Setenv("FTL_DEBUG", "invalid")
 	if isDebugEnabled() {
@@ -38,7 +38,7 @@ func TestSanitizePath(t *testing.T) {
 		{"just-a-string", "just-a-string"},
 		{"path?multiple=params&secret=hidden", "path?[REDACTED]"},
 	}
-	
+
 	for _, test := range tests {
 		result := sanitizePath(test.input)
 		if result != test.expected {
@@ -50,12 +50,12 @@ func TestSanitizePath(t *testing.T) {
 func TestSecureLog(t *testing.T) {
 	// This test ensures secureLog doesn't panic and respects debug flag
 	// We can't easily test the actual output without capturing stdout
-	
+
 	// Test with debug disabled
 	t.Setenv("FTL_DEBUG", "")
 	// Should not panic
 	secureLog("test message: %s", "value")
-	
+
 	// Test with debug enabled
 	t.Setenv("FTL_DEBUG", "true")
 	// Should not panic
@@ -87,19 +87,19 @@ func TestCamelToSnake(t *testing.T) {
 
 func TestText(t *testing.T) {
 	resp := Text("Hello, world!")
-	
+
 	if len(resp.Content) != 1 {
 		t.Errorf("Expected 1 content item, got %d", len(resp.Content))
 	}
-	
+
 	if resp.Content[0].Type != "text" {
 		t.Errorf("Expected content type 'text', got %q", resp.Content[0].Type)
 	}
-	
+
 	if resp.Content[0].Text != "Hello, world!" {
 		t.Errorf("Expected text 'Hello, world!', got %q", resp.Content[0].Text)
 	}
-	
+
 	if resp.IsError {
 		t.Error("Expected IsError to be false")
 	}
@@ -108,7 +108,7 @@ func TestText(t *testing.T) {
 func TestTextf(t *testing.T) {
 	resp := Textf("Hello, %s! You are %d years old.", "Alice", 30)
 	expected := "Hello, Alice! You are 30 years old."
-	
+
 	if resp.Content[0].Text != expected {
 		t.Errorf("Expected text %q, got %q", expected, resp.Content[0].Text)
 	}
@@ -116,11 +116,11 @@ func TestTextf(t *testing.T) {
 
 func TestError(t *testing.T) {
 	resp := Error("Something went wrong")
-	
+
 	if !resp.IsError {
 		t.Error("Expected IsError to be true")
 	}
-	
+
 	if resp.Content[0].Text != "Something went wrong" {
 		t.Errorf("Expected error text 'Something went wrong', got %q", resp.Content[0].Text)
 	}
@@ -129,11 +129,11 @@ func TestError(t *testing.T) {
 func TestErrorf(t *testing.T) {
 	resp := Errorf("Error code: %d", 404)
 	expected := "Error code: 404"
-	
+
 	if resp.Content[0].Text != expected {
 		t.Errorf("Expected text %q, got %q", expected, resp.Content[0].Text)
 	}
-	
+
 	if !resp.IsError {
 		t.Error("Expected IsError to be true")
 	}
@@ -144,18 +144,18 @@ func TestWithStructured(t *testing.T) {
 		"result": 42,
 		"status": "success",
 	}
-	
+
 	resp := WithStructured("Operation completed", data)
-	
+
 	if resp.Content[0].Text != "Operation completed" {
 		t.Errorf("Expected text 'Operation completed', got %q", resp.Content[0].Text)
 	}
-	
+
 	structured, ok := resp.StructuredContent.(map[string]interface{})
 	if !ok {
 		t.Fatal("Expected StructuredContent to be map[string]interface{}")
 	}
-	
+
 	if structured["result"] != 42 {
 		t.Errorf("Expected result 42, got %v", structured["result"])
 	}
@@ -169,19 +169,19 @@ func TestContentCreators(t *testing.T) {
 	if textContent.Type != "text" || textContent.Text != "Hello" {
 		t.Error("TextContent not created correctly")
 	}
-	
+
 	// Test ImageContent
 	imageContent := ImageContent("base64data", "image/png", nil)
 	if imageContent.Type != "image" || imageContent.Data != "base64data" || imageContent.MimeType != "image/png" {
 		t.Error("ImageContent not created correctly")
 	}
-	
+
 	// Test AudioContent
 	audioContent := AudioContent("base64audio", "audio/wav", nil)
 	if audioContent.Type != "audio" || audioContent.Data != "base64audio" || audioContent.MimeType != "audio/wav" {
 		t.Error("AudioContent not created correctly")
 	}
-	
+
 	// Test ResourceContent
 	resource := &ResourceContents{
 		URI:      "file://test.txt",
@@ -201,23 +201,23 @@ func TestContentTypeGuards(t *testing.T) {
 	imageContent := ToolContent{Type: "image", Data: "data", MimeType: "image/png"}
 	audioContent := ToolContent{Type: "audio", Data: "data", MimeType: "audio/wav"}
 	resourceContent := ToolContent{Type: "resource", Resource: &ResourceContents{URI: "test"}}
-	
+
 	if !IsTextContent(textContent) {
 		t.Error("IsTextContent failed for text content")
 	}
-	
+
 	if !IsImageContent(imageContent) {
 		t.Error("IsImageContent failed for image content")
 	}
-	
+
 	if !IsAudioContent(audioContent) {
 		t.Error("IsAudioContent failed for audio content")
 	}
-	
+
 	if !IsResourceContent(resourceContent) {
 		t.Error("IsResourceContent failed for resource content")
 	}
-	
+
 	// Test negative cases
 	if IsTextContent(imageContent) {
 		t.Error("IsTextContent returned true for image content")
@@ -240,23 +240,23 @@ func TestToolDefinitionStructure(t *testing.T) {
 			return Text("test response")
 		},
 	}
-	
+
 	if toolDef.Description != "Test tool" {
 		t.Error("Tool description not set correctly")
 	}
-	
+
 	if toolDef.Handler == nil {
 		t.Error("Tool handler not set")
 	}
-	
+
 	// Test handler function
 	testInput := map[string]interface{}{"input": "test"}
 	response := toolDef.Handler(testInput)
-	
+
 	if response.IsError {
 		t.Error("Expected successful response from test handler")
 	}
-	
+
 	if len(response.Content) == 0 || response.Content[0].Text != "test response" {
 		t.Error("Handler didn't return expected response")
 	}

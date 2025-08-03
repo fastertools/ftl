@@ -117,19 +117,20 @@ jobs:
       run: |
         # Create a test file that uses the SDK
         cat > test_wasm.py << 'EOF'
-        from ftl_sdk import create_tools, ToolResponse
+        from ftl_sdk import FTL
         
-        Handler = create_tools({
-            "test": {
-                "description": "Test tool",
-                "inputSchema": {"type": "object"},
-                "handler": lambda input: ToolResponse.text("test")
-            }
-        })
+        ftl = FTL()
+        
+        @ftl.tool
+        def test() -> str:
+            """Test tool"""
+            return "test"
+        
+        Handler = ftl.create_handler()
         EOF
         
         # Try to build with componentize-py
-        componentize-py -w spin-http componentize test_wasm -o test.wasm
+        componentize-py -w spin-http componentize test_wasm -p . -o test.wasm
         
         # Verify the WASM file was created
         test -f test.wasm || exit 1

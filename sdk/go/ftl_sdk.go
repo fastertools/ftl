@@ -37,7 +37,7 @@ func camelToSnake(s string) string {
 	if s == "" {
 		return ""
 	}
-	
+
 	var result strings.Builder
 	for i, r := range s {
 		if i > 0 && r >= 'A' && r <= 'Z' {
@@ -267,7 +267,6 @@ func ResourceContent(resource *ResourceContents, annotations *ContentAnnotations
 	}
 }
 
-
 // CreateTools creates a Spin HTTP handler for MCP tools.
 //
 // Example:
@@ -295,7 +294,6 @@ func ResourceContent(resource *ResourceContents, annotations *ContentAnnotations
 //	}
 //
 //	func main() {}
-
 
 // Type guards for content types
 
