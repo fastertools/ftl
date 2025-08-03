@@ -5,7 +5,7 @@ use spin_test_sdk::{
     },
     spin_test,
 };
-use serde_json::Value;
+use crate::ResponseData;
 
 // Test error response format for missing token
 #[spin_test]
@@ -14,14 +14,14 @@ fn test_missing_token_error_format() {
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
     
-    assert_eq!(response.status(), 401);
+    // Extract all response data
+    let response_data = ResponseData::from_response(response);
+    
+    assert_eq!(response_data.status, 401);
     
     // Check WWW-Authenticate header format
-    let headers = response.headers();
-    let entries = headers.entries();
-    let www_auth = entries.iter()
-        .find(|(name, _)| name == "www-authenticate")
-        .map(|(_, value)| String::from_utf8_lossy(value));
+    let www_auth = response_data.find_header("www-authenticate")
+        .map(|value| String::from_utf8_lossy(value));
     
     assert!(www_auth.is_some());
     let auth_header = www_auth.unwrap();
@@ -31,15 +31,11 @@ fn test_missing_token_error_format() {
     assert!(auth_header.contains("error=\"unauthorized\""));
     assert!(auth_header.contains("error_description=\"Missing authorization header\""));
     
-    // Check response body
-    let body = crate::read_body(&response);
-    if !body.is_empty() {
-        let json: Result<Value, _> = serde_json::from_slice(&body);
-        if let Ok(json) = json {
-            assert_eq!(json["error"], "unauthorized");
-            assert_eq!(json["error_description"], "Missing authorization header");
-        }
-    }
+    // Check response body - MUST have error response
+    let json = response_data.body_json()
+        .expect("Error response must have JSON body");
+    assert_eq!(json["error"], "unauthorized");
+    assert_eq!(json["error_description"], "Missing authorization header");
 }
 
 // Test error response for invalid token

@@ -5,7 +5,7 @@ use spin_test_sdk::{
     },
     spin_test,
 };
-use crate::test_helpers;
+use crate::{test_helpers, ResponseData};
 
 // Test OAuth protected resource metadata endpoint
 #[spin_test]
@@ -24,22 +24,30 @@ fn test_oauth_protected_resource_metadata() {
         .set_path_with_query(Some("/.well-known/oauth-protected-resource"))
         .unwrap();
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
     // Should return 200 when provider is configured
-    assert_eq!(response.status(), 200);
+    assert_eq!(response_data.status, 200);
     
     // Check content type
-    let headers = response.headers();
-    let content_type = test_helpers::find_header_str(&headers, "content-type");
-    
+    let content_type = response_data.find_header("content-type")
+        .map(|v| String::from_utf8_lossy(v));
     assert!(content_type.is_some());
     assert!(content_type.unwrap().contains("application/json"));
     
     // Check CORS headers
-    let cors_header = test_helpers::find_header_str(&headers, "access-control-allow-origin");
+    let cors_header = response_data.find_header("access-control-allow-origin")
+        .map(|v| String::from_utf8_lossy(v));
+    assert_eq!(cors_header.as_deref(), Some("*"));
     
-    assert!(cors_header.is_some());
-    assert_eq!(cors_header.unwrap(), "*");
+    // Verify the metadata JSON structure
+    let json = response_data.body_json()
+        .expect("OAuth metadata should be valid JSON");
+    
+    // Verify required fields
+    assert!(json["resource"].is_string(), "Must have resource URL");
+    assert!(json["authorization_servers"].is_array(), "Must have authorization_servers array");
+    assert!(json["authentication_methods"]["bearer"]["required"].is_boolean());
 }
 
 // Test OAuth authorization server metadata endpoint
@@ -55,16 +63,26 @@ fn test_oauth_authorization_server_metadata() {
         .set_path_with_query(Some("/.well-known/oauth-authorization-server"))
         .unwrap();
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
     // Should return 200 when provider is configured
-    assert_eq!(response.status(), 200);
+    assert_eq!(response_data.status, 200);
     
     // Check content type
-    let headers = response.headers();
-    let content_type = test_helpers::find_header_str(&headers, "content-type");
-    
+    let content_type = response_data.find_header("content-type")
+        .map(|v| String::from_utf8_lossy(v));
     assert!(content_type.is_some());
     assert!(content_type.unwrap().contains("application/json"));
+    
+    // Verify the metadata JSON structure  
+    let json = response_data.body_json()
+        .expect("OAuth authorization server metadata should be valid JSON");
+    
+    // Verify required fields per RFC 8414
+    assert!(json["issuer"].is_string(), "Must have issuer");
+    assert!(json["jwks_uri"].is_string(), "Must have jwks_uri");
+    assert!(json["response_types_supported"].is_array(), "Must have response_types_supported");
+    assert!(json["token_endpoint_auth_methods_supported"].is_array());
 }
 
 // Test that discovery endpoints work without authentication

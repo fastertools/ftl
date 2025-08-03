@@ -101,23 +101,23 @@ pub async fn forward_to_gateway(
     let body = incoming_response.into_body();
     
     // Build the final response
-    let mut response_builder = Response::builder();
-    response_builder.status(status);
+    let mut binding = Response::builder();
+    let mut response_builder = binding.status(status);
     
     // Add gateway response headers first
     for (name, value) in headers_vec {
-        response_builder.header(name, value);
+        response_builder = response_builder.header(&name, &value);
     }
     
     // Add/override CORS headers
-    response_builder
+    response_builder = response_builder
         .header("Access-Control-Allow-Origin", "*")
         .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         .header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     
     // Add trace ID if present
     if let Some(trace_id) = trace_id {
-        response_builder.header(&config.trace_header, trace_id);
+        response_builder = response_builder.header(&config.trace_header, trace_id);
     }
     
     // Build the response with body

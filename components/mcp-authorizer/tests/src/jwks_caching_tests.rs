@@ -158,7 +158,6 @@ fn test_jwks_caching() {
     body1.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
     
     let response1 = spin_test_sdk::perform_request(request1);
-    eprintln!("test_jwks_caching first request got status: {}", response1.status());
     assert_eq!(response1.status(), 200);
     
     // Check JWKS was fetched once
@@ -184,7 +183,6 @@ fn test_jwks_caching() {
     body2.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":2}");
     
     let response2 = spin_test_sdk::perform_request(request2);
-    eprintln!("test_jwks_caching second request got status: {}", response2.status());
     assert_eq!(response2.status(), 200);
     
     // Check JWKS was NOT fetched again

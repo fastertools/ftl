@@ -14,16 +14,49 @@ mod error_response_tests;
 mod provider_config_tests;
 mod kid_validation_tests;
 mod scope_validation_tests;
+mod gateway_forwarding_tests;
 mod test_helpers;
 mod simple_test;
 mod test_setup;
 mod request_helpers;
 
-// Test helper to read response body
-pub fn read_body(_response: &http::types::IncomingResponse) -> Vec<u8> {
-    // For now, we'll return empty as reading body in spin tests is complex
-    // In real tests, this would read from the response stream
-    Vec::new()
+// Response data helper to extract all needed information
+pub struct ResponseData {
+    pub status: u16,
+    pub headers: Vec<(String, Vec<u8>)>,
+    pub body: Vec<u8>,
+}
+
+impl ResponseData {
+    pub fn from_response(response: http::types::IncomingResponse) -> Self {
+        let status = response.status();
+        
+        // Extract headers before consuming response
+        let headers = response.headers()
+            .entries()
+            .into_iter()
+            .map(|(name, value)| (name.to_string(), value.to_vec()))
+            .collect();
+        
+        // Now consume response to get body
+        let body = response.body().unwrap_or_else(|_| Vec::new());
+        
+        Self { status, headers, body }
+    }
+    
+    pub fn find_header(&self, name: &str) -> Option<&Vec<u8>> {
+        self.headers.iter()
+            .find(|(h_name, _)| h_name.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value)
+    }
+    
+    pub fn body_json(&self) -> Option<serde_json::Value> {
+        if self.body.is_empty() {
+            None
+        } else {
+            serde_json::from_slice(&self.body).ok()
+        }
+    }
 }
 
 // Existing tests from the original file

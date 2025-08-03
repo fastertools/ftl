@@ -6,6 +6,7 @@ use spin_test_sdk::{
     },
     spin_test,
 };
+use crate::ResponseData;
 
 use base64::Engine;
 use chrono::{Duration, Utc};
@@ -60,7 +61,7 @@ pub fn configure_test_provider() {
 }
 
 /// Helper to generate RSA key pair for testing
-fn generate_test_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
+pub fn generate_test_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
     let mut rng = rand::thread_rng();
     let bits = 2048;
     let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate private key");
@@ -69,7 +70,7 @@ fn generate_test_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
 }
 
 /// Helper to create a JWT token with custom claims
-fn create_test_token(
+pub fn create_test_token(
     private_key: &RsaPrivateKey,
     claims: Claims,
     kid: Option<&str>,
@@ -86,7 +87,7 @@ fn create_test_token(
 }
 
 /// Helper to create a JWKS response with the public key
-fn create_jwks_response(public_key: &RsaPublicKey, kid: &str) -> serde_json::Value {
+pub fn create_jwks_response(public_key: &RsaPublicKey, kid: &str) -> serde_json::Value {
     // Create proper JWK format
     let n = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(&public_key.n().to_bytes_be());
@@ -106,7 +107,7 @@ fn create_jwks_response(public_key: &RsaPublicKey, kid: &str) -> serde_json::Val
 }
 
 /// Mock HTTP response for JWKS endpoint
-fn mock_jwks_endpoint(url: &str, jwks: serde_json::Value) {
+pub fn mock_jwks_endpoint(url: &str, jwks: serde_json::Value) {
     let response = http::types::OutgoingResponse::new(http::types::Headers::new());
     response.set_status_code(200).unwrap();
     let headers = response.headers();
@@ -197,11 +198,17 @@ fn test_valid_token_jwks_verification() {
     body.write_bytes(serde_json::to_string(&body_content).unwrap().as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
     // Should succeed with 200
-    assert_eq!(response.status(), 200);
+    assert_eq!(response_data.status, 200);
     
-    // Note: We can't verify the response body content due to spin-test SDK limitations
+    // Verify the gateway response body is properly forwarded
+    let json = response_data.body_json()
+        .expect("Response should have JSON body");
+    assert_eq!(json["jsonrpc"], "2.0");
+    assert_eq!(json["result"]["tools"][0], "test-tool");
+    assert_eq!(json["id"], 1)
 }
 
 // Test: Expired token rejection
@@ -240,11 +247,16 @@ fn test_expired_token_rejection() {
     request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
     // Should return 401
-    assert_eq!(response.status(), 401);
+    assert_eq!(response_data.status, 401);
     
-    // Note: We can't verify the response body content due to spin-test SDK limitations
+    // Verify error response format
+    let json = response_data.body_json()
+        .expect("Error response should have JSON body");
+    assert_eq!(json["error"], "invalid_token");
+    assert!(json["error_description"].as_str().unwrap().contains("expired"))
 }
 
 // Test: Invalid signature rejection
@@ -423,9 +435,16 @@ fn test_multiple_audiences_validation() {
     body.write_bytes(serde_json::to_string(&body_content).unwrap().as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
     // Should succeed
-    assert_eq!(response.status(), 200);
+    assert_eq!(response_data.status, 200);
+    
+    // Verify response - gateway mock returns successful response
+    let json = response_data.body_json()
+        .expect("Response should have JSON body");
+    assert_eq!(json["jsonrpc"], "2.0");
+    assert!(json["result"].is_object());
 }
 
 // Test: Scope extraction from different formats
@@ -477,9 +496,16 @@ fn test_scope_extraction() {
     body.write_bytes(serde_json::to_string(&body_content).unwrap().as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
     
-    // Should succeed
-    assert_eq!(response.status(), 200);
+    // Should succeed - scopes were properly extracted and forwarded
+    assert_eq!(response_data.status, 200);
+    
+    // Verify response
+    let json = response_data.body_json()
+        .expect("Response should have JSON body");
+    assert_eq!(json["jsonrpc"], "2.0");
+    assert!(json["result"].is_object());
 }
 
 // Test: Client ID extraction with explicit claim
@@ -554,13 +580,15 @@ fn test_client_id_extraction_explicit() {
     body.write_bytes(serde_json::to_string(&body_content).unwrap().as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
-    
-    // Debug: print status to understand failure
-    eprintln!("test_client_id_extraction_explicit got status: {}", response.status());
+    let response_data = ResponseData::from_response(response);
     
     // Should succeed
-    assert_eq!(response.status(), 200);
+    assert_eq!(response_data.status, 200);
     
-    // Note: We can't verify the response body content due to spin-test SDK limitations
-    // The test passes if the request succeeds, which means client_id was extracted
+    // Verify the response contains the client_id that was forwarded
+    let json = response_data.body_json()
+        .expect("Response should have JSON body");
+    assert_eq!(json["jsonrpc"], "2.0");
+    assert_eq!(json["result"]["client_id_received"], "app456");
+    assert_eq!(json["id"], 1)
 }

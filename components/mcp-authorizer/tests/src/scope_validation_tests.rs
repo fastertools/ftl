@@ -176,8 +176,8 @@ fn test_scope_precedence() {
     // Should succeed
     assert_eq!(response.status(), 200);
     
-    // In the actual implementation, we would verify that 'read write' was used,
-    // not 'admin delete', but we can't inspect the auth context in these tests
+    // The OAuth2 'scope' claim takes precedence over Microsoft 'scp' claim
+    // Gateway forwarding tests verify auth context headers are properly set
 }
 
 // Test: String issuer mismatch rejection
