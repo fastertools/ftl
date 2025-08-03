@@ -1,23 +1,23 @@
-use spin_sdk::http::{Request, Response};
+use spin_sdk::http::Response;
 
 use crate::providers::AuthProvider;
 
-/// Handle OAuth metadata endpoints
-pub fn handle_metadata_request(
+/// Handle OAuth discovery requests
+pub fn handle_discovery_request(
     path: &str,
     provider: &dyn AuthProvider,
     host: Option<&str>,
-    req: &Request,
 ) -> Response {
-    // Determine resource URL first
-    let resource_url = determine_resource_url(host, req);
+    let resource_url = determine_resource_url(host);
 
     match path {
         "/.well-known/oauth-protected-resource" => {
+            // RFC 9728 Resource Metadata
             let metadata = serde_json::json!({
                 "resource": resource_url,
                 "authorization_servers": [provider.issuer()],
-                "bearer_methods_supported": ["header"]
+                "bearer_methods_supported": ["header"],
+                "scopes_supported": ["mcp"]
             });
 
             Response::builder()
@@ -28,7 +28,7 @@ pub fn handle_metadata_request(
                 .build()
         }
         "/.well-known/oauth-authorization-server" => {
-            // Return provider-specific metadata
+            // OAuth 2.0 Authorization Server Metadata
             let discovery = provider.discovery_metadata(&resource_url);
             let metadata = serde_json::json!({
                 "issuer": discovery.issuer,
@@ -36,18 +36,12 @@ pub fn handle_metadata_request(
                 "token_endpoint": discovery.token_endpoint,
                 "jwks_uri": discovery.jwks_uri,
                 "userinfo_endpoint": discovery.userinfo_endpoint,
-                "revocation_endpoint": discovery.revocation_endpoint,
-                "introspection_endpoint": discovery.introspection_endpoint,
                 "response_types_supported": ["code"],
                 "response_modes_supported": ["query"],
                 "grant_types_supported": ["authorization_code", "refresh_token"],
                 "code_challenge_methods_supported": ["S256"],
-                "token_endpoint_auth_methods_supported": [
-                    "none",
-                    "client_secret_post",
-                    "client_secret_basic"
-                ],
-                "scopes_supported": ["email", "offline_access", "openid", "profile"]
+                "token_endpoint_auth_methods_supported": ["none"],
+                "scopes_supported": ["mcp", "openid", "profile", "email"]
             });
 
             Response::builder()
@@ -59,44 +53,26 @@ pub fn handle_metadata_request(
         }
         _ => Response::builder()
             .status(404)
-            .body("Not found".to_string())
+            .body("Not found")
             .build(),
     }
 }
 
-/// Determine the resource URL based on request headers
-fn determine_resource_url(host: Option<&str>, req: &Request) -> String {
+/// Determine the resource URL based on host
+fn determine_resource_url(host: Option<&str>) -> String {
     host.map_or_else(
-        || {
-            eprintln!("No host header found, using default");
-            "http://127.0.0.1:3000/mcp".to_string() // Default fallback
-        },
+        || "http://localhost:3000".to_string(),
         |h| {
-            // Check X-Forwarded-Proto header for protocol
-            let forwarded_proto = req
-                .headers()
-                .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto"))
-                .and_then(|(_, value)| value.as_str());
-
-            // Determine protocol
-            let protocol = forwarded_proto.unwrap_or_else(|| {
-                if h.contains(":443") || h.contains(".fermyon.tech") || h.contains(".fermyon.cloud")
-                {
-                    "https"
-                } else if h.contains(":80")
-                    || h.starts_with("localhost")
-                    || h.starts_with("127.0.0.1")
-                {
-                    "http"
-                } else {
-                    // Default to https for production domains
-                    "https"
-                }
-            });
-
-            let url = format!("{protocol}://{h}/mcp");
-            eprintln!("Returning resource URL: {url}");
-            url
-        },
+            // Determine protocol based on host
+            let protocol = if h.contains(".fermyon.tech") || 
+                             h.contains(".fermyon.cloud") ||
+                             h.contains(":443") {
+                "https"
+            } else {
+                "http"
+            };
+            
+            format!("{protocol}://{h}")
+        }
     )
 }

@@ -1,313 +1,211 @@
-use anyhow::{Context, Result};
+//! Configuration management for the MCP Authorizer
+
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use spin_sdk::variables;
 
-use crate::providers::{AuthKitProvider, OidcProvider, OidcProviderConfig, ProviderRegistry};
-
-/// Gateway configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct GatewayConfig {
-    pub mcp_gateway_url: String,
-    pub trace_id_header: String,
-    pub enabled: bool,
-    pub provider: Option<ProviderConfig>,
+/// Main configuration structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    /// URL of the MCP gateway to forward requests to
+    pub gateway_url: String,
+    
+    /// Header name for request tracing
+    pub trace_header: String,
+    
+    /// JWT provider configuration (always required)
+    pub provider: Provider,
 }
 
-/// Provider configuration enum
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ProviderConfig {
-    #[serde(rename = "authkit")]
-    AuthKit {
-        issuer: String,
-        #[serde(default)]
-        jwks_uri: Option<String>,
-        #[serde(default)]
-        audience: Option<String>,
-    },
-    Oidc {
-        name: String,
-        issuer: String,
-        jwks_uri: String,
-        #[serde(default)]
-        audience: Option<String>,
-        authorization_endpoint: String,
-        token_endpoint: String,
-        #[serde(default)]
-        userinfo_endpoint: Option<String>,
-        #[serde(default)]
-        allowed_domains: Vec<String>,
-    },
+/// JWT provider configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Provider {
+    /// JWT issuer URL (must be HTTPS)
+    pub issuer: String,
+    
+    /// JWKS URI for key discovery
+    pub jwks_uri: Option<String>,
+    
+    /// Static public key (PEM format)
+    pub public_key: Option<String>,
+    
+    /// Expected audience(s)
+    pub audience: Option<Vec<String>>,
+    
+    /// JWT signing algorithm (defaults to RS256)
+    pub algorithm: Option<String>,
+    
+    /// OAuth 2.0 endpoints (optional)
+    pub oauth_endpoints: Option<OAuthEndpoints>,
 }
 
-impl GatewayConfig {
+/// OAuth 2.0 endpoint configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthEndpoints {
+    pub authorize: Option<String>,
+    pub token: Option<String>,
+    pub userinfo: Option<String>,
+}
+
+impl Config {
     /// Load configuration from Spin variables
-    pub fn from_spin_vars() -> Result<Self> {
-        // Read core settings
-        let enabled = variables::get("auth_enabled")
-            .unwrap_or_else(|_| "false".to_string())
-            .parse::<bool>()
-            .unwrap_or(false);
-
-        let mcp_gateway_url = variables::get("auth_gateway_url")
-            .unwrap_or_else(|_| "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string());
-
-        let trace_id_header =
-            variables::get("auth_trace_header").unwrap_or_else(|_| "X-Trace-Id".to_string());
-
-        // Read provider configuration
-        let provider_type = variables::get("auth_provider_type").unwrap_or_default();
-
-        let provider = if provider_type.is_empty() {
-            None
-        } else {
-            Some(Self::load_provider_config(&provider_type)?)
-        };
-
-        Ok(Self {
-            mcp_gateway_url,
-            trace_id_header,
-            enabled,
+    pub fn load() -> Result<Self> {
+        let gateway_url = variables::get("mcp_gateway_url")
+            .unwrap_or_else(|_| "https://mcp-gateway.spin.internal".to_string());
+        
+        let trace_header = variables::get("mcp_trace_header")
+            .unwrap_or_else(|_| "x-trace-id".to_string())
+            .to_lowercase();
+        
+        // Provider configuration is always required
+        let provider = Provider::load()?;
+        
+        Ok(Config {
+            gateway_url,
+            trace_header,
             provider,
         })
     }
+}
 
-    /// Ensure URL uses HTTPS protocol. Adds https:// if no protocol specified.
-    /// Returns error if http:// is explicitly used.
-    fn ensure_https_url(url: String) -> Result<String> {
-        if url.starts_with("http://") {
-            anyhow::bail!(
-                "Auth provider URLs must use HTTPS. HTTP is not allowed for security reasons. \
-                If you meant to use HTTPS, either provide just the domain (e.g., \"example.authkit.app\") \
-                or the full HTTPS URL (e.g., \"https://example.authkit.app\")."
-            )
-        } else if url.starts_with("https://") {
-            Ok(url)
-        } else {
-            Ok(format!("https://{url}"))
-        }
-    }
-
-    /// Load provider configuration from variables
-    fn load_provider_config(provider_type: &str) -> Result<ProviderConfig> {
-        let issuer = variables::get("auth_provider_issuer")
-            .context("auth_provider_issuer is required when auth_provider_type is set")?;
-        let issuer = Self::ensure_https_url(issuer)?;
-
-        let audience = variables::get("auth_provider_audience")
-            .ok()
+impl Provider {
+    /// Load provider configuration
+    fn load() -> Result<Self> {
+        // Load issuer (required)
+        let issuer = normalize_issuer(
+            variables::get("mcp_jwt_issuer")
+                .map_err(|_| anyhow::anyhow!("Missing mcp_jwt_issuer"))?
+        )?;
+        
+        // Load JWKS URI or public key (one required)
+        let jwks_uri = variables::get("mcp_jwt_jwks_uri").ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                // Auto-derive JWKS URI for known providers
+                if issuer.contains(".authkit.app") || issuer.contains(".workos.com") {
+                    Some(format!("{}/.well-known/jwks.json", issuer))
+                } else {
+                    None
+                }
+            })
+            .map(|uri| normalize_url(&uri))
+            .transpose()?;
+        
+        let public_key = variables::get("mcp_jwt_public_key").ok()
             .filter(|s| !s.is_empty());
-
-        match provider_type {
-            "authkit" => {
-                let jwks_uri = variables::get("auth_provider_jwks_uri")
-                    .ok()
-                    .filter(|s| !s.is_empty());
-
-                Ok(ProviderConfig::AuthKit {
-                    issuer,
-                    jwks_uri,
-                    audience,
-                })
-            }
-            "oidc" => {
-                let name = variables::get("auth_provider_name")
-                    .context("auth_provider_name is required for OIDC provider")?;
-
-                let jwks_uri = variables::get("auth_provider_jwks_uri")
-                    .context("auth_provider_jwks_uri is required for OIDC provider")?;
-                let jwks_uri = Self::ensure_https_url(jwks_uri)?;
-
-                let authorization_endpoint = variables::get("auth_provider_authorize_endpoint")
-                    .context("auth_provider_authorize_endpoint is required for OIDC provider")?;
-                let authorization_endpoint = Self::ensure_https_url(authorization_endpoint)?;
-
-                let token_endpoint = variables::get("auth_provider_token_endpoint")
-                    .context("auth_provider_token_endpoint is required for OIDC provider")?;
-                let token_endpoint = Self::ensure_https_url(token_endpoint)?;
-
-                let userinfo_endpoint = variables::get("auth_provider_userinfo_endpoint")
-                    .ok()
-                    .filter(|s| !s.is_empty())
-                    .map(Self::ensure_https_url)
-                    .transpose()?;
-
-                let allowed_domains = variables::get("auth_provider_allowed_domains")
-                    .unwrap_or_default()
-                    .split(',')
-                    .filter(|s| !s.trim().is_empty())
-                    .map(|s| s.trim().to_string())
-                    .collect();
-
-                Ok(ProviderConfig::Oidc {
-                    name,
-                    issuer,
-                    jwks_uri,
-                    audience,
-                    authorization_endpoint,
-                    token_endpoint,
-                    userinfo_endpoint,
-                    allowed_domains,
-                })
-            }
-            _ => anyhow::bail!(
-                "Unknown auth provider type: {}. Expected 'authkit' or 'oidc'",
-                provider_type
-            ),
+        
+        // Validate we have at least one key source
+        if jwks_uri.is_none() && public_key.is_none() {
+            return Err(anyhow::anyhow!(
+                "Either mcp_jwt_jwks_uri or mcp_jwt_public_key must be provided"
+            ));
         }
-    }
-
-    /// Build provider registry from configuration
-    pub fn build_registry(&self) -> ProviderRegistry {
-        let mut registry = ProviderRegistry::new();
-
-        if let Some(provider_config) = &self.provider {
-            match provider_config {
-                ProviderConfig::AuthKit {
-                    issuer,
-                    jwks_uri,
-                    audience,
-                } => {
-                    let provider =
-                        AuthKitProvider::new(issuer.clone(), jwks_uri.clone(), audience.clone());
-                    registry.add_provider(Box::new(provider));
-                }
-                ProviderConfig::Oidc {
-                    name,
-                    issuer,
-                    jwks_uri,
-                    audience,
-                    authorization_endpoint,
-                    token_endpoint,
-                    userinfo_endpoint,
-                    allowed_domains,
-                } => {
-                    let config = OidcProviderConfig {
-                        name: name.clone(),
-                        issuer: issuer.clone(),
-                        jwks_uri: jwks_uri.clone(),
-                        audience: audience.clone(),
-                        authorization_endpoint: authorization_endpoint.clone(),
-                        token_endpoint: token_endpoint.clone(),
-                        userinfo_endpoint: userinfo_endpoint.clone(),
-                        allowed_domains: allowed_domains.clone(),
-                    };
-                    let provider = OidcProvider::new(config);
-                    registry.add_provider(Box::new(provider));
-                }
-            }
+        
+        // Validate we don't have both
+        if jwks_uri.is_some() && public_key.is_some() {
+            return Err(anyhow::anyhow!(
+                "Cannot specify both mcp_jwt_jwks_uri and mcp_jwt_public_key"
+            ));
         }
-
-        registry
+        
+        // Load audience (optional)
+        let audience = variables::get("mcp_jwt_audience").ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| vec![s]);
+        
+        // Load algorithm (optional, defaults to RS256 like FastMCP)
+        let algorithm = variables::get("mcp_jwt_algorithm").ok()
+            .filter(|s| !s.is_empty())
+            .map(|alg| {
+                // Validate algorithm
+                let valid_algorithms = [
+                    "HS256", "HS384", "HS512",
+                    "RS256", "RS384", "RS512", 
+                    "ES256", "ES384",
+                    "PS256", "PS384", "PS512",
+                ];
+                
+                if !valid_algorithms.contains(&alg.as_str()) {
+                    return Err(anyhow::anyhow!("Unsupported algorithm: {}", alg));
+                }
+                Ok(alg)
+            })
+            .transpose()?;
+        
+        // Load OAuth endpoints (all optional)
+        let oauth_endpoints = load_oauth_endpoints()?;
+        
+        Ok(Provider {
+            issuer,
+            jwks_uri,
+            public_key,
+            audience,
+            algorithm,
+            oauth_endpoints,
+        })
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_authkit_provider_config() {
-        let provider = ProviderConfig::AuthKit {
-            issuer: "https://example.authkit.app".to_string(),
-            jwks_uri: None,
-            audience: Some("my-api".to_string()),
-        };
-
-        // Test serialization
-        let json = serde_json::to_string(&provider).unwrap();
-        assert!(json.contains("authkit"));
-        assert!(json.contains("https://example.authkit.app"));
+/// Load OAuth endpoints if any are configured
+fn load_oauth_endpoints() -> Result<Option<OAuthEndpoints>> {
+    let authorize = variables::get("mcp_oauth_authorize_endpoint").ok()
+        .filter(|s| !s.is_empty())
+        .map(|url| normalize_url(&url))
+        .transpose()?;
+    
+    let token = variables::get("mcp_oauth_token_endpoint").ok()
+        .filter(|s| !s.is_empty())
+        .map(|url| normalize_url(&url))
+        .transpose()?;
+    
+    let userinfo = variables::get("mcp_oauth_userinfo_endpoint").ok()
+        .filter(|s| !s.is_empty())
+        .map(|url| normalize_url(&url))
+        .transpose()?;
+    
+    if authorize.is_some() || token.is_some() || userinfo.is_some() {
+        Ok(Some(OAuthEndpoints {
+            authorize,
+            token,
+            userinfo,
+        }))
+    } else {
+        Ok(None)
     }
+}
 
-    #[test]
-    fn test_oidc_provider_config() {
-        let provider = ProviderConfig::Oidc {
-            name: "auth0".to_string(),
-            issuer: "https://example.auth0.com".to_string(),
-            jwks_uri: "https://example.auth0.com/.well-known/jwks.json".to_string(),
-            audience: Some("my-api".to_string()),
-            authorization_endpoint: "https://example.auth0.com/authorize".to_string(),
-            token_endpoint: "https://example.auth0.com/oauth/token".to_string(),
-            userinfo_endpoint: None,
-            allowed_domains: vec!["*.auth0.com".to_string()],
-        };
-
-        // Test serialization
-        let json = serde_json::to_string(&provider).unwrap();
-        assert!(json.contains("oidc"));
-        assert!(json.contains("auth0"));
+/// Normalize issuer (handle both URLs and plain strings)
+fn normalize_issuer(mut issuer: String) -> Result<String> {
+    // Check if it looks like a URL
+    if issuer.starts_with("http://") || issuer.starts_with("https://") {
+        // For URLs, validate HTTPS
+        if !issuer.starts_with("https://") {
+            return Err(anyhow::anyhow!("URL issuers must use HTTPS"));
+        }
+        
+        // Remove trailing slash from URLs
+        if issuer.ends_with('/') {
+            issuer.pop();
+        }
     }
+    // Otherwise, keep as-is (string issuer per RFC 7519)
+    
+    Ok(issuer)
+}
 
-    #[test]
-    fn test_gateway_config_with_provider() {
-        let config = GatewayConfig {
-            mcp_gateway_url: "http://gateway.internal".to_string(),
-            trace_id_header: "X-Request-ID".to_string(),
-            enabled: true,
-            provider: Some(ProviderConfig::AuthKit {
-                issuer: "https://example.authkit.app".to_string(),
-                jwks_uri: None,
-                audience: None,
-            }),
-        };
-
-        assert!(config.enabled);
-        assert!(config.provider.is_some());
+/// Normalize URL (ensure HTTPS, validate format)
+fn normalize_url(url: &str) -> Result<String> {
+    // Add https:// if no protocol
+    let normalized = if !url.starts_with("http://") && !url.starts_with("https://") {
+        format!("https://{}", url)
+    } else {
+        url.to_string()
+    };
+    
+    // Validate HTTPS for security
+    if !normalized.starts_with("https://") {
+        return Err(anyhow::anyhow!("URL must use HTTPS: {}", url));
     }
-
-    #[test]
-    fn test_gateway_config_without_provider() {
-        let config = GatewayConfig {
-            mcp_gateway_url: "http://gateway.internal".to_string(),
-            trace_id_header: "X-Request-ID".to_string(),
-            enabled: false,
-            provider: None,
-        };
-
-        assert!(!config.enabled);
-        assert!(config.provider.is_none());
-    }
-
-    #[test]
-    fn test_ensure_https_url() {
-        // Test with https:// already present
-        assert_eq!(
-            GatewayConfig::ensure_https_url("https://example.com".to_string()).unwrap(),
-            "https://example.com"
-        );
-
-        // Test with http:// should fail
-        let result = GatewayConfig::ensure_https_url("http://example.com".to_string());
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Auth provider URLs must use HTTPS")
-        );
-
-        // Test without protocol - should add https://
-        assert_eq!(
-            GatewayConfig::ensure_https_url("example.com".to_string()).unwrap(),
-            "https://example.com"
-        );
-
-        // Test with domain and path
-        assert_eq!(
-            GatewayConfig::ensure_https_url("example.com/path".to_string()).unwrap(),
-            "https://example.com/path"
-        );
-
-        // Test with AuthKit style domain
-        assert_eq!(
-            GatewayConfig::ensure_https_url("divine-lion-50-staging.authkit.app".to_string())
-                .unwrap(),
-            "https://divine-lion-50-staging.authkit.app"
-        );
-
-        // Test with http://localhost should also fail
-        let result = GatewayConfig::ensure_https_url("http://localhost:8080".to_string());
-        assert!(result.is_err());
-    }
+    
+    Ok(normalized)
 }

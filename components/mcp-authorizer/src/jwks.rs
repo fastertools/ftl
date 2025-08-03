@@ -1,182 +1,163 @@
-use anyhow::{Result, anyhow};
-use jsonwebtoken::{Algorithm, DecodingKey};
-use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+//! JWKS (JSON Web Key Set) fetching and caching
 
-/// `JWKS` response structure
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct JwksResponse {
+use jsonwebtoken::DecodingKey;
+use serde::{Deserialize, Serialize};
+use spin_sdk::http::Response;
+use spin_sdk::key_value::Store;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::error::{AuthError, Result};
+
+/// JWKS cache TTL in seconds (1 hour)
+const JWKS_CACHE_TTL: u64 = 3600;
+
+/// JWKS response structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Jwks {
     pub keys: Vec<Jwk>,
 }
 
-/// JSON Web Key structure
-#[derive(Debug, Deserialize, Serialize, Clone)]
+/// JSON Web Key
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Jwk {
+    /// Key type (RSA, EC, etc.)
     pub kty: String,
-    pub kid: Option<String>,
+    
+    /// Key use (sig, enc)
+    #[serde(rename = "use")]
+    pub use_: Option<String>,
+    
+    /// Algorithm
     pub alg: Option<String>,
-    pub r#use: Option<String>,
+    
+    /// Key ID
+    pub kid: Option<String>,
+    
+    /// RSA modulus (base64url)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<String>,
+    
+    /// RSA exponent (base64url)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub e: Option<String>,
-    pub x5c: Option<Vec<String>>,
-    pub x5t: Option<String>,
 }
 
-/// Type alias for the JWKS cache entry
-type JwksCacheEntry = (JwksResponse, std::time::Instant);
+/// Cached JWKS with expiration
+#[derive(Debug, Serialize, Deserialize)]
+struct CachedJwks {
+    jwks: Jwks,
+    expires_at: u64,
+}
 
-/// Type alias for the JWKS cache
-type JwksCache = Arc<RwLock<HashMap<String, JwksCacheEntry>>>;
-
-/// Cache for `JWKS` data
-static JWKS_CACHE: Lazy<JwksCache> = Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
-
-/// Cache duration (5 minutes)
-const CACHE_DURATION: std::time::Duration = std::time::Duration::from_secs(300);
-
-/// Maximum number of `JWKS` URIs to cache (prevent `DoS`)
-const MAX_CACHE_SIZE: usize = 100;
-
-/// Fetch `JWKS` from the given URI with caching
-pub async fn fetch_jwks(jwks_uri: &str) -> Result<JwksResponse> {
-    // Validate URI to prevent cache pollution
-    if jwks_uri.is_empty() || jwks_uri.len() > 2048 {
-        return Err(anyhow!("Invalid JWKS URI"));
-    }
-
+/// Fetch JWKS from URI with caching
+pub async fn fetch_jwks(jwks_uri: &str, store: &Store) -> Result<Jwks> {
+    let cache_key = format!("jwks:{}", jwks_uri);
+    
     // Check cache first
-    {
-        let cache = JWKS_CACHE.read().await;
-        if let Some((jwks, timestamp)) = cache.get(jwks_uri) {
-            if timestamp.elapsed() < CACHE_DURATION {
-                return Ok(jwks.clone());
+    if let Ok(Some(cached_data)) = store.get(&cache_key) {
+        if let Ok(cached_str) = String::from_utf8(cached_data) {
+            if let Ok(cached) = serde_json::from_str::<CachedJwks>(&cached_str) {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                
+                if now < cached.expires_at {
+                    return Ok(cached.jwks);
+                }
             }
         }
     }
-
-    // Fetch from network
+    
+    // Fetch JWKS from URI
     let request = spin_sdk::http::Request::builder()
         .method(spin_sdk::http::Method::Get)
         .uri(jwks_uri)
         .header("Accept", "application/json")
         .build();
-
-    let response: spin_sdk::http::Response = spin_sdk::http::send(request)
-        .await
-        .map_err(|e| anyhow!("Failed to fetch JWKS from {jwks_uri}: {e}"))?;
-
+    
+    let response: Response = spin_sdk::http::send(request).await
+        .map_err(|e| AuthError::Internal(format!("Failed to fetch JWKS: {}", e)))?;
+    
     if *response.status() != 200 {
-        let status = response.status();
-        return Err(anyhow!("Failed to fetch JWKS: HTTP {status}"));
+        return Err(AuthError::Internal(format!("JWKS fetch failed with status: {}", response.status())));
     }
-
-    let jwks: JwksResponse = serde_json::from_slice(response.body())?;
-
-    // Update cache
-    {
-        let mut cache = JWKS_CACHE.write().await;
-
-        // If cache is at max size, remove oldest entry
-        if cache.len() >= MAX_CACHE_SIZE {
-            // Find and remove the oldest entry
-            if let Some(oldest_key) = cache
-                .iter()
-                .min_by_key(|(_, (_, timestamp))| timestamp)
-                .map(|(key, _)| key.clone())
-            {
-                cache.remove(&oldest_key);
-            }
-        }
-
-        cache.insert(
-            jwks_uri.to_string(),
-            (jwks.clone(), std::time::Instant::now()),
-        );
-    }
-
+    
+    let body = response.body();
+    let jwks: Jwks = serde_json::from_slice(body)?;
+    
+    // Cache the JWKS
+    let expires_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() + JWKS_CACHE_TTL;
+    
+    let cached = CachedJwks {
+        jwks: jwks.clone(),
+        expires_at,
+    };
+    
+    let _ = store.set(&cache_key, serde_json::to_string(&cached)?.as_bytes());
+    
     Ok(jwks)
 }
 
-/// Get decoding key for a specific key ID
-pub async fn get_decoding_key(jwks_uri: &str, kid: &str) -> Result<DecodingKey> {
-    let jwks = fetch_jwks(jwks_uri).await?;
-
-    let jwk = jwks
-        .keys
-        .iter()
-        .find(|k| k.kid.as_deref() == Some(kid))
-        .ok_or_else(|| anyhow!("Key with id '{kid}' not found in JWKS"))?;
-
-    match jwk.kty.as_str() {
-        "RSA" => {
-            let n = jwk
-                .n
-                .as_ref()
-                .ok_or_else(|| anyhow!("Missing 'n' in RSA key"))?;
-            let e = jwk
-                .e
-                .as_ref()
-                .ok_or_else(|| anyhow!("Missing 'e' in RSA key"))?;
-
-            DecodingKey::from_rsa_components(n, e)
-                .map_err(|e| anyhow!("Failed to create RSA key: {e}"))
-        }
-        "EC" => {
-            // For EC keys, we'd need to handle them differently
-            // For now, we'll use the x5c certificate if available
-            jwk.x5c
-                .as_ref()
-                .ok_or_else(|| anyhow!("EC key support requires x5c certificate"))
-                .and_then(|x5c| {
-                    x5c.first()
-                        .ok_or_else(|| anyhow!("No certificate found in x5c"))
-                        .and_then(|cert| {
-                            DecodingKey::from_ec_pem(cert.as_bytes()).map_err(|e| {
-                                anyhow!("Failed to create EC key from certificate: {e}")
-                            })
-                        })
-                })
-        }
-        _ => {
-            let kty = &jwk.kty;
-            Err(anyhow!("Unsupported key type: {kty}"))
-        }
-    }
-}
-
-/// Get the algorithm from a `JWK`
-#[allow(dead_code)]
-pub fn get_algorithm(jwk: &Jwk) -> Result<Algorithm> {
-    match jwk.alg.as_deref() {
-        Some("RS256") => Ok(Algorithm::RS256),
-        Some("RS384") => Ok(Algorithm::RS384),
-        Some("RS512") => Ok(Algorithm::RS512),
-        Some("ES256") => Ok(Algorithm::ES256),
-        Some("ES384") => Ok(Algorithm::ES384),
-        Some("HS256") => Ok(Algorithm::HS256),
-        Some("HS384") => Ok(Algorithm::HS384),
-        Some("HS512") => Ok(Algorithm::HS512),
-        Some(alg) => Err(anyhow!("Unsupported algorithm: {alg}")),
-        None => {
-            // Default based on key type
-            match jwk.kty.as_str() {
-                "RSA" => Ok(Algorithm::RS256),
-                "EC" => Ok(Algorithm::ES256),
-                _ => {
-                    let kty = &jwk.kty;
-                    Err(anyhow!("Cannot determine algorithm for key type: {kty}"))
+/// Find a key in JWKS that matches the given KID
+pub fn find_key(jwks: &Jwks, kid: Option<&str>) -> Result<DecodingKey> {
+    // Filter keys by type and use
+    let matching_keys: Vec<&Jwk> = jwks.keys.iter()
+        .filter(|key| {
+            // Check key type
+            if key.kty != "RSA" {
+                return false;
+            }
+            
+            // Check use if specified
+            if let Some(use_) = &key.use_ {
+                if use_ != "sig" {
+                    return false;
                 }
             }
-        }
+            
+            true
+        })
+        .collect();
+    
+    if matching_keys.is_empty() {
+        return Err(AuthError::InvalidToken("No matching keys found in JWKS".to_string()));
     }
+    
+    // Find key by KID if specified
+    let key = if let Some(kid) = kid {
+        // Token has KID - find exact match
+        matching_keys.iter()
+            .find(|k| k.kid.as_deref() == Some(kid))
+            .ok_or_else(|| AuthError::InvalidToken(format!("Key with kid '{}' not found", kid)))?
+    } else {
+        // No KID in token - only allow if there's exactly one key (matching FastMCP)
+        if matching_keys.len() == 1 {
+            matching_keys[0]
+        } else if matching_keys.is_empty() {
+            return Err(AuthError::InvalidToken("No keys found in JWKS".to_string()));
+        } else {
+            return Err(AuthError::InvalidToken("Multiple keys in JWKS but no key ID (kid) in token".to_string()));
+        }
+    };
+    
+    // Extract RSA components
+    let n = key.n.as_ref()
+        .ok_or_else(|| AuthError::InvalidToken("Missing RSA modulus".to_string()))?;
+    let e = key.e.as_ref()
+        .ok_or_else(|| AuthError::InvalidToken("Missing RSA exponent".to_string()))?;
+    
+    // Build RSA public key
+    build_rsa_key(n, e)
 }
 
-/// Clear the `JWKS` cache - useful for testing or forced refresh
-#[allow(dead_code)]
-pub async fn clear_cache() {
-    let mut cache = JWKS_CACHE.write().await;
-    cache.clear();
+
+/// Build RSA decoding key from modulus and exponent
+fn build_rsa_key(n: &str, e: &str) -> Result<DecodingKey> {
+    // jsonwebtoken provides a convenient method for this
+    DecodingKey::from_rsa_components(n, e)
+        .map_err(|e| AuthError::InvalidToken(format!("Invalid RSA key components: {}", e)))
 }

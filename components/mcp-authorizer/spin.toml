@@ -7,52 +7,53 @@ authors = ["FTL Contributors"]
 description = "Authentication gateway for FTL MCP servers"
 
 [variables]
-# These defaults are used for spin test
-auth_enabled = { default = "true" }
-auth_gateway_url = { default = "http://test-gateway.internal/mcp-internal" }
-auth_trace_header = { default = "X-Trace-Id" }
-auth_provider_type = { default = "authkit" }
-auth_provider_issuer = { default = "https://test.authkit.app" }
-auth_provider_audience = { default = "" }
-auth_provider_jwks_uri = { default = "https://test.authkit.app/.well-known/jwks.json" }
-auth_provider_name = { default = "" }
-auth_provider_authorize_endpoint = { default = "" }
-auth_provider_token_endpoint = { default = "" }
-auth_provider_userinfo_endpoint = { default = "" }
-auth_provider_allowed_domains = { default = "" }
+# Core settings
+mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
+mcp_trace_header = { default = "x-trace-id" }
+
+# JWT provider settings
+mcp_jwt_issuer = { default = "https://test.authkit.app" }
+mcp_jwt_audience = { default = "" }
+mcp_jwt_jwks_uri = { default = "" }
+mcp_jwt_public_key = { default = "" }
+mcp_jwt_algorithm = { default = "" }
+
+# OAuth endpoints (optional)
+mcp_oauth_authorize_endpoint = { default = "" }
+mcp_oauth_token_endpoint = { default = "" }
+mcp_oauth_userinfo_endpoint = { default = "" }
 
 [[trigger.http]]
 route = "/..."
 component = "mcp-authorizer"
 
 [component.mcp-authorizer]
-source = "target/wasm32-wasip1/release/mcp_authorizer.wasm"
-allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://*.auth0.com"]
+source = "../../target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm"
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*"]
+key_value_stores = ["default"]
 [component.mcp-authorizer.build]
 command = "cargo build --target wasm32-wasip1 --release"
 workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
 [component.mcp-authorizer.variables]
-# Core auth settings
-auth_enabled = "{{ auth_enabled }}"
-auth_gateway_url = "{{ auth_gateway_url }}"
-auth_trace_header = "{{ auth_trace_header }}"
+# Core settings
+mcp_gateway_url = "{{ mcp_gateway_url }}"
+mcp_trace_header = "{{ mcp_trace_header }}"
 
-# Provider configuration
-auth_provider_type = "{{ auth_provider_type }}"
-auth_provider_issuer = "{{ auth_provider_issuer }}"
-auth_provider_audience = "{{ auth_provider_audience }}"
+# JWT provider settings
+mcp_jwt_issuer = "{{ mcp_jwt_issuer }}"
+mcp_jwt_audience = "{{ mcp_jwt_audience }}"
+mcp_jwt_jwks_uri = "{{ mcp_jwt_jwks_uri }}"
+mcp_jwt_public_key = "{{ mcp_jwt_public_key }}"
+mcp_jwt_algorithm = "{{ mcp_jwt_algorithm }}"
 
-# OIDC-specific settings
-auth_provider_name = "{{ auth_provider_name }}"
-auth_provider_jwks_uri = "{{ auth_provider_jwks_uri }}"
-auth_provider_authorize_endpoint = "{{ auth_provider_authorize_endpoint }}"
-auth_provider_token_endpoint = "{{ auth_provider_token_endpoint }}"
-auth_provider_userinfo_endpoint = "{{ auth_provider_userinfo_endpoint }}"
-auth_provider_allowed_domains = "{{ auth_provider_allowed_domains }}"
+# OAuth endpoints
+mcp_oauth_authorize_endpoint = "{{ mcp_oauth_authorize_endpoint }}"
+mcp_oauth_token_endpoint = "{{ mcp_oauth_token_endpoint }}"
+mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]
-source = "target/wasm32-wasip1/release/tests.wasm"
-build = "cargo component build --release"
+source = "tests/target/wasm32-wasip1/release/tests.wasm"
+build = "cargo build --target wasm32-wasip1 --release"
 workdir = "tests"

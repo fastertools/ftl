@@ -1,69 +1,200 @@
-use anyhow::Result;
-use spin_sdk::http::{IntoResponse, Request};
+//! MCP Authorizer - A high-performance JWT authentication gateway for MCP servers
+//! 
+//! This component implements OAuth 2.0 Bearer Token authentication with JWKS support,
+//! providing a secure gateway to MCP (Model Context Protocol) servers.
+
+use spin_sdk::http::{IntoResponse, Request, Response};
+use spin_sdk::key_value::Store;
 
 mod auth;
 mod config;
-mod handlers;
+mod discovery;
+mod error;
+mod forwarding;
 mod jwks;
-mod logging;
-mod metadata;
-mod providers;
-mod proxy;
+mod token;
 
-use config::GatewayConfig;
-use handlers::{handle_authenticated_request, handle_cors_preflight, handle_metadata_endpoints};
-use logging::{Logger, get_trace_id};
+use config::Config;
+use error::{AuthError, Result};
 
-/// Main entry point for the authentication gateway
+/// Main HTTP component handler
 #[spin_sdk::http_component]
-async fn handle_request(req: Request) -> Result<impl IntoResponse> {
-    // Load gateway configuration
-    let config = GatewayConfig::from_spin_vars()?;
-
-    // Check if authentication is enabled right at the entry point
-    if !config.enabled {
-        // Bypass everything and forward directly to MCP gateway
-        let trace_id = get_trace_id(&req, &config.trace_id_header);
-        let logger = Logger::new(&trace_id);
-
-        logger
-            .info("Authentication disabled, forwarding request directly")
-            .emit();
-
-        let auth_config = auth::AuthConfig {
-            mcp_gateway_url: config.mcp_gateway_url.clone(),
-        };
-
-        match proxy::forward_to_mcp_gateway(req, &auth_config, None, &trace_id).await {
-            Ok(response) => return Ok(response),
-            Err(e) => {
-                logger
-                    .error("Failed to forward request to MCP gateway")
-                    .field("error", &e)
-                    .emit();
-                return Ok(spin_sdk::http::Response::builder()
-                    .status(502)
-                    .body(format!("Gateway error: {e}"))
-                    .build());
-            }
-        }
+async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
+    // Handle CORS preflight requests immediately
+    if *req.method() == spin_sdk::http::Method::Options {
+        return Ok(create_cors_response());
     }
 
-    // Authentication is enabled, proceed with normal auth flow
-    let registry = config.build_registry();
-    let provider = registry.providers().first();
+    // Load configuration
+    let config = Config::load()?;
+    
+    // Extract trace ID for request tracking
+    let trace_id = extract_trace_id(&req, &config.trace_header);
+    
+    // Handle OAuth discovery endpoints (no auth required)
+    if let Some(response) = handle_discovery(&req, &config, &trace_id) {
+        return Ok(response);
+    }
 
-    // Extract trace ID for structured logging
-    let trace_id = get_trace_id(&req, &config.trace_id_header);
-    let logger = Logger::new(&trace_id);
+    // Authenticate the request - auth is always required
+    match authenticate(&req, &config).await {
+        Ok(auth_context) => {
+            // Forward authenticated request
+            forward_request(req, &config, auth_context, trace_id).await
+        }
+        Err(auth_error) => {
+            // Return authentication error
+            Ok(create_error_response(auth_error, &req, &config, trace_id))
+        }
+    }
+}
 
+/// Authenticate the incoming request
+async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
+    // Extract bearer token
+    let token = auth::extract_bearer_token(req)?;
+    
+    // Get auth provider
+    let provider = &config.provider;
+    
+    // Open KV store for JWKS caching
+    let store = Store::open_default()
+        .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {}", e)))?;
+    
+    // Verify token and extract claims
+    let token_info = token::verify(token, provider, &store).await?;
+    
+    // Build auth context
+    Ok(auth::Context {
+        client_id: token_info.client_id,
+        user_id: token_info.sub,
+        scopes: token_info.scopes,
+        issuer: token_info.iss,
+        raw_token: token.to_string(),
+    })
+}
+
+/// Handle OAuth discovery endpoints
+fn handle_discovery(req: &Request, config: &Config, trace_id: &Option<String>) -> Option<Response> {
     let path = req.path();
-    let method = req.method();
+    
+    match path {
+        "/.well-known/oauth-protected-resource" => {
+            Some(discovery::oauth_protected_resource(req, config, trace_id))
+        }
+        "/.well-known/oauth-authorization-server" => {
+            Some(discovery::oauth_authorization_server(req, config, trace_id))
+        }
+        "/.well-known/openid-configuration" => {
+            Some(discovery::openid_configuration(req, config, trace_id))
+        }
+        _ => None,
+    }
+}
 
-    // Extract host header for metadata endpoints
-    // Check multiple headers that might contain the host
-    let host = req
-        .headers()
+/// Forward request to the MCP gateway
+async fn forward_request(
+    req: Request,
+    config: &Config,
+    auth_context: auth::Context,
+    trace_id: Option<String>,
+) -> anyhow::Result<Response> {
+    forwarding::forward_to_gateway(req, config, auth_context, trace_id).await
+}
+
+/// Create authentication error response
+fn create_error_response(error: AuthError, req: &Request, config: &Config, trace_id: Option<String>) -> Response {
+    let (status, error_code, description) = match &error {
+        AuthError::Unauthorized(msg) => (401, "unauthorized", msg.as_str()),
+        AuthError::InvalidToken(msg) => (401, "invalid_token", msg.as_str()),
+        AuthError::ExpiredToken => (401, "invalid_token", "Token has expired"),
+        AuthError::InvalidIssuer => (401, "invalid_token", "Invalid issuer"),
+        AuthError::InvalidAudience => (401, "invalid_token", "Invalid audience"),
+        AuthError::InvalidSignature => (401, "invalid_token", "Invalid signature"),
+        AuthError::Configuration(msg) => (500, "server_error", msg.as_str()),
+        AuthError::Internal(msg) => (500, "server_error", msg.as_str()),
+    };
+
+    // Build JSON error body
+    let body = serde_json::json!({
+        "error": error_code,
+        "error_description": description
+    });
+
+    // Build response with appropriate headers
+    let mut binding = Response::builder();
+    let mut builder = binding.status(status as u16);
+    
+    // Add common headers
+    let cors_headers = [
+        ("content-type", "application/json"),
+        ("access-control-allow-origin", "*"),
+        ("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS"),
+        ("access-control-allow-headers", "Content-Type, Authorization"),
+    ];
+    
+    for (key, value) in cors_headers {
+        builder = builder.header(key, value);
+    }
+    
+    // Add WWW-Authenticate header for 401 responses
+    if status == 401 {
+        let www_auth = format!(
+            r#"Bearer error="{}", error_description="{}""#,
+            error_code, description
+        );
+        
+        // Add resource metadata if we have a host
+        let www_auth_value = if let Some(host) = extract_host(req) {
+            let resource_url = format!("https://{}/.well-known/oauth-protected-resource", host);
+            format!("{}, resource_metadata=\"{}\"", www_auth, resource_url)
+        } else {
+            www_auth
+        };
+        
+        builder = builder.header("www-authenticate", www_auth_value);
+    }
+    
+    // Add trace header if present
+    if let Some(trace_id) = trace_id {
+        builder = builder.header(&config.trace_header, trace_id);
+    }
+    
+    builder.body(body.to_string()).build()
+}
+
+/// Create CORS preflight response
+fn create_cors_response() -> Response {
+    let headers = [
+        ("access-control-allow-origin", "*"),
+        ("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS"),
+        ("access-control-allow-headers", "Content-Type, Authorization"),
+        ("access-control-max-age", "86400"),
+    ];
+    
+    let mut binding = Response::builder();
+    let mut builder = binding.status(204);
+    
+    for (key, value) in headers {
+        builder = builder.header(key, value);
+    }
+    
+    builder.build()
+}
+
+
+/// Extract trace ID from request headers
+fn extract_trace_id(req: &Request, trace_header: &str) -> Option<String> {
+    req.headers()
+        .find(|(name, _)| name.eq_ignore_ascii_case(trace_header))
+        .and_then(|(_, value)| value.as_str())
+        .map(String::from)
+}
+
+
+/// Extract host from request headers
+fn extract_host(req: &Request) -> Option<String> {
+    req.headers()
         .find(|(name, _)| name.eq_ignore_ascii_case("host"))
         .and_then(|(_, value)| value.as_str())
         .map(String::from)
@@ -73,37 +204,4 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
                 .and_then(|(_, value)| value.as_str())
                 .map(String::from)
         })
-        .or_else(|| {
-            req.headers()
-                .find(|(name, _)| name.eq_ignore_ascii_case("x-original-host"))
-                .and_then(|(_, value)| value.as_str())
-                .map(String::from)
-        });
-
-    // Handle metadata endpoints
-    if let Some(response) = handle_metadata_endpoints(
-        path,
-        provider.map(std::convert::AsRef::as_ref),
-        host.as_deref(),
-        &req,
-        &logger,
-    ) {
-        return Ok(response);
-    }
-
-    // Handle CORS preflight
-    if let Some(response) = handle_cors_preflight(method) {
-        return Ok(response);
-    }
-
-    // All other requests require authentication
-    Ok(handle_authenticated_request(
-        req,
-        &config,
-        provider.map(std::convert::AsRef::as_ref),
-        host.as_deref(),
-        &trace_id,
-        &logger,
-    )
-    .await)
 }

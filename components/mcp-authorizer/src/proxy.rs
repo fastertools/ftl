@@ -2,40 +2,25 @@ use anyhow::Result;
 use serde_json::Value;
 use spin_sdk::http::{Request, Response};
 
-use crate::{
-    auth::{AuthConfig, Claims},
-    providers::UserContext,
-};
+use crate::providers::UserContext;
 
-/// Forward authenticated requests to the MCP gateway
-#[allow(clippy::too_many_lines)]
+/// Forward requests to the MCP gateway
 pub async fn forward_to_mcp_gateway(
     req: Request,
-    config: &AuthConfig,
-    auth_context: Option<(Claims, UserContext)>,
+    mcp_gateway_url: &str,
+    user_context: Option<UserContext>,
     trace_id: &str,
 ) -> Result<Response> {
-    // Parse the request body to potentially inject user info
+    // Parse the request body
     let body = req.body();
     let mut request_data: Value = if body.is_empty() {
-        // If there's no body, we shouldn't forward an empty object
-        // Let's just forward the request as-is
-        eprintln!("Warning: Empty request body received");
         serde_json::json!(null)
     } else {
-        match serde_json::from_slice(body) {
-            Ok(data) => data,
-            Err(e) => {
-                eprintln!("Failed to parse request body as JSON: {e}");
-                let body_str = String::from_utf8_lossy(body);
-                eprintln!("Request body: {body_str:?}");
-                return Err(anyhow::anyhow!("Invalid JSON in request body: {e}"));
-            }
-        }
+        serde_json::from_slice(body)?
     };
 
     // If this is an initialize request and we have auth context, inject user info
-    if let Some((ref _claims, ref user_context)) = auth_context {
+    if let Some(user) = &user_context {
         if let Some(obj) = request_data.as_object_mut() {
             if let Some(method) = obj.get("method").and_then(|m| m.as_str()) {
                 if method == "initialize" {
@@ -44,9 +29,9 @@ pub async fn forward_to_mcp_gateway(
                         params.insert(
                             "_authContext".to_string(),
                             serde_json::json!({
-                                "authenticated_user": user_context.id,
-                                "email": user_context.email,
-                                "provider": user_context.provider,
+                                "authenticated_user": user.id,
+                                "email": user.email,
+                                "provider": user.provider,
                             }),
                         );
                     }
@@ -55,37 +40,25 @@ pub async fn forward_to_mcp_gateway(
         }
     }
 
-    // Build the request to forward to MCP gateway
-    let mcp_url = &config.mcp_gateway_url;
-    eprintln!("Forwarding request to: {mcp_url}");
-
-    // Determine the body to forward
+    // Build the request to forward
     let forward_body = if body.is_empty() {
-        // Forward empty body as-is
-        eprintln!("Forwarding empty request body");
         body.to_vec()
     } else if request_data == serde_json::json!(null) {
-        // If we couldn't parse, forward original body
         body.to_vec()
     } else {
-        // Forward modified JSON
-        eprintln!(
-            "Request data: {}",
-            serde_json::to_string_pretty(&request_data)?
-        );
         serde_json::to_vec(&request_data)?
     };
 
     let forward_req = Request::builder()
         .method(req.method().clone())
-        .uri(&config.mcp_gateway_url)
+        .uri(mcp_gateway_url)
         .header("Content-Type", "application/json")
         .header("X-Trace-Id", trace_id)
         .body(forward_body)
         .build();
 
     // Forward the request
-    let resp: spin_sdk::http::Response = spin_sdk::http::send(forward_req).await?;
+    let resp: Response = spin_sdk::http::send(forward_req).await?;
 
     // Parse the response to potentially inject auth info
     let resp_body = resp.body();
@@ -94,21 +67,18 @@ pub async fn forward_to_mcp_gateway(
     } else {
         match serde_json::from_slice(resp_body) {
             Ok(data) => data,
-            Err(e) => {
-                eprintln!("Failed to parse MCP gateway response as JSON: {e}");
-                let status = resp.status();
-                eprintln!("Response status: {status}");
-                let body_str = String::from_utf8_lossy(resp_body);
-                eprintln!("Response body: {body_str:?}");
-                return Err(anyhow::anyhow!(
-                    "Invalid JSON response from MCP gateway: {e}"
-                ));
+            Err(_) => {
+                // If we can't parse, just return as-is
+                return Ok(Response::builder()
+                    .status(*resp.status())
+                    .body(resp_body.to_vec())
+                    .build());
             }
         }
     };
 
-    // If this is an initialize response and we have auth context, inject auth info into serverInfo
-    if let Some((ref _claims, ref user_context)) = auth_context {
+    // If this is an initialize response and we have auth context, inject auth info
+    if let Some(user) = &user_context {
         if let Some(result) = response_data
             .as_object_mut()
             .and_then(|obj| obj.get_mut("result"))
@@ -121,24 +91,22 @@ pub async fn forward_to_mcp_gateway(
                 server_info.insert(
                     "authInfo".to_string(),
                     serde_json::json!({
-                        "authenticated_user": user_context.id,
-                        "email": user_context.email,
-                        "provider": user_context.provider,
+                        "authenticated_user": user.id,
+                        "email": user.email,
+                        "provider": user.provider,
                     }),
                 );
             }
         }
     }
 
-    // Build the response to return
+    // Build the response
     if response_data == serde_json::json!(null) || resp_body.is_empty() {
-        // Return the original response as-is
         Ok(Response::builder()
             .status(*resp.status())
             .body(resp_body.to_vec())
             .build())
     } else {
-        // Return the modified JSON response
         Ok(Response::builder()
             .status(*resp.status())
             .header("Content-Type", "application/json")

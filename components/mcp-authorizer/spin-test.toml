@@ -1,0 +1,11 @@
+# Spin Test Configuration for MCP Authorizer
+
+[test-environment]
+# Core settings
+mcp_gateway_url = "http://test-gateway.spin.internal/mcp-internal"
+mcp_trace_header = "x-trace-id"
+
+# JWT provider settings
+mcp_jwt_issuer = "https://test.authkit.app"
+mcp_jwt_audience = "test-audience"
+# JWKS URI will be auto-derived for AuthKit domains

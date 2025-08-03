@@ -18,14 +18,6 @@ pub trait AuthProvider: Send + Sync {
     /// Get discovery metadata for OAuth 2.0
     fn discovery_metadata(&self, resource_url: &str) -> DiscoveryMetadata;
 
-    /// Extract the provider-specific user context from claims
-    fn extract_user_context(&self, claims: &crate::auth::Claims) -> UserContext {
-        UserContext {
-            id: claims.sub.clone(),
-            email: claims.email.clone(),
-            provider: self.name().to_string(),
-        }
-    }
 
     /// Get the provider name
     fn name(&self) -> &str;
