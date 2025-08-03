@@ -24,7 +24,10 @@ pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Optio
             };
             
             json!({
-                "resource": extract_resource_url(req),
+                "resource": [
+                    "http://localhost:3000/mcp",
+                    "http://127.0.0.1:3000/mcp"
+                ],
                 "authorization_servers": authorization_servers,
                 "bearer_methods_supported": ["header"],
                 "authentication_methods": {
@@ -37,7 +40,10 @@ pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Optio
         }
         crate::config::Provider::Static(_) => {
             json!({
-                "resource": extract_resource_url(req),
+                "resource": [
+                    "http://localhost:3000/mcp",
+                    "http://127.0.0.1:3000/mcp"
+                ],
                 "authorization_servers": [],
                 "bearer_methods_supported": ["header"],
                 "authentication_methods": {
@@ -217,13 +223,3 @@ fn build_success_response(metadata: serde_json::Value, _trace_id: &Option<String
 }
 
 
-/// Extract resource URL from request
-fn extract_resource_url(req: &Request) -> String {
-    let scheme = "https";
-    let host = req.headers()
-        .find(|(name, _)| name.eq_ignore_ascii_case("host"))
-        .and_then(|(_, value)| value.as_str())
-        .unwrap_or("localhost");
-    
-    format!("{}://{}", scheme, host)
-}

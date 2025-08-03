@@ -1,0 +1,25 @@
+[project]
+name = "authkit"
+version = "0.1.0"
+description = "FTL MCP server for hosting MCP tools"
+authors = []
+
+[auth]
+enabled = false
+
+[tools.example-tool-component]
+path = "example-tool-component"
+wasm = "example-tool-component/target/wasm32-wasip1/release/example_tool_component.wasm"
+allowed_outbound_hosts = []
+
+[tools.example-tool-component.build]
+command = "cargo build --target wasm32-wasip1 --release"
+watch = [
+    "src/**/*.rs",
+    "Cargo.toml",
+]
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.9"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+validate_arguments = true

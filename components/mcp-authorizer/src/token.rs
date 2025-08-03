@@ -120,6 +120,10 @@ pub async fn verify(token: &str, provider: &JWTProvider, store: &Store) -> Resul
     // Set audience validation  
     if let Some(audiences) = &provider.audience {
         validation.set_audience(audiences);
+    } else {
+        // Explicitly disable audience validation when no audience is configured
+        // This is needed for WorkOS AuthKit compatibility
+        validation.validate_aud = false;
     }
     
     // Decode and validate token

@@ -47,6 +47,8 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
             forward_request(req, &config, auth_context, trace_id).await
         }
         Err(auth_error) => {
+            // Log the error for debugging
+            eprintln!("Authentication error: {:?}", auth_error);
             // Return authentication error
             Ok(create_error_response(auth_error, &req, &config, trace_id))
         }
@@ -88,17 +90,15 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
 fn handle_discovery(req: &Request, config: &Config, trace_id: &Option<String>) -> Option<Response> {
     let path = req.path();
     
-    match path {
-        "/.well-known/oauth-protected-resource" => {
-            Some(discovery::oauth_protected_resource(req, config, trace_id))
-        }
-        "/.well-known/oauth-authorization-server" => {
-            Some(discovery::oauth_authorization_server(req, config, trace_id))
-        }
-        "/.well-known/openid-configuration" => {
-            Some(discovery::openid_configuration(req, config, trace_id))
-        }
-        _ => None,
+    // Handle discovery endpoints with or without path suffixes
+    if path.starts_with("/.well-known/oauth-protected-resource") {
+        Some(discovery::oauth_protected_resource(req, config, trace_id))
+    } else if path.starts_with("/.well-known/oauth-authorization-server") {
+        Some(discovery::oauth_authorization_server(req, config, trace_id))
+    } else if path.starts_with("/.well-known/openid-configuration") {
+        Some(discovery::openid_configuration(req, config, trace_id))
+    } else {
+        None
     }
 }
 
@@ -156,7 +156,13 @@ fn create_error_response(error: AuthError, req: &Request, config: &Config, trace
         
         // Add resource metadata if we have a host
         let www_auth_value = if let Some(host) = extract_host(req) {
-            let resource_url = format!("https://{}/.well-known/oauth-protected-resource", host);
+            // Use http for local development (localhost/127.0.0.1)
+            let scheme = if host.starts_with("localhost") || host.starts_with("127.0.0.1") {
+                "http"
+            } else {
+                "https"
+            };
+            let resource_url = format!("{}://{}/.well-known/oauth-protected-resource", scheme, host);
             format!("{}, resource_metadata=\"{}\"", www_auth, resource_url)
         } else {
             www_auth

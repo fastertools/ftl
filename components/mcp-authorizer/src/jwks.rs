@@ -70,6 +70,7 @@ pub async fn fetch_jwks(jwks_uri: &str, store: &Store) -> Result<Jwks> {
     }
     
     // Fetch JWKS from URI
+    eprintln!("Fetching JWKS from: {}", jwks_uri);
     let request = spin_sdk::http::Request::builder()
         .method(spin_sdk::http::Method::Get)
         .uri(jwks_uri)
@@ -77,7 +78,10 @@ pub async fn fetch_jwks(jwks_uri: &str, store: &Store) -> Result<Jwks> {
         .build();
     
     let response: Response = spin_sdk::http::send(request).await
-        .map_err(|e| AuthError::Internal(format!("Failed to fetch JWKS: {}", e)))?;
+        .map_err(|e| {
+            eprintln!("Failed to fetch JWKS from {}: {}", jwks_uri, e);
+            AuthError::Internal(format!("Failed to fetch JWKS: {}", e))
+        })?;
     
     if *response.status() != 200 {
         return Err(AuthError::Internal(format!("JWKS fetch failed with status: {}", response.status())));

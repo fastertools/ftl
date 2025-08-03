@@ -130,6 +130,8 @@ impl McpGateway {
             }
             "tools/list" => Some(self.handle_list_tools(request).await),
             "tools/call" => Some(self.handle_call_tool(request).await),
+            "prompts/list" => Some(self.handle_list_prompts(request)),
+            "resources/list" => Some(self.handle_list_resources(request)),
             "ping" => Some(Self::handle_ping(self, request)),
             _ => Some(JsonRpcResponse::error(
                 request.id,
@@ -355,6 +357,20 @@ impl McpGateway {
 
     fn handle_ping(_gateway: &Self, request: JsonRpcRequest) -> JsonRpcResponse {
         JsonRpcResponse::success(request.id, serde_json::json!({}))
+    }
+
+    fn handle_list_prompts(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        // Return empty prompts list - this gateway doesn't support prompts
+        JsonRpcResponse::success(request.id, serde_json::json!({
+            "prompts": []
+        }))
+    }
+
+    fn handle_list_resources(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        // Return empty resources list - this gateway doesn't support resources
+        JsonRpcResponse::success(request.id, serde_json::json!({
+            "resources": []
+        }))
     }
 }
 
