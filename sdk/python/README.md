@@ -36,9 +36,9 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 ## Overview
 
 This SDK provides:
-- Decorator-based API for easy tool creation (v0.2.0+)
+- Decorator-based API for easy tool creation
 - Automatic JSON Schema generation from type hints
-- Support for both sync and async functions (v0.2.0+)
+- Support for both sync and async functions
 - Automatic return value conversion to MCP format
 - Zero-dependency implementation (only requires `spin-sdk`)
 - Full compatibility with Spin WebAssembly components
@@ -111,7 +111,7 @@ spin aka deploy
 
 ## API Reference
 
-### Decorator-based API (v0.2.0+)
+### Decorator-based API
 
 #### `FTL` Class
 
@@ -214,7 +214,7 @@ def word_count(text: str) -> dict:
 Handler = ftl.create_handler()
 ```
 
-### Async Tools (v0.2.0+)
+### Async Tools
 
 ```python
 import asyncio
@@ -527,7 +527,7 @@ mypy src
 
 ## Migration from v0.1.x
 
-The v0.2.0 release introduces a new decorator-based API. The old `create_tools` function is still available for backwards compatibility, but we recommend migrating to the new API:
+The SDK provides both a modern decorator-based API and a legacy `create_tools` function for backwards compatibility. We recommend using the decorator-based API:
 
 ```python
 # Old API (v0.1.x)
@@ -541,7 +541,7 @@ Handler = create_tools({
     }
 })
 
-# New API (v0.2.0+)
+# New API (recommended)
 from ftl_sdk import FTL
 
 ftl = FTL()

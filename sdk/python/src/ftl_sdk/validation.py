@@ -5,29 +5,28 @@ This module contains validation logic for tool inputs and outputs,
 including schema generation and output validation.
 """
 
-import inspect
-from typing import Any, Dict, Optional, Union, get_type_hints, get_origin, get_args
 import json
+from typing import Any, Union, get_args, get_origin
 
 
 class OutputSchemaGenerator:
     """Generate JSON schemas from Python type annotations."""
-    
+
     @staticmethod
-    def generate_from_type(python_type: type) -> Optional[Dict[str, Any]]:
+    def generate_from_type(python_type: type) -> dict[str, Any] | None:
         """
         Generate JSON Schema from a Python type annotation.
-        
+
         Args:
             python_type: The Python type to convert
-            
+
         Returns:
             JSON Schema dict or None if schema cannot be generated
         """
         # Handle None/Any types - no schema
         if python_type is None or python_type is type(None) or python_type is Any:
             return None
-            
+
         # Basic type mapping
         type_map = {
             str: {"type": "string"},
@@ -35,25 +34,18 @@ class OutputSchemaGenerator:
             float: {"type": "number"},
             bool: {"type": "boolean"},
             list: {"type": "array"},
-            dict: {"type": "object"}
+            dict: {"type": "object"},
         }
-        
+
         # Handle primitive types that need wrapping (check this FIRST)
         if python_type in (int, float, str, bool):
             schema = type_map[python_type]
-            return {
-                "type": "object",
-                "properties": {
-                    "result": schema
-                },
-                "required": ["result"],
-                "x-ftl-wrapped": True
-            }
-        
+            return {"type": "object", "properties": {"result": schema}, "required": ["result"], "x-ftl-wrapped": True}
+
         # Check for direct mapping (non-primitives)
         if python_type in type_map:
             return type_map[python_type]
-            
+
         # Handle Union types (including Optional)
         origin = get_origin(python_type)
         if origin is Union:
@@ -69,15 +61,13 @@ class OutputSchemaGenerator:
                         if inner_schema.get("type") != "object":
                             return {
                                 "type": "object",
-                                "properties": {
-                                    "result": inner_schema
-                                },
+                                "properties": {"result": inner_schema},
                                 "required": ["result"],
-                                "x-ftl-wrapped": True
+                                "x-ftl-wrapped": True,
                             }
                         return inner_schema
             return None
-            
+
         # Handle List types
         if origin is list:
             args = get_args(python_type)
@@ -87,47 +77,42 @@ class OutputSchemaGenerator:
                     # List types need to be wrapped in object
                     return {
                         "type": "object",
-                        "properties": {
-                            "result": {
-                                "type": "array",
-                                "items": item_schema
-                            }
-                        },
+                        "properties": {"result": {"type": "array", "items": item_schema}},
                         "required": ["result"],
-                        "x-ftl-wrapped": True
+                        "x-ftl-wrapped": True,
                     }
             return None
-            
+
         # Handle Dict types - already objects, no wrapping needed
         if origin is dict:
             return {"type": "object"}
-            
+
         # For other types (classes, etc.), assume object
         return {"type": "object"}
 
 
 class OutputValidator:
     """Validate tool outputs against their schemas."""
-    
+
     @staticmethod
-    def validate_output(output: Any, schema: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def validate_output(output: Any, schema: dict[str, Any] | None) -> dict[str, Any]:
         """
         Validate and transform output according to schema.
-        
+
         Args:
             output: The output value to validate
             schema: The JSON schema to validate against
-            
+
         Returns:
             Validated and potentially transformed output
-            
+
         Raises:
             ValueError: If output doesn't match schema
         """
         if schema is None:
             # No schema - no validation needed
             return output if isinstance(output, dict) else {"result": output}
-            
+
         # Check if schema indicates wrapped primitive
         if schema.get("x-ftl-wrapped"):
             # Output should be wrapped in result key
@@ -137,34 +122,39 @@ class OutputValidator:
             elif "result" not in output:
                 # Wrap dict in result key
                 return {"result": output}
-                
+
         # For object schemas without wrapping, ensure output is dict
         if schema.get("type") == "object" and not isinstance(output, dict):
             # Try to convert to dict
             if hasattr(output, "__dict__"):
-                return vars(output)
+                return dict(vars(output))
             else:
                 # Can't convert to dict - wrap it
                 return {"value": output}
-                
-        return output
-    
+
+        # If output is already a dict, return it
+        if isinstance(output, dict):
+            return output
+
+        # Otherwise wrap primitive values
+        return {"result": output}
+
     @staticmethod
     def is_valid_structured_output(output: Any) -> bool:
         """
         Check if output is valid for structured content.
-        
+
         Structured content must be JSON-serializable dict.
-        
+
         Args:
             output: The output to check
-            
+
         Returns:
             True if valid for structured content
         """
         if not isinstance(output, dict):
             return False
-            
+
         try:
             # Try to serialize to JSON
             json.dumps(output)
