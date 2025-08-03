@@ -37,6 +37,8 @@ hex = "0.4"
 url = "2.5"
 # For RSA key handling
 rsa = "0.9"
+# For random number generation (for test utilities)
+rand = "0.8"
 # For async operations
 futures = "0.3"
 

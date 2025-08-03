@@ -4,7 +4,7 @@ use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use spin_sdk::key_value::Store;
 
-use crate::config::Provider;
+use crate::config::JWTProvider;
 use crate::error::{AuthError, Result};
 use crate::jwks;
 
@@ -77,7 +77,7 @@ enum ScopeValue {
 }
 
 /// Verify a JWT token using the provided configuration
-pub async fn verify(token: &str, provider: &Provider, store: &Store) -> Result<TokenInfo> {
+pub async fn verify(token: &str, provider: &JWTProvider, store: &Store) -> Result<TokenInfo> {
     // Decode header to get KID if present
     let header = decode_header(token)?;
     let kid = header.kid.as_deref();

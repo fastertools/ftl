@@ -12,7 +12,11 @@ mod discovery;
 mod error;
 mod forwarding;
 mod jwks;
+mod static_token;
 mod token;
+
+#[cfg(test)]
+pub mod test_utils;
 
 use config::Config;
 use error::{AuthError, Result};
@@ -54,15 +58,21 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
     // Extract bearer token
     let token = auth::extract_bearer_token(req)?;
     
-    // Get auth provider
-    let provider = &config.provider;
-    
-    // Open KV store for JWKS caching
-    let store = Store::open_default()
-        .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {}", e)))?;
-    
-    // Verify token and extract claims
-    let token_info = token::verify(token, provider, &store).await?;
+    // Verify token based on provider type
+    let token_info = match &config.provider {
+        config::Provider::JWT(jwt_provider) => {
+            // Open KV store for JWKS caching
+            let store = Store::open_default()
+                .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {}", e)))?;
+            
+            // Verify JWT token
+            token::verify(token, jwt_provider, &store).await?
+        }
+        config::Provider::Static(static_provider) => {
+            // Verify static token
+            static_token::verify(token, static_provider).await?
+        }
+    };
     
     // Build auth context
     Ok(auth::Context {

@@ -7,49 +7,72 @@ use crate::config::Config;
 
 /// Handle OAuth protected resource metadata endpoint
 pub fn oauth_protected_resource(req: &Request, config: &Config, trace_id: &Option<String>) -> Response {
-    let provider = &config.provider;
-    
-    // Build metadata
-    let metadata = json!({
-        "resource": extract_resource_url(req),
-        "authorization_servers": [
-            {
-                "issuer": provider.issuer,
-                "jwks_uri": provider.jwks_uri,
-            }
-        ],
-        "authentication_methods": {
-            "bearer": {
-                "required": true,
-                "algs_supported": ["RS256"],
-            }
-        },
-    });
+    // Build metadata based on provider type
+    let metadata = match &config.provider {
+        crate::config::Provider::JWT(jwt_provider) => {
+            json!({
+                "resource": extract_resource_url(req),
+                "authorization_servers": [
+                    {
+                        "issuer": jwt_provider.issuer,
+                        "jwks_uri": jwt_provider.jwks_uri,
+                    }
+                ],
+                "authentication_methods": {
+                    "bearer": {
+                        "required": true,
+                        "algs_supported": ["RS256"],
+                    }
+                },
+            })
+        }
+        crate::config::Provider::Static(_) => {
+            json!({
+                "resource": extract_resource_url(req),
+                "authorization_servers": [],
+                "authentication_methods": {
+                    "bearer": {
+                        "required": true,
+                        "description": "Static token authentication for development",
+                    }
+                },
+            })
+        }
+    };
     
     build_success_response(metadata, trace_id, &config.trace_header)
 }
 
 /// Handle OAuth authorization server metadata endpoint
 pub fn oauth_authorization_server(_req: &Request, config: &Config, trace_id: &Option<String>) -> Response {
-    let provider = &config.provider;
-    
-    let oauth_endpoints = provider.oauth_endpoints.as_ref();
-    
-    // Build metadata
-    let metadata = json!({
-        "issuer": provider.issuer,
-        "authorization_endpoint": oauth_endpoints.map(|e| &e.authorize),
-        "token_endpoint": oauth_endpoints.map(|e| &e.token),
-        "userinfo_endpoint": oauth_endpoints.and_then(|e| e.userinfo.as_ref()),
-        "jwks_uri": provider.jwks_uri,
-        "response_types_supported": ["code", "token", "id_token"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["RS256"],
-        "scopes_supported": ["openid", "profile", "email"],
-        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-        "claims_supported": ["sub", "iss", "aud", "exp", "iat", "scope", "client_id"],
-        "grant_types_supported": ["authorization_code", "refresh_token"],
-    });
+    // Build metadata based on provider type
+    let metadata = match &config.provider {
+        crate::config::Provider::JWT(jwt_provider) => {
+            let oauth_endpoints = jwt_provider.oauth_endpoints.as_ref();
+            
+            json!({
+                "issuer": jwt_provider.issuer,
+                "authorization_endpoint": oauth_endpoints.map(|e| &e.authorize),
+                "token_endpoint": oauth_endpoints.map(|e| &e.token),
+                "userinfo_endpoint": oauth_endpoints.and_then(|e| e.userinfo.as_ref()),
+                "jwks_uri": jwt_provider.jwks_uri,
+                "response_types_supported": ["code", "token", "id_token"],
+                "subject_types_supported": ["public"],
+                "id_token_signing_alg_values_supported": ["RS256"],
+                "scopes_supported": ["openid", "profile", "email"],
+                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+                "claims_supported": ["sub", "iss", "aud", "exp", "iat", "scope", "client_id"],
+                "grant_types_supported": ["authorization_code", "refresh_token"],
+            })
+        }
+        crate::config::Provider::Static(_) => {
+            // Static provider has no authorization server
+            json!({
+                "error": "not_supported",
+                "error_description": "Static token provider does not support OAuth authorization server metadata"
+            })
+        }
+    };
     
     build_success_response(metadata, trace_id, &config.trace_header)
 }
@@ -58,34 +81,43 @@ pub fn oauth_authorization_server(_req: &Request, config: &Config, trace_id: &Op
 pub fn openid_configuration(_req: &Request, config: &Config, trace_id: &Option<String>) -> Response {
     // OpenID configuration is similar to OAuth authorization server metadata
     // but with some additional fields
-    let provider = &config.provider;
-    
-    let oauth_endpoints = provider.oauth_endpoints.as_ref();
-    
-    // Build metadata
-    let metadata = json!({
-        "issuer": provider.issuer,
-        "authorization_endpoint": oauth_endpoints.map(|e| &e.authorize),
-        "token_endpoint": oauth_endpoints.map(|e| &e.token),
-        "userinfo_endpoint": oauth_endpoints.and_then(|e| e.userinfo.as_ref()),
-        "jwks_uri": provider.jwks_uri,
-        "response_types_supported": ["code", "token", "id_token", "code id_token"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["RS256"],
-        "scopes_supported": ["openid", "profile", "email", "offline_access"],
-        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-        "claims_supported": [
-            "sub", "iss", "aud", "exp", "iat", "auth_time",
-            "nonce", "acr", "amr", "azp", "name", "given_name",
-            "family_name", "middle_name", "nickname", "preferred_username",
-            "profile", "picture", "website", "email", "email_verified",
-            "gender", "birthdate", "zoneinfo", "locale", "phone_number",
-            "phone_number_verified", "address", "updated_at"
-        ],
-        "grant_types_supported": ["authorization_code", "implicit", "refresh_token"],
-        "acr_values_supported": [],
-        "code_challenge_methods_supported": ["S256"],
-    });
+    // Build metadata based on provider type
+    let metadata = match &config.provider {
+        crate::config::Provider::JWT(jwt_provider) => {
+            let oauth_endpoints = jwt_provider.oauth_endpoints.as_ref();
+            
+            json!({
+                "issuer": jwt_provider.issuer,
+                "authorization_endpoint": oauth_endpoints.map(|e| &e.authorize),
+                "token_endpoint": oauth_endpoints.map(|e| &e.token),
+                "userinfo_endpoint": oauth_endpoints.and_then(|e| e.userinfo.as_ref()),
+                "jwks_uri": jwt_provider.jwks_uri,
+                "response_types_supported": ["code", "token", "id_token", "code id_token"],
+                "subject_types_supported": ["public"],
+                "id_token_signing_alg_values_supported": ["RS256"],
+                "scopes_supported": ["openid", "profile", "email", "offline_access"],
+                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+                "claims_supported": [
+                    "sub", "iss", "aud", "exp", "iat", "auth_time",
+                    "nonce", "acr", "amr", "azp", "name", "given_name",
+                    "family_name", "middle_name", "nickname", "preferred_username",
+                    "profile", "picture", "website", "email", "email_verified",
+                    "gender", "birthdate", "zoneinfo", "locale", "phone_number",
+                    "phone_number_verified", "address", "updated_at"
+                ],
+                "grant_types_supported": ["authorization_code", "implicit", "refresh_token"],
+                "acr_values_supported": [],
+                "code_challenge_methods_supported": ["S256"],
+            })
+        }
+        crate::config::Provider::Static(_) => {
+            // Static provider has no OIDC support
+            json!({
+                "error": "not_supported",
+                "error_description": "Static token provider does not support OpenID Connect"
+            })
+        }
+    };
     
     build_success_response(metadata, trace_id, &config.trace_header)
 }

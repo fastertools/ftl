@@ -17,9 +17,22 @@ pub struct Config {
     pub provider: Provider,
 }
 
+/// Provider type enumeration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Provider {
+    /// JWT provider with JWKS or static key
+    #[serde(rename = "jwt")]
+    JWT(JWTProvider),
+    
+    /// Static token provider for development
+    #[serde(rename = "static")]
+    Static(StaticProvider),
+}
+
 /// JWT provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Provider {
+pub struct JWTProvider {
     /// JWT issuer URL (must be HTTPS)
     pub issuer: String,
     
@@ -40,6 +53,32 @@ pub struct Provider {
     
     /// OAuth 2.0 endpoints (optional)
     pub oauth_endpoints: Option<OAuthEndpoints>,
+}
+
+/// Static token provider configuration for development
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StaticProvider {
+    /// Map of token strings to their metadata
+    pub tokens: std::collections::HashMap<String, StaticTokenInfo>,
+    
+    /// Required scopes for all requests
+    pub required_scopes: Option<Vec<String>>,
+}
+
+/// Static token information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StaticTokenInfo {
+    /// Client ID for this token
+    pub client_id: String,
+    
+    /// User ID (subject)
+    pub sub: String,
+    
+    /// Scopes granted to this token
+    pub scopes: Vec<String>,
+    
+    /// Optional expiration timestamp
+    pub expires_at: Option<i64>,
 }
 
 /// OAuth 2.0 endpoint configuration
@@ -74,6 +113,18 @@ impl Config {
 impl Provider {
     /// Load provider configuration
     fn load() -> Result<Self> {
+        // Check provider type first
+        let provider_type = variables::get("mcp_provider_type")
+            .unwrap_or_else(|_| "jwt".to_string());
+        
+        match provider_type.as_str() {
+            "static" => Self::load_static_provider(),
+            "jwt" | _ => Self::load_jwt_provider(),
+        }
+    }
+    
+    /// Load JWT provider configuration
+    fn load_jwt_provider() -> Result<Self> {
         // Load issuer (required)
         let issuer = normalize_issuer(
             variables::get("mcp_jwt_issuer")
@@ -143,7 +194,7 @@ impl Provider {
         // Load OAuth endpoints (all optional)
         let oauth_endpoints = load_oauth_endpoints()?;
         
-        Ok(Provider {
+        Ok(Provider::JWT(JWTProvider {
             issuer,
             jwks_uri,
             public_key,
@@ -151,7 +202,66 @@ impl Provider {
             algorithm,
             required_scopes,
             oauth_endpoints,
-        })
+        }))
+    }
+    
+    /// Load static provider configuration
+    fn load_static_provider() -> Result<Self> {
+        use std::collections::HashMap;
+        
+        // Load static tokens from configuration
+        // Format: mcp_static_tokens = "token1:client1:user1:read,write;token2:client2:user2:admin"
+        let tokens_config = variables::get("mcp_static_tokens")
+            .map_err(|_| anyhow::anyhow!("Missing mcp_static_tokens for static provider"))?;
+        
+        let mut tokens = HashMap::new();
+        
+        for token_def in tokens_config.split(';') {
+            let token_def = token_def.trim();
+            if token_def.is_empty() {
+                continue;
+            }
+            
+            let parts: Vec<&str> = token_def.split(':').collect();
+            if parts.len() < 4 {
+                return Err(anyhow::anyhow!(
+                    "Invalid static token format. Expected: token:client_id:sub:scope1,scope2"
+                ));
+            }
+            
+            let token = parts[0].to_string();
+            let client_id = parts[1].to_string();
+            let sub = parts[2].to_string();
+            let scopes = parts[3].split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            
+            // Optional expiration timestamp as 5th part
+            let expires_at = parts.get(4)
+                .and_then(|s| s.parse::<i64>().ok());
+            
+            tokens.insert(token, StaticTokenInfo {
+                client_id,
+                sub,
+                scopes,
+                expires_at,
+            });
+        }
+        
+        if tokens.is_empty() {
+            return Err(anyhow::anyhow!("No static tokens configured"));
+        }
+        
+        // Load required scopes (optional)
+        let required_scopes = variables::get("mcp_jwt_required_scopes").ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
+        
+        Ok(Provider::Static(StaticProvider {
+            tokens,
+            required_scopes,
+        }))
     }
 }
 

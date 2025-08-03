@@ -1154,6 +1154,7 @@ dependencies = [
  "futures",
  "hex",
  "jsonwebtoken",
+ "rand",
  "rsa",
  "serde",
  "serde_json",

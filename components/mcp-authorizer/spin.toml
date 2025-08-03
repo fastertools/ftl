@@ -10,6 +10,7 @@ description = "Authentication gateway for FTL MCP servers"
 # Core settings
 mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
 mcp_trace_header = { default = "x-trace-id" }
+mcp_provider_type = { default = "jwt" }
 
 # JWT provider settings
 mcp_jwt_issuer = { default = "https://test.authkit.app" }
@@ -23,6 +24,9 @@ mcp_jwt_required_scopes = { default = "" }
 mcp_oauth_authorize_endpoint = { default = "" }
 mcp_oauth_token_endpoint = { default = "" }
 mcp_oauth_userinfo_endpoint = { default = "" }
+
+# Static provider settings
+mcp_static_tokens = { default = "" }
 
 [[trigger.http]]
 route = "/..."
@@ -40,6 +44,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Core settings
 mcp_gateway_url = "{{ mcp_gateway_url }}"
 mcp_trace_header = "{{ mcp_trace_header }}"
+mcp_provider_type = "{{ mcp_provider_type }}"
 
 # JWT provider settings
 mcp_jwt_issuer = "{{ mcp_jwt_issuer }}"
@@ -53,6 +58,9 @@ mcp_jwt_required_scopes = "{{ mcp_jwt_required_scopes }}"
 mcp_oauth_authorize_endpoint = "{{ mcp_oauth_authorize_endpoint }}"
 mcp_oauth_token_endpoint = "{{ mcp_oauth_token_endpoint }}"
 mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
+
+# Static provider settings
+mcp_static_tokens = "{{ mcp_static_tokens }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]
