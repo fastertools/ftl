@@ -84,16 +84,16 @@ func CreateTools(tools map[string]ToolDefinition) {
 		method := r.Method
 
 		// Secure logging for debugging (only logs when FTL_DEBUG=true)
-		secureLog("Method: %s, Path: '%s', Tools count: %d", method, sanitizePath(path), len(toolsCopy))
+		secureLogf("Method: %s, Path: '%s', Tools count: %d", method, sanitizePath(path), len(toolsCopy))
 
 		// Debug: Log tool count only (tool names could be sensitive)
 		if isDebugEnabled() {
-			secureLog("Available tools: %d registered", len(toolsCopy))
+			secureLogf("Available tools: %d registered", len(toolsCopy))
 		}
 
 		// Handle GET / - return tool metadata
 		if method == "GET" && (path == "/" || path == "") {
-			secureLog("Handling GET request for tools metadata, found %d tools", len(toolsCopy))
+			secureLogf("Handling GET request for tools metadata, found %d tools", len(toolsCopy))
 			metadata := make([]ToolMetadata, 0, len(toolsCopy))
 			for key, tool := range toolsCopy {
 				// Use explicit name if provided, otherwise convert from key
