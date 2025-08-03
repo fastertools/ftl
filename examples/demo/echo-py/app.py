@@ -1,19 +1,12 @@
-from ftl_sdk import create_tools, ToolResponse
+from ftl_sdk import FTL
 
-# Create the echo tool handler
-IncomingHandler = create_tools({
-    "echo_py": {
-        "description": "An MCP tool written in Python",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "The input message to process"
-                }
-            },
-            "required": ["message"]
-        },
-        "handler": lambda input: ToolResponse.text(f"Processed: {input['message']}")
-    }
-})
+# Create FTL application instance
+ftl = FTL()
+
+@ftl.tool(name="echo_py")
+def echo_python(message: str) -> str:
+    """An MCP tool written in Python that processes messages."""
+    return f"Processed: {message}"
+
+# Create the Spin handler
+IncomingHandler = ftl.create_handler()

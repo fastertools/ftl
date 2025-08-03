@@ -1,13 +1,13 @@
-from ftl_sdk import create_tools, ToolResponse
+from ftl_sdk import FTL
 from spin_sdk import http
 import json
 
-def get_weather(args):
-    """Get weather for a location using Open-Meteo API"""
-    location = args.get("location")
-    if not location:
-        return ToolResponse.error("Location is required")
-    
+# Create FTL application instance
+ftl = FTL()
+
+@ftl.tool(name="get_weather_py")
+def get_weather(location: str) -> str:
+    """Get current weather for a location using Open-Meteo API."""
     # First, get coordinates for the location
     geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}"
     
@@ -16,7 +16,7 @@ def get_weather(args):
         geo_data = json.loads(geo_response.body)
         
         if not geo_data.get("results"):
-            return ToolResponse.error(f"Location '{location}' not found")
+            raise ValueError(f"Location '{location}' not found")
         
         # Get the first result
         result = geo_data["results"][0]
@@ -37,25 +37,10 @@ def get_weather(args):
         weather_info += f"Wind Speed: {current['windspeed']} km/h\n"
         weather_info += f"Wind Direction: {current['winddirection']}°"
         
-        return ToolResponse.text(weather_info)
+        return weather_info
         
     except Exception as e:
-        return ToolResponse.error(f"Failed to get weather: {str(e)}")
+        raise ValueError(f"Failed to get weather: {str(e)}")
 
-# Define MCP tools
-IncomingHandler = create_tools({
-    "get_weather_py": {
-        "description": "Get current weather for a location",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "City name or location"
-                }
-            },
-            "required": ["location"]
-        },
-        "handler": get_weather
-    }
-})
+# Create the Spin handler
+IncomingHandler = ftl.create_handler()
