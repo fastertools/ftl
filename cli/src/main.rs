@@ -629,7 +629,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Execute the command
-    let result = match cli.command {
+    match cli.command {
         Commands::Init(args) => ftl_commands::init::execute(args.into()).await,
         Commands::Build(args) => ftl_commands::build::execute(args.into()).await,
         Commands::Up(args) => ftl_commands::up::execute(args.into()).await,
@@ -641,7 +641,5 @@ async fn main() -> Result<()> {
         Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
         Commands::Eng(args) => handle_eng_command(args).await,
-    };
-
-    result
+    }
 }

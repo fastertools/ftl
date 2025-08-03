@@ -51,9 +51,6 @@ Repository = "https://github.com/fastertools/ftl-cli"
 Issues = "https://github.com/fastertools/ftl-cli/issues"
 Documentation = "https://github.com/fastertools/ftl-cli/tree/main/sdk/python"
 
-[tool.setuptools]
-py-modules = ["ftl_sdk"]
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -136,7 +133,7 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
     "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
+    "if __name__ == .__main__:",
+    "class .*\\(.*Protocol.*\\):",
     "@(abc\\.)?abstractmethod",
 ]
