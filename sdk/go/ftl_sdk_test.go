@@ -54,12 +54,12 @@ func TestSecureLog(t *testing.T) {
 	// Test with debug disabled
 	t.Setenv("FTL_DEBUG", "")
 	// Should not panic
-	secureLog("test message: %s", "value")
+	secureLogf("test message: %s", "value")
 
 	// Test with debug enabled
 	t.Setenv("FTL_DEBUG", "true")
 	// Should not panic
-	secureLog("test message: %s", "value")
+	secureLogf("test message: %s", "value")
 }
 
 func TestCamelToSnake(t *testing.T) {
@@ -197,29 +197,29 @@ func TestContentCreators(t *testing.T) {
 // Test type guards
 
 func TestContentTypeGuards(t *testing.T) {
-	textContent := ToolContent{Type: "text", Text: "Hello"}
-	imageContent := ToolContent{Type: "image", Data: "data", MimeType: "image/png"}
-	audioContent := ToolContent{Type: "audio", Data: "data", MimeType: "audio/wav"}
-	resourceContent := ToolContent{Type: "resource", Resource: &ResourceContents{URI: "test"}}
+	textContent := ToolContent{Type: ContentTypeText, Text: "Hello"}
+	imageContent := ToolContent{Type: ContentTypeImage, Data: "data", MimeType: "image/png"}
+	audioContent := ToolContent{Type: ContentTypeAudio, Data: "data", MimeType: "audio/wav"}
+	resourceContent := ToolContent{Type: ContentTypeResource, Resource: &ResourceContents{URI: "test"}}
 
-	if !IsTextContent(textContent) {
+	if !IsTextContent(&textContent) {
 		t.Error("IsTextContent failed for text content")
 	}
 
-	if !IsImageContent(imageContent) {
+	if !IsImageContent(&imageContent) {
 		t.Error("IsImageContent failed for image content")
 	}
 
-	if !IsAudioContent(audioContent) {
+	if !IsAudioContent(&audioContent) {
 		t.Error("IsAudioContent failed for audio content")
 	}
 
-	if !IsResourceContent(resourceContent) {
+	if !IsResourceContent(&resourceContent) {
 		t.Error("IsResourceContent failed for resource content")
 	}
 
 	// Test negative cases
-	if IsTextContent(imageContent) {
+	if IsTextContent(&imageContent) {
 		t.Error("IsTextContent returned true for image content")
 	}
 }
@@ -236,7 +236,7 @@ func TestToolDefinitionStructure(t *testing.T) {
 				"input": map[string]interface{}{"type": "string"},
 			},
 		},
-		Handler: func(input map[string]interface{}) ToolResponse {
+		Handler: func(_ map[string]interface{}) ToolResponse {
 			return Text("test response")
 		},
 	}

@@ -17,8 +17,8 @@ func isDebugEnabled() bool {
 	return os.Getenv("FTL_DEBUG") == "true"
 }
 
-// secureLog provides controlled debug logging without exposing sensitive data
-func secureLog(format string, args ...interface{}) {
+// secureLogf provides controlled debug logging without exposing sensitive data
+func secureLogf(format string, args ...interface{}) {
 	if isDebugEnabled() {
 		fmt.Printf("[DEBUG] "+format+"\n", args...)
 	}
@@ -51,6 +51,14 @@ func camelToSnake(s string) string {
 	}
 	return result.String()
 }
+
+// Content type constants
+const (
+	ContentTypeText     = "text"
+	ContentTypeImage    = "image"
+	ContentTypeAudio    = "audio"
+	ContentTypeResource = "resource"
+)
 
 // ToolMetadata represents tool metadata returned by GET requests
 type ToolMetadata struct {
@@ -298,21 +306,21 @@ func ResourceContent(resource *ResourceContents, annotations *ContentAnnotations
 // Type guards for content types
 
 // IsTextContent checks if content is text type
-func IsTextContent(c ToolContent) bool {
-	return c.Type == "text"
+func IsTextContent(c *ToolContent) bool {
+	return c.Type == ContentTypeText
 }
 
 // IsImageContent checks if content is image type
-func IsImageContent(c ToolContent) bool {
-	return c.Type == "image"
+func IsImageContent(c *ToolContent) bool {
+	return c.Type == ContentTypeImage
 }
 
 // IsAudioContent checks if content is audio type
-func IsAudioContent(c ToolContent) bool {
-	return c.Type == "audio"
+func IsAudioContent(c *ToolContent) bool {
+	return c.Type == ContentTypeAudio
 }
 
 // IsResourceContent checks if content is resource type
-func IsResourceContent(c ToolContent) bool {
-	return c.Type == "resource"
+func IsResourceContent(c *ToolContent) bool {
+	return c.Type == ContentTypeResource
 }

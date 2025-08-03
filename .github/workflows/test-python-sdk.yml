@@ -108,10 +108,11 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install componentize-py
+    - name: Install componentize-py and SDK
       run: |
         python -m pip install --upgrade pip
         pip install componentize-py spin-sdk
+        pip install -e .
 
     - name: Test WASM build
       run: |
@@ -126,11 +127,12 @@ jobs:
             """Test tool"""
             return "test"
         
-        Handler = ftl.create_handler()
+        # Spin expects IncomingHandler, not Handler
+        IncomingHandler = ftl.create_handler()
         EOF
         
-        # Try to build with componentize-py
-        componentize-py -w spin-http componentize test_wasm -p . -o test.wasm
+        # Try to build with componentize-py, including SDK source path
+        componentize-py -w spin-http componentize test_wasm -p . -p src -o test.wasm
         
         # Verify the WASM file was created
         test -f test.wasm || exit 1

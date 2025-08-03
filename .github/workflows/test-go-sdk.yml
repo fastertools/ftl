@@ -60,7 +60,7 @@ jobs:
 
     - name: Run golangci-lint
       working-directory: sdk/go
-      run: golangci-lint run
+      run: golangci-lint run --build-tags test
 
     - name: Run tests
       working-directory: sdk/go
