@@ -129,6 +129,23 @@ pub async fn verify(token: &str, provider: &Provider, store: &Store) -> Result<T
     // Extract scopes
     let scopes = extract_scopes(&claims);
     
+    // Check required scopes
+    if let Some(required_scopes) = &provider.required_scopes {
+        use std::collections::HashSet;
+        
+        let token_scopes: HashSet<String> = scopes.iter().cloned().collect();
+        let required_set: HashSet<String> = required_scopes.iter().cloned().collect();
+        
+        if !required_set.is_subset(&token_scopes) {
+            let missing_scopes: Vec<String> = required_set.difference(&token_scopes)
+                .cloned()
+                .collect();
+            return Err(AuthError::Unauthorized(
+                format!("Token missing required scopes: {:?}", missing_scopes)
+            ));
+        }
+    }
+    
     // Extract client ID (prefer explicit claim over sub)
     let client_id = claims.client_id.as_ref()
         .unwrap_or(&claims.sub)

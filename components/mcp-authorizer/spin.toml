@@ -17,6 +17,7 @@ mcp_jwt_audience = { default = "" }
 mcp_jwt_jwks_uri = { default = "" }
 mcp_jwt_public_key = { default = "" }
 mcp_jwt_algorithm = { default = "" }
+mcp_jwt_required_scopes = { default = "" }
 
 # OAuth endpoints (optional)
 mcp_oauth_authorize_endpoint = { default = "" }
@@ -46,6 +47,7 @@ mcp_jwt_audience = "{{ mcp_jwt_audience }}"
 mcp_jwt_jwks_uri = "{{ mcp_jwt_jwks_uri }}"
 mcp_jwt_public_key = "{{ mcp_jwt_public_key }}"
 mcp_jwt_algorithm = "{{ mcp_jwt_algorithm }}"
+mcp_jwt_required_scopes = "{{ mcp_jwt_required_scopes }}"
 
 # OAuth endpoints
 mcp_oauth_authorize_endpoint = "{{ mcp_oauth_authorize_endpoint }}"

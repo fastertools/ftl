@@ -223,8 +223,7 @@ fn test_insufficient_scopes() {
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
-    // Note: Our implementation might not have required scopes configuration yet
-    // Note: auth_provider_required_scopes was removed as it's no longer supported
+    variables::set("mcp_jwt_required_scopes", "admin,write");
     
     let (private_key, public_key) = generate_test_key_pair();
     
@@ -251,11 +250,8 @@ fn test_insufficient_scopes() {
     
     let response = spin_test_sdk::perform_request(request);
     
-    // Our implementation doesn't support required_scopes configuration
-    // So the token is valid even with insufficient scopes
-    // FastMCP would return 401 when required_scopes are not met
-    // But since we don't have that feature, the request succeeds
-    assert_eq!(response.status(), 200);
+    // Should fail with 401 - insufficient scopes
+    assert_eq!(response.status(), 401);
 }
 
 // Test: Sufficient scopes
@@ -266,8 +262,7 @@ fn test_sufficient_scopes() {
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
-    // Note: Our implementation might not have required scopes configuration yet
-    // Note: auth_provider_required_scopes was removed as it's no longer supported
+    variables::set("mcp_jwt_required_scopes", "read,write");
     
     let (private_key, public_key) = generate_test_key_pair();
     
@@ -298,5 +293,168 @@ fn test_sufficient_scopes() {
     let response = spin_test_sdk::perform_request(request);
     
     // Should succeed with sufficient scopes
+    assert_eq!(response.status(), 200);
+}
+
+// Test: Empty required scopes
+#[spin_test]
+fn test_empty_required_scopes() {
+    // Configure provider with empty required scopes (should accept any token)
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
+    variables::set("mcp_jwt_required_scopes", ""); // Empty required scopes
+    
+    let (private_key, public_key) = generate_test_key_pair();
+    
+    // Mock JWKS
+    mock_jwks_endpoint(&public_key);
+    mock_gateway();
+    
+    // Create token with no scopes
+    let token = create_token_with_scopes(
+        &private_key,
+        "https://test.authkit.app",
+        "test-audience",
+        None,
+        None,
+    );
+    
+    // Make request
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    request.set_method(&http::types::Method::Post).unwrap();
+    
+    let body = request.body().unwrap();
+    body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
+    
+    let response = spin_test_sdk::perform_request(request);
+    
+    // Should succeed - no required scopes means any token is valid
+    assert_eq!(response.status(), 200);
+}
+
+// Test: Exact scope match
+#[spin_test]
+fn test_exact_scope_match() {
+    // Configure provider with required scopes
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
+    variables::set("mcp_jwt_required_scopes", "users:read,users:write");
+    
+    let (private_key, public_key) = generate_test_key_pair();
+    
+    // Mock JWKS
+    mock_jwks_endpoint(&public_key);
+    mock_gateway();
+    
+    // Create token with exact matching scopes
+    let token = create_token_with_scopes(
+        &private_key,
+        "https://test.authkit.app",
+        "test-audience",
+        Some("users:read users:write".to_string()), // Exact match
+        None,
+    );
+    
+    // Make request
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    request.set_method(&http::types::Method::Post).unwrap();
+    
+    let body = request.body().unwrap();
+    body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
+    
+    let response = spin_test_sdk::perform_request(request);
+    
+    // Should succeed with exact scope match
+    assert_eq!(response.status(), 200);
+}
+
+// Test: Partial scope match failure
+#[spin_test]
+fn test_partial_scope_match_failure() {
+    // Configure provider with required scopes
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
+    variables::set("mcp_jwt_required_scopes", "users:read,users:write,admin");
+    
+    let (private_key, public_key) = generate_test_key_pair();
+    
+    // Mock JWKS
+    mock_jwks_endpoint(&public_key);
+    mock_gateway();
+    
+    // Create token with only partial scopes
+    let token = create_token_with_scopes(
+        &private_key,
+        "https://test.authkit.app",
+        "test-audience",
+        Some("users:read admin".to_string()), // Missing users:write
+        None,
+    );
+    
+    // Make request
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    
+    let response = spin_test_sdk::perform_request(request);
+    
+    // Should fail - missing required scope
+    assert_eq!(response.status(), 401);
+}
+
+// Test: Scope validation with Microsoft 'scp' claim
+#[spin_test]
+fn test_scope_validation_with_scp_claim() {
+    // Configure provider with required scopes
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
+    variables::set("mcp_jwt_required_scopes", "api.read,api.write");
+    
+    let (private_key, public_key) = generate_test_key_pair();
+    
+    // Mock JWKS
+    mock_jwks_endpoint(&public_key);
+    mock_gateway();
+    
+    // Create token with scopes in 'scp' claim as array (Microsoft style)
+    let token = create_token_with_scopes(
+        &private_key,
+        "https://test.authkit.app",
+        "test-audience",
+        None, // No 'scope' claim
+        Some(ScopeValue::List(vec!["api.read".to_string(), "api.write".to_string(), "api.admin".to_string()])),
+    );
+    
+    // Make request
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    request.set_method(&http::types::Method::Post).unwrap();
+    
+    let body = request.body().unwrap();
+    body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
+    
+    let response = spin_test_sdk::perform_request(request);
+    
+    // Should succeed - has required scopes via 'scp' claim
     assert_eq!(response.status(), 200);
 }

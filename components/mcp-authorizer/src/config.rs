@@ -35,6 +35,9 @@ pub struct Provider {
     /// JWT signing algorithm (defaults to RS256)
     pub algorithm: Option<String>,
     
+    /// Required scopes for all requests
+    pub required_scopes: Option<Vec<String>>,
+    
     /// OAuth 2.0 endpoints (optional)
     pub oauth_endpoints: Option<OAuthEndpoints>,
 }
@@ -132,6 +135,11 @@ impl Provider {
             })
             .transpose()?;
         
+        // Load required scopes (optional)
+        let required_scopes = variables::get("mcp_jwt_required_scopes").ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
+        
         // Load OAuth endpoints (all optional)
         let oauth_endpoints = load_oauth_endpoints()?;
         
@@ -141,6 +149,7 @@ impl Provider {
             public_key,
             audience,
             algorithm,
+            required_scopes,
             oauth_endpoints,
         })
     }
