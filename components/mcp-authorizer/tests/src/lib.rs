@@ -18,6 +18,8 @@ mod gateway_forwarding_tests;
 mod static_provider_tests;
 mod jwt_test_utils_tests;
 mod test_token_utils;
+mod optional_issuer_tests;
+mod authkit_integration_tests;
 mod test_helpers;
 mod simple_test;
 mod test_setup;

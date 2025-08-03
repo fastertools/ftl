@@ -7,7 +7,7 @@ Fast tools for AI agents
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
 [![Rust](https://img.shields.io/badge/rust-1.86+-orange.svg)](https://www.rust-lang.org)
-[![Discord](https://img.shields.io/discord/1397659435177869403?logo=discord&label=Discord&link=https%3A%2F%2Fdiscord.gg%2FZ9S5KuVD)](https://discord.gg/Z9S5KuVD)
+[![Discord](https://img.shields.io/discord/1397659435177869403?logo=discord&label=Discord&link=https%3A%2F%2Fdiscord.gg%2FByFw4eKEU7)](https://discord.gg/ByFw4eKEU7)
 
 [Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
 
@@ -15,11 +15,11 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a framework for polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for adding capabilities to AI agents with performant, sandboxed, remote-ready tools.
+FTL is a framework for polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for adding capabilities to AI agents with performant, sandboxed, edge-ready tools.
 
 Tools authored in multiple [source languages](./sdk/README.md) can run simultaneously in a single MCP server process on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 
-FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote tools with sub-millisecond cold starts and consistently low latency across geographic regions. Run `ftl eng login` to join the waitlist.
+FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote tools with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
 
 ## Why?
 
@@ -182,6 +182,8 @@ claude mcp add -t http faster-tools http://127.0.0.1:3000/mcp
 ```
 
 ### Ready to deploy?
+
+Join [Discord](https://discord.gg/ByFw4eKEU7) to request access.
 
 Log in to FTL Engine
 ```bash

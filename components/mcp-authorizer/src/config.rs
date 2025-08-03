@@ -125,28 +125,37 @@ impl Provider {
     
     /// Load JWT provider configuration
     fn load_jwt_provider() -> Result<Self> {
-        // Load issuer (required)
-        let issuer = normalize_issuer(
-            variables::get("mcp_jwt_issuer")
-                .map_err(|_| anyhow::anyhow!("Missing mcp_jwt_issuer"))?
-        )?;
+        // Load issuer (optional - empty means no issuer validation)
+        let issuer = variables::get("mcp_jwt_issuer").ok()
+            .filter(|s| !s.is_empty())
+            .map(normalize_issuer)
+            .transpose()?
+            .unwrap_or_default();
         
-        // Load JWKS URI or public key (one required)
+        // Load public key first to check if we should skip JWKS auto-derivation
+        let public_key = variables::get("mcp_jwt_public_key").ok()
+            .filter(|s| !s.is_empty());
+        
+        // Load JWKS URI or auto-derive it (but only if no public key is set)
         let jwks_uri = variables::get("mcp_jwt_jwks_uri").ok()
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                // Auto-derive JWKS URI for known providers
-                if issuer.contains(".authkit.app") || issuer.contains(".workos.com") {
-                    Some(format!("{}/.well-known/jwks.json", issuer))
+                // Auto-derive JWKS URI for known providers only if:
+                // 1. Issuer is set
+                // 2. No public key is configured
+                if !issuer.is_empty() && public_key.is_none() {
+                    if issuer.contains(".authkit.app") || issuer.contains(".workos.com") {
+                        // WorkOS AuthKit uses /oauth2/jwks endpoint
+                        Some(format!("{}/oauth2/jwks", issuer))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
             })
             .map(|uri| normalize_url(&uri))
             .transpose()?;
-        
-        let public_key = variables::get("mcp_jwt_public_key").ok()
-            .filter(|s| !s.is_empty());
         
         // Validate we have at least one key source
         if jwks_uri.is_none() && public_key.is_none() {
