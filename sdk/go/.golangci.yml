@@ -11,14 +11,14 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar  # replaces deprecated exportloopref
     - exhaustive
     - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
+    - mnd          # replaces deprecated gomnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -46,7 +46,8 @@ linters:
 
 linters-settings:
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   gocyclo:
     min-complexity: 15
   dupl:
@@ -58,22 +59,20 @@ linters-settings:
     locale: US
   lll:
     line-length: 140
-  gomnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - return
-        ignored-numbers:
-          - '0'
-          - '1'
-          - '200'
-          - '400'
-          - '404'
-          - '405'
-          - '500'
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - return
+    ignored-numbers:
+      - '0'
+      - '1'
+      - '200'
+      - '400'
+      - '404'
+      - '405'
+      - '500'
   gocritic:
     enabled-tags:
       - diagnostic
@@ -87,7 +86,7 @@ issues:
     # Exclude some linters from running on test files
     - path: _test\.go
       linters:
-        - gomnd
+        - mnd
         - dupl
         - gosec
 
