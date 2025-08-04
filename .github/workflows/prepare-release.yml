@@ -11,6 +11,8 @@ on:
           - cli
           - sdk-rust
           - sdk-typescript
+          - sdk-python
+          - sdk-go
           - mcp-authorizer
           - mcp-gateway
       version_type:
@@ -52,8 +54,20 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Setup Python
+        if: inputs.component == 'sdk-python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Setup Go
+        if: inputs.component == 'sdk-go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      
       - name: Setup Rust
-        if: inputs.component != 'sdk-typescript'
+        if: inputs.component != 'sdk-typescript' && inputs.component != 'sdk-python' && inputs.component != 'sdk-go'
         uses: dtolnay/rust-toolchain@stable
       
       - name: Determine version
@@ -93,6 +107,18 @@ jobs:
               ;;
             sdk-typescript)
               CURRENT_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+              ;;
+            sdk-python)
+              CURRENT_VERSION=$(grep '^version = ' sdk/python/pyproject.toml | cut -d'"' -f2)
+              ;;
+            sdk-go)
+              # Go modules use tags, so we need to check the latest tag for this SDK
+              LATEST_TAG=$(git tag --list "sdk-go-v*" --sort=-version:refname | head -1)
+              if [ -z "$LATEST_TAG" ]; then
+                CURRENT_VERSION="0.0.0"
+              else
+                CURRENT_VERSION=${LATEST_TAG#sdk-go-v}
+              fi
               ;;
             mcp-authorizer|mcp-gateway)
               CURRENT_VERSION=$(grep '^version' "components/${COMPONENT}/Cargo.toml" | head -1 | cut -d'"' -f2)
@@ -166,6 +192,19 @@ jobs:
               npm version "$NEW_VERSION" --no-git-tag-version
               # Update package-lock.json
               npm install --package-lock-only
+              cd ../..
+              ;;
+            sdk-python)
+              # Update version in pyproject.toml
+              sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/python/pyproject.toml
+              ;;
+            sdk-go)
+              # Go modules use tags for versioning, so we just need to prepare the module
+              # The actual version is set via git tags
+              echo "Go SDK will be tagged as sdk-go-v${NEW_VERSION}"
+              # Update go.mod if there are any internal version references
+              cd sdk/go
+              go mod tidy
               cd ../..
               ;;
             mcp-authorizer|mcp-gateway)
@@ -252,6 +291,14 @@ jobs:
             sdk-typescript)
               TAG="sdk-typescript-v${NEW_VERSION}"
               TITLE="release: TypeScript SDK v${NEW_VERSION}"
+              ;;
+            sdk-python)
+              TAG="sdk-python-v${NEW_VERSION}"
+              TITLE="release: Python SDK v${NEW_VERSION}"
+              ;;
+            sdk-go)
+              TAG="sdk-go-v${NEW_VERSION}"
+              TITLE="release: Go SDK v${NEW_VERSION}"
               ;;
             mcp-authorizer|mcp-gateway)
               TAG="component-${COMPONENT}-v${NEW_VERSION}"
