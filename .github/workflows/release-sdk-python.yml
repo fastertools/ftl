@@ -288,7 +288,6 @@ jobs:
             if grep -q 'ftl-sdk' "$file"; then
               # Update pinned version format: ftl-sdk==X.Y.Z
               sed -i "s/ftl-sdk==[^\"']*/ftl-sdk==$VERSION/" "$file"
-
               echo "✅ Updated $file"
             fi
           done
