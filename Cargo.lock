@@ -990,16 +990,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dd6caf6059519a65843af8fe2a3ae298b14b80179855aeb4adc2c1934ee619"
 
 [[package]]
-name = "fs4"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8640e34b88f7652208ce9e88b1a37a2ae95227d84abec377ccd3c5cfeb141ed4"
-dependencies = [
- "rustix",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1020,7 +1010,6 @@ dependencies = [
  "ftl-common",
  "ftl-language",
  "ftl-runtime",
- "ftl-telemetry",
  "nix",
  "notify",
  "predicates",
@@ -1029,7 +1018,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
@@ -1211,26 +1199,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
-]
-
-[[package]]
-name = "ftl-telemetry"
-version = "0.0.23"
-dependencies = [
- "anyhow",
- "chrono",
- "dirs",
- "fs4",
- "ftl-common",
- "pretty_assertions",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "uuid",
 ]
 
 [[package]]

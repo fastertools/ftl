@@ -20,6 +20,8 @@ jobs:
       needs.changes.outputs.cli == 'true' || 
       needs.changes.outputs.rust-sdk == 'true' || 
       needs.changes.outputs.typescript-sdk == 'true' ||
+      needs.changes.outputs.go-sdk == 'true' ||
+      needs.changes.outputs.python-sdk == 'true' ||
       needs.changes.outputs.core-crates == 'true' || 
       needs.changes.outputs.components == 'true' || 
       needs.changes.outputs.ci == 'true'
@@ -28,6 +30,8 @@ jobs:
       cli-changed: ${{ needs.changes.outputs.cli }}
       rust-sdk-changed: ${{ needs.changes.outputs.rust-sdk }}
       typescript-sdk-changed: ${{ needs.changes.outputs.typescript-sdk }}
+      go-sdk-changed: ${{ needs.changes.outputs.go-sdk }}
+      python-sdk-changed: ${{ needs.changes.outputs.python-sdk }}
       core-crates-changed: ${{ needs.changes.outputs.core-crates }}
       components-changed: ${{ needs.changes.outputs.components }}
       ci-changed: ${{ needs.changes.outputs.ci }}
@@ -56,6 +60,8 @@ jobs:
           if [ "${{ needs.changes.outputs.cli }}" == "true" ] || \
              [ "${{ needs.changes.outputs.rust-sdk }}" == "true" ] || \
              [ "${{ needs.changes.outputs.typescript-sdk }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.go-sdk }}" == "true" ] || \
+             [ "${{ needs.changes.outputs.python-sdk }}" == "true" ] || \
              [ "${{ needs.changes.outputs.core-crates }}" == "true" ] || \
              [ "${{ needs.changes.outputs.components }}" == "true" ] || \
              [ "${{ needs.changes.outputs.ci }}" == "true" ]; then

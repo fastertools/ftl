@@ -2,21 +2,44 @@
 
 A lightweight SDK for building MCP (Model Context Protocol) tools with Go using the Spin framework.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/fastertools/ftl-cli/sdk/go.svg)](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fastertools/ftl-cli/sdk/go)](https://goreportcard.com/report/github.com/fastertools/ftl-cli/sdk/go)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/fastertools/ftl-cli?filter=sdk/go/*)
+
 ## Installation
 
+### Latest Version
+
 ```bash
-go get github.com/fastertools/ftl-cli/sdk/go
+go get github.com/fastertools/ftl-cli/sdk/go@latest
+```
+
+### Specific Version
+
+```bash
+go get github.com/fastertools/ftl-cli/sdk/go@v0.1.0
+```
+
+### Development Version
+
+```bash
+go get github.com/fastertools/ftl-cli/sdk/go@main
 ```
 
 ## Requirements
 
-- Go 1.21+
+- Go 1.23+
 - TinyGo 0.30.0+ (for WASI compilation)
 - Spin CLI (for running tools)
 
 ## Quick Start
 
-Create a simple echo tool:
+Create a tool with the FTL CLI:
+
+```bash
+ftl init my-app
+ftl add my-go-tool -l go
+```
 
 ```go
 package main
@@ -274,6 +297,40 @@ func main() {}
 - Limited to packages compatible with TinyGo and WASI
 - No goroutines or certain runtime features due to WASI constraints
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development
+
+```bash
+# Clone the repository
+git clone https://github.com/fastertools/ftl-cli.git
+cd ftl-cli/sdk/go
+
+# Install development dependencies
+make dev-deps
+
+# Run tests
+make test
+
+# Run linting
+make lint
+
+# Run all quality checks
+make quality
+```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each release.
+
 ## License
 
-Apache License 2.0
+Apache License 2.0 - see [LICENSE](../../LICENSE) for details.

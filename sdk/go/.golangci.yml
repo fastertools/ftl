@@ -1,0 +1,105 @@
+# golangci-lint configuration for FTL Go SDK
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - bodyclose
+    - dogsled
+    - dupl
+    - errcheck
+    - copyloopvar  # replaces deprecated exportloopref
+    - exhaustive
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - mnd          # replaces deprecated gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+  disable:
+    - gochecknoglobals  # We need globals for Spin HTTP handlers
+    - gochecknoinits    # We use init() for handler registration
+    - godox             # Allow TODO/FIXME comments
+    - prealloc          # Not always beneficial in WASI
+
+linters-settings:
+  govet:
+    enable:
+      - shadow
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 150  # Higher threshold for SDK
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - return
+    ignored-numbers:
+      - '0'
+      - '1'
+      - '200'
+      - '400'
+      - '404'
+      - '405'
+      - '500'
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on test files
+    - path: _test\.go
+      linters:
+        - mnd
+        - dupl
+        - gosec
+
+    # Exclude known patterns
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+        
+    # Allow string concatenation in spin handler
+    - path: ftl_sdk\.go
+      text: "string concatenation"
+      linters:
+        - gocritic
+
+  max-issues-per-linter: 0
+  max-same-issues: 0

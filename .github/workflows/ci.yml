@@ -18,6 +18,12 @@ on:
       components-changed:
         required: true
         type: string
+      go-sdk-changed:
+        required: true
+        type: string
+      python-sdk-changed:
+        required: true
+        type: string
       ci-changed:
         required: true
         type: string
@@ -115,6 +121,282 @@ jobs:
           cd sdk/typescript
           npm test
 
+  lint-go-sdk:
+    name: Lint Go SDK
+    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.23', '1.24']
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('sdk/go/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.go-version }}-
+      
+      - name: Install golangci-lint
+        working-directory: sdk/go
+        run: |
+          go mod download
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      
+      - name: Run go fmt
+        working-directory: sdk/go
+        run: |
+          fmt_output=$(go fmt ./...)
+          if [ -n "$fmt_output" ]; then
+            echo "The following files need formatting:"
+            echo "$fmt_output"
+            exit 1
+          fi
+      
+      - name: Run golangci-lint
+        working-directory: sdk/go
+        run: golangci-lint run --build-tags test
+
+  test-go-sdk:
+    name: Test Go SDK
+    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.23', '1.24']
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('sdk/go/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.go-version }}-
+      
+      - name: Install dependencies
+        working-directory: sdk/go
+        run: go mod download
+      
+      - name: Run tests
+        working-directory: sdk/go
+        run: go test -v -race -coverprofile=coverage.out -tags test ./...
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./sdk/go/coverage.out
+          flags: go-sdk
+          name: go-sdk-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+      
+      - name: Check for security vulnerabilities
+        working-directory: sdk/go
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck -tags test ./...
+
+  test-python-sdk:
+    name: Test Python SDK
+    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('sdk/python/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-
+      
+      - name: Install tox
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-gh-actions
+      
+      - name: Run tox tests
+        run: tox
+      
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./sdk/python/coverage.xml
+          flags: python-sdk
+          name: python-sdk-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  lint-python-sdk:
+    name: Lint Python SDK
+    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('sdk/python/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      
+      - name: Check formatting with black
+        run: black --check src tests
+      
+      - name: Run ruff linter
+        run: ruff check src tests
+      
+      - name: Run mypy type checker
+        run: mypy src
+
+  wasm-python-sdk:
+    name: Test Python WebAssembly Compatibility
+    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install componentize-py and SDK
+        run: |
+          python -m pip install --upgrade pip
+          pip install componentize-py spin-sdk
+          pip install -e .
+      
+      - name: Test WASM build
+        run: |
+          # Create a test file that uses the SDK
+          cat > test_wasm.py << 'EOF'
+          from ftl_sdk import FTL
+          
+          ftl = FTL()
+          
+          @ftl.tool
+          def test() -> str:
+              """Test tool"""
+              return "test"
+          
+          # Spin expects IncomingHandler, not Handler
+          IncomingHandler = ftl.create_handler()
+          EOF
+          
+          # Try to build with componentize-py, including SDK source path
+          componentize-py -w spin-http componentize test_wasm -p . -p src -o test.wasm
+          
+          # Verify the WASM file was created
+          test -f test.wasm || exit 1
+          
+          # Clean up
+          rm test_wasm.py test.wasm
+
+  security-python-sdk:
+    name: Security Scan Python SDK
+    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install safety
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety
+      
+      - name: Install SDK dependencies
+        run: pip install -e .
+      
+      - name: Run safety check
+        run: safety check
+        continue-on-error: true  # Don't fail the build for security warnings
+
+  build-python-sdk:
+    name: Build Python Distribution
+    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: Build distribution
+        run: python -m build
+      
+      - name: Check distribution
+        run: twine check dist/*
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: sdk/python/dist/
+
 
   test-sdk:
     name: Test Rust SDK
@@ -167,7 +449,7 @@ jobs:
 
   security:
     name: Security Audit
-    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
+    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.go-sdk-changed == 'true' || inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

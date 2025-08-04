@@ -37,8 +37,6 @@ enum Commands {
     Tools(ToolsArgs),
     /// Manage remote tools on FTL Engine
     Eng(EngArgs),
-    /// Manage telemetry settings
-    Telemetry(TelemetryArgs),
 }
 
 // Simple command wrappers - just forward arguments
@@ -358,22 +356,6 @@ enum ToolsCommand {
     },
 }
 
-#[derive(Debug, Args)]
-struct TelemetryArgs {
-    #[command(subcommand)]
-    command: TelemetryCommand,
-}
-
-#[derive(Debug, Clone, Subcommand)]
-enum TelemetryCommand {
-    /// Enable telemetry
-    Enable,
-    /// Disable telemetry
-    Disable,
-    /// Show telemetry status
-    Status,
-}
-
 // Conversion implementations
 
 impl From<InitArgs> for ftl_commands::init::InitArgs {
@@ -562,63 +544,6 @@ impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
     }
 }
 
-fn handle_telemetry_command(args: &TelemetryArgs) -> Result<()> {
-    use ftl_common::config::Config;
-    use ftl_telemetry::config::TelemetryConfig;
-
-    match &args.command {
-        TelemetryCommand::Enable => {
-            let mut config = Config::load()?;
-            let mut telemetry_config = config.get_section::<TelemetryConfig>()?.unwrap_or_default();
-            telemetry_config.enabled = true;
-            config.set_section(telemetry_config)?;
-            config.save()?;
-            println!("Telemetry has been enabled");
-            println!("Run 'ftl telemetry status' to see current settings");
-            Ok(())
-        }
-        TelemetryCommand::Disable => {
-            let mut config = Config::load()?;
-            let mut telemetry_config = config.get_section::<TelemetryConfig>()?.unwrap_or_default();
-            telemetry_config.enabled = false;
-            config.set_section(telemetry_config)?;
-            config.save()?;
-            println!("Telemetry has been disabled");
-            println!(
-                "You can also set FTL_TELEMETRY_DISABLED=1 to disable via environment variable"
-            );
-            Ok(())
-        }
-        TelemetryCommand::Status => {
-            let config = Config::load()?;
-            let telemetry_config = config.get_section::<TelemetryConfig>()?.unwrap_or_default();
-
-            println!("Telemetry Status:");
-            println!("  Enabled: {}", telemetry_config.enabled);
-            println!("  Installation ID: {}", telemetry_config.installation_id);
-            println!(
-                "  Environment override: {}",
-                if std::env::var("FTL_TELEMETRY_DISABLED").is_ok() {
-                    "DISABLED (FTL_TELEMETRY_DISABLED is set)"
-                } else {
-                    "None"
-                }
-            );
-            println!(
-                "  Effective status: {}",
-                if telemetry_config.is_enabled() {
-                    "ACTIVE"
-                } else {
-                    "INACTIVE"
-                }
-            );
-            println!("\nTelemetry data is stored locally at: ~/.ftl/logs/<installation-id>/");
-            println!("No data is sent to external servers.");
-            Ok(())
-        }
-    }
-}
-
 async fn handle_eng_command(args: EngArgs) -> Result<()> {
     match args.command {
         EngCommand::Login {
@@ -692,11 +617,6 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
     }
 }
 
-/// Sanitize error messages to remove potentially sensitive information
-fn sanitize_error(error: &anyhow::Error) -> String {
-    ftl_telemetry::privacy::sanitize_error_message(&error.to_string())
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -706,55 +626,10 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    // Initialize telemetry (shows first-run notice if needed)
-    let telemetry_client = match ftl_telemetry::TelemetryClient::initialize().await {
-        Ok(client) => Some(client),
-        Err(e) => {
-            tracing::debug!("Failed to initialize telemetry: {}", e);
-            None
-        }
-    };
-
-    // Generate session ID for this CLI invocation
-    let session_id = uuid::Uuid::new_v4().to_string();
-
     let cli = Cli::parse();
 
-    // Extract command name for telemetry
-    let command_name = match &cli.command {
-        Commands::Init(_) => "init",
-        Commands::Build(_) => "build",
-        Commands::Up(_) => "up",
-        Commands::Publish(_) => "publish",
-        Commands::Setup(_) => "setup",
-        Commands::Update(_) => "update",
-        Commands::Add(_) => "add",
-        Commands::Test(_) => "test",
-        Commands::Registry(_) => "registry",
-        Commands::Tools(_) => "tools",
-        Commands::Eng(_) => "eng",
-        Commands::Telemetry(_) => "telemetry",
-    };
-
-    // Record command execution start
-    let start_time = std::time::Instant::now();
-    if let Some(ref client) = telemetry_client {
-        // Filter sensitive arguments before logging
-        let args: Vec<String> = std::env::args().skip(1).collect();
-        let filtered_args = ftl_telemetry::privacy::filter_command_args(&args);
-
-        let event = ftl_telemetry::events::TelemetryEvent::command_executed(
-            command_name,
-            filtered_args,
-            session_id.clone(),
-        );
-        if let Err(e) = client.log_event(event).await {
-            tracing::debug!("Failed to log telemetry event: {}", e);
-        }
-    }
-
     // Execute the command
-    let result = match cli.command {
+    match cli.command {
         Commands::Init(args) => ftl_commands::init::execute(args.into()).await,
         Commands::Build(args) => ftl_commands::build::execute(args.into()).await,
         Commands::Up(args) => ftl_commands::up::execute(args.into()).await,
@@ -766,28 +641,5 @@ async fn main() -> Result<()> {
         Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
         Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
         Commands::Eng(args) => handle_eng_command(args).await,
-        Commands::Telemetry(args) => handle_telemetry_command(&args),
-    };
-
-    // Record command completion
-    let duration_ms = start_time.elapsed().as_millis() as u64;
-    if let Some(ref client) = telemetry_client {
-        let event = match &result {
-            Ok(()) => ftl_telemetry::events::TelemetryEvent::command_success(
-                command_name,
-                duration_ms,
-                session_id,
-            ),
-            Err(e) => ftl_telemetry::events::TelemetryEvent::command_error(
-                command_name,
-                &sanitize_error(e),
-                session_id,
-            ),
-        };
-        if let Err(e) = client.log_event(event).await {
-            tracing::debug!("Failed to log telemetry completion event: {}", e);
-        }
     }
-
-    result
 }

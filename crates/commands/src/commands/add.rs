@@ -193,13 +193,13 @@ fn determine_language(language: Option<&String>, ui: &Arc<dyn UserInterface>) ->
 
         Language::from_str(mapped_lang).map_err(|_| {
             anyhow::anyhow!(
-                "Invalid language: {}. Valid options are: rust, typescript, javascript",
+                "Invalid language: {}. Valid options are: rust, typescript, javascript, python, go",
                 lang_str
             )
         })
     } else {
         // Interactive language selection
-        let languages = vec!["rust", "typescript"];
+        let languages = vec!["rust", "typescript", "python", "go"];
         let selection = ui.prompt_select("Select programming language", &languages, 0)?;
         Language::from_str(languages[selection])
             .map_err(|e| anyhow::anyhow!("Failed to parse language: {}", e))
@@ -223,13 +223,13 @@ fn update_ftl_toml(
     // Parse config
     let mut config = FtlConfig::parse(&content)?;
 
-    // Create build configuration with explicit defaults based on language
+    // Create build configuration with standardized make commands
     let (build, wasm_path) = match language {
         Language::Rust => {
             let wasm_filename = component_name.replace('-', "_");
             (
                 BuildConfig {
-                    command: "cargo build --target wasm32-wasip1 --release".to_string(),
+                    command: "make build".to_string(),
                     watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                     env: HashMap::new(),
                 },
@@ -238,7 +238,7 @@ fn update_ftl_toml(
         }
         Language::TypeScript | Language::JavaScript => (
             BuildConfig {
-                command: "npm install && npm run build".to_string(),
+                command: "make build".to_string(),
                 watch: vec![
                     "src/**/*.ts".to_string(),
                     "src/**/*.js".to_string(),
@@ -251,9 +251,7 @@ fn update_ftl_toml(
         ),
         Language::Python => (
             BuildConfig {
-                command: format!(
-                    "componentize-py -w spin-http componentize {component_name}/src/main.py -o {component_name}/app.wasm"
-                ),
+                command: "make build".to_string(),
                 watch: vec!["src/**/*.py".to_string(), "pyproject.toml".to_string()],
                 env: HashMap::new(),
             },
@@ -261,9 +259,7 @@ fn update_ftl_toml(
         ),
         Language::Go => (
             BuildConfig {
-                command: format!(
-                    "tinygo build -target=wasi -scheduler=none -no-debug -o {component_name}/main.wasm {component_name}/main.go"
-                ),
+                command: "make build".to_string(),
                 watch: vec!["*.go".to_string(), "go.mod".to_string()],
                 env: HashMap::new(),
             },

@@ -6,7 +6,7 @@ component = "{{project-name | kebab_case}}"
 source = "{{project-name | kebab_case}}/app.wasm"
 allowed_outbound_hosts = []
 [component.{{project-name | kebab_case}}.build]
-command = "componentize-py -w spin-http componentize {{project-name | kebab_case}}/src/main.py -o {{project-name | kebab_case}}/app.wasm"
+command = "make -C {{project-name | kebab_case}} build"
 watch = ["src/**/*.py", "pyproject.toml"]
 
 # IMPORTANT: After adding this component, update the tool_components variable

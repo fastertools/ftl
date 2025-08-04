@@ -5,12 +5,59 @@
 package ftl
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"os"
 	"strings"
+)
 
-	spinhttp "github.com/fermyon/spin/sdk/go/v2/http"
+// Utility functions for SDK
+
+// isDebugEnabled checks if debug logging is enabled via environment variable
+func isDebugEnabled() bool {
+	return os.Getenv("FTL_DEBUG") == "true"
+}
+
+// secureLogf provides controlled debug logging without exposing sensitive data
+func secureLogf(format string, args ...interface{}) {
+	if isDebugEnabled() {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
+}
+
+// sanitizePath removes potentially sensitive query parameters from path logging
+func sanitizePath(path string) string {
+	if idx := strings.Index(path, "?"); idx != -1 {
+		return path[:idx] + "?[REDACTED]"
+	}
+	return path
+}
+
+// camelToSnake converts camelCase to snake_case
+func camelToSnake(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteRune('_')
+		}
+		if r >= 'A' && r <= 'Z' {
+			result.WriteRune(r + ('a' - 'A'))
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// Content type constants
+const (
+	ContentTypeText     = "text"
+	ContentTypeImage    = "image"
+	ContentTypeAudio    = "audio"
+	ContentTypeResource = "resource"
 )
 
 // ToolMetadata represents tool metadata returned by GET requests
@@ -228,18 +275,6 @@ func ResourceContent(resource *ResourceContents, annotations *ContentAnnotations
 	}
 }
 
-// camelToSnake converts camelCase to snake_case
-func camelToSnake(s string) string {
-	var result strings.Builder
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result.WriteRune('_')
-		}
-		result.WriteRune(r)
-	}
-	return strings.ToLower(result.String())
-}
-
 // CreateTools creates a Spin HTTP handler for MCP tools.
 //
 // Example:
@@ -267,128 +302,25 @@ func camelToSnake(s string) string {
 //	}
 //
 //	func main() {}
-func CreateTools(tools map[string]ToolDefinition) {
-	// Capture tools in closure
-	toolsCopy := make(map[string]ToolDefinition)
-	for k, v := range tools {
-		toolsCopy[k] = v
-	}
-	
-	spinhttp.Handle(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		method := r.Method
-
-		// Log request for debugging
-		fmt.Printf("[DEBUG] Method: %s, Path: '%s', URI: '%s', Tools count: %d\n", method, path, r.RequestURI, len(toolsCopy))
-		
-		// Debug: Print tool names
-		for key := range toolsCopy {
-			fmt.Printf("[DEBUG] Tool key: %s\n", key)
-		}
-
-		// Handle GET / - return tool metadata
-		if method == "GET" && (path == "/" || path == "") {
-			fmt.Printf("[DEBUG] Handling GET request for tools metadata, found %d tools\n", len(toolsCopy))
-			metadata := make([]ToolMetadata, 0, len(toolsCopy))
-			for key, tool := range toolsCopy {
-				// Use explicit name if provided, otherwise convert from key
-				toolName := tool.Name
-				if toolName == "" {
-					toolName = camelToSnake(key)
-				}
-
-				// Set default input schema if not provided
-				inputSchema := tool.InputSchema
-				if inputSchema == nil {
-					inputSchema = map[string]interface{}{"type": "object"}
-				}
-
-				metadata = append(metadata, ToolMetadata{
-					Name:         toolName,
-					Title:        tool.Title,
-					Description:  tool.Description,
-					InputSchema:  inputSchema,
-					OutputSchema: tool.OutputSchema,
-					Annotations:  tool.Annotations,
-					Meta:         tool.Meta,
-				})
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(metadata)
-			return
-		}
-
-		// Handle POST /{tool_name} - execute tool
-		if method == "POST" && len(path) > 1 {
-			toolName := strings.TrimPrefix(path, "/")
-
-			// Find the tool by name
-			var toolEntry *ToolDefinition
-			for key, tool := range toolsCopy {
-				effectiveName := tool.Name
-				if effectiveName == "" {
-					effectiveName = camelToSnake(key)
-				}
-				if effectiveName == toolName {
-					toolEntry = &tool
-					break
-				}
-			}
-
-			if toolEntry == nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(404)
-				json.NewEncoder(w).Encode(Error(fmt.Sprintf("Tool '%s' not found", toolName)))
-				return
-			}
-
-			// Parse input
-			var input map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-				// Handle empty body
-				input = make(map[string]interface{})
-			}
-
-			// Execute handler
-			result := toolEntry.Handler(input)
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
-
-		// Method not allowed
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Allow", "GET, POST")
-		w.WriteHeader(405)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    -32601,
-				"message": "Method not allowed",
-			},
-		})
-	})
-}
 
 // Type guards for content types
 
 // IsTextContent checks if content is text type
-func IsTextContent(c ToolContent) bool {
-	return c.Type == "text"
+func IsTextContent(c *ToolContent) bool {
+	return c.Type == ContentTypeText
 }
 
 // IsImageContent checks if content is image type
-func IsImageContent(c ToolContent) bool {
-	return c.Type == "image"
+func IsImageContent(c *ToolContent) bool {
+	return c.Type == ContentTypeImage
 }
 
 // IsAudioContent checks if content is audio type
-func IsAudioContent(c ToolContent) bool {
-	return c.Type == "audio"
+func IsAudioContent(c *ToolContent) bool {
+	return c.Type == ContentTypeAudio
 }
 
 // IsResourceContent checks if content is resource type
-func IsResourceContent(c ToolContent) bool {
-	return c.Type == "resource"
+func IsResourceContent(c *ToolContent) bool {
+	return c.Type == ContentTypeResource
 }
