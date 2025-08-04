@@ -208,9 +208,8 @@ jobs:
                 sed -i "s/^Version: .*/Version: ${NEW_VERSION}/" sdk/go/README.md
               else
                 # Add version line after the title if it doesn't exist
-                sed -i "2a\\
-Version: ${NEW_VERSION}\\
-" sdk/go/README.md
+                # Using a more YAML-friendly approach
+                awk 'NR==2 {print; print "Version: '"${NEW_VERSION}"'\n"} NR!=2' sdk/go/README.md > sdk/go/README.md.tmp && mv sdk/go/README.md.tmp sdk/go/README.md
               fi
               
               # Run go mod tidy to ensure module is clean
