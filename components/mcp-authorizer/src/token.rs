@@ -97,7 +97,7 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
         ));
     };
 
-    // Set up validation using configured algorithm (defaults to RS256 like FastMCP)
+    // Set up validation using configured algorithm (defaults to RS256)
     let algorithm = match provider.algorithm.as_deref().unwrap_or("RS256") {
         "HS256" => Algorithm::HS256,
         "HS384" => Algorithm::HS384,

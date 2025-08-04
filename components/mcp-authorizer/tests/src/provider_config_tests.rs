@@ -309,7 +309,6 @@ fn test_no_issuer_validation() {
     
     // Should succeed if issuer validation is disabled
     // Note: Our implementation may still require issuer, so this might fail
-    // This test documents the expected behavior from FastMCP
     assert!(response.status() == 200 || response.status() == 401);
 }
 
@@ -320,7 +319,6 @@ fn test_multiple_expected_audiences() {
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     // Note: Our current implementation might not support multiple audiences in config
-    // This test documents what FastMCP supports
     variables::set("mcp_jwt_audience", "audience1,audience2,audience3");
     
     let (private_key, public_key) = generate_test_key_pair();
@@ -359,7 +357,6 @@ fn test_algorithm_configuration() {
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
     // Note: Our implementation might not have algorithm configuration yet
-    // Note: auth_provider_algorithms was removed as it's no longer supported
     
     let (private_key, public_key) = generate_test_key_pair();
     

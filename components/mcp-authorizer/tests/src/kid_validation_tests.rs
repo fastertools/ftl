@@ -258,11 +258,11 @@ fn test_jwks_token_validation_with_multiple_keys_and_no_kid_in_token() {
     
     let response = spin_test_sdk::perform_request(request);
     
-    // Should fail - multiple keys but no KID in token (matching FastMCP behavior)
+    // Should fail - multiple keys but no KID in token
     assert_eq!(response.status(), 401);
 }
 
-// Test: Token without KID when JWKS has KID (should succeed per FastMCP)
+// Test: Token without KID when JWKS has KID
 #[spin_test]
 fn test_jwks_token_validation_with_no_kid_and_kid_in_jwks() {
     configure_test_provider();
@@ -305,6 +305,6 @@ fn test_jwks_token_validation_with_no_kid_and_kid_in_jwks() {
     
     let response = spin_test_sdk::perform_request(request);
     
-    // Should succeed - when token has no KID, it can match a JWKS key with KID (per FastMCP)
+    // Should succeed - when token has no KID, it can match a JWKS key with KID
     assert_eq!(response.status(), 200);
 }

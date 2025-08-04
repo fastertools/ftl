@@ -34,7 +34,7 @@ class ToolResponse:
 
 class ToolResult:
     """
-    FastMCP-style tool result with simple constructor API.
+    Tool result with simple constructor API.
 
     Examples:
         # Simple text content
@@ -111,7 +111,7 @@ class ToolResult:
 
     def to_mcp_result(self) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], dict[str, Any]]:
         """
-        Convert to MCP result format (FastMCP compatibility).
+        Convert to MCP result format.
 
         Returns:
             Content blocks, or tuple of (content blocks, structured content)

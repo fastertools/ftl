@@ -1,8 +1,8 @@
 """
-FTL SDK for Python - FastMCP-style decorator-based API.
+FTL SDK for Python - Decorator-based API.
 
 This module provides a modern, decorator-based API for creating MCP tools
-that compile to WebAssembly, following the FastMCP patterns.
+that compile to WebAssembly.
 """
 
 import asyncio
@@ -30,7 +30,7 @@ class FTL:
     """
     Main FTL application class providing decorator-based tool registration.
 
-    This class follows the FastMCP pattern of providing a central namespace
+    This class provides a central namespace
     for all MCP operations through decorators.
 
     Example:
@@ -288,7 +288,7 @@ class FTL:
         """
         Convert any function return value to MCP response format.
 
-        This implements FastMCP-style automatic conversion where functions
+        This implements automatic conversion where functions
         can return basic Python types and the framework handles MCP formatting.
 
         Args:

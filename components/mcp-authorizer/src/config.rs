@@ -180,7 +180,7 @@ impl Provider {
             .filter(|s| !s.is_empty())
             .map(|s| vec![s]);
 
-        // Load algorithm (optional, defaults to RS256 like FastMCP)
+        // Load algorithm (optional, defaults to RS256)
         let algorithm = variables::get("mcp_jwt_algorithm")
             .ok()
             .filter(|s| !s.is_empty())

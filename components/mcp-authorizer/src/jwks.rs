@@ -146,7 +146,7 @@ pub fn find_key(jwks: &Jwks, kid: Option<&str>) -> Result<DecodingKey> {
             .find(|k| k.kid.as_deref() == Some(kid))
             .ok_or_else(|| AuthError::InvalidToken(format!("Key with kid '{kid}' not found")))?
     } else {
-        // No KID in token - only allow if there's exactly one key (matching FastMCP)
+        // No KID in token - only allow if there's exactly one key
         if matching_keys.len() == 1 {
             matching_keys
                 .first()
