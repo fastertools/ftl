@@ -24,6 +24,12 @@ on:
       core-crates:
         description: "Core crates changed (affects everything)"
         value: ${{ jobs.detect.outputs.core-crates }}
+      go-sdk:
+        description: "Go SDK files changed"
+        value: ${{ jobs.detect.outputs.go-sdk }}
+      python-sdk:
+        description: "Python SDK files changed"
+        value: ${{ jobs.detect.outputs.python-sdk }}
       ci:
         description: "CI workflow files changed"
         value: ${{ jobs.detect.outputs.ci }}
@@ -40,6 +46,8 @@ jobs:
       mcp-authorizer: ${{ steps.detect.outputs.mcp-authorizer }}
       mcp-gateway: ${{ steps.detect.outputs.mcp-gateway }}
       core-crates: ${{ steps.detect.outputs.core-crates }}
+      go-sdk: ${{ steps.detect.outputs.go-sdk }}
+      python-sdk: ${{ steps.detect.outputs.python-sdk }}
       ci: ${{ steps.detect.outputs.ci }}
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +123,14 @@ jobs:
           CORE_CHANGED=$(check_changes "$core_patterns")
           echo "core-crates=$CORE_CHANGED" >> $GITHUB_OUTPUT
           
+          go_sdk_patterns="^sdk/go/"
+          GO_SDK_CHANGED=$(check_changes "$go_sdk_patterns")
+          echo "go-sdk=$GO_SDK_CHANGED" >> $GITHUB_OUTPUT
+          
+          python_sdk_patterns="^sdk/python/"
+          PYTHON_SDK_CHANGED=$(check_changes "$python_sdk_patterns")
+          echo "python-sdk=$PYTHON_SDK_CHANGED" >> $GITHUB_OUTPUT
+          
           ci_patterns="^\.github/workflows/"
           CI_CHANGED=$(check_changes "$ci_patterns")
           echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
@@ -128,6 +144,8 @@ jobs:
           echo "CLI changed: $CLI_CHANGED"
           echo "Rust SDK changed: $RUST_SDK_CHANGED"
           echo "TypeScript SDK changed: $TYPESCRIPT_SDK_CHANGED"
+          echo "Go SDK changed: $GO_SDK_CHANGED"
+          echo "Python SDK changed: $PYTHON_SDK_CHANGED"
           echo "Components changed: $COMPONENTS_CHANGED"
           echo "MCP Authorizer changed: $MCP_AUTH_CHANGED"
           echo "MCP Gateway changed: $MCP_GW_CHANGED"

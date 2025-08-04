@@ -4,7 +4,7 @@ An FTL MCP tool written in Go.
 
 ## Prerequisites
 
-- Go 1.21 or higher
+- Go 1.23 or higher
 - TinyGo 0.30.0+ (for WebAssembly compilation)
 - golangci-lint (for development)
 
@@ -193,7 +193,7 @@ ftl eng deploy
 If you encounter build errors:
 
 1. Ensure TinyGo is installed: `tinygo version`
-2. Check Go version: `go version` (must be 1.21+)
+2. Check Go version: `go version` (must be 1.23+)
 3. Run `go mod tidy` to fix dependencies
 4. Check for TinyGo-incompatible packages
 
