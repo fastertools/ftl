@@ -125,24 +125,21 @@ jobs:
     name: Lint Go SDK
     if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.23', '1.24']
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.23'
       
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('sdk/go/go.sum') }}
+          key: ${{ runner.os }}-go-1.23-${{ hashFiles('sdk/go/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ matrix.go-version }}-
+            ${{ runner.os }}-go-1.23-
       
       - name: Install golangci-lint
         working-directory: sdk/go
@@ -168,24 +165,21 @@ jobs:
     name: Test Go SDK
     if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.23', '1.24']
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.23'
       
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('sdk/go/go.sum') }}
+          key: ${{ runner.os }}-go-1.23-${{ hashFiles('sdk/go/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ matrix.go-version }}-
+            ${{ runner.os }}-go-1.23-
       
       - name: Install dependencies
         working-directory: sdk/go
@@ -213,27 +207,24 @@ jobs:
     name: Test Python SDK
     if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
     defaults:
       run:
         working-directory: sdk/python
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
       
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('sdk/python/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-3.10-${{ hashFiles('sdk/python/pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-3.10-
             ${{ runner.os }}-pip-
       
       - name: Install tox
@@ -245,7 +236,6 @@ jobs:
         run: tox
       
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'
         uses: codecov/codecov-action@v4
         with:
           file: ./sdk/python/coverage.xml
