@@ -24,23 +24,19 @@ anyhow = "1"
 spin-sdk = "3.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-base64 = "0.22"
 jsonwebtoken = "9.3"
-# For error handling
-thiserror = "1.0"
 # For time handling
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
-# For hashing
-sha2 = "0.10"
-hex = "0.4"
 # For URL parsing
 url = "2.5"
-# For RSA key handling
-rsa = "0.9"
-# For random number generation (for test utilities)
-rand = "0.8"
 # For async operations
 futures = "0.3"
+
+[dev-dependencies]
+# For RSA key handling in tests
+rsa = "0.9"
+# For random number generation in tests
+rand = "0.8"
 
 [lints.rust]
 unsafe_code = "forbid"
