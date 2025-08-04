@@ -1,11 +1,29 @@
 [project]
-name = "authkit"
+name = "authkit-example"
 version = "0.1.0"
 description = "FTL MCP server for hosting MCP tools"
 authors = []
 
 [auth]
-enabled = false
+enabled = true
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
+validate_arguments = true
+
+[auth.authkit]
+issuer = "https://divine-lion-50-staging.authkit.app"
+# audience = "mcp-api"  # optional
+# required_scopes = "mcp:read,mcp:write"  # optional
+
+# Uncomment for development with static tokens:
+# [auth]
+# enabled = true
+# 
+# [auth.static_token]
+# tokens = "dev-token:dev-client:dev-user:read,write"
+# required_scopes = "read"
 
 [tools.example-tool-component]
 path = "example-tool-component"
@@ -18,8 +36,3 @@ watch = [
     "src/**/*.rs",
     "Cargo.toml",
 ]
-
-[mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.9"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.9"
-validate_arguments = true

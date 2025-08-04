@@ -1501,21 +1501,21 @@ command = "cargo build --release --target wasm32-wasip1"
             assert!(req.variables.contains_key("auth_enabled"));
             assert_eq!(req.variables.get("auth_enabled"), Some(&"true".to_string()));
 
-            assert!(req.variables.contains_key("auth_provider_type"));
+            assert!(req.variables.contains_key("mcp_provider_type"));
             assert_eq!(
-                req.variables.get("auth_provider_type"),
-                Some(&"authkit".to_string())
+                req.variables.get("mcp_provider_type"),
+                Some(&"jwt".to_string())
             );
 
-            assert!(req.variables.contains_key("auth_provider_issuer"));
+            assert!(req.variables.contains_key("mcp_jwt_issuer"));
             assert_eq!(
-                req.variables.get("auth_provider_issuer"),
+                req.variables.get("mcp_jwt_issuer"),
                 Some(&"https://test.authkit.app".to_string())
             );
 
-            assert!(req.variables.contains_key("auth_provider_audience"));
+            assert!(req.variables.contains_key("mcp_jwt_audience"));
             assert_eq!(
-                req.variables.get("auth_provider_audience"),
+                req.variables.get("mcp_jwt_audience"),
                 Some(&"my-api".to_string())
             );
 
@@ -1722,17 +1722,17 @@ command = "cargo build --release --target wasm32-wasip1"
                 Some(&"false".to_string())
             ); // CLI override
 
-            assert!(req.variables.contains_key("auth_provider_issuer"));
+            assert!(req.variables.contains_key("mcp_jwt_issuer"));
             assert_eq!(
-                req.variables.get("auth_provider_issuer"),
+                req.variables.get("mcp_jwt_issuer"),
                 Some(&"https://override.authkit.app".to_string())
             ); // CLI override
 
             // ftl.toml values should still be present for non-overridden variables
-            assert!(req.variables.contains_key("auth_provider_type"));
+            assert!(req.variables.contains_key("mcp_provider_type"));
             assert_eq!(
-                req.variables.get("auth_provider_type"),
-                Some(&"authkit".to_string())
+                req.variables.get("mcp_provider_type"),
+                Some(&"jwt".to_string())
             );
 
             Ok(types::CreateDeploymentResponse {
@@ -1764,7 +1764,7 @@ command = "cargo build --release --target wasm32-wasip1"
         deps,
         deploy_args_with_variables(vec![
             "auth_enabled=false".to_string(),
-            "auth_provider_issuer=https://override.authkit.app".to_string(),
+            "mcp_jwt_issuer=https://override.authkit.app".to_string(),
         ]),
     )
     .await;

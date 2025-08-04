@@ -84,15 +84,20 @@ pub struct AuthConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// `AuthKit` configuration (mutually exclusive with oidc)
+    /// `AuthKit` configuration (mutually exclusive with oidc and static)
     #[serde(default)]
     #[garde(dive)]
     pub authkit: Option<AuthKitConfig>,
 
-    /// OIDC configuration (mutually exclusive with authkit)
+    /// OIDC configuration (mutually exclusive with authkit and static)
     #[serde(default)]
     #[garde(dive)]
     pub oidc: Option<OidcConfig>,
+
+    /// Static token configuration (mutually exclusive with authkit and oidc)
+    #[serde(default)]
+    #[garde(dive)]
+    pub static_token: Option<StaticTokenConfig>,
 }
 
 /// AuthKit-specific configuration
@@ -106,6 +111,11 @@ pub struct AuthKitConfig {
     #[serde(default)]
     #[garde(skip)]
     pub audience: String,
+
+    /// Required scopes (comma-separated)
+    #[serde(default)]
+    #[garde(skip)]
+    pub required_scopes: String,
 }
 
 /// OIDC-specific configuration
@@ -120,31 +130,55 @@ pub struct OidcConfig {
     #[garde(skip)]
     pub audience: String,
 
-    /// Provider name (e.g., "auth0", "okta")
-    #[garde(length(min = 1))]
-    pub provider_name: String,
-
-    /// JWKS URI
-    #[garde(length(min = 1))]
+    /// JWKS URI (optional - can be auto-discovered for some providers)
+    #[serde(default)]
+    #[garde(skip)]
     pub jwks_uri: String,
 
-    /// Authorization endpoint
-    #[garde(length(min = 1))]
+    /// Public key in PEM format (optional - alternative to JWKS)
+    #[serde(default)]
+    #[garde(skip)]
+    pub public_key: String,
+
+    /// JWT algorithm (e.g., RS256, ES256)
+    #[serde(default)]
+    #[garde(skip)]
+    pub algorithm: String,
+
+    /// Required scopes (comma-separated)
+    #[serde(default)]
+    #[garde(skip)]
+    pub required_scopes: String,
+
+    /// Authorization endpoint (optional)
+    #[serde(default)]
+    #[garde(skip)]
     pub authorize_endpoint: String,
 
-    /// Token endpoint
-    #[garde(length(min = 1))]
+    /// Token endpoint (optional)
+    #[serde(default)]
+    #[garde(skip)]
     pub token_endpoint: String,
 
     /// User info endpoint (optional)
     #[serde(default)]
     #[garde(skip)]
     pub userinfo_endpoint: String,
+}
 
-    /// Allowed domains (comma-separated)
+/// Static token configuration (for development/testing)
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct StaticTokenConfig {
+    /// Static token definitions
+    /// Format: "token:client_id:sub:scope1,scope2[:expires_at]"
+    /// Multiple tokens separated by semicolons
+    #[garde(length(min = 1))]
+    pub tokens: String,
+
+    /// Required scopes (comma-separated)
     #[serde(default)]
     #[garde(skip)]
-    pub allowed_domains: String,
+    pub required_scopes: String,
 }
 
 /// Deployment configuration for a tool
@@ -261,12 +295,12 @@ pub struct BuildConfig {
 #[garde(allow_unvalidated)]
 pub struct McpConfig {
     /// Gateway component registry URI
-    /// Example: "ghcr.io/fastertools/mcp-gateway:0.0.9"
+    /// Example: "ghcr.io/fastertools/mcp-gateway:0.0.10"
     #[serde(default = "default_gateway_uri")]
     pub gateway: String,
 
     /// MCP authorizer component registry URI
-    /// Example: "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+    /// Example: "ghcr.io/fastertools/mcp-authorizer:0.0.10"
     #[serde(default = "default_authorizer_uri")]
     pub authorizer: String,
 
@@ -280,11 +314,11 @@ fn default_version() -> String {
 }
 
 fn default_gateway_uri() -> String {
-    "ghcr.io/fastertools/mcp-gateway:0.0.9".to_string()
+    "ghcr.io/fastertools/mcp-gateway:0.0.10".to_string()
 }
 
 fn default_authorizer_uri() -> String {
-    "ghcr.io/fastertools/mcp-authorizer:0.0.9".to_string()
+    "ghcr.io/fastertools/mcp-authorizer:0.0.10".to_string()
 }
 
 const fn default_true() -> bool {
@@ -331,9 +365,11 @@ impl AuthConfig {
     /// Get the provider type as a string
     pub const fn provider_type(&self) -> &str {
         if self.authkit.is_some() {
-            "authkit"
+            "jwt"  // AuthKit uses JWT provider
         } else if self.oidc.is_some() {
-            "oidc"
+            "jwt"  // OIDC uses JWT provider
+        } else if self.static_token.is_some() {
+            "static"
         } else {
             ""
         }
@@ -356,6 +392,19 @@ impl AuthConfig {
             &authkit.audience
         } else if let Some(oidc) = &self.oidc {
             &oidc.audience
+        } else {
+            ""
+        }
+    }
+
+    /// Get the required scopes
+    pub fn required_scopes(&self) -> &str {
+        if let Some(authkit) = &self.authkit {
+            &authkit.required_scopes
+        } else if let Some(oidc) = &self.oidc {
+            &oidc.required_scopes
+        } else if let Some(static_token) = &self.static_token {
+            &static_token.required_scopes
         } else {
             ""
         }
@@ -429,15 +478,15 @@ impl FtlConfig {
 
         // Additional auth validation
         if config.auth.enabled {
-            match (&config.auth.authkit, &config.auth.oidc) {
-                (None, None) => {
+            match (&config.auth.authkit, &config.auth.oidc, &config.auth.static_token) {
+                (None, None, None) => {
                     return Err(anyhow::anyhow!(
-                        "Either 'authkit' or 'oidc' configuration must be provided when auth is enabled"
+                        "Either 'authkit', 'oidc', or 'static_token' configuration must be provided when auth is enabled"
                     ));
                 }
-                (Some(_), Some(_)) => {
+                (Some(_), Some(_), _) | (Some(_), _, Some(_)) | (_, Some(_), Some(_)) => {
                     return Err(anyhow::anyhow!(
-                        "Only one of 'authkit' or 'oidc' can be configured, not both"
+                        "Only one of 'authkit', 'oidc', or 'static_token' can be configured at a time"
                     ));
                 }
                 _ => {} // One provider configured, which is correct
@@ -521,7 +570,7 @@ enabled = true
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Either 'authkit' or 'oidc' configuration must be provided")
+                .contains("Either 'authkit', 'oidc', or 'static_token' configuration must be provided")
         );
     }
 
@@ -662,7 +711,7 @@ audience = "my-api"
         let result = FtlConfig::parse(content);
         assert!(result.is_ok());
         let config = result.unwrap();
-        assert_eq!(config.auth.provider_type(), "authkit");
+        assert_eq!(config.auth.provider_type(), "jwt");
         assert_eq!(config.auth.issuer(), "https://my-tenant.authkit.app");
         assert_eq!(config.auth.audience(), "my-api");
 
@@ -677,7 +726,6 @@ enabled = true
 [auth.oidc]
 issuer = "https://auth.example.com"
 audience = "api"
-provider_name = "okta"
 jwks_uri = "https://auth.example.com/.well-known/jwks.json"
 authorize_endpoint = "https://auth.example.com/authorize"
 token_endpoint = "https://auth.example.com/token"
@@ -685,7 +733,7 @@ token_endpoint = "https://auth.example.com/token"
         let result = FtlConfig::parse(content);
         assert!(result.is_ok());
         let config = result.unwrap();
-        assert_eq!(config.auth.provider_type(), "oidc");
+        assert_eq!(config.auth.provider_type(), "jwt");
         assert_eq!(config.auth.issuer(), "https://auth.example.com");
 
         // Test auth enabled with no provider - should fail
@@ -702,7 +750,7 @@ enabled = true
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Either 'authkit' or 'oidc' configuration must be provided")
+                .contains("Either 'authkit', 'oidc', or 'static_token' configuration must be provided")
         );
 
         // Test auth enabled with both providers - should fail
@@ -720,7 +768,6 @@ audience = "my-api"
 [auth.oidc]
 issuer = "https://auth.example.com"
 audience = "api"
-provider_name = "okta"
 jwks_uri = "https://auth.example.com/.well-known/jwks.json"
 authorize_endpoint = "https://auth.example.com/authorize"
 token_endpoint = "https://auth.example.com/token"
@@ -731,7 +778,7 @@ token_endpoint = "https://auth.example.com/token"
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Only one of 'authkit' or 'oidc' can be configured")
+                .contains("Only one of 'authkit', 'oidc', or 'static_token' can be configured")
         );
 
         // Test authkit with missing required field
@@ -763,22 +810,18 @@ enabled = true
 [auth.oidc]
 issuer = "https://example.com"
 audience = "my-api"
-provider_name = "okta"
 jwks_uri = "https://example.com/.well-known/jwks.json"
 authorize_endpoint = "https://example.com/oauth/authorize"
 token_endpoint = "https://example.com/oauth/token"
 userinfo_endpoint = "https://example.com/oauth/userinfo"
-allowed_domains = "example.com,test.com"
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_ok());
         let config = result.unwrap();
         assert!(config.auth.oidc.is_some());
         let oidc = config.auth.oidc.as_ref().unwrap();
-        assert_eq!(oidc.provider_name, "okta");
         assert_eq!(oidc.jwks_uri, "https://example.com/.well-known/jwks.json");
         assert_eq!(oidc.userinfo_endpoint, "https://example.com/oauth/userinfo");
-        assert_eq!(oidc.allowed_domains, "example.com,test.com");
     }
 
     #[test]
@@ -822,10 +865,10 @@ name = "test-project"
         assert_eq!(config.auth.provider_type(), "");
 
         // Check MCP defaults
-        assert_eq!(config.mcp.gateway, "ghcr.io/fastertools/mcp-gateway:0.0.9");
+        assert_eq!(config.mcp.gateway, "ghcr.io/fastertools/mcp-gateway:0.0.10");
         assert_eq!(
             config.mcp.authorizer,
-            "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+            "ghcr.io/fastertools/mcp-authorizer:0.0.10"
         );
         assert!(config.mcp.validate_arguments);
     }
@@ -870,7 +913,7 @@ watch = ["src/**/*.ts", "package.json"]
         assert_eq!(config.project.name, "my-project");
         assert_eq!(config.project.version, "1.0.0");
         assert!(config.auth.enabled);
-        assert_eq!(config.auth.provider_type(), "authkit");
+        assert_eq!(config.auth.provider_type(), "jwt");
         assert_eq!(config.tools.len(), 2);
         assert_eq!(
             config.tools["echo"].build.command,

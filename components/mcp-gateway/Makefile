@@ -1,32 +1,52 @@
-.PHONY: all build test lint format check clean
+.PHONY: build test clean lint check release
 
-all: format lint test build
-
+# Default target
 build:
-	cargo component build --release --target wasm32-wasip1
+	spin build
 
+# Run tests
 test:
-	cargo test
+	spin test
 
-lint:
-	cargo clippy -- -D warnings
-
-format:
-	cargo fmt
-
-check:
-	cargo fmt -- --check
-	cargo clippy -- -D warnings
-	cargo test
-
+# Clean build artifacts
 clean:
 	cargo clean
 
-# Development helpers
-watch:
-	cargo watch -x check -x test
+# Run linter
+lint:
+	cargo clippy -- -D warnings
 
-publish:
+# Format code
+format:
+	cargo fmt
+
+# Check formatting
+format-check:
+	cargo fmt -- --check
+
+# Run all checks (format, lint, test)
+check: format-check lint test
+
+# Build optimized release
+release: clean
+	cargo build --target wasm32-wasip1 --release
+	@echo "Release build complete: target/wasm32-wasip1/release/ftl_mcp_gateway.wasm"
+
+publish: build
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
 	wkg oci push ghcr.io/fastertools/mcp-gateway:$$VERSION target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
 	wkg oci push ghcr.io/fastertools/mcp-gateway:latest target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
+
+# Help
+help:
+	@echo "Available targets:"
+	@echo "  build        - Build the MCP gateway for WASM"
+	@echo "  test         - Run tests"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  lint         - Run clippy linter"
+	@echo "  format       - Format code"
+	@echo "  format-check - Check code formatting"
+	@echo "  check        - Run all checks (format, lint, test)"
+	@echo "  release      - Build optimized release"
+	@echo "  publish      - Publish to ghcr.io"
+	@echo "  help         - Show this help message"

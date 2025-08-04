@@ -279,8 +279,10 @@ fn test_transpile_with_auth() {
             authkit: Some(AuthKitConfig {
                 issuer: "https://my-tenant.authkit.app".to_string(),
                 audience: "mcp-api".to_string(),
+                required_scopes: String::new(),
             }),
             oidc: None,
+            static_token: None,
         },
         tools: HashMap::new(),
         mcp: McpConfig::default(),
@@ -291,11 +293,11 @@ fn test_transpile_with_auth() {
 
     // Check auth configuration
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
-    assert!(result.contains("auth_provider_type = { default = \"authkit\" }"));
+    assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
     assert!(
-        result.contains("auth_provider_issuer = { default = \"https://my-tenant.authkit.app\" }")
+        result.contains("mcp_jwt_issuer = { default = \"https://my-tenant.authkit.app\" }")
     );
-    assert!(result.contains("auth_provider_audience = { default = \"mcp-api\" }"));
+    assert!(result.contains("mcp_jwt_audience = { default = \"mcp-api\" }"));
 
     // Validate and check auth variables
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -304,8 +306,8 @@ fn test_transpile_with_auth() {
         SpinVariable::Default { default } if default == "true"
     ));
     assert!(matches!(
-        &spin_config.variables["auth_provider_type"],
-        SpinVariable::Default { default } if default == "authkit"
+        &spin_config.variables["mcp_provider_type"],
+        SpinVariable::Default { default } if default == "jwt"
     ));
 }
 
@@ -324,13 +326,15 @@ fn test_transpile_with_oidc_auth() {
             oidc: Some(OidcConfig {
                 issuer: "https://auth.example.com".to_string(),
                 audience: "api".to_string(),
-                provider_name: "okta".to_string(),
                 jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
+                public_key: String::new(),
+                algorithm: String::new(),
+                required_scopes: String::new(),
                 authorize_endpoint: "https://auth.example.com/authorize".to_string(),
                 token_endpoint: "https://auth.example.com/token".to_string(),
                 userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
-                allowed_domains: "example.com,test.com".to_string(),
             }),
+            static_token: None,
         },
         tools: HashMap::new(),
         mcp: McpConfig::default(),
@@ -341,20 +345,63 @@ fn test_transpile_with_oidc_auth() {
 
     // Check OIDC configuration
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
-    assert!(result.contains("auth_provider_type = { default = \"oidc\" }"));
-    assert!(result.contains("auth_provider_name = { default = \"okta\" }"));
+    assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
     assert!(result.contains(
-        "auth_provider_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
+        "mcp_jwt_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
     ));
-    assert!(
-        result.contains("auth_provider_allowed_domains = { default = \"example.com,test.com\" }")
-    );
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
     assert!(matches!(
-        &spin_config.variables["auth_provider_type"],
-        SpinVariable::Default { default } if default == "oidc"
+        &spin_config.variables["mcp_provider_type"],
+        SpinVariable::Default { default } if default == "jwt"
+    ));
+}
+
+#[test]
+fn test_transpile_with_static_token_auth() {
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "static-auth-project".to_string(),
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+        },
+        auth: AuthConfig {
+            enabled: true,
+            authkit: None,
+            oidc: None,
+            static_token: Some(StaticTokenConfig {
+                tokens: "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600".to_string(),
+                required_scopes: "read".to_string(),
+            }),
+        },
+        tools: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    println!("Generated TOML with static token auth:\n{result}");
+
+    // Check auth is enabled
+    assert!(result.contains("auth_enabled = { default = \"true\" }"));
+    
+    // Check static provider type
+    assert!(result.contains("mcp_provider_type = { default = \"static\" }"));
+    assert!(result.contains("mcp_static_tokens = { default = \"dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600\" }"));
+    assert!(result.contains("mcp_jwt_required_scopes = { default = \"read\" }"));
+    
+    // Check component names
+    assert!(result.contains("[component.mcp]"));
+    assert!(result.contains("[component.ftl-mcp-gateway]"));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["mcp_provider_type"],
+        SpinVariable::Default { default } if default == "static"
     ));
 }
 
@@ -584,8 +631,10 @@ fn test_transpile_complete_example() {
             authkit: Some(AuthKitConfig {
                 issuer: "https://example.authkit.app".to_string(),
                 audience: "complete-example-api".to_string(),
+                required_scopes: String::new(),
             }),
             oidc: None,
+            static_token: None,
         },
         tools,
         mcp: McpConfig {
@@ -654,8 +703,8 @@ fn test_transpile_complete_example() {
         SpinVariable::Default { default } if default == "true"
     ));
     assert!(matches!(
-        &spin_config.variables["auth_provider_type"],
-        SpinVariable::Default { default } if default == "authkit"
+        &spin_config.variables["mcp_provider_type"],
+        SpinVariable::Default { default } if default == "jwt"
     ));
 }
 
@@ -946,7 +995,7 @@ fn test_http_trigger_generation() {
 
     // Check trigger generation
     assert!(result.contains("[[trigger.http]]"));
-    assert!(result.contains("route = \"/mcp\""));
+    assert!(result.contains("route = \"/...\""));
 
     // Auth is disabled by default, so OAuth endpoints should NOT be present
     assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
@@ -977,6 +1026,7 @@ fn test_auth_disabled_omits_authorizer() {
             enabled: false,
             authkit: None,
             oidc: None,
+            static_token: None,
         },
         tools: HashMap::new(),
         mcp: McpConfig::default(),
@@ -999,16 +1049,15 @@ fn test_auth_disabled_omits_authorizer() {
     assert!(!result.contains("/.well-known/oauth-authorization-server"));
 
     // Check that auth variables are NOT included (except auth_enabled)
-    assert!(!result.contains("auth_provider_type"));
-    assert!(!result.contains("auth_provider_issuer"));
-    assert!(!result.contains("auth_provider_audience"));
-    assert!(!result.contains("auth_provider_name"));
-    assert!(!result.contains("auth_provider_jwks_uri"));
-    assert!(!result.contains("auth_gateway_url"));
-    assert!(!result.contains("auth_trace_header"));
+    assert!(!result.contains("mcp_provider_type"));
+    assert!(!result.contains("mcp_jwt_issuer"));
+    assert!(!result.contains("mcp_jwt_audience"));
+    assert!(!result.contains("mcp_jwt_jwks_uri"));
+    assert!(!result.contains("mcp_gateway_url"));
+    assert!(!result.contains("mcp_trace_header"));
 
-    // Check that /mcp route points directly to gateway (named "mcp")
-    assert!(result.contains("route = \"/mcp\""));
+    // Check that wildcard route points directly to gateway (named "mcp")
+    assert!(result.contains("route = \"/...\""));
     assert!(result.contains("component = \"mcp\""));
 
     // Validate the generated TOML
@@ -1042,8 +1091,10 @@ fn test_auth_enabled_includes_authorizer() {
             authkit: Some(AuthKitConfig {
                 issuer: "https://example.authkit.app".to_string(),
                 audience: "test-api".to_string(),
+                required_scopes: String::new(),
             }),
             oidc: None,
+            static_token: None,
         },
         tools: HashMap::new(),
         mcp: McpConfig::default(),
@@ -1060,24 +1111,23 @@ fn test_auth_enabled_includes_authorizer() {
     // Check that MCP authorizer component IS present
     assert!(result.contains("[component.mcp]"));
 
-    // Check that OAuth endpoints ARE present
-    assert!(result.contains("/.well-known/oauth-protected-resource"));
-    assert!(result.contains("/.well-known/oauth-authorization-server"));
+    // Check that wildcard route is present
+    assert!(result.contains("route = \"/...\""));
 
     // Check that auth variables ARE included
-    assert!(result.contains("auth_provider_type"));
-    assert!(result.contains("auth_provider_issuer"));
-    assert!(result.contains("auth_provider_audience"));
-    assert!(result.contains("auth_gateway_url"));
-    assert!(result.contains("auth_trace_header"));
+    assert!(result.contains("mcp_provider_type"));
+    assert!(result.contains("mcp_jwt_issuer"));
+    assert!(result.contains("mcp_jwt_audience"));
+    assert!(result.contains("mcp_gateway_url"));
+    assert!(result.contains("mcp_trace_header"));
 
-    // Check that /mcp route points to authorizer
-    let mcp_route_matches: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
-    assert!(!mcp_route_matches.is_empty(), "Should have /mcp route");
+    // Check that wildcard route points to authorizer
+    let wildcard_route_matches: Vec<_> = result.match_indices("route = \"/...\"").collect();
+    assert!(!wildcard_route_matches.is_empty(), "Should have wildcard route");
 
-    // Find the component for the /mcp route
-    let mcp_route_pos = mcp_route_matches[0].0;
-    let after_route = &result[mcp_route_pos..];
+    // Find the component for the wildcard route
+    let wildcard_route_pos = wildcard_route_matches[0].0;
+    let after_route = &result[wildcard_route_pos..];
     assert!(after_route.contains("component = \"mcp\""));
 
     // Check that gateway has private route
@@ -1133,6 +1183,7 @@ fn test_auth_disabled_with_tools() {
             enabled: false,
             authkit: None,
             oidc: None,
+            static_token: None,
         },
         tools,
         mcp: McpConfig::default(),
@@ -1155,13 +1206,13 @@ fn test_auth_disabled_with_tools() {
     // Check that tool component exists
     assert!(result.contains("[component.my-tool]"));
 
-    // Check that /mcp route points directly to gateway
-    let mcp_routes: Vec<_> = result.match_indices("route = \"/mcp\"").collect();
-    assert_eq!(mcp_routes.len(), 1, "Should have exactly one /mcp route");
+    // Check that wildcard route points directly to gateway
+    let wildcard_routes: Vec<_> = result.match_indices("route = \"/...\"").collect();
+    assert_eq!(wildcard_routes.len(), 1, "Should have exactly one wildcard route");
 
     // Verify it's followed by gateway component named "mcp"
-    let after_mcp = &result[mcp_routes[0].0..];
-    assert!(after_mcp.contains("component = \"mcp\""));
+    let after_wildcard = &result[wildcard_routes[0].0..];
+    assert!(after_wildcard.contains("component = \"mcp\""));
 
     // Check that tool has private route
     assert!(result.contains("component = \"my-tool\""));

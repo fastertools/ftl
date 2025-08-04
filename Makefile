@@ -35,6 +35,7 @@ lint:
 # Run tests
 test:
 	cargo nextest run
+	cd components/mcp-authorizer && spin build && spin test
 
 # Run tests with coverage
 coverage:

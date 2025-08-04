@@ -14,22 +14,32 @@ First, ensure you have a WorkOS AuthKit domain. You'll need the domain URL (e.g.
 
 ### 2. Configure Authentication
 
-Set the AuthKit domain using an environment variable:
+Update the `ftl.toml` file to enable AuthKit authentication:
 
-```bash
-export SPIN_VARIABLE_AUTHKIT_DOMAIN="https://your-tenant.authkit.app"
+```toml
+[auth]
+enabled = true
+
+[auth.authkit]
+issuer = "https://your-tenant.authkit.app"
+audience = "mcp-api"  # optional
+required_scopes = "mcp:read,mcp:write"  # optional
 ```
 
-Optionally, require specific scopes for API access:
+Alternatively, you can override settings with environment variables:
 
 ```bash
-export SPIN_VARIABLE_MCP_REQUIRED_SCOPES="mcp:read,mcp:write"
+export SPIN_VARIABLE_MCP_JWT_ISSUER="https://your-tenant.authkit.app"
+export SPIN_VARIABLE_MCP_JWT_AUDIENCE="mcp-api"
+export SPIN_VARIABLE_MCP_JWT_REQUIRED_SCOPES="mcp:read,mcp:write"
 ```
+
+Note: The old `SPIN_VARIABLE_AUTHKIT_DOMAIN` variable is no longer used. Use `SPIN_VARIABLE_MCP_JWT_ISSUER` instead.
 
 ### 3. Start the Server
 
 ```bash
-spin up
+ftl up
 ```
 
 The server will be available at http://localhost:3000/mcp
@@ -80,10 +90,7 @@ curl http://localhost:3000/.well-known/openid-configuration
 ftl add my-tool --language rust
 ```
 
-Then add to `tool_components` in spin.toml:
-```toml
-tool_components = { default = "example-tool-component,my-tool" }
-```
+The tool will be automatically included in the generated spin.toml.
 
 ### Pre-built Tools
 
@@ -95,35 +102,45 @@ ftl tools add calculator
 
 ### Required Configuration
 
-- `SPIN_VARIABLE_AUTHKIT_DOMAIN`: Your WorkOS AuthKit domain (e.g., `https://your-tenant.authkit.app`)
+- AuthKit issuer in `ftl.toml` or `SPIN_VARIABLE_MCP_JWT_ISSUER` environment variable
 
 ### Optional Configuration
 
-- `SPIN_VARIABLE_MCP_REQUIRED_SCOPES`: Comma-separated list of required scopes (e.g., `read,write,admin`)
+- `audience`: Expected audience for tokens
+- `required_scopes`: Comma-separated list of required scopes (e.g., `mcp:read,mcp:write`)
 
 ### Advanced Configuration
 
-For non-AuthKit JWT providers, you can manually configure the JWKS endpoint by modifying the spin.toml variables directly or using environment variables:
+For non-AuthKit JWT providers, configure OIDC in `ftl.toml`:
 
-```bash
-export SPIN_VARIABLE_MCP_JWT_ISSUER="https://auth.example.com"
-export SPIN_VARIABLE_MCP_JWT_JWKS_URI="https://auth.example.com/.well-known/jwks.json"
-export SPIN_VARIABLE_MCP_JWT_AUDIENCE="your-api-audience"
+```toml
+[auth]
+enabled = true
+
+[auth.oidc]
+issuer = "https://auth.example.com"
+audience = "your-api-audience"  # optional
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+required_scopes = "read,write"  # optional
 ```
 
 ## Development Mode
 
 For local development without authentication, you can use static tokens:
 
-1. Create a `.env.local` file:
-```bash
-MCP_PROVIDER_TYPE=static
-MCP_STATIC_TOKENS="dev-token:dev-client:dev-user:read,write"
+1. Configure static tokens in `ftl.toml`:
+```toml
+[auth]
+enabled = true
+
+[auth.static_token]
+tokens = "dev-token:dev-client:dev-user:read,write"
+required_scopes = "read"  # optional
 ```
 
-2. Start with local config:
+2. Start the server:
 ```bash
-spin up --env-file .env.local
+ftl up
 ```
 
 3. Use the static token:
@@ -142,7 +159,7 @@ Deploy your authenticated MCP server:
 ftl deploy
 ```
 
-Make sure to set the `SPIN_VARIABLE_AUTHKIT_DOMAIN` environment variable in your deployment environment.
+Make sure to configure the appropriate authentication settings in your `ftl.toml` or through environment variables.
 
 ## How It Works
 

@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-mcp-authorizer"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "anyhow",
  "base64",
@@ -1166,7 +1166,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-mcp-gateway"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "anyhow",
  "ftl-sdk",
