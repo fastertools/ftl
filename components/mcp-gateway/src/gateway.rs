@@ -102,12 +102,8 @@ impl McpGateway {
                 if errors.is_empty() {
                     Ok(())
                 } else {
-                    let error_messages: Vec<String> = errors
-                        .iter()
-                        .map(|error| {
-                            format!("Validation error at {}: {}", error.instance_path, error)
-                        })
-                        .collect();
+                    let error_messages: Vec<String> =
+                        errors.iter().map(|error| format!("{error}")).collect();
                     Err(format!(
                         "Invalid arguments for tool '{}': {}",
                         tool_name,
@@ -296,7 +292,7 @@ impl McpGateway {
                     return JsonRpcResponse::error(
                         request.id,
                         ErrorCode::INVALID_PARAMS.0,
-                        &format!("Invalid call tool parameters: {e}"),
+                        &format!("Invalid params: {e}"),
                     );
                 }
             },
@@ -304,7 +300,7 @@ impl McpGateway {
                 return JsonRpcResponse::error(
                     request.id,
                     ErrorCode::INVALID_PARAMS.0,
-                    "Missing call tool parameters",
+                    "Invalid params: missing required parameters",
                 );
             }
         };
@@ -315,7 +311,7 @@ impl McpGateway {
             return JsonRpcResponse::error(
                 request.id,
                 ErrorCode::INVALID_PARAMS.0,
-                &format!("Tool '{}' not found", params.name),
+                &format!("Unknown tool: {}", params.name),
             );
         };
 
@@ -330,7 +326,7 @@ impl McpGateway {
                 return JsonRpcResponse::error(
                     request.id,
                     ErrorCode::INVALID_PARAMS.0,
-                    &validation_error,
+                    &format!("Invalid params: {validation_error}"),
                 );
             }
         }
@@ -345,10 +341,14 @@ impl McpGateway {
                 Err(e) => JsonRpcResponse::error(
                     request.id,
                     ErrorCode::INTERNAL_ERROR.0,
-                    &format!("Failed to serialize tool response: {e}"),
+                    &format!("Internal error: {e}"),
                 ),
             },
-            Err(e) => JsonRpcResponse::error(request.id, ErrorCode::INTERNAL_ERROR.0, &e),
+            Err(e) => JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INTERNAL_ERROR.0,
+                &format!("Internal error: {e}"),
+            ),
         }
     }
 
@@ -398,8 +398,26 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     }
 
     // Parse JSON-RPC request
-    let request: JsonRpcRequest = match serde_json::from_slice(req.body()) {
-        Ok(r) => r,
+    let request: JsonRpcRequest = match serde_json::from_slice::<JsonRpcRequest>(req.body()) {
+        Ok(r) => {
+            // Validate JSON-RPC version
+            if r.jsonrpc != "2.0" {
+                let error_response = JsonRpcResponse::error(
+                    r.id,
+                    ErrorCode::INVALID_REQUEST.0,
+                    "Unsupported JSON-RPC version",
+                );
+                return Response::builder()
+                    .status(200)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(serde_json::to_vec(&error_response).unwrap_or_else(|_| {
+                        br#"{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal serialization error"}}"#.to_vec()
+                    }))
+                    .build();
+            }
+            r
+        }
         Err(e) => {
             let error_response = JsonRpcResponse::error(
                 None,
@@ -430,6 +448,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         },
         validate_arguments,
     };
+
     let gateway = McpGateway::new(config);
 
     // Handle the request

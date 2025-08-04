@@ -1,0 +1,11 @@
+# Spin Test Configuration for MCP Gateway
+
+[test-environment]
+# Core settings
+tool_components = "echo,calculator,weather"
+validate_arguments = "true"
+
+# Mock tool configurations
+echo_url = "http://echo.spin.internal/"
+calculator_url = "http://calculator.spin.internal/"
+weather_url = "http://weather.spin.internal/"

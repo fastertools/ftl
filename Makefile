@@ -36,6 +36,7 @@ lint:
 test:
 	cargo nextest run
 	cd components/mcp-authorizer && spin build && spin test
+	cd components/mcp-gateway && spin build && spin test
 
 # Run tests with coverage
 # Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling

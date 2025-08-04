@@ -9,6 +9,7 @@ description = "MCP gateway for FTL MCP components"
 [variables]
 # Tool components configuration
 tool_components = { default = "example-tool-component" }
+validate_arguments = { default = "true" }
 
 [[trigger.http]]
 route = "/..."
@@ -24,7 +25,7 @@ workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 [component.mcp-gateway.variables]
-validate_arguments = "true"
+validate_arguments = "{{ validate_arguments }}"
 tool_components = "{{ tool_components }}"
 
 # Test configuration
