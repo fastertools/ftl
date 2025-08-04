@@ -1,6 +1,6 @@
 # FTL Go SDK
 
-Version: 0.0.0
+Version: 0.1.0
 
 A lightweight SDK for building MCP (Model Context Protocol) tools with Go using the Spin framework.
 
