@@ -42,14 +42,14 @@ toml = "0.9"
 toml_edit = "0.23"
 anyhow = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.35", features = ["rt", "rt-multi-thread", "macros", "time", "process", "signal", "fs"] }
+tokio = { version = "1.47", features = ["rt", "rt-multi-thread", "macros", "time", "process", "signal", "fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile = "3.8"
 which = "8.0"
 handlebars = "6.0"
 walkdir = "2.4"
-notify = "8.1"
+notify = "8.2"
 include_dir = "0.7"
 cargo_metadata = "0.21"
 dirs = "6.0"
