@@ -206,17 +206,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.PAT || github.token }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Setup Git
+        uses: ./.github/actions/setup-git
+        with:
+          token: ${{ secrets.PAT || github.token }}
       
       - name: Create update branch
         run: |
-          BRANCH="update-templates-py-sdk-v${{ needs.verify-tag.outputs.version }}"
+          BRANCH="update-templates-sdk-python-v${{ needs.verify-tag.outputs.version }}"
           git checkout -b "$BRANCH"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
@@ -252,20 +252,19 @@ jobs:
             -m "Updates project templates to use the newly published SDK version." \
             -m "This is an automated update following the release of ftl-sdk v${{ needs.verify-tag.outputs.version }}."
       
-      - name: Push update branch
+      - name: Push branch
         run: |
           git push origin "$UPDATE_BRANCH"
       
-      - name: Create pull request
+      - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT || github.token }}
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          gh pr create \
-            --title "chore: update templates to ftl-sdk v${VERSION}" \
-            --body "## 📦 Update Templates to ftl-sdk v${VERSION}
-
+          PR_BODY=$(cat <<EOF
+          ## 📦 Update Templates to ftl-sdk v${VERSION}
+          
           This PR updates project templates to use the newly published ftl-sdk version.
           
           ### Changes
@@ -274,13 +273,24 @@ jobs:
           ### Context
           This is an automated PR created after successfully publishing ftl-sdk v${VERSION} to PyPI.
           
+          ### Checklist
+          - [x] SDK v${VERSION} is published on PyPI
+          - [x] Templates updated to new version
+          - [ ] CI tests pass with new version
+          
           ### Links
           - [PyPI Package](https://pypi.org/project/ftl-sdk/${VERSION}/)
           - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-python-v${VERSION})
           
           ---
-          *This PR was automatically created by the release workflow.*" \
+          *🤖 This PR was automatically created by the release workflow*
+          EOF
+          )
+          
+          gh pr create \
+            --title "chore: update templates to ftl-sdk v${VERSION}" \
+            --body "$PR_BODY" \
             --base main \
             --head "$UPDATE_BRANCH" \
-            --label "dependencies" \
-            --label "automated"
+            --label "automated" \
+            --label "dependencies"
