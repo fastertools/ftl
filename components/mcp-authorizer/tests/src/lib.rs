@@ -23,7 +23,6 @@ mod authkit_integration_tests;
 mod test_helpers;
 mod simple_test;
 mod test_setup;
-mod request_helpers;
 
 // Response data helper to extract all needed information
 pub struct ResponseData {

@@ -259,7 +259,8 @@ async fn run_with_watch(
 
                 if should_rebuild {
                     // Debounce - wait a bit for multiple file changes to settle
-                    deps.async_runtime.sleep(Duration::from_millis(200)).await;
+                    // Python and Go can create many temporary files during compilation
+                    deps.async_runtime.sleep(Duration::from_millis(300)).await;
 
                     if config.clear {
                         // Clear screen
@@ -332,14 +333,45 @@ pub fn should_watch_file(path: &Path) -> bool {
         || path_str.contains(".spin\\")
         || path_str.contains("node_modules/")
         || path_str.contains("node_modules\\")
+        || path_str.contains("__pycache__/")
+        || path_str.contains("__pycache__\\")
+        || path_str.contains(".pytest_cache/")
+        || path_str.contains(".pytest_cache\\")
+        || path_str.contains(".mypy_cache/")
+        || path_str.contains(".mypy_cache\\")
+        || path_str.contains(".tox/")
+        || path_str.contains(".tox\\")
+        || path_str.contains("venv/")
+        || path_str.contains("venv\\")
+        || path_str.contains(".venv/")
+        || path_str.contains(".venv\\")
         || path_str.ends_with(".wasm")
         || path_str.ends_with(".wat")
+        || path_str.ends_with(".pyc")
+        || path_str.ends_with(".pyo")
+        || path_str.ends_with(".pyd")
+        || path_str.ends_with(".so")
+        || path_str.ends_with(".o")
+        || path_str.ends_with(".a")
+        || path_str.ends_with(".exe")
+        || path_str.ends_with(".dll")
+        || path_str.ends_with(".dylib")
         || path_str.ends_with("package-lock.json")
         || path_str.ends_with("yarn.lock")
         || path_str.ends_with("pnpm-lock.yaml")
         || path_str.ends_with("Cargo.lock")
+        || path_str.ends_with("go.sum")
     {
         return false;
+    }
+
+    // Skip Go temporary build files
+    if let Some(file_name) = path.file_name() {
+        let name_str = file_name.to_string_lossy();
+        // Go creates temporary files like go-build123456789
+        if name_str.starts_with("go-build") {
+            return false;
+        }
     }
 
     // Only watch source files
@@ -347,10 +379,27 @@ pub fn should_watch_file(path: &Path) -> bool {
         let ext_str = ext.to_string_lossy();
         matches!(
             ext_str.as_ref(),
-            "rs" | "toml" | "js" | "ts" | "jsx" | "tsx" | "json" | "go" | "py" | "c" | "cpp" | "h"
+            "rs" | "toml"
+                | "js"
+                | "ts"
+                | "jsx"
+                | "tsx"
+                | "json"
+                | "go"
+                | "py"
+                | "c"
+                | "cpp"
+                | "h"
+                | "mod"
         ) && !matches!(ext_str.as_ref(), "wasm" | "wat")
     } else {
-        false
+        // Watch files without extensions (like go.mod files renamed during build)
+        if let Some(file_name) = path.file_name() {
+            let name_str = file_name.to_string_lossy();
+            matches!(name_str.as_ref(), "go.mod" | "Makefile" | "Dockerfile")
+        } else {
+            false
+        }
     }
 }
 
@@ -621,21 +670,26 @@ struct RealWatchHandle {
 #[async_trait::async_trait]
 impl WatchHandle for RealWatchHandle {
     async fn wait_for_change(&mut self) -> Result<Vec<PathBuf>> {
+        use tokio::time::{Duration, timeout};
+
         let mut changes = Vec::new();
 
         // Wait for first change
         if let Some(path) = self.rx.recv().await {
             changes.push(path);
+        } else {
+            anyhow::bail!("Watcher closed unexpectedly");
         }
 
-        // Collect any additional changes that arrive quickly
-        while let Ok(path) = self.rx.try_recv() {
+        // Collect any additional changes that arrive quickly (within 50ms)
+        // This helps batch rapid file changes from build tools
+        while let Ok(Some(path)) = timeout(Duration::from_millis(50), self.rx.recv()).await {
             changes.push(path);
         }
 
-        if changes.is_empty() {
-            anyhow::bail!("Watcher closed unexpectedly");
-        }
+        // Deduplicate paths
+        changes.sort();
+        changes.dedup();
 
         Ok(changes)
     }

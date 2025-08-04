@@ -75,7 +75,6 @@ pub struct TestTokenBuilder {
     scopes: Option<Vec<String>>,
     client_id: Option<String>,
     expires_in: Option<Duration>,
-    not_before: Option<i64>,
     kid: Option<String>,
     additional_claims: HashMap<String, serde_json::Value>,
 }
@@ -118,11 +117,6 @@ impl TestTokenBuilder {
         self
     }
     
-    /// Set scopes from a string slice
-    pub fn scope_str(mut self, scope: &str) -> Self {
-        self.scopes = Some(scope.split_whitespace().map(String::from).collect());
-        self
-    }
     
     /// Set the client ID
     pub fn client_id(mut self, client_id: impl Into<String>) -> Self {
@@ -136,11 +130,6 @@ impl TestTokenBuilder {
         self
     }
     
-    /// Set the not-before time (nbf claim)
-    pub fn not_before(mut self, timestamp: i64) -> Self {
-        self.not_before = Some(timestamp);
-        self
-    }
     
     /// Set the key ID (kid header)
     pub fn kid(mut self, kid: impl Into<String>) -> Self {
@@ -188,7 +177,7 @@ impl TestTokenBuilder {
             aud: self.audience,
             exp,
             iat: now.timestamp(),
-            nbf: self.not_before,
+            nbf: None,
             client_id: self.client_id,
             scope: self.scopes.as_ref().map(|s| s.join(" ")),
         };
@@ -241,20 +230,6 @@ pub fn create_expired_token(key_pair: &TestKeyPair) -> String {
     )
 }
 
-/// Create a token with custom issuer and audience
-pub fn create_custom_token(
-    key_pair: &TestKeyPair,
-    issuer: &str,
-    audience: &str,
-    scopes: Vec<&str>,
-) -> String {
-    key_pair.create_token(
-        TestTokenBuilder::new()
-            .issuer(issuer)
-            .audience(audience)
-            .scopes(scopes)
-    )
-}
 
 #[cfg(test)]
 mod tests {

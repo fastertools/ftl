@@ -748,6 +748,13 @@ command = "cargo build --target wasm32-wasi"
 
 #[test]
 fn test_should_watch_file() {
+    test_should_watch_source_files();
+    test_should_not_watch_build_outputs();
+    test_should_not_watch_python_artifacts();
+    test_should_not_watch_go_artifacts();
+}
+
+fn test_should_watch_source_files() {
     use std::path::PathBuf;
 
     // Should watch source files
@@ -757,6 +764,14 @@ fn test_should_watch_file() {
     assert!(up::should_watch_file(&PathBuf::from("app.js")));
     assert!(up::should_watch_file(&PathBuf::from("Cargo.toml")));
     assert!(up::should_watch_file(&PathBuf::from("package.json")));
+    assert!(up::should_watch_file(&PathBuf::from("main.go")));
+    assert!(up::should_watch_file(&PathBuf::from("app.py")));
+    assert!(up::should_watch_file(&PathBuf::from("go.mod")));
+    assert!(up::should_watch_file(&PathBuf::from("Makefile")));
+}
+
+fn test_should_not_watch_build_outputs() {
+    use std::path::PathBuf;
 
     // Should not watch build outputs
     assert!(!up::should_watch_file(&PathBuf::from("target/debug/app")));
@@ -771,10 +786,53 @@ fn test_should_watch_file() {
     assert!(!up::should_watch_file(&PathBuf::from("Cargo.lock")));
     assert!(!up::should_watch_file(&PathBuf::from("package-lock.json")));
     assert!(!up::should_watch_file(&PathBuf::from("yarn.lock")));
+    assert!(!up::should_watch_file(&PathBuf::from("go.sum")));
 
     // Should not watch wasm files
     assert!(!up::should_watch_file(&PathBuf::from("module.wasm")));
     assert!(!up::should_watch_file(&PathBuf::from("module.wat")));
+
+    // Binary/library files - should not watch
+    assert!(!up::should_watch_file(&PathBuf::from("app.exe")));
+    assert!(!up::should_watch_file(&PathBuf::from("lib.dll")));
+    assert!(!up::should_watch_file(&PathBuf::from("lib.dylib")));
+}
+
+fn test_should_not_watch_python_artifacts() {
+    use std::path::PathBuf;
+
+    // Python specific - should not watch
+    assert!(!up::should_watch_file(&PathBuf::from(
+        "__pycache__/module.pyc"
+    )));
+    assert!(!up::should_watch_file(&PathBuf::from(
+        "src/__pycache__/app.pyc"
+    )));
+    assert!(!up::should_watch_file(&PathBuf::from("module.pyc")));
+    assert!(!up::should_watch_file(&PathBuf::from("module.pyo")));
+    assert!(!up::should_watch_file(&PathBuf::from("module.pyd")));
+    assert!(!up::should_watch_file(&PathBuf::from(".pytest_cache/data")));
+    assert!(!up::should_watch_file(&PathBuf::from(".mypy_cache/file")));
+    assert!(!up::should_watch_file(&PathBuf::from("venv/bin/python")));
+    assert!(!up::should_watch_file(&PathBuf::from(
+        ".venv/lib/site-packages/pkg"
+    )));
+    assert!(!up::should_watch_file(&PathBuf::from(".tox/py39/lib")));
+}
+
+fn test_should_not_watch_go_artifacts() {
+    use std::path::PathBuf;
+
+    // Go specific - should not watch
+    assert!(!up::should_watch_file(&PathBuf::from("main.o")));
+    assert!(!up::should_watch_file(&PathBuf::from("libapp.a")));
+    assert!(!up::should_watch_file(&PathBuf::from("libapp.so")));
+    assert!(!up::should_watch_file(&PathBuf::from(
+        "go-build123456789/main.o"
+    )));
+    assert!(!up::should_watch_file(&PathBuf::from(
+        "/tmp/go-build999/b001/exe/main"
+    )));
 }
 
 #[tokio::test]

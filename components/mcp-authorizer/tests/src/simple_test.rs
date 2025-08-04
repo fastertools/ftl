@@ -1,8 +1,5 @@
 use spin_test_sdk::{
-    bindings::{
-        fermyon::spin_test_virt::variables,
-        wasi::http,
-    },
+    bindings::wasi::http,
     spin_test,
 };
 
