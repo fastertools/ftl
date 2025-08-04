@@ -38,12 +38,14 @@ test:
 	cd components/mcp-authorizer && spin build && spin test
 
 # Run tests with coverage
+# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
 coverage:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-'
 
 # Generate HTML coverage report
+# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
 coverage-open:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros' --open
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-' --open
 
 # Fix formatting
 fmt:

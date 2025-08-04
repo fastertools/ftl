@@ -4,7 +4,7 @@ inputs:
   threshold:
     description: 'Minimum coverage percentage required'
     required: false
-    default: '75'
+    default: '85'
 
 runs:
   using: 'composite'
@@ -12,8 +12,8 @@ runs:
     - name: Check coverage threshold
       shell: bash
       run: |
-        # Generate coverage report and extract percentage
-        COVERAGE=$(cargo llvm-cov report --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros' | tail -1 | awk '{print $4}' | sed 's/%//')
+        # Generate coverage report and extract percentage (excluding spin components)
+        COVERAGE=$(cargo llvm-cov report --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-' | tail -1 | awk '{print $4}' | sed 's/%//')
         echo "Coverage: ${COVERAGE}%"
         
         # Fail if coverage drops below threshold

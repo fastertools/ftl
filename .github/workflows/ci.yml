@@ -441,8 +441,8 @@ jobs:
       
       - name: Run core crate tests with coverage
         run: |
-          # Run only core crate tests (excluding ftl-cli and ftl-sdk-macros)
-          cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --all-features --profile ci --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
+          # Run only core crate tests (excluding ftl-cli, ftl-sdk-macros, and spin components)
+          cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --all-features --profile ci --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-'
           
       - name: Check coverage threshold
         uses: ./.github/actions/check-coverage
