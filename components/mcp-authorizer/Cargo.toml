@@ -32,12 +32,6 @@ url = "2.5"
 # For async operations
 futures = "0.3"
 
-[dev-dependencies]
-# For RSA key handling in tests
-rsa = "0.9"
-# For random number generation in tests
-rand = "0.8"
-
 [lints.rust]
 unsafe_code = "forbid"
 

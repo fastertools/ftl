@@ -15,9 +15,6 @@ mod jwks;
 mod static_token;
 mod token;
 
-#[cfg(test)]
-pub mod test_utils;
-
 use config::Config;
 use error::{AuthError, Result};
 
