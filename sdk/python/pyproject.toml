@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ftl-sdk"
-version = "0.2.0"
-description = "Python SDK for building MCP tools that compile to WebAssembly"
+version = "0.1.0"
+description = "Python SDK for building Model Context Protocol (MCP) tools that compile to WebAssembly"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
