@@ -589,64 +589,72 @@ fn add_auth_variables_from_ftl(
     }
 
     let provider_type = config.auth.provider_type();
-    if !provider_type.is_empty() && !variables.contains_key("auth_provider_type") {
-        variables.insert("auth_provider_type".to_string(), provider_type.to_string());
+    if !provider_type.is_empty() && !variables.contains_key("mcp_provider_type") {
+        variables.insert("mcp_provider_type".to_string(), provider_type.to_string());
     }
 
     let issuer = config.auth.issuer();
-    if !issuer.is_empty() && !variables.contains_key("auth_provider_issuer") {
-        variables.insert("auth_provider_issuer".to_string(), issuer.to_string());
+    if !issuer.is_empty() && !variables.contains_key("mcp_jwt_issuer") {
+        variables.insert("mcp_jwt_issuer".to_string(), issuer.to_string());
     }
 
     let audience = config.auth.audience();
-    if !audience.is_empty() && !variables.contains_key("auth_provider_audience") {
-        variables.insert("auth_provider_audience".to_string(), audience.to_string());
+    if !audience.is_empty() && !variables.contains_key("mcp_jwt_audience") {
+        variables.insert("mcp_jwt_audience".to_string(), audience.to_string());
+    }
+
+    let required_scopes = config.auth.required_scopes();
+    if !required_scopes.is_empty() && !variables.contains_key("mcp_jwt_required_scopes") {
+        variables.insert(
+            "mcp_jwt_required_scopes".to_string(),
+            required_scopes.to_string(),
+        );
     }
 
     // Add OIDC-specific variables if present
     if let Some(oidc) = &config.auth.oidc {
-        if !oidc.provider_name.is_empty() && !variables.contains_key("auth_provider_name") {
-            variables.insert("auth_provider_name".to_string(), oidc.provider_name.clone());
+        if !oidc.jwks_uri.is_empty() && !variables.contains_key("mcp_jwt_jwks_uri") {
+            variables.insert("mcp_jwt_jwks_uri".to_string(), oidc.jwks_uri.clone());
         }
 
-        if !oidc.jwks_uri.is_empty() && !variables.contains_key("auth_provider_jwks_uri") {
-            variables.insert("auth_provider_jwks_uri".to_string(), oidc.jwks_uri.clone());
+        if !oidc.public_key.is_empty() && !variables.contains_key("mcp_jwt_public_key") {
+            variables.insert("mcp_jwt_public_key".to_string(), oidc.public_key.clone());
+        }
+
+        if !oidc.algorithm.is_empty() && !variables.contains_key("mcp_jwt_algorithm") {
+            variables.insert("mcp_jwt_algorithm".to_string(), oidc.algorithm.clone());
         }
 
         if !oidc.authorize_endpoint.is_empty()
-            && !variables.contains_key("auth_provider_authorize_endpoint")
+            && !variables.contains_key("mcp_oauth_authorize_endpoint")
         {
             variables.insert(
-                "auth_provider_authorize_endpoint".to_string(),
+                "mcp_oauth_authorize_endpoint".to_string(),
                 oidc.authorize_endpoint.clone(),
             );
         }
 
-        if !oidc.token_endpoint.is_empty()
-            && !variables.contains_key("auth_provider_token_endpoint")
-        {
+        if !oidc.token_endpoint.is_empty() && !variables.contains_key("mcp_oauth_token_endpoint") {
             variables.insert(
-                "auth_provider_token_endpoint".to_string(),
+                "mcp_oauth_token_endpoint".to_string(),
                 oidc.token_endpoint.clone(),
             );
         }
 
         if !oidc.userinfo_endpoint.is_empty()
-            && !variables.contains_key("auth_provider_userinfo_endpoint")
+            && !variables.contains_key("mcp_oauth_userinfo_endpoint")
         {
             variables.insert(
-                "auth_provider_userinfo_endpoint".to_string(),
+                "mcp_oauth_userinfo_endpoint".to_string(),
                 oidc.userinfo_endpoint.clone(),
             );
         }
+    }
 
-        if !oidc.allowed_domains.is_empty()
-            && !variables.contains_key("auth_provider_allowed_domains")
-        {
-            variables.insert(
-                "auth_provider_allowed_domains".to_string(),
-                oidc.allowed_domains.clone(),
-            );
+    // Add static token provider variables if present
+    if let Some(static_token) = &config.auth.static_token {
+        if !static_token.tokens.is_empty() && !variables.contains_key("mcp_static_tokens") {
+            variables.insert("mcp_static_tokens".to_string(), static_token.tokens.clone());
         }
     }
 

@@ -118,6 +118,11 @@ pub struct ServerCapabilities {
     pub resources: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompts: Option<Value>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "experimental_capabilities"
+    )]
+    pub experimental_capabilities: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -11,8 +11,8 @@ authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 # Components from private repos can be accessed via `docker login`.
 # See https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
 # Default components:
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.9"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
 # If true, the gateway component should automatically validate tool call arguments based on tool schema.
 validate_arguments = true
 
@@ -31,17 +31,24 @@ enabled = false
 [auth.authkit]
 issuer = "https://divine-lion-50-staging.authkit.app"
 # audience = "mcp-api"  # optional
+# required_scopes = "read,write"  # optional
 
 # For OIDC (Auth0, Okta, etc.):
 # [auth.oidc]
 # issuer = "https://your-domain.auth0.com"
 # audience = "your-api-identifier"  # optional
-# provider_name = "auth0"
 # jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
-# authorize_endpoint = "https://your-domain.auth0.com/authorize"
-# token_endpoint = "https://your-domain.auth0.com/oauth/token"
-# userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
-# allowed_domains = "*.auth0.com"  # optional
+# public_key = ""  # optional - PEM format public key (alternative to JWKS)
+# algorithm = "RS256"  # optional - JWT signing algorithm
+# required_scopes = "read,write"  # optional
+# authorize_endpoint = "https://your-domain.auth0.com/authorize"  # optional - for OAuth discovery
+# token_endpoint = "https://your-domain.auth0.com/oauth/token"  # optional - for OAuth discovery
+# userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional - for OAuth discovery
+
+# For Static Tokens (development/testing only):
+# [auth.static_token]
+# tokens = "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
+# required_scopes = "read"  # optional
 
 # ========================================
 # Example configurations:
@@ -49,24 +56,32 @@ issuer = "https://divine-lion-50-staging.authkit.app"
 # AuthKit:
 #   [auth]
 #   enabled = true
-#   provider = "authkit"
+#   
+#   [auth.authkit]
 #   issuer = "https://your-tenant.authkit.app"
 #   audience = "mcp-api"  # optional
+#   required_scopes = "mcp:read,mcp:write"  # optional
 #
 # Auth0:
 #   [auth]
 #   enabled = true
-#   provider = "oidc"
-#   issuer = "https://your-domain.auth0.com"
-#   audience = "your-api-identifier"  # optional
 #   
 #   [auth.oidc]
-#   provider_name = "auth0"
+#   issuer = "https://your-domain.auth0.com"
+#   audience = "your-api-identifier"  # optional
 #   jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+#   required_scopes = "read,write"  # optional
 #   authorize_endpoint = "https://your-domain.auth0.com/authorize"
 #   token_endpoint = "https://your-domain.auth0.com/oauth/token"
 #   userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
-#   allowed_domains = "*.auth0.com"  # optional
+#
+# Static Tokens (dev only):
+#   [auth]
+#   enabled = true
+#   
+#   [auth.static_token]
+#   tokens = "test-token:test-client:test-user:read,write"
+#   required_scopes = "read"
 
 # ========================================
 # Application Variables

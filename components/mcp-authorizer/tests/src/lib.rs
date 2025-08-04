@@ -1,13 +1,75 @@
 use spin_test_sdk::{
-    bindings::{fermyon::spin_test_virt, wasi::http},
+    bindings::{
+        fermyon::spin_test_virt::variables,
+        wasi::http
+    },
     spin_test,
 };
 
-// Note: Test configuration is provided by spin-test.toml
-// Auth is enabled with an AuthKit provider configured
+mod jwt_tests;
+mod jwt_verification_tests;
+mod jwks_caching_tests;
+mod oauth_discovery_tests;
+mod error_response_tests;
+mod provider_config_tests;
+mod kid_validation_tests;
+mod scope_validation_tests;
+mod gateway_forwarding_tests;
+mod static_provider_tests;
+mod jwt_test_utils_tests;
+mod test_token_utils;
+mod optional_issuer_tests;
+mod authkit_integration_tests;
+mod test_helpers;
+mod simple_test;
+mod test_setup;
+
+// Response data helper to extract all needed information
+pub struct ResponseData {
+    pub status: u16,
+    pub headers: Vec<(String, Vec<u8>)>,
+    pub body: Vec<u8>,
+}
+
+impl ResponseData {
+    pub fn from_response(response: http::types::IncomingResponse) -> Self {
+        let status = response.status();
+        
+        // Extract headers before consuming response
+        let headers = response.headers()
+            .entries()
+            .into_iter()
+            .map(|(name, value)| (name.to_string(), value.to_vec()))
+            .collect();
+        
+        // Now consume response to get body
+        let body = response.body().unwrap_or_else(|_| Vec::new());
+        
+        Self { status, headers, body }
+    }
+    
+    pub fn find_header(&self, name: &str) -> Option<&Vec<u8>> {
+        self.headers.iter()
+            .find(|(h_name, _)| h_name.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value)
+    }
+    
+    pub fn body_json(&self) -> Option<serde_json::Value> {
+        if self.body.is_empty() {
+            None
+        } else {
+            serde_json::from_slice(&self.body).ok()
+        }
+    }
+}
+
+// Existing tests from the original file
 
 #[spin_test]
 fn unauthenticated_request() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // Make request without auth header
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -18,10 +80,7 @@ fn unauthenticated_request() {
 
     // Check for WWW-Authenticate header
     let headers = response.headers();
-    let www_auth_exists = headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "www-authenticate");
+    let www_auth_exists = test_helpers::find_header(&headers, "www-authenticate").is_some();
     assert!(www_auth_exists);
 }
 
@@ -38,15 +97,15 @@ fn options_cors_request() {
 
     // Check for CORS headers
     let headers = response.headers();
-    let has_cors = headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "access-control-allow-origin");
+    let has_cors = test_helpers::find_header(&headers, "access-control-allow-origin").is_some();
     assert!(has_cors);
 }
 
 #[spin_test]
 fn metadata_endpoint() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // With the test configuration, we have a provider configured
     // Test /.well-known/oauth-protected-resource endpoint
     let headers = http::types::Headers::new();
@@ -63,14 +122,17 @@ fn metadata_endpoint() {
 
     // Check for proper content type
     let headers = response.headers();
-    let has_json_content = headers.entries().iter().any(|(name, value)| {
-        name == "content-type" && String::from_utf8_lossy(value).contains("application/json")
-    });
+    let has_json_content = test_helpers::find_header_str(&headers, "content-type")
+        .map(|ct| ct.contains("application/json"))
+        .unwrap_or(false);
     assert!(has_json_content);
 }
 
 #[spin_test]
 fn authorization_server_metadata() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // With the test configuration, we have a provider configured
     // Test /.well-known/oauth-authorization-server endpoint
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -84,14 +146,17 @@ fn authorization_server_metadata() {
 
     // Check response contains OAuth metadata
     let headers = response.headers();
-    let has_json_content = headers.entries().iter().any(|(name, value)| {
-        name == "content-type" && String::from_utf8_lossy(value).contains("application/json")
-    });
+    let has_json_content = test_helpers::find_header_str(&headers, "content-type")
+        .map(|ct| ct.contains("application/json"))
+        .unwrap_or(false);
     assert!(has_json_content);
 }
 
 #[spin_test]
 fn provider_config_works() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // Test that the provider configuration works correctly
     // Make request to metadata endpoint
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -105,15 +170,15 @@ fn provider_config_works() {
 
     // Verify CORS headers are present
     let headers = response.headers();
-    let has_cors = headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "access-control-allow-origin");
+    let has_cors = test_helpers::find_header(&headers, "access-control-allow-origin").is_some();
     assert!(has_cors);
 }
 
 #[spin_test]
 fn trace_id_header() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // Test that trace ID is propagated through requests
     let headers = http::types::Headers::new();
     headers.append("x-trace-id", b"test-trace-123").unwrap();
@@ -127,15 +192,15 @@ fn trace_id_header() {
 
     // Check for trace ID in response
     let response_headers = response.headers();
-    let has_trace = response_headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "x-trace-id");
+    let has_trace = test_helpers::find_header(&response_headers, "x-trace-id").is_some();
     assert!(has_trace);
 }
 
 #[spin_test]
 fn auth_enabled_requires_token() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // With auth enabled in test config, requests without auth should fail
     // Make request without auth header
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -147,15 +212,15 @@ fn auth_enabled_requires_token() {
 
     // Check for WWW-Authenticate header
     let headers = response.headers();
-    let www_auth_exists = headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "www-authenticate");
+    let www_auth_exists = test_helpers::find_header(&headers, "www-authenticate").is_some();
     assert!(www_auth_exists);
 }
 
 #[spin_test]
 fn metadata_endpoint_with_provider() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+    
     // Test /.well-known/oauth-protected-resource endpoint
     let headers = http::types::Headers::new();
     headers.append("host", b"example.com").unwrap();
@@ -171,10 +236,7 @@ fn metadata_endpoint_with_provider() {
 
     // Check for content type
     let headers = response.headers();
-    let has_content_type = headers
-        .entries()
-        .iter()
-        .any(|(name, _)| name == "content-type");
+    let has_content_type = test_helpers::find_header(&headers, "content-type").is_some();
     assert!(has_content_type);
 }
 
@@ -182,9 +244,7 @@ fn metadata_endpoint_with_provider() {
 fn https_enforcement_rejects_http() {
     // Test that HTTP URLs are rejected for security
     // Override the test config to use HTTP
-    spin_test_virt::variables::set("auth_enabled", "true");
-    spin_test_virt::variables::set("auth_provider_type", "authkit");
-    spin_test_virt::variables::set("auth_provider_issuer", "http://example.authkit.app");
+    variables::set("mcp_jwt_issuer", "http://example.authkit.app");
 
     // Try to make a request - the component should fail to initialize
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -198,10 +258,8 @@ fn https_enforcement_rejects_http() {
 #[spin_test]
 fn https_enforcement_accepts_bare_domain() {
     // Test that bare domains work (https:// is added automatically)
-    spin_test_virt::variables::set("auth_enabled", "true");
-    spin_test_virt::variables::set("auth_provider_type", "authkit");
-    spin_test_virt::variables::set("auth_provider_issuer", "example.authkit.app");
-    spin_test_virt::variables::set("auth_provider_jwks_uri", "");
+    variables::set("mcp_jwt_issuer", "example.authkit.app");
+    // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -217,10 +275,8 @@ fn https_enforcement_accepts_bare_domain() {
 #[spin_test]
 fn https_enforcement_accepts_https_prefix() {
     // Test that explicit https:// URLs work
-    spin_test_virt::variables::set("auth_enabled", "true");
-    spin_test_virt::variables::set("auth_provider_type", "authkit");
-    spin_test_virt::variables::set("auth_provider_issuer", "https://example.authkit.app");
-    spin_test_virt::variables::set("auth_provider_jwks_uri", "");
+    variables::set("mcp_jwt_issuer", "https://example.authkit.app");
+    // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -236,16 +292,12 @@ fn https_enforcement_accepts_https_prefix() {
 #[spin_test]
 fn https_enforcement_oidc_urls() {
     // Test that OIDC URLs also enforce HTTPS
-    spin_test_virt::variables::set("auth_enabled", "true");
-    spin_test_virt::variables::set("auth_provider_type", "oidc");
-    spin_test_virt::variables::set("auth_provider_name", "test");
-    spin_test_virt::variables::set("auth_provider_issuer", "https://example.com");
-    spin_test_virt::variables::set("auth_provider_jwks_uri", "http://example.com/jwks"); // HTTP should fail
-    spin_test_virt::variables::set("auth_provider_authorize_endpoint", "example.com/auth");
-    spin_test_virt::variables::set("auth_provider_token_endpoint", "example.com/token");
-    spin_test_virt::variables::set("auth_provider_userinfo_endpoint", "");
-    spin_test_virt::variables::set("auth_provider_allowed_domains", "");
-    spin_test_virt::variables::set("auth_provider_audience", "");
+    variables::set("mcp_jwt_issuer", "https://example.com");
+    variables::set("mcp_jwt_jwks_uri", "http://example.com/jwks"); // HTTP should fail
+    variables::set("mcp_oauth_authorize_endpoint", "example.com/auth");
+    variables::set("mcp_oauth_token_endpoint", "example.com/token");
+    variables::set("mcp_oauth_userinfo_endpoint", "");
+    variables::set("mcp_jwt_audience", "");
 
     // Try to make a request - the component should fail to initialize
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());

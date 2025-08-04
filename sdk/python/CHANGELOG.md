@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic JSON Schema generation from Python type hints
 - Automatic return value conversion to MCP format
 - Output schema validation with primitive type wrapping
-- FastMCP-style pattern alignment
 - Async function support - tools can now be defined as `async def` functions
 - The SDK automatically detects async functions and handles them appropriately
 - Mixed sync/async tools are supported in the same application

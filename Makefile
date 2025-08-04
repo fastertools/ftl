@@ -30,19 +30,23 @@ fmt-check:
 
 # Run clippy
 lint:
-	cargo clippy --all-targets --all-features -- -D warnings
+	cargo clippy --all-targets --all-features --workspace -- -D warnings
 
 # Run tests
 test:
 	cargo nextest run
+	cd components/mcp-authorizer && spin build && spin test
+	cd components/mcp-gateway && spin build && spin test
 
 # Run tests with coverage
+# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
 coverage:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-'
 
 # Generate HTML coverage report
+# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
 coverage-open:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros' --open
+	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-' --open
 
 # Fix formatting
 fmt:
@@ -50,7 +54,7 @@ fmt:
 
 # Fix clippy warnings
 fix-clippy:
-	cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged
+	cargo clippy --all-targets --all-features --workspace --fix --allow-dirty --allow-staged
 
 # Fix everything
 fix:

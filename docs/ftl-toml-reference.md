@@ -26,11 +26,13 @@ authors = ["Your Name <you@example.com>"]
 
 The `[mcp]` section configures the Model Context Protocol gateway and authorizer components. You can use the default FTL components or specify custom implementations.
 
+When authentication is enabled, the authorizer component handles all incoming requests at the wildcard route `/...`, validating tokens before forwarding to the internal gateway. When authentication is disabled, all requests go directly to the gateway.
+
 ```toml
 [mcp]
 # Full registry URIs for MCP components
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.9"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.9"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
 validate_arguments = true
 ```
 
@@ -72,6 +74,7 @@ enabled = true
 [auth.authkit]
 issuer = "https://your-tenant.authkit.app"
 audience = "mcp-api"  # optional
+required_scopes = "mcp:read,mcp:write"  # optional - comma-separated list of required scopes
 ```
 
 ### OIDC Configuration
@@ -83,13 +86,31 @@ enabled = true
 [auth.oidc]
 issuer = "https://your-domain.auth0.com"
 audience = "your-api-identifier"  # optional
-provider_name = "auth0"
 jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
-authorize_endpoint = "https://your-domain.auth0.com/authorize"
-token_endpoint = "https://your-domain.auth0.com/oauth/token"
-userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
-allowed_domains = "*.auth0.com"  # optional
+public_key = ""  # optional - PEM format public key (alternative to JWKS)
+algorithm = "RS256"  # optional - JWT signing algorithm
+required_scopes = "read,write"  # optional - comma-separated list of required scopes
+authorize_endpoint = "https://your-domain.auth0.com/authorize"  # optional - for OAuth discovery
+token_endpoint = "https://your-domain.auth0.com/oauth/token"  # optional - for OAuth discovery
+userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional - for OAuth discovery
 ```
+
+### Static Token Configuration (Development Only)
+
+For development and testing, you can use static tokens:
+
+```toml
+[auth]
+enabled = true
+
+[auth.static_token]
+tokens = "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
+required_scopes = "read"  # optional - comma-separated list of required scopes
+```
+
+Token format: `token:client_id:sub:scope1,scope2[:expires_at]`
+- Multiple tokens separated by semicolons
+- Expiration timestamp is optional (Unix timestamp)
 
 ## Variables Section
 
@@ -194,8 +215,8 @@ enabled = true
 [auth.oidc]
 issuer = "https://auth.mycompany.com"
 audience = "mcp-api"
-provider_name = "custom-oidc"
 jwks_uri = "https://auth.mycompany.com/.well-known/jwks.json"
+required_scopes = "mcp:read,mcp:write"
 authorize_endpoint = "https://auth.mycompany.com/authorize"
 token_endpoint = "https://auth.mycompany.com/oauth/token"
 

@@ -2,20 +2,11 @@
 
 # Default target
 build:
-	cargo build --target wasm32-wasip1 --release
-
-# Build the component for publishing
-build-component:
-	cargo component build --target wasm32-wasip1 --release
-
-test-cargo:
-	cargo test
-
-test-spin:
-	spin test
+	spin build
 
 # Run tests
-test: test-cargo test-spin
+test:
+	spin test
 
 # Clean build artifacts
 clean:
@@ -39,12 +30,12 @@ check: format-check lint test
 # Build optimized release
 release: clean
 	cargo build --target wasm32-wasip1 --release
-	@echo "Release build complete: target/wasm32-wasip1/release/mcp_authorizer.wasm"
+	@echo "Release build complete: target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm"
 
-publish: build-component
+publish: build
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
-	wkg oci push ghcr.io/fastertools/mcp-authorizer:$$VERSION target/wasm32-wasip1/release/mcp_authorizer.wasm
-	wkg oci push ghcr.io/fastertools/mcp-authorizer:latest target/wasm32-wasip1/release/mcp_authorizer.wasm
+	wkg oci push ghcr.io/fastertools/mcp-authorizer:$$VERSION target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm
+	wkg oci push ghcr.io/fastertools/mcp-authorizer:latest target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm
 
 # Help
 help:

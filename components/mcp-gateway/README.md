@@ -1,35 +1,44 @@
 # FTL MCP Gateway
 
-The core routing component that implements the Model Context Protocol (MCP) server and forwards requests to individual tool components.
+A WebAssembly-based Model Context Protocol (MCP) server that routes tool requests to individual tool components within the Spin framework.
 
 ## Overview
 
-The MCP Gateway acts as a central router that:
-- Implements the MCP JSON-RPC protocol
-- Discovers and lists available tools from configured components
-- Validates tool arguments against JSON schemas
-- Routes tool calls to appropriate WebAssembly components
-- Handles errors and protocol compliance
+The MCP Gateway provides a standardized MCP-compliant interface for accessing multiple tool components. It handles protocol negotiation, tool discovery, argument validation, and request routing through Spin's internal networking.
+
+Key features:
+- Full MCP JSON-RPC protocol implementation
+- Dynamic tool discovery from configured components
+- Optional JSON Schema argument validation
+- Parallel metadata fetching for optimal performance
+- Comprehensive error handling and CORS support
 
 ## Architecture
 
 ```
-JSON-RPC Request → MCP Gateway → Tool Component (via Spin internal networking)
-                        ↓
-                  Tool Discovery
-                  Validation
-                  Routing
+MCP Client → JSON-RPC → MCP Gateway → Tool Component (WASM)
+                           ↓
+                    [Tool Discovery]
+                    [Validation]
+                    [Routing]
 ```
 
 ## Configuration
 
-The gateway is configured using Spin variables:
+Configure the gateway using Spin variables:
 
 ```toml
-[component.ftl-mcp-gateway.variables]
-tool_components = "echo,calculator,weather"  # Comma-separated list of tools
-validate_arguments = "true"                  # Enable JSON schema validation
+[variables]
+tool_components = { default = "example-tool-component" }
+validate_arguments = { default = "true" }
+
+[component.mcp-gateway.variables]
+tool_components = "{{ tool_components }}"
+validate_arguments = "{{ validate_arguments }}"
 ```
+
+- `tool_components`: Comma-separated list of component names that provide tools
+- `validate_arguments`: Enable/disable JSON Schema validation of tool arguments
 
 ## Protocol Implementation
 
@@ -43,10 +52,11 @@ validate_arguments = "true"                  # Enable JSON schema validation
 
 ### Request Flow
 
-1. **Tool Discovery**: On startup, the gateway fetches metadata from each configured tool component
-2. **Validation**: When `validate_arguments` is enabled, incoming arguments are validated against the tool's JSON schema
-3. **Routing**: Tool names are converted from snake_case to kebab-case for component resolution
-4. **Execution**: Requests are forwarded to `http://{tool-name}.spin.internal/`
+1. **Tool Discovery**: Gateway fetches metadata from all configured components in parallel
+2. **Name Resolution**: Component names are converted from snake_case to kebab-case
+3. **Validation**: Arguments are validated against tool's JSON Schema (if enabled)
+4. **Routing**: Requests are forwarded to `http://{component-name}.spin.internal/`
+5. **Response**: Tool execution results are returned in MCP-compliant format
 
 ## Tool Component Requirements
 
@@ -90,11 +100,12 @@ Standard error codes:
 - `-32602`: Invalid params
 - `-32603`: Internal error
 
-## Performance Features
+## Performance
 
-- Parallel metadata fetching for all tools
-- Minimal overhead routing via Spin's internal networking
-- Optional argument validation can be disabled for performance
+- Parallel metadata fetching across all configured components
+- Efficient routing through Spin's internal networking stack
+- Optional argument validation for performance-sensitive scenarios
+- WebAssembly-based execution with minimal overhead
 
 ## Usage Example
 
@@ -137,12 +148,24 @@ curl -X POST http://localhost:3000/mcp \
 
 ## Development
 
-Built with:
-- Rust and the Spin SDK
-- JSON Schema validation via jsonschema crate
-- Async/await for concurrent operations
+### Requirements
+- Rust toolchain with `wasm32-wasip1` target
+- Spin CLI (v2.0+)
 
-To modify the gateway:
-1. Update the source in `src/`
-2. Build: `cargo build --target wasm32-wasip1 --release`
-3. Test with the demo application
+### Building
+```bash
+cargo build --target wasm32-wasip1 --release
+```
+
+### Testing
+```bash
+cd tests
+./run_tests.sh
+```
+
+### Architecture
+Built with:
+- Rust and Spin SDK for WebAssembly runtime
+- `jsonschema` crate for argument validation
+- Async/await for concurrent component communication
+- `serde` for JSON serialization/deserialization
