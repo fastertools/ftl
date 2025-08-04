@@ -114,7 +114,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: validate-and-test
+    needs: [verify-tag, validate-and-test]
     runs-on: ubuntu-latest
     
     steps:
@@ -122,70 +122,12 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Configure Git
+    - name: Create Go module subdirectory tag
       run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-    - name: Update go.mod
-      working-directory: sdk/go
-      run: |
-        # Run go mod tidy to ensure everything is clean
-        go mod tidy
-
-    - name: Update CHANGELOG
-      working-directory: sdk/go
-      run: |
-        # Get the current date
-        date=$(date +%Y-%m-%d)
-        
-        # Create a new changelog entry
-        cat > CHANGELOG.tmp.md << EOF
-        # Changelog
-
-        ## [v${{ needs.verify-tag.outputs.version }}] - $date
-        
-        ### Added
-        - (Add new features here)
-        
-        ### Changed
-        - (Add changes here)
-        
-        ### Fixed
-        - (Add bug fixes here)
-        
-        EOF
-        
-        # Append existing changelog content if it exists
-        if [ -f CHANGELOG.md ]; then
-          tail -n +2 CHANGELOG.md >> CHANGELOG.tmp.md
-        fi
-        
-        mv CHANGELOG.tmp.md CHANGELOG.md
-
-    - name: Commit version changes
-      run: |
-        git add sdk/go/CHANGELOG.md
-        if [ -f sdk/go/go.sum ]; then
-          git add sdk/go/go.sum
-        fi
-        git commit -m "chore(sdk/go): release v${{ needs.verify-tag.outputs.version }}"
-
-    - name: Create and push tag
-      run: |
-        # Create the tag with the sdk-go- prefix to match other SDKs
-        tag_name="sdk-go-v${{ needs.verify-tag.outputs.version }}"
-        git tag -a "$tag_name" -m "Release Go SDK v${{ needs.verify-tag.outputs.version }}"
-        
-        # Also create Go module subdirectory tag for proper Go module versioning
+        # Create Go module subdirectory tag for proper Go module versioning
         go_module_tag="sdk/go/v${{ needs.verify-tag.outputs.version }}"
         git tag -a "$go_module_tag" -m "Release Go SDK v${{ needs.verify-tag.outputs.version }}"
-        
-        # Push the commit and tags
-        git push origin HEAD:main
-        git push origin "$tag_name"
         git push origin "$go_module_tag"
 
     - name: Create GitHub Release
@@ -240,16 +182,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT || github.token }}
       
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Setup Git
+        uses: ./.github/actions/setup-git
+        with:
+          token: ${{ secrets.PAT || github.token }}
       
       - name: Create update branch
         run: |
-          BRANCH="update-templates-go-sdk-v${{ needs.verify-tag.outputs.version }}"
+          BRANCH="update-templates-sdk-go-v${{ needs.verify-tag.outputs.version }}"
           git checkout -b "$BRANCH"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
@@ -287,16 +229,15 @@ jobs:
         run: |
           git push origin "$UPDATE_BRANCH"
       
-      - name: Create pull request
+      - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT || github.token }}
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          gh pr create \
-            --title "chore: update templates to Go SDK v${VERSION}" \
-            --body "## 📦 Update Templates to Go SDK v${VERSION}
-
+          PR_BODY=$(cat <<EOF
+          ## 📦 Update Templates to Go SDK v${VERSION}
+          
           This PR updates project templates to use the newly published Go SDK version.
           
           ### Changes
@@ -306,13 +247,26 @@ jobs:
           ### Context
           This is an automated PR created after successfully publishing Go SDK v${VERSION}.
           
+          ### Checklist
+          - [x] SDK v${VERSION} tag has been created
+          - [x] Go module subdirectory tag created for proper versioning
+          - [x] Templates updated to new version
+          - [x] \`go mod tidy\` run for all templates
+          - [ ] CI tests pass with new version
+          
           ### Links
           - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go@v${VERSION})
           - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-go-v${VERSION})
           
           ---
-          *This PR was automatically created by the release workflow.*" \
+          *🤖 This PR was automatically created by the release workflow*
+          EOF
+          )
+          
+          gh pr create \
+            --title "chore: update templates to Go SDK v${VERSION}" \
+            --body "$PR_BODY" \
             --base main \
             --head "$UPDATE_BRANCH" \
-            --label "dependencies" \
-            --label "automated"
+            --label "automated" \
+            --label "dependencies"
