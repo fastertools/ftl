@@ -26,21 +26,20 @@ go get github.com/fastertools/ftl-cli/sdk/go@v0.1.0
 go get github.com/fastertools/ftl-cli/sdk/go@main
 ```
 
-## Version Support
-
-| SDK Version | Go Version | TinyGo Version | Status |
-|-------------|------------|----------------|--------|
-| v0.1.x      | 1.21+      | 0.30.0+        | Active |
-
 ## Requirements
 
-- Go 1.21+
+- Go 1.23+
 - TinyGo 0.30.0+ (for WASI compilation)
 - Spin CLI (for running tools)
 
 ## Quick Start
 
-Create a simple echo tool:
+Create a tool with the FTL CLI:
+
+```bash
+ftl init my-app
+ftl add my-go-tool -l go
+```
 
 ```go
 package main

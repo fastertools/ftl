@@ -49,7 +49,6 @@ This SDK provides:
 - Python 3.10 or later
 - `componentize-py` for building WebAssembly components
 - `spin-sdk` for Spin runtime integration
-- Spin CLI for deployment
 
 ## Quick Start
 
@@ -70,28 +69,6 @@ def echo(message: str) -> str:
 Handler = ftl.create_handler()
 ```
 
-### 2. Configure Spin
-
-Create a `spin.toml` file:
-
-```toml
-spin_manifest_version = 2
-
-[application]
-name = "my-python-tool"
-version = "0.1.0"
-authors = ["Your Name <you@example.com>"]
-
-[[trigger.http]]
-route = "/..."
-component = "my-tool"
-
-[component.my-tool]
-source = "app.wasm"
-[component.my-tool.build]
-command = "componentize-py -w spin-http componentize app -o app.wasm"
-```
-
 ### 3. Build and Deploy
 
 ```bash
@@ -103,10 +80,10 @@ source venv/bin/activate
 pip install componentize-py spin-sdk ftl-sdk
 
 # Build
-spin build
+ftl build
 
 # Deploy to Fermyon Cloud
-spin aka deploy
+ftl deploy
 ```
 
 ## API Reference
@@ -374,9 +351,9 @@ Tools must be compiled to WebAssembly to run on Spin:
    componentize-py -w spin-http componentize app -o app.wasm
    ```
 
-3. **Or use Spin's build command**:
+3. **Or use FTL CLIs build command**:
    ```bash
-   spin build
+   ftl build
    ```
 
 ## Best Practices
@@ -451,17 +428,11 @@ def test_handler_missing_field():
 
 ## Deployment
 
-Deploy to Fermyon Cloud:
+Deploy to FTL:
 
 ```bash
 # Deploy with auto-generated name
-spin aka deploy --create-name my-app-name --no-confirm
-
-# Check deployment status
-spin aka app status
-
-# View logs
-spin aka logs
+ftl deploy
 ```
 
 ## Development
@@ -511,47 +482,6 @@ ruff check src tests
 
 # Type checking
 mypy src
-```
-
-## Version Support
-
-| SDK Version | Python Version | Status |
-|-------------|----------------|--------|
-| 0.1.x       | 3.10+          | Active |
-
-## Limitations
-
-- **1ms execution limit**: WebAssembly components have a 1ms execution time limit per invocation
-- **No streaming**: The WebAssembly architecture doesn't support streaming responses
-- **Synchronous I/O**: While async/await syntax is supported, I/O operations are still synchronous under the hood due to WASM constraints
-
-## Migration from v0.1.x
-
-The SDK provides both a modern decorator-based API and a legacy `create_tools` function for backwards compatibility. We recommend using the decorator-based API:
-
-```python
-# Old API (v0.1.x)
-from ftl_sdk import create_tools, ToolResponse
-
-Handler = create_tools({
-    "echo": {
-        "description": "Echo the input",
-        "inputSchema": {...},
-        "handler": lambda input: ToolResponse.text(f"Echo: {input['message']}")
-    }
-})
-
-# New API (recommended)
-from ftl_sdk import FTL
-
-ftl = FTL()
-
-@ftl.tool
-def echo(message: str) -> str:
-    """Echo the input."""
-    return f"Echo: {message}"
-
-Handler = ftl.create_handler()
 ```
 
 ## Changelog

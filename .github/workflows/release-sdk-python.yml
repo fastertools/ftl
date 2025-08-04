@@ -234,7 +234,7 @@ jobs:
       id: release_notes
       run: |
         # Get commits since last SDK release
-        last_tag=$(git tag -l "sdk/python/v*" --sort=-version:refname | head -n 2 | tail -n 1)
+        last_tag=$(git tag -l "sdk-python-v*" --sort=-version:refname | head -n 2 | tail -n 1)
         
         if [ -z "$last_tag" ]; then
           echo "This is the first release of the Python SDK!" > release_notes.md
@@ -266,7 +266,7 @@ jobs:
 
     - name: Create and push tag
       run: |
-        tag_name="sdk/python/v${{ inputs.version }}"
+        tag_name="sdk-python-v${{ inputs.version }}"
         git tag -a "$tag_name" -m "Release Python SDK v${{ inputs.version }}"
         git push origin "$tag_name"
 
@@ -275,7 +275,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: sdk/python/v${{ inputs.version }}
+        tag_name: sdk-python-v${{ inputs.version }}
         release_name: Python SDK v${{ inputs.version }}
         body: ${{ env.RELEASE_NOTES }}
         draft: false

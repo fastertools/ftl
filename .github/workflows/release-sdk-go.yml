@@ -41,7 +41,12 @@ jobs:
       id: get_version
       working-directory: sdk/go
       run: |
-        current_version=$(grep -E '^// Version:' go.mod | awk '{print $3}' | sed 's/v//')
+        # For Go modules, we'll check the latest git tag for this SDK
+        current_version=$(git tag -l "sdk-go-v*" --sort=-version:refname | head -n 1 | sed 's|sdk-go-v||')
+        if [ -z "$current_version" ]; then
+          echo "No existing Go SDK tags found, assuming this is the first release"
+          current_version="0.1.0"
+        fi
         echo "current_version=$current_version" >> $GITHUB_OUTPUT
         echo "Current version: $current_version"
         echo "New version: ${{ inputs.version }}"
@@ -51,16 +56,22 @@ jobs:
         current="${{ steps.get_version.outputs.current_version }}"
         new="${{ inputs.version }}"
         
-        # Simple version comparison (works for most cases)
-        if [ "$(printf '%s\n' "$new" "$current" | sort -V | head -n1)" = "$new" ] && [ "$new" != "$current" ]; then
-          echo "❌ New version ($new) must be higher than current version ($current)"
-          exit 1
+        # Skip version comparison if this is the first release
+        if [ "$current" = "0.1.0" ] && [ -z "$(git tag -l 'sdk-go-v*')" ]; then
+          echo "✅ First release - no version comparison needed"
+        else
+          # Simple version comparison (works for most cases)
+          if [ "$(printf '%s\n' "$new" "$current" | sort -V | head -n1)" = "$new" ] && [ "$new" != "$current" ]; then
+            echo "❌ New version ($new) must be higher than current version ($current)"
+            exit 1
+          fi
+          echo "✅ Version $new is newer than $current"
         fi
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
 
     - name: Install TinyGo
       run: |
@@ -94,12 +105,9 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Update version in go.mod
+    - name: Update go.mod
       working-directory: sdk/go
       run: |
-        # Update the version comment in go.mod
-        sed -i "s|// Version: v.*|// Version: v${{ inputs.version }}|" go.mod
-        
         # Run go mod tidy to ensure everything is clean
         go mod tidy
 
@@ -135,13 +143,16 @@ jobs:
 
     - name: Commit version changes
       run: |
-        git add sdk/go/go.mod sdk/go/go.sum sdk/go/CHANGELOG.md
-        git commit -m "chore(sdk/go): bump version to v${{ inputs.version }}"
+        git add sdk/go/CHANGELOG.md
+        if [ -f sdk/go/go.sum ]; then
+          git add sdk/go/go.sum
+        fi
+        git commit -m "chore(sdk/go): release v${{ inputs.version }}"
 
     - name: Create and push tag
       run: |
-        # Create the tag with the sdk/go/ prefix
-        tag_name="sdk/go/v${{ inputs.version }}"
+        # Create the tag with the sdk-go- prefix to match other SDKs
+        tag_name="sdk-go-v${{ inputs.version }}"
         git tag -a "$tag_name" -m "Release Go SDK v${{ inputs.version }}"
         
         # Push the commit and tag
@@ -152,7 +163,7 @@ jobs:
       id: release_notes
       run: |
         # Get commits since last SDK release
-        last_tag=$(git tag -l "sdk/go/v*" --sort=-version:refname | head -n 2 | tail -n 1)
+        last_tag=$(git tag -l "sdk-go-v*" --sort=-version:refname | head -n 2 | tail -n 1)
         
         if [ -z "$last_tag" ]; then
           echo "This is the first release of the Go SDK!" > release_notes.md
@@ -181,7 +192,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: sdk/go/v${{ inputs.version }}
+        tag_name: sdk-go-v${{ inputs.version }}
         release_name: Go SDK v${{ inputs.version }}
         body: ${{ env.RELEASE_NOTES }}
         draft: false

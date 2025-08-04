@@ -5,7 +5,7 @@ description = "An FTL MCP tool written in Python"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    # ftl-sdk is installed separately in Makefile
+    "ftl-sdk",
     # Add your project dependencies here
 ]
 

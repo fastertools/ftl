@@ -52,11 +52,9 @@ build: clean
 	@. venv/bin/activate && pip install --upgrade pip --quiet
 	@. venv/bin/activate && pip install componentize-py --quiet
 	@. venv/bin/activate && pip install -e . --quiet
-	@# TODO: Replace with published ftl-sdk when available
-	@. venv/bin/activate && pip install -e /Users/coreyryan/data/mashh/ftl-cli/sdk/python --quiet 2>/dev/null || \
-		echo "Warning: Could not install ftl-sdk from local path. Please install manually."
+	@. venv/bin/activate && pip install ftl-sdk --quiet
 	@echo "Building WASM component..."
-	@. venv/bin/activate && componentize-py -w spin-http componentize src.main -p . -p /Users/coreyryan/data/mashh/ftl-cli/sdk/python/src -o app.wasm
+	@. venv/bin/activate && componentize-py -w spin-http componentize src.main -p . -o app.wasm
 	@echo "✓ Build successful!"
 
 # Development workflow
