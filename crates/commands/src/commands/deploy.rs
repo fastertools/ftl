@@ -605,7 +605,10 @@ fn add_auth_variables_from_ftl(
 
     let required_scopes = config.auth.required_scopes();
     if !required_scopes.is_empty() && !variables.contains_key("mcp_jwt_required_scopes") {
-        variables.insert("mcp_jwt_required_scopes".to_string(), required_scopes.to_string());
+        variables.insert(
+            "mcp_jwt_required_scopes".to_string(),
+            required_scopes.to_string(),
+        );
     }
 
     // Add OIDC-specific variables if present
@@ -631,9 +634,7 @@ fn add_auth_variables_from_ftl(
             );
         }
 
-        if !oidc.token_endpoint.is_empty()
-            && !variables.contains_key("mcp_oauth_token_endpoint")
-        {
+        if !oidc.token_endpoint.is_empty() && !variables.contains_key("mcp_oauth_token_endpoint") {
             variables.insert(
                 "mcp_oauth_token_endpoint".to_string(),
                 oidc.token_endpoint.clone(),

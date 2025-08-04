@@ -30,7 +30,7 @@ fmt-check:
 
 # Run clippy
 lint:
-	cargo clippy --all-targets --all-features -- -D warnings
+	cargo clippy --all-targets --all-features --workspace -- -D warnings
 
 # Run tests
 test:
@@ -51,7 +51,7 @@ fmt:
 
 # Fix clippy warnings
 fix-clippy:
-	cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged
+	cargo clippy --all-targets --all-features --workspace --fix --allow-dirty --allow-staged
 
 # Fix everything
 fix:

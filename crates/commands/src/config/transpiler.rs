@@ -322,7 +322,7 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
     ];
 
     let mut variables = HashMap::new();
-    
+
     // Core MCP settings
     variables.insert(
         "mcp_gateway_url".to_string(),
@@ -336,7 +336,7 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
         "mcp_provider_type".to_string(),
         "{{ mcp_provider_type }}".to_string(),
     );
-    
+
     // JWT provider settings
     variables.insert(
         "mcp_jwt_issuer".to_string(),
@@ -362,7 +362,7 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
         "mcp_jwt_required_scopes".to_string(),
         "{{ mcp_jwt_required_scopes }}".to_string(),
     );
-    
+
     // OAuth discovery settings
     variables.insert(
         "mcp_oauth_authorize_endpoint".to_string(),
@@ -376,7 +376,7 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
         "mcp_oauth_userinfo_endpoint".to_string(),
         "{{ mcp_oauth_userinfo_endpoint }}".to_string(),
     );
-    
+
     // Static provider settings
     variables.insert(
         "mcp_static_tokens".to_string(),

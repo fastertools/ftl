@@ -294,9 +294,7 @@ fn test_transpile_with_auth() {
     // Check auth configuration
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
     assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
-    assert!(
-        result.contains("mcp_jwt_issuer = { default = \"https://my-tenant.authkit.app\" }")
-    );
+    assert!(result.contains("mcp_jwt_issuer = { default = \"https://my-tenant.authkit.app\" }"));
     assert!(result.contains("mcp_jwt_audience = { default = \"mcp-api\" }"));
 
     // Validate and check auth variables
@@ -372,7 +370,9 @@ fn test_transpile_with_static_token_auth() {
             authkit: None,
             oidc: None,
             static_token: Some(StaticTokenConfig {
-                tokens: "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600".to_string(),
+                tokens:
+                    "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
+                        .to_string(),
                 required_scopes: "read".to_string(),
             }),
         },
@@ -387,12 +387,12 @@ fn test_transpile_with_static_token_auth() {
 
     // Check auth is enabled
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
-    
+
     // Check static provider type
     assert!(result.contains("mcp_provider_type = { default = \"static\" }"));
     assert!(result.contains("mcp_static_tokens = { default = \"dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600\" }"));
     assert!(result.contains("mcp_jwt_required_scopes = { default = \"read\" }"));
-    
+
     // Check component names
     assert!(result.contains("[component.mcp]"));
     assert!(result.contains("[component.ftl-mcp-gateway]"));
@@ -1123,7 +1123,10 @@ fn test_auth_enabled_includes_authorizer() {
 
     // Check that wildcard route points to authorizer
     let wildcard_route_matches: Vec<_> = result.match_indices("route = \"/...\"").collect();
-    assert!(!wildcard_route_matches.is_empty(), "Should have wildcard route");
+    assert!(
+        !wildcard_route_matches.is_empty(),
+        "Should have wildcard route"
+    );
 
     // Find the component for the wildcard route
     let wildcard_route_pos = wildcard_route_matches[0].0;
@@ -1208,7 +1211,11 @@ fn test_auth_disabled_with_tools() {
 
     // Check that wildcard route points directly to gateway
     let wildcard_routes: Vec<_> = result.match_indices("route = \"/...\"").collect();
-    assert_eq!(wildcard_routes.len(), 1, "Should have exactly one wildcard route");
+    assert_eq!(
+        wildcard_routes.len(),
+        1,
+        "Should have exactly one wildcard route"
+    );
 
     // Verify it's followed by gateway component named "mcp"
     let after_wildcard = &result[wildcard_routes[0].0..];

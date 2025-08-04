@@ -1,5 +1,5 @@
 //! MCP Authorizer - A high-performance JWT authentication gateway for MCP servers
-//! 
+//!
 //! This component implements OAuth 2.0 Bearer Token authentication with JWKS support,
 //! providing a secure gateway to MCP (Model Context Protocol) servers.
 
@@ -31,12 +31,12 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
 
     // Load configuration
     let config = Config::load()?;
-    
+
     // Extract trace ID for request tracking
     let trace_id = extract_trace_id(&req, &config.trace_header);
-    
+
     // Handle OAuth discovery endpoints (no auth required)
-    if let Some(response) = handle_discovery(&req, &config, &trace_id) {
+    if let Some(response) = handle_discovery(&req, &config, trace_id.as_ref()) {
         return Ok(response);
     }
 
@@ -44,7 +44,11 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     match authenticate(&req, &config).await {
         Ok(auth_context) => {
             // Log successful authentication
-            eprintln!("AUTH_SUCCESS path={} client_id={}", req.path(), auth_context.client_id);
+            eprintln!(
+                "AUTH_SUCCESS path={} client_id={}",
+                req.path(),
+                auth_context.client_id
+            );
             // Forward authenticated request
             forward_request(req, &config, auth_context, trace_id).await
         }
@@ -52,7 +56,7 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
             // Log the error with more context
             eprintln!("AUTH_ERROR path={} error={:?}", req.path(), auth_error);
             // Return authentication error
-            Ok(create_error_response(auth_error, &req, &config, trace_id))
+            Ok(create_error_response(&auth_error, &req, &config, trace_id))
         }
     }
 }
@@ -61,23 +65,23 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
 async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
     // Extract bearer token
     let token = auth::extract_bearer_token(req)?;
-    
+
     // Verify token based on provider type
     let token_info = match &config.provider {
-        config::Provider::JWT(jwt_provider) => {
+        config::Provider::Jwt(jwt_provider) => {
             // Open KV store for JWKS caching
             let store = Store::open_default()
-                .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {}", e)))?;
-            
+                .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {e}")))?;
+
             // Verify JWT token
             token::verify(token, jwt_provider, &store).await?
         }
         config::Provider::Static(static_provider) => {
             // Verify static token
-            static_token::verify(token, static_provider).await?
+            static_token::verify(token, static_provider)?
         }
     };
-    
+
     // Build auth context
     Ok(auth::Context {
         client_id: token_info.client_id,
@@ -89,9 +93,9 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
 }
 
 /// Handle OAuth discovery endpoints
-fn handle_discovery(req: &Request, config: &Config, trace_id: &Option<String>) -> Option<Response> {
+fn handle_discovery(req: &Request, config: &Config, trace_id: Option<&String>) -> Option<Response> {
     let path = req.path();
-    
+
     // Handle discovery endpoints with or without path suffixes
     if path.starts_with("/.well-known/oauth-protected-resource") {
         Some(discovery::oauth_protected_resource(req, config, trace_id))
@@ -115,16 +119,22 @@ async fn forward_request(
 }
 
 /// Create authentication error response
-fn create_error_response(error: AuthError, req: &Request, config: &Config, trace_id: Option<String>) -> Response {
-    let (status, error_code, description) = match &error {
+fn create_error_response(
+    error: &AuthError,
+    req: &Request,
+    config: &Config,
+    trace_id: Option<String>,
+) -> Response {
+    let (status, error_code, description) = match error {
         AuthError::Unauthorized(msg) => (401, "unauthorized", msg.as_str()),
         AuthError::InvalidToken(msg) => (401, "invalid_token", msg.as_str()),
         AuthError::ExpiredToken => (401, "invalid_token", "Token has expired"),
         AuthError::InvalidIssuer => (401, "invalid_token", "Invalid issuer"),
         AuthError::InvalidAudience => (401, "invalid_token", "Invalid audience"),
         AuthError::InvalidSignature => (401, "invalid_token", "Invalid signature"),
-        AuthError::Configuration(msg) => (500, "server_error", msg.as_str()),
-        AuthError::Internal(msg) => (500, "server_error", msg.as_str()),
+        AuthError::Configuration(msg) | AuthError::Internal(msg) => {
+            (500, "server_error", msg.as_str())
+        }
     };
 
     // Build JSON error body
@@ -135,27 +145,31 @@ fn create_error_response(error: AuthError, req: &Request, config: &Config, trace
 
     // Build response with appropriate headers
     let mut binding = Response::builder();
-    let mut builder = binding.status(status as u16);
-    
+    let status_u16 = u16::try_from(status).unwrap_or(500);
+    let mut builder = binding.status(status_u16);
+
     // Add common headers
     let cors_headers = [
         ("content-type", "application/json"),
         ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS"),
-        ("access-control-allow-headers", "Content-Type, Authorization"),
+        (
+            "access-control-allow-methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        ),
+        (
+            "access-control-allow-headers",
+            "Content-Type, Authorization",
+        ),
     ];
-    
+
     for (key, value) in cors_headers {
         builder = builder.header(key, value);
     }
-    
+
     // Add WWW-Authenticate header for 401 responses
     if status == 401 {
-        let www_auth = format!(
-            r#"Bearer error="{}", error_description="{}""#,
-            error_code, description
-        );
-        
+        let www_auth = format!(r#"Bearer error="{error_code}", error_description="{description}""#);
+
         // Add resource metadata if we have a host
         let www_auth_value = if let Some(host) = extract_host(req) {
             // Use http for local development (localhost/127.0.0.1)
@@ -164,20 +178,20 @@ fn create_error_response(error: AuthError, req: &Request, config: &Config, trace
             } else {
                 "https"
             };
-            let resource_url = format!("{}://{}/.well-known/oauth-protected-resource", scheme, host);
-            format!("{}, resource_metadata=\"{}\"", www_auth, resource_url)
+            let resource_url = format!("{scheme}://{host}/.well-known/oauth-protected-resource");
+            format!("{www_auth}, resource_metadata=\"{resource_url}\"")
         } else {
             www_auth
         };
-        
+
         builder = builder.header("www-authenticate", www_auth_value);
     }
-    
+
     // Add trace header if present
     if let Some(trace_id) = trace_id {
         builder = builder.header(&config.trace_header, trace_id);
     }
-    
+
     builder.body(body.to_string()).build()
 }
 
@@ -185,21 +199,26 @@ fn create_error_response(error: AuthError, req: &Request, config: &Config, trace
 fn create_cors_response() -> Response {
     let headers = [
         ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS"),
-        ("access-control-allow-headers", "Content-Type, Authorization"),
+        (
+            "access-control-allow-methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        ),
+        (
+            "access-control-allow-headers",
+            "Content-Type, Authorization",
+        ),
         ("access-control-max-age", "86400"),
     ];
-    
+
     let mut binding = Response::builder();
     let mut builder = binding.status(204);
-    
+
     for (key, value) in headers {
         builder = builder.header(key, value);
     }
-    
+
     builder.build()
 }
-
 
 /// Extract trace ID from request headers
 fn extract_trace_id(req: &Request, trace_header: &str) -> Option<String> {
@@ -208,7 +227,6 @@ fn extract_trace_id(req: &Request, trace_header: &str) -> Option<String> {
         .and_then(|(_, value)| value.as_str())
         .map(String::from)
 }
-
 
 /// Extract host from request headers
 fn extract_host(req: &Request) -> Option<String> {

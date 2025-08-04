@@ -130,8 +130,8 @@ impl McpGateway {
             }
             "tools/list" => Some(self.handle_list_tools(request).await),
             "tools/call" => Some(self.handle_call_tool(request).await),
-            "prompts/list" => Some(self.handle_list_prompts(request)),
-            "resources/list" => Some(self.handle_list_resources(request)),
+            "prompts/list" => Some(Self::handle_list_prompts(request)),
+            "resources/list" => Some(Self::handle_list_resources(request)),
             "ping" => Some(Self::handle_ping(self, request)),
             _ => Some(JsonRpcResponse::error(
                 request.id,
@@ -245,6 +245,49 @@ impl McpGateway {
         }
     }
 
+    async fn execute_tool_call(
+        &self,
+        component_name: &str,
+        tool_name: &str,
+        tool_arguments: serde_json::Value,
+    ) -> Result<ToolResponse, String> {
+        let component_name_kebab = Self::snake_to_kebab(component_name);
+        let tool_url = format!("http://{component_name_kebab}.spin.internal/{tool_name}");
+
+        let req = Request::builder()
+            .method(Method::Post)
+            .uri(&tool_url)
+            .header("Content-Type", "application/json")
+            .body(
+                serde_json::to_vec(&tool_arguments)
+                    .unwrap_or_else(|_| br#"{"error":"Failed to serialize request"}"#.to_vec()),
+            )
+            .build();
+
+        match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.body();
+
+                if *status == 200 {
+                    serde_json::from_slice::<ToolResponse>(body)
+                        .map_err(|e| format!("Tool returned invalid response format: {e}"))
+                } else {
+                    let error_text = String::from_utf8_lossy(body);
+                    Ok(ToolResponse {
+                        content: vec![ToolContent::Text {
+                            text: format!("Tool execution failed (status {status}): {error_text}"),
+                            annotations: None,
+                        }],
+                        structured_content: None,
+                        is_error: Some(true),
+                    })
+                }
+            }
+            Err(e) => Err(format!("Failed to call tool '{tool_name}': {e}")),
+        }
+    }
+
     async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
         let params: CallToolRequest = match request.params {
             Some(p) => match serde_json::from_value(p) {
@@ -267,15 +310,13 @@ impl McpGateway {
         };
 
         // Find which component contains this tool
-        let (component_name, tool_metadata) = match self.find_tool_component(&params.name).await {
-            Some(result) => result,
-            None => {
-                return JsonRpcResponse::error(
-                    request.id,
-                    ErrorCode::INVALID_PARAMS.0,
-                    &format!("Tool '{}' not found", params.name),
-                );
-            }
+        let Some((component_name, tool_metadata)) = self.find_tool_component(&params.name).await
+        else {
+            return JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INVALID_PARAMS.0,
+                &format!("Tool '{}' not found", params.name),
+            );
         };
 
         // Validate arguments if validation is enabled
@@ -294,74 +335,20 @@ impl McpGateway {
             }
         }
 
-        // Call the specific tool component using path-based routing
-        let component_name_kebab = Self::snake_to_kebab(&component_name);
-        let tool_url = format!(
-            "http://{component_name_kebab}.spin.internal/{}",
-            params.name
-        );
-
-        // Prepare the request body with just the arguments
-        let tool_request_body = tool_arguments;
-
-        let req = Request::builder()
-            .method(Method::Post)
-            .uri(&tool_url)
-            .header("Content-Type", "application/json")
-            .body(
-                serde_json::to_vec(&tool_request_body)
-                    .unwrap_or_else(|_| br#"{"error":"Failed to serialize request"}"#.to_vec()),
-            )
-            .build();
-
-        match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
-            Ok(resp) => {
-                let status = resp.status();
-                let body = resp.body();
-
-                if *status == 200 {
-                    // Success - tool must return MCP-formatted response
-                    match serde_json::from_slice::<ToolResponse>(body) {
-                        Ok(tool_response) => match serde_json::to_value(tool_response) {
-                            Ok(value) => JsonRpcResponse::success(request.id, value),
-                            Err(e) => JsonRpcResponse::error(
-                                request.id,
-                                ErrorCode::INTERNAL_ERROR.0,
-                                &format!("Failed to serialize tool response: {e}"),
-                            ),
-                        },
-                        Err(e) => JsonRpcResponse::error(
-                            request.id,
-                            ErrorCode::INTERNAL_ERROR.0,
-                            &format!("Tool returned invalid response format: {e}"),
-                        ),
-                    }
-                } else {
-                    // Error response from tool
-                    let error_text = String::from_utf8_lossy(body);
-                    let tool_response = ToolResponse {
-                        content: vec![ToolContent::Text {
-                            text: format!("Tool execution failed (status {status}): {error_text}"),
-                            annotations: None,
-                        }],
-                        structured_content: None,
-                        is_error: Some(true),
-                    };
-                    match serde_json::to_value(tool_response) {
-                        Ok(value) => JsonRpcResponse::success(request.id, value),
-                        Err(e) => JsonRpcResponse::error(
-                            request.id,
-                            ErrorCode::INTERNAL_ERROR.0,
-                            &format!("Failed to serialize tool response: {e}"),
-                        ),
-                    }
-                }
-            }
-            Err(e) => JsonRpcResponse::error(
-                request.id,
-                ErrorCode::INTERNAL_ERROR.0,
-                &format!("Failed to call tool '{}': {}", params.name, e),
-            ),
+        // Execute the tool call
+        match self
+            .execute_tool_call(&component_name, &params.name, tool_arguments)
+            .await
+        {
+            Ok(tool_response) => match serde_json::to_value(tool_response) {
+                Ok(value) => JsonRpcResponse::success(request.id, value),
+                Err(e) => JsonRpcResponse::error(
+                    request.id,
+                    ErrorCode::INTERNAL_ERROR.0,
+                    &format!("Failed to serialize tool response: {e}"),
+                ),
+            },
+            Err(e) => JsonRpcResponse::error(request.id, ErrorCode::INTERNAL_ERROR.0, &e),
         }
     }
 
@@ -369,18 +356,24 @@ impl McpGateway {
         JsonRpcResponse::success(request.id, serde_json::json!({}))
     }
 
-    fn handle_list_prompts(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+    fn handle_list_prompts(request: JsonRpcRequest) -> JsonRpcResponse {
         // Return empty prompts list - this gateway doesn't support prompts
-        JsonRpcResponse::success(request.id, serde_json::json!({
-            "prompts": []
-        }))
+        JsonRpcResponse::success(
+            request.id,
+            serde_json::json!({
+                "prompts": []
+            }),
+        )
     }
 
-    fn handle_list_resources(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+    fn handle_list_resources(request: JsonRpcRequest) -> JsonRpcResponse {
         // Return empty resources list - this gateway doesn't support resources
-        JsonRpcResponse::success(request.id, serde_json::json!({
-            "resources": []
-        }))
+        JsonRpcResponse::success(
+            request.id,
+            serde_json::json!({
+                "resources": []
+            }),
+        )
     }
 }
 

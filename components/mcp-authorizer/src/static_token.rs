@@ -7,11 +7,13 @@ use crate::error::{AuthError, Result};
 use crate::token::TokenInfo;
 
 /// Verify a static token using the provided configuration
-pub async fn verify(token: &str, provider: &StaticProvider) -> Result<TokenInfo> {
+pub fn verify(token: &str, provider: &StaticProvider) -> Result<TokenInfo> {
     // Look up token in static token map
-    let token_info = provider.tokens.get(token)
+    let token_info = provider
+        .tokens
+        .get(token)
         .ok_or_else(|| AuthError::InvalidToken("Token not found".to_string()))?;
-    
+
     // Check expiration if present
     if let Some(expires_at) = token_info.expires_at {
         let now = Utc::now().timestamp();
@@ -19,24 +21,25 @@ pub async fn verify(token: &str, provider: &StaticProvider) -> Result<TokenInfo>
             return Err(AuthError::ExpiredToken);
         }
     }
-    
+
     // Check required scopes
     if let Some(required_scopes) = &provider.required_scopes {
         use std::collections::HashSet;
-        
+
         let token_scopes: HashSet<_> = token_info.scopes.iter().collect();
         let required_set: HashSet<_> = required_scopes.iter().collect();
-        
+
         if !required_set.is_subset(&token_scopes) {
-            let missing_scopes: Vec<_> = required_set.difference(&token_scopes)
-                .map(|s| (*s).clone())
+            let missing_scopes: Vec<_> = required_set
+                .difference(&token_scopes)
+                .map(|s| (*s).to_string())
                 .collect();
-            return Err(AuthError::Unauthorized(
-                format!("Token missing required scopes: {:?}", missing_scopes)
-            ));
+            return Err(AuthError::Unauthorized(format!(
+                "Token missing required scopes: {missing_scopes:?}"
+            )));
         }
     }
-    
+
     Ok(TokenInfo {
         client_id: token_info.client_id.clone(),
         sub: token_info.sub.clone(),

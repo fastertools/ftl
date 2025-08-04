@@ -170,7 +170,7 @@ pub struct OidcConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct StaticTokenConfig {
     /// Static token definitions
-    /// Format: "token:client_id:sub:scope1,scope2[:expires_at]"
+    /// Format: "`token:client_id:sub:scope1,scope2[:expires_at]`"
     /// Multiple tokens separated by semicolons
     #[garde(length(min = 1))]
     pub tokens: String,
@@ -364,10 +364,8 @@ fn validate_tools(tools: &HashMap<String, ToolConfig>, _ctx: &()) -> garde::Resu
 impl AuthConfig {
     /// Get the provider type as a string
     pub const fn provider_type(&self) -> &str {
-        if self.authkit.is_some() {
-            "jwt"  // AuthKit uses JWT provider
-        } else if self.oidc.is_some() {
-            "jwt"  // OIDC uses JWT provider
+        if self.authkit.is_some() || self.oidc.is_some() {
+            "jwt" // Both AuthKit and OIDC use JWT provider
         } else if self.static_token.is_some() {
             "static"
         } else {
@@ -478,7 +476,11 @@ impl FtlConfig {
 
         // Additional auth validation
         if config.auth.enabled {
-            match (&config.auth.authkit, &config.auth.oidc, &config.auth.static_token) {
+            match (
+                &config.auth.authkit,
+                &config.auth.oidc,
+                &config.auth.static_token,
+            ) {
                 (None, None, None) => {
                     return Err(anyhow::anyhow!(
                         "Either 'authkit', 'oidc', or 'static_token' configuration must be provided when auth is enabled"
@@ -566,12 +568,9 @@ enabled = true
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Either 'authkit', 'oidc', or 'static_token' configuration must be provided")
-        );
+        assert!(result.unwrap_err().to_string().contains(
+            "Either 'authkit', 'oidc', or 'static_token' configuration must be provided"
+        ));
     }
 
     #[test]
@@ -746,12 +745,9 @@ enabled = true
 "#;
         let result = FtlConfig::parse(content);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Either 'authkit', 'oidc', or 'static_token' configuration must be provided")
-        );
+        assert!(result.unwrap_err().to_string().contains(
+            "Either 'authkit', 'oidc', or 'static_token' configuration must be provided"
+        ));
 
         // Test auth enabled with both providers - should fail
         let content = r#"
