@@ -155,9 +155,14 @@ jobs:
         tag_name="sdk-go-v${{ inputs.version }}"
         git tag -a "$tag_name" -m "Release Go SDK v${{ inputs.version }}"
         
-        # Push the commit and tag
+        # Also create Go module subdirectory tag for proper Go module versioning
+        go_module_tag="sdk/go/v${{ inputs.version }}"
+        git tag -a "$go_module_tag" -m "Release Go SDK v${{ inputs.version }}"
+        
+        # Push the commit and tags
         git push origin HEAD:main
         git push origin "$tag_name"
+        git push origin "$go_module_tag"
 
     - name: Generate release notes
       id: release_notes
@@ -211,3 +216,11 @@ jobs:
         else
           echo "⚠️  Module may take a few minutes to appear in the proxy"
         fi
+        
+        echo ""
+        echo "📦 Go module users can import with:"
+        echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ inputs.version }}"
+        echo ""
+        echo "🏷️  Created tags:"
+        echo "  - sdk-go-v${{ inputs.version }} (release tracking)"
+        echo "  - sdk/go/v${{ inputs.version }} (Go module resolution)"

@@ -42,6 +42,12 @@ jobs:
               "TypeScript SDK")
                 TAG="sdk-typescript-v${VERSION}"
                 ;;
+              "Python SDK")
+                TAG="sdk-python-v${VERSION}"
+                ;;
+              "Go SDK")
+                TAG="sdk-go-v${VERSION}"
+                ;;
               *)
                 # Assume it's a component name
                 COMPONENT_LOWER=$(echo "$COMPONENT" | tr '[:upper:]' '[:lower:]')
@@ -80,6 +86,18 @@ jobs:
           
           # Push tag
           git push origin "$TAG"
+          
+          # For Go SDK, also create the Go module subdirectory tag
+          if [[ "$COMPONENT" == "Go SDK" ]]; then
+            GO_MODULE_TAG="sdk/go/v$VERSION"
+            git tag -a "$GO_MODULE_TAG" -m "Release $COMPONENT v$VERSION
+
+          Automated release from PR #${{ github.event.pull_request.number }}
+          
+          ${{ github.event.pull_request.body }}"
+            git push origin "$GO_MODULE_TAG"
+            echo "✅ Also created Go module tag: $GO_MODULE_TAG"
+          fi
           
           echo "✅ Created and pushed tag: $TAG"
           echo "The release workflow will now be triggered automatically!"
