@@ -286,7 +286,14 @@ jobs:
           # Update pyproject.toml files in templates
           find templates -name "pyproject.toml" -type f | while read -r file; do
             if grep -q 'ftl-sdk' "$file"; then
-              sed -i "s/ftl-sdk = \"[^\"]*\"/ftl-sdk = \"$VERSION\"/" "$file"
+              # Handle both formats: "ftl-sdk" and "ftl-sdk==X.Y.Z"
+              # First, try to update versioned format
+              if grep -q 'ftl-sdk==' "$file"; then
+                sed -i "s/ftl-sdk==[^\"']*/ftl-sdk==$VERSION/" "$file"
+              else
+                # Update unversioned format in dependencies array
+                sed -i "s/\"ftl-sdk\",/\"ftl-sdk==$VERSION\",/" "$file"
+              fi
               echo "✅ Updated $file"
             fi
           done
