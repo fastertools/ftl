@@ -1,22 +1,9 @@
 name: Release Python SDK
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.2.0)'
-        required: true
-        type: string
-      test_pypi:
-        description: 'Publish to TestPyPI first?'
-        required: false
-        type: boolean
-        default: true
-      prerelease:
-        description: 'Is this a pre-release?'
-        required: false
-        type: boolean
-        default: false
+  push:
+    tags:
+      - 'sdk-python-v*'
 
 permissions:
   contents: write
@@ -24,8 +11,39 @@ permissions:
   id-token: write  # Required for trusted publishing
 
 jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Parse tag
+        id: parse
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/sdk-python-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🔢 Version: $VERSION"
+      
+      - name: Verify tag is on main branch
+        uses: ./.github/actions/verify-tag
+      
+      - name: Verify version matches pyproject.toml
+        run: |
+          VERSION="${{ steps.parse.outputs.version }}"
+          PACKAGE_VERSION=$(grep -E '^version = ' sdk/python/pyproject.toml | awk -F'"' '{print $2}')
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match pyproject.toml version ($PACKAGE_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version matches pyproject.toml"
+
   validate-and-test:
     name: Validate and Test
+    needs: verify-tag
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,7 +59,7 @@ jobs:
 
     - name: Validate version format
       run: |
-        if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+        if ! [[ "${{ needs.verify-tag.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
           echo "❌ Invalid version format. Please use semantic versioning (e.g., 1.0.0 or 1.0.0-beta1)"
           exit 1
         fi
@@ -52,12 +70,12 @@ jobs:
         current_version=$(grep -E '^version = ' pyproject.toml | awk -F'"' '{print $2}')
         echo "current_version=$current_version" >> $GITHUB_OUTPUT
         echo "Current version: $current_version"
-        echo "New version: ${{ inputs.version }}"
+        echo "New version: ${{ needs.verify-tag.outputs.version }}"
 
     - name: Check version is newer
       run: |
         current="${{ steps.get_version.outputs.current_version }}"
-        new="${{ inputs.version }}"
+        new="${{ needs.verify-tag.outputs.version }}"
         
         # Simple version comparison (works for most cases)
         if [ "$(printf '%s\n' "$new" "$current" | sort -V | head -n1)" = "$new" ] && [ "$new" != "$current" ]; then
@@ -83,7 +101,7 @@ jobs:
 
   build:
     name: Build Distribution
-    needs: validate-and-test
+    needs: [verify-tag, validate-and-test]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -109,7 +127,7 @@ jobs:
     - name: Update version in pyproject.toml
       run: |
         # Update the version in pyproject.toml
-        sed -i "s/^version = .*/version = \"${{ inputs.version }}\"/" pyproject.toml
+        sed -i "s/^version = .*/version = \"${{ needs.verify-tag.outputs.version }}\"/" pyproject.toml
         
         # Verify the change
         grep "^version = " pyproject.toml
@@ -123,7 +141,7 @@ jobs:
         cat > CHANGELOG.tmp.md << EOF
         # Changelog
         
-        ## [v${{ inputs.version }}] - $date
+        ## [v${{ needs.verify-tag.outputs.version }}] - $date
         
         ### Added
         - (Add new features here)
@@ -164,41 +182,12 @@ jobs:
       run: |
         cd ../..  # Go to repo root
         git add sdk/python/pyproject.toml sdk/python/CHANGELOG.md
-        git commit -m "chore(sdk/python): bump version to v${{ inputs.version }}"
+        git commit -m "chore(sdk/python): bump version to v${{ needs.verify-tag.outputs.version }}"
         git push origin HEAD:main
-
-  publish-testpypi:
-    name: Publish to TestPyPI
-    if: inputs.test_pypi
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/ftl-sdk
-    permissions:
-      id-token: write
-    
-    steps:
-    - name: Download distribution packages
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-
-    - name: Publish to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-
-    - name: Verify TestPyPI installation
-      run: |
-        sleep 30  # Wait for package to be available
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ftl-sdk==${{ inputs.version }}
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [build, publish-testpypi]
-    if: always() && needs.build.result == 'success' && (needs.publish-testpypi.result == 'success' || needs.publish-testpypi.result == 'skipped')
+    needs: [verify-tag, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -218,7 +207,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: publish-pypi
+    needs: [verify-tag, publish-pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -230,56 +219,26 @@ jobs:
         fetch-depth: 0
         ref: main  # Get the latest commit with version bump
 
-    - name: Generate release notes
-      id: release_notes
-      run: |
-        # Get commits since last SDK release
-        last_tag=$(git tag -l "sdk-python-v*" --sort=-version:refname | head -n 2 | tail -n 1)
-        
-        if [ -z "$last_tag" ]; then
-          echo "This is the first release of the Python SDK!" > release_notes.md
-        else
-          echo "## Changes since $last_tag" > release_notes.md
-          echo "" >> release_notes.md
-          
-          # Get commit messages
-          git log --pretty=format:"- %s (%h)" "$last_tag"..HEAD -- sdk/python/ >> release_notes.md
-        fi
-        
-        echo "" >> release_notes.md
-        echo "## Installation" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "### From PyPI" >> release_notes.md
-        echo '```bash' >> release_notes.md
-        echo "pip install ftl-sdk==${{ inputs.version }}" >> release_notes.md
-        echo '```' >> release_notes.md
-        echo "" >> release_notes.md
-        echo "### From TestPyPI (if available)" >> release_notes.md
-        echo '```bash' >> release_notes.md
-        echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ftl-sdk==${{ inputs.version }}" >> release_notes.md
-        echo '```' >> release_notes.md
-        
-        # Save for GitHub release
-        echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-        cat release_notes.md >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-
-    - name: Create and push tag
-      run: |
-        tag_name="sdk-python-v${{ inputs.version }}"
-        git tag -a "$tag_name" -m "Release Python SDK v${{ inputs.version }}"
-        git push origin "$tag_name"
-
     - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: sdk-python-v${{ inputs.version }}
-        release_name: Python SDK v${{ inputs.version }}
-        body: ${{ env.RELEASE_NOTES }}
+        name: "Python SDK v${{ needs.verify-tag.outputs.version }}"
         draft: false
-        prerelease: ${{ inputs.prerelease }}
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## Python SDK v${{ needs.verify-tag.outputs.version }}
+          
+          ### Installation
+          
+          ```bash
+          pip install ftl-sdk==${{ needs.verify-tag.outputs.version }}
+          ```
+          
+          ### Links
+          
+          - [PyPI Package](https://pypi.org/project/ftl-sdk/${{ needs.verify-tag.outputs.version }}/)
+          - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/python)
 
     - name: Verify PyPI installation
       run: |
@@ -287,5 +246,92 @@ jobs:
         sleep 60
         
         # Try to install from PyPI
-        pip install ftl-sdk==${{ inputs.version }}
+        pip install ftl-sdk==${{ needs.verify-tag.outputs.version }}
         echo "✅ Package is available on PyPI!"
+
+  update-templates:
+    name: Update Templates PR
+    needs: [verify-tag, publish-pypi]
+    if: needs.publish-pypi.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Create update branch
+        run: |
+          BRANCH="update-templates-py-sdk-v${{ needs.verify-tag.outputs.version }}"
+          git checkout -b "$BRANCH"
+          echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
+      
+      - name: Update template versions
+        run: |
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          # Update Python templates
+          find templates -name "requirements.txt" -type f | while read -r file; do
+            if grep -q 'ftl-sdk' "$file"; then
+              sed -i "s/ftl-sdk==.*/ftl-sdk==$VERSION/" "$file"
+              echo "✅ Updated $file"
+            fi
+          done
+          
+          # Update pyproject.toml files in templates
+          find templates -name "pyproject.toml" -type f | while read -r file; do
+            if grep -q 'ftl-sdk' "$file"; then
+              # Update pinned version format: ftl-sdk==X.Y.Z
+              sed -i "s/ftl-sdk==[^\"']*/ftl-sdk==$VERSION/" "$file"
+              echo "✅ Updated $file"
+            fi
+          done
+      
+      - name: Commit changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No template updates needed"
+            exit 0
+          fi
+          git commit -m "chore: update templates to use ftl-sdk v${{ needs.verify-tag.outputs.version }}" \
+            -m "Updates project templates to use the newly published SDK version." \
+            -m "This is an automated update following the release of ftl-sdk v${{ needs.verify-tag.outputs.version }}."
+      
+      - name: Push update branch
+        run: |
+          git push origin "$UPDATE_BRANCH"
+      
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.verify-tag.outputs.version }}"
+          
+          gh pr create \
+            --title "chore: update templates to ftl-sdk v${VERSION}" \
+            --body "## 📦 Update Templates to ftl-sdk v${VERSION}
+
+          This PR updates project templates to use the newly published ftl-sdk version.
+          
+          ### Changes
+          - Updated Python project templates to use ftl-sdk v${VERSION}
+          
+          ### Context
+          This is an automated PR created after successfully publishing ftl-sdk v${VERSION} to PyPI.
+          
+          ### Links
+          - [PyPI Package](https://pypi.org/project/ftl-sdk/${VERSION}/)
+          - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-python-v${VERSION})
+          
+          ---
+          *This PR was automatically created by the release workflow.*" \
+            --base main \
+            --head "$UPDATE_BRANCH" \
+            --label "dependencies" \
+            --label "automated"
