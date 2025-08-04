@@ -199,10 +199,21 @@ jobs:
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/python/pyproject.toml
               ;;
             sdk-go)
-              # Go modules use tags for versioning, so we just need to prepare the module
-              # The actual version is set via git tags
+              # Go modules use tags for versioning, but we update the README to track version
               echo "Go SDK will be tagged as sdk-go-v${NEW_VERSION}"
-              # Update go.mod if there are any internal version references
+              
+              # Update version in README.md
+              if grep -q "^Version: " sdk/go/README.md; then
+                # Update existing version line
+                sed -i "s/^Version: .*/Version: ${NEW_VERSION}/" sdk/go/README.md
+              else
+                # Add version line after the title if it doesn't exist
+                sed -i "2a\\
+Version: ${NEW_VERSION}\\
+" sdk/go/README.md
+              fi
+              
+              # Run go mod tidy to ensure module is clean
               cd sdk/go
               go mod tidy
               cd ../..
