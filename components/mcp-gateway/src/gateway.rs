@@ -7,6 +7,10 @@ use crate::mcp_types::{
     JsonRpcResponse, ListToolsResponse, McpProtocolVersion, ServerCapabilities, ServerInfo,
     ToolContent, ToolMetadata, ToolResponse,
 };
+use crate::middleware::{
+    context::MiddlewareContext, invocation_tracker::{InvocationTracker, TrackerConfig},
+    pipeline::{MiddlewarePipeline, MiddlewareBuilder},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
@@ -21,11 +25,47 @@ fn default_validate_arguments() -> bool {
 
 pub struct McpGateway {
     config: GatewayConfig,
+    middleware_pipeline: MiddlewarePipeline,
+    request_context: std::collections::HashMap<String, String>,
 }
 
 impl McpGateway {
     pub fn new(config: GatewayConfig) -> Self {
-        Self { config }
+        // Build middleware pipeline
+        let mut builder = MiddlewareBuilder::new();
+        
+        // Add InvocationTracker if enabled
+        if variables::get("invocation_tracker_enabled")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true)
+        {
+            let tracker_config = TrackerConfig {
+                enabled: true,
+                collector_url: variables::get("metrics_collector_url")
+                    .unwrap_or_else(|_| "http://metrics-collector.spin.internal/events".to_string()),
+            };
+            
+            let tracker = InvocationTracker::new(tracker_config);
+            builder = builder.with_invocation_tracker(tracker);
+            
+            Self {
+                config,
+                middleware_pipeline: builder.build(),
+                request_context: std::collections::HashMap::new(),
+            }
+        } else {
+            Self {
+                config,
+                middleware_pipeline: builder.build(),
+                request_context: std::collections::HashMap::new(),
+            }
+        }
+    }
+
+    /// Set request context extracted from headers
+    pub fn set_request_context(&mut self, context: std::collections::HashMap<String, String>) {
+        self.request_context = context;
     }
 
     /// Convert `snake_case` to kebab-case for component names
@@ -224,11 +264,12 @@ impl McpGateway {
             .map(|component_name| self.fetch_component_tools(component_name))
             .collect();
 
-        // Execute all futures concurrently and collect results
-        let results = futures::future::join_all(metadata_futures).await;
-
-        // Flatten the results to get all tools from all components
-        let tools: Vec<ToolMetadata> = results.into_iter().flatten().collect();
+        // Execute all futures sequentially and collect results
+        let mut tools: Vec<ToolMetadata> = Vec::new();
+        for future in metadata_futures {
+            let component_tools = future.await;
+            tools.extend(component_tools);
+        }
 
         let response = ListToolsResponse { tools };
         match serde_json::to_value(response) {
@@ -285,12 +326,13 @@ impl McpGateway {
     }
 
     async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        let request_id = request.id.clone();
         let params: CallToolRequest = match request.params {
             Some(p) => match serde_json::from_value(p) {
                 Ok(params) => params,
                 Err(e) => {
                     return JsonRpcResponse::error(
-                        request.id,
+                        request_id,
                         ErrorCode::INVALID_PARAMS.0,
                         &format!("Invalid params: {e}"),
                     );
@@ -298,7 +340,7 @@ impl McpGateway {
             },
             None => {
                 return JsonRpcResponse::error(
-                    request.id,
+                    request_id,
                     ErrorCode::INVALID_PARAMS.0,
                     "Invalid params: missing required parameters",
                 );
@@ -306,13 +348,15 @@ impl McpGateway {
         };
 
         // Find which component contains this tool
-        let Some((component_name, tool_metadata)) = self.find_tool_component(&params.name).await
-        else {
-            return JsonRpcResponse::error(
-                request.id,
-                ErrorCode::INVALID_PARAMS.0,
-                &format!("Unknown tool: {}", params.name),
-            );
+        let (component_name, tool_metadata) = match self.find_tool_component(&params.name).await {
+            Some(result) => result,
+            None => {
+                return JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INVALID_PARAMS.0,
+                    &format!("Tool '{}' not found", params.name),
+                );
+            }
         };
 
         // Validate arguments if validation is enabled
@@ -324,32 +368,150 @@ impl McpGateway {
                 Self::validate_arguments(&params.name, &tool_metadata.input_schema, &tool_arguments)
             {
                 return JsonRpcResponse::error(
-                    request.id,
+                    request_id,
                     ErrorCode::INVALID_PARAMS.0,
                     &format!("Invalid params: {validation_error}"),
                 );
             }
         }
 
-        // Execute the tool call
-        match self
-            .execute_tool_call(&component_name, &params.name, tool_arguments)
-            .await
-        {
-            Ok(tool_response) => match serde_json::to_value(tool_response) {
-                Ok(value) => JsonRpcResponse::success(request.id, value),
-                Err(e) => JsonRpcResponse::error(
-                    request.id,
-                    ErrorCode::INTERNAL_ERROR.0,
-                    &format!("Internal error: {e}"),
-                ),
-            },
-            Err(e) => JsonRpcResponse::error(
-                request.id,
-                ErrorCode::INTERNAL_ERROR.0,
-                &format!("Internal error: {e}"),
-            ),
+        // Create middleware context
+        let mut ctx = MiddlewareContext::new(params.name.clone(), component_name.clone());
+        
+        // Add tenant/user context from request headers
+        for (key, value) in &self.request_context {
+            ctx.metadata.additional.insert(key.clone(), value.clone());
         }
+        
+        // Set request size if we have arguments
+        if let Ok(serialized) = serde_json::to_vec(&tool_arguments) {
+            ctx.set_request_size(serialized.len());
+        }
+
+        // Run pre-process middleware
+        ctx.timing.pre_process_start = Some(std::time::Instant::now());
+        if let Err(e) = self.middleware_pipeline.pre_process(&mut ctx).await {
+            if e.is_fatal {
+                return JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INTERNAL_ERROR.0,
+                    &format!("Middleware pre-process error: {}", e.message),
+                );
+            }
+            // Non-fatal errors are logged but don't stop execution
+        }
+        ctx.timing.pre_process_end = Some(std::time::Instant::now());
+
+        // Call the specific tool component using path-based routing
+        let component_name_kebab = Self::snake_to_kebab(&component_name);
+        let tool_url = format!(
+            "http://{component_name_kebab}.spin.internal/{}",
+            params.name
+        );
+
+        // Prepare the request body with just the arguments
+        let tool_request_body = tool_arguments;
+
+        let req = Request::builder()
+            .method(Method::Post)
+            .uri(&tool_url)
+            .header("Content-Type", "application/json")
+            .body(
+                serde_json::to_vec(&tool_request_body)
+                    .unwrap_or_else(|_| br#"{"error":"Failed to serialize request"}"#.to_vec()),
+            )
+            .build();
+
+        // Mark tool execution start
+        ctx.timing.tool_execution_start = Some(std::time::Instant::now());
+
+        let tool_result = spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await;
+        
+        // Mark tool execution end
+        ctx.timing.tool_execution_end = Some(std::time::Instant::now());
+
+        // Process the result and prepare response
+        let response = match tool_result {
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.body();
+
+                if *status == 200 {
+                    // Success - tool must return MCP-formatted response
+                    match serde_json::from_slice::<ToolResponse>(body) {
+                        Ok(tool_response) => {
+                            // Set success in context
+                            ctx.set_tool_success(true, Some(body.len()));
+                            
+                            match serde_json::to_value(tool_response) {
+                                Ok(value) => JsonRpcResponse::success(request_id.clone(), value),
+                                Err(e) => {
+                                    ctx.set_error(format!("Failed to serialize tool response: {e}"));
+                                    JsonRpcResponse::error(
+                                        request_id.clone(),
+                                        ErrorCode::INTERNAL_ERROR.0,
+                                        &format!("Failed to serialize tool response: {e}"),
+                                    )
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            ctx.set_error(format!("Tool returned invalid response format: {e}"));
+                            JsonRpcResponse::error(
+                                request_id.clone(),
+                                ErrorCode::INTERNAL_ERROR.0,
+                                &format!("Tool returned invalid response format: {e}"),
+                            )
+                        }
+                    }
+                } else {
+                    // Error response from tool
+                    let error_text = String::from_utf8_lossy(body);
+                    ctx.set_error(format!("Tool execution failed (status {status}): {error_text}"));
+                    
+                    let tool_response = ToolResponse {
+                        content: vec![ToolContent::Text {
+                            text: format!("Tool execution failed (status {status}): {error_text}"),
+                            annotations: None,
+                        }],
+                        structured_content: None,
+                        is_error: Some(true),
+                    };
+                    match serde_json::to_value(tool_response) {
+                        Ok(value) => JsonRpcResponse::success(request_id.clone(), value),
+                        Err(e) => JsonRpcResponse::error(
+                            request_id.clone(),
+                            ErrorCode::INTERNAL_ERROR.0,
+                            &format!("Failed to serialize tool response: {e}"),
+                        ),
+                    }
+                }
+            }
+            Err(e) => {
+                ctx.set_error(format!("Failed to call tool: {}", e));
+                JsonRpcResponse::error(
+                    request_id.clone(),
+                    ErrorCode::INTERNAL_ERROR.0,
+                    &format!("Failed to call tool '{}': {}", params.name, e),
+                )
+            }
+        };
+
+        // Run post-process middleware
+        ctx.timing.post_process_start = Some(std::time::Instant::now());
+        if let Err(e) = self.middleware_pipeline.post_process(&mut ctx).await {
+            if e.is_fatal {
+                return JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INTERNAL_ERROR.0,
+                    &format!("Middleware post-process error: {}", e.message),
+                );
+            }
+            // Non-fatal errors are logged but don't stop execution
+        }
+        ctx.timing.post_process_end = Some(std::time::Instant::now());
+
+        response
     }
 
     fn handle_ping(_gateway: &Self, request: JsonRpcRequest) -> JsonRpcResponse {
@@ -383,12 +545,13 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         return Response::builder()
             .status(200)
             .header("Access-Control-Allow-Origin", "*")
-            .header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             .header("Access-Control-Allow-Headers", "Content-Type")
             .build();
     }
 
-    // Only accept POST requests
+
+    // Only accept POST requests for JSON-RPC
     if *req.method() != Method::Post {
         return Response::builder()
             .status(405)
@@ -435,6 +598,31 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         }
     };
 
+    // Extract tenant/user context from headers (set by upstream mcp-authorizer)
+    let mut request_context = std::collections::HashMap::new();
+    
+    // Look for standard auth headers
+    for (name, value) in req.headers() {
+        match name.to_lowercase().as_str() {
+            "x-tenant-id" => {
+                if let Some(tenant_id) = value.as_str() {
+                    request_context.insert("tenant_id".to_string(), tenant_id.to_string());
+                }
+            }
+            "x-user-id" => {
+                if let Some(user_id) = value.as_str() {
+                    request_context.insert("user_id".to_string(), user_id.to_string());
+                }
+            }
+            "x-auth-provider" => {
+                if let Some(provider) = value.as_str() {
+                    request_context.insert("auth_provider".to_string(), provider.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
     // Create gateway with config
     let validate_arguments = variables::get("validate_arguments")
         .unwrap_or_else(|_| "true".to_string())
@@ -448,8 +636,10 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         },
         validate_arguments,
     };
-
-    let gateway = McpGateway::new(config);
+    let mut gateway = McpGateway::new(config);
+    
+    // Store request context for middleware to access
+    gateway.set_request_context(request_context);
 
     // Handle the request
     gateway.handle_request(request).await.map_or_else(

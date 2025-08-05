@@ -19,6 +19,7 @@ default-members = [
 exclude = [
     "examples",
     "templates",
+    ".agent",
 ]
 
 # Note: WebAssembly components are in the components/ directory

@@ -120,28 +120,22 @@ command = "cargo build --release --target wasm32-wasip1"
     // Note: We can't check exact paths because canonicalize() may resolve symlinks
     // (e.g., /var -> /private/var on macOS)
 
-    // Check that wasm path is absolute
+    // Check that MCP components use absolute paths 
     assert!(
-        spin_content.contains("source = \"/"),
-        "Expected wasm path to be absolute (start with /) in:\n{spin_content}"
+        spin_content.contains("source = \"/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm\""),
+        "Expected MCP gateway to use absolute path in:\n{spin_content}"
     );
 
-    // Check that the wasm path ends with the expected relative part
+    // Check that tool components still use relative paths (current architecture)
     assert!(
-        spin_content.contains("/my-tool/target/wasm32-wasip1/release/my_tool.wasm\""),
-        "Expected wasm path to contain the correct relative path in:\n{spin_content}"
+        spin_content.contains("source = \"my-tool/target/wasm32-wasip1/release/my_tool.wasm\""),
+        "Expected tool component to use relative path in:\n{spin_content}"
     );
 
-    // Check that workdir is absolute
+    // Check that workdir remains relative for tool components
     assert!(
-        spin_content.contains("workdir = \"/"),
-        "Expected workdir to be absolute (start with /) in:\n{spin_content}"
-    );
-
-    // Check that workdir ends with the expected relative part
-    assert!(
-        spin_content.contains("/my-tool\""),
-        "Expected workdir to contain the correct relative path in:\n{spin_content}"
+        spin_content.contains("workdir = \"my-tool\""),
+        "Expected workdir to be relative for tool components in:\n{spin_content}"
     );
 }
 
@@ -314,8 +308,8 @@ fn test_transpile_with_auth() {
     );
     assert!(result.contains("mcp_jwt_audience = { default = \"\" }"));
 
-    // For private mode without OIDC, tenant_id should be required
-    assert!(result.contains("mcp_tenant_id = { required = true }"));
+    // Static tokens variable (empty in main branch)
+    assert!(result.contains("mcp_static_tokens = { default = \"\" }"));
 
     // Validate and check auth variables
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -328,8 +322,8 @@ fn test_transpile_with_auth() {
         SpinVariable::Default { default } if default == "jwt"
     ));
     assert!(matches!(
-        &spin_config.variables["mcp_tenant_id"],
-        SpinVariable::Required { required: true }
+        &spin_config.variables["mcp_static_tokens"],
+        SpinVariable::Default { default } if default == ""
     ));
 }
 
@@ -369,18 +363,14 @@ fn test_transpile_with_oidc_auth() {
         "mcp_jwt_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
     ));
 
-    // For private mode with OIDC, tenant_id should be empty (not required)
-    assert!(result.contains("mcp_tenant_id = { default = \"\" }"));
+    // Static tokens variable (empty in main branch)
+    assert!(result.contains("mcp_static_tokens = { default = \"\" }"));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
     assert!(matches!(
         &spin_config.variables["mcp_provider_type"],
         SpinVariable::Default { default } if default == "jwt"
-    ));
-    assert!(matches!(
-        &spin_config.variables["mcp_tenant_id"],
-        SpinVariable::Default { default } if default.is_empty()
     ));
 }
 
@@ -456,8 +446,8 @@ fn test_transpile_with_custom_gateway_uris() {
 
     // Gateway component should exist with custom URI (named "mcp")
     assert!(result.contains("[component.mcp]"));
-    // Now we just use a simple source string, not a structured registry format
-    assert!(result.contains("source = \"ghcr.io/myorg/custom-gateway:2.0.0\""));
+    // Gateway uses absolute path in main's architecture, not registry URI
+    assert!(result.contains("source = \"/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm\""));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -466,10 +456,10 @@ fn test_transpile_with_custom_gateway_uris() {
     assert!(spin_config.component.contains_key("mcp"));
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
-    // Gateway component should have a local source (string path)
+    // Gateway component should have a local source (absolute path)
     let gateway_component = &spin_config.component["mcp"];
     if let ComponentSource::Local(path) = &gateway_component.source {
-        assert_eq!(path, "ghcr.io/myorg/custom-gateway:2.0.0");
+        assert_eq!(path, "/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm");
     } else {
         panic!("Expected gateway component to have local source");
     }
@@ -908,14 +898,12 @@ fn test_parse_component_source() {
     // Since we're downloading registry components with wkg, everything becomes a local path
 
     let test_cases = vec![
-        ("app.wasm", "app.wasm"),
-        ("/path/to/app.wasm", "/path/to/app.wasm"),
-        // Even registry URLs are now treated as local paths (will be downloaded by wkg)
-        ("ghcr.io/myorg/my-tool:1.0.0", "ghcr.io/myorg/my-tool:1.0.0"),
+        ("ghcr.io/myorg/my-tool:1.0.0", "oci://ghcr.io/myorg/my-tool:1.0.0"),
+        ("docker.io/library/hello:latest", "oci://docker.io/library/hello:latest"),
     ];
 
     for (input, expected) in test_cases {
-        let result = parse_component_source(input, None);
+        let result = parse_registry_uri_to_source(input);
         match result {
             ComponentSource::Local(path) => {
                 assert_eq!(path, expected, "Path mismatch for input: {input}");
@@ -991,9 +979,9 @@ fn test_http_trigger_generation() {
     assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
     assert!(!result.contains("route = \"/.well-known/oauth-authorization-server\""));
 
-    // Count private route triggers (2 tools = 2, gateway is not private when auth is disabled)
+    // Count private route triggers (2 tools + 1 metrics = 3, gateway is not private when auth is disabled)
     let private_count = result.matches("route = { private = true }").count();
-    assert_eq!(private_count, 2);
+    assert_eq!(private_count, 3);
 
     // Each tool should have a trigger
     let tool1_triggers = result.matches("component = \"tool1\"").count();

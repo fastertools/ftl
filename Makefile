@@ -16,6 +16,14 @@ default:
 	@echo "  pre-push      - Pre-push checks"
 	@echo "  build-release - Build release"
 
+load:
+	cp ./.mnemic/ftl-cli.plist /Users/coreyryan/Library/LaunchAgents/dev.mnemic.cli.ftl.plist
+	launchctl load /Users/coreyryan/Library/LaunchAgents/dev.mnemic.cli.ftl.plist
+
+unload:
+	launchctl stop /Users/coreyryan/Library/LaunchAgents/dev.mnemic.cli.ftl.plist 
+	launchctl unload /Users/coreyryan/Library/LaunchAgents/dev.mnemic.cli.ftl.plist 	
+
 # Run all CI checks
 ci:
 	@echo "🔍 Running CI checks..."

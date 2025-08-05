@@ -2,6 +2,7 @@
 .memory
 .mnemic
 .agent
+CLAUDE.md
 
 # Rust build artifacts
 target/

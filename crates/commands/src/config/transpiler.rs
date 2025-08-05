@@ -13,11 +13,10 @@ use ftl_runtime::deps::FileSystem;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Parse a component source into a Spin source configuration
-/// Handles both registry URIs and local files, using `default_registry` when needed
-fn parse_component_source(source: &str, _default_registry: Option<&str>) -> ComponentSource {
-    // For local WASM files, use them directly
-    ComponentSource::Local(source.to_string())
+/// Parse a registry URI to a component source
+fn parse_registry_uri_to_source(registry_uri: &str) -> ComponentSource {
+    // Use registry URI directly - Spin will handle OCI resolution
+    ComponentSource::Local(format!("oci://{}", registry_uri))
 }
 
 /// Transpile an FTL configuration to Spin configuration
@@ -75,21 +74,6 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 
     // Only add other auth variables if auth is enabled
     if ftl_config.is_auth_enabled() {
-        // Add tenant_id variable for private mode without OIDC (platform will provide the value)
-        if ftl_config.project.access_control == "private" && ftl_config.oidc.is_none() {
-            variables.insert(
-                "mcp_tenant_id".to_string(),
-                SpinVariable::Required { required: true },
-            );
-        } else {
-            // For public mode or private with OIDC, tenant_id is empty
-            variables.insert(
-                "mcp_tenant_id".to_string(),
-                SpinVariable::Default {
-                    default: String::new(),
-                },
-            );
-        }
         // Core MCP variables
         variables.insert(
             "mcp_gateway_url".to_string(),
@@ -110,7 +94,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             },
         );
 
-        // JWT provider variables (both FTL AuthKit and custom OIDC use JWT)
+        // JWT provider variables
         variables.insert(
             "mcp_jwt_issuer".to_string(),
             SpinVariable::Default {
@@ -130,7 +114,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             },
         );
 
-        // JWKS URI - empty for FTL AuthKit (auto-derived), explicit for OIDC
+        // JWKS URI - explicit for OIDC, empty for AuthKit
         let jwks_uri = if let Some(oidc) = &ftl_config.oidc {
             oidc.jwks_uri.clone()
         } else {
@@ -207,7 +191,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             }
         }
 
-        // Static provider variables - no longer supported in new configuration
+        // Static tokens (not supported in main branch simplification)
         variables.insert(
             "mcp_static_tokens".to_string(),
             SpinVariable::Default {
@@ -216,26 +200,31 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         );
     }
 
+    // Check if middleware is enabled before moving variables
+    let middleware_enabled = variables.get("middleware_enabled")
+        .and_then(|v| match v {
+            SpinVariable::Default { default } => Some(default.as_str()),
+            _ => None,
+        })
+        .map(|s| s == "true")
+        .unwrap_or(true);
+
     spin_config.variables = variables;
 
     // Build components
     let mut components = HashMap::new();
 
-    // Get default registry from project config
-    let default_registry = ftl_config.project.default_registry.as_deref();
-
     if ftl_config.is_auth_enabled() {
         // When auth is enabled, add authorizer as "mcp" and gateway as "ftl-mcp-gateway"
         components.insert(
             "mcp".to_string(),
-            create_mcp_component(&ftl_config.mcp.authorizer, default_registry),
+            create_mcp_component(&ftl_config.mcp.authorizer),
         );
         components.insert(
             "ftl-mcp-gateway".to_string(),
             create_gateway_component(
                 &ftl_config.mcp.gateway,
                 ftl_config.mcp.validate_arguments,
-                default_registry,
             ),
         );
     } else {
@@ -245,8 +234,15 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             create_gateway_component(
                 &ftl_config.mcp.gateway,
                 ftl_config.mcp.validate_arguments,
-                default_registry,
             ),
+        );
+    }
+
+    // Add metrics collector component if middleware is enabled
+    if middleware_enabled {
+        components.insert(
+            "ftl-metrics".to_string(),
+            create_metrics_collector_component(),
         );
     }
 
@@ -254,7 +250,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     for (tool_name, tool_config) in &ftl_config.tools {
         components.insert(
             tool_name.clone(),
-            create_tool_component(tool_name, tool_config, default_registry),
+            create_tool_component(tool_name, tool_config),
         );
     }
 
@@ -298,19 +294,30 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         });
     }
 
+    // Add metrics collector triggers
+    if middleware_enabled {
+        // Private trigger for internal event submission
+        triggers.http.push(HttpTrigger {
+            route: RouteConfig::Private { private: true },
+            component: "ftl-metrics".to_string(),
+            executor: None,
+        });
+        
+        // Public trigger for metrics endpoints
+        triggers.http.push(HttpTrigger {
+            route: RouteConfig::Path("/metrics/...".to_string()),
+            component: "ftl-metrics".to_string(),
+            executor: None,
+        });
+    }
+
     // Generate the TOML with triggers
     spin_config.to_toml_string_with_triggers(&triggers)
 }
 
 /// Create MCP authorizer component configuration
-fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> ComponentConfig {
-    // Use default if empty
-    let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-authorizer:0.0.12"
-    } else {
-        registry_uri
-    };
-    let source = parse_component_source(uri, default_registry);
+fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
+    let source = parse_registry_uri_to_source(registry_uri);
 
     let allowed_hosts = vec![
         "http://*.spin.internal".to_string(),
@@ -380,12 +387,6 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> C
         "{{ mcp_static_tokens }}".to_string(),
     );
 
-    // Tenant ID for private mode
-    variables.insert(
-        "mcp_tenant_id".to_string(),
-        "{{ mcp_tenant_id }}".to_string(),
-    );
-
     ComponentConfig {
         description: String::new(),
         source,
@@ -402,18 +403,9 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> C
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(
-    registry_uri: &str,
-    validate_args: bool,
-    default_registry: Option<&str>,
-) -> ComponentConfig {
-    // Use default if empty
-    let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-gateway:0.0.10"
-    } else {
-        registry_uri
-    };
-    let source = parse_component_source(uri, default_registry);
+fn create_gateway_component(_registry_uri: &str, validate_args: bool) -> ComponentConfig {
+    // Use absolute path to actual WASM build location
+    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm".to_string());
 
     let allowed_hosts = vec!["http://*.spin.internal".to_string()];
 
@@ -423,6 +415,22 @@ fn create_gateway_component(
         "{{ tool_components }}".to_string(),
     );
     variables.insert("validate_arguments".to_string(), validate_args.to_string());
+
+    // Middleware configuration
+    variables.insert("middleware_enabled".to_string(), "true".to_string());
+    variables.insert("middleware_stack".to_string(), "invocation_tracker".to_string());
+
+    // Invocation tracker config
+    variables.insert("invocation_tracker_enabled".to_string(), "true".to_string());
+    variables.insert("invocation_tracker_max_metrics".to_string(), "10000".to_string());
+    variables.insert("invocation_tracker_flush_interval_secs".to_string(), "60".to_string());
+    variables.insert("invocation_tracker_track_arg_size".to_string(), "true".to_string());
+    variables.insert("invocation_tracker_detailed_timing".to_string(), "true".to_string());
+
+    // Metrics export config
+    variables.insert("metrics_enabled".to_string(), "true".to_string());
+    variables.insert("metrics_path".to_string(), "/metrics".to_string());
+    variables.insert("metrics_collector_url".to_string(), "http://ftl-metrics.spin.internal/events".to_string());
 
     ComponentConfig {
         description: String::new(),
@@ -439,11 +447,35 @@ fn create_gateway_component(
     }
 }
 
+/// Create metrics collector component configuration
+fn create_metrics_collector_component() -> ComponentConfig {
+    // Use absolute path to actual WASM build location  
+    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/metrics_collector.wasm".to_string());
+
+    let mut variables = HashMap::new();
+    variables.insert("max_metrics".to_string(), "10000".to_string());
+    variables.insert("flush_interval_secs".to_string(), "60".to_string());
+    variables.insert("aggregation_window_secs".to_string(), "300".to_string());
+
+    ComponentConfig {
+        description: String::new(),
+        source,
+        files: Vec::new(),
+        exclude_files: Vec::new(),
+        allowed_outbound_hosts: vec!["http://*.spin.internal".to_string()],
+        key_value_stores: Vec::new(),
+        environment: HashMap::new(),
+        build: None,
+        variables,
+        dependencies_inherit_configuration: false,
+        dependencies: HashMap::new(),
+    }
+}
+
 /// Create tool component configuration
 fn create_tool_component(
     name: &str,
     config: &ToolConfig,
-    default_registry: Option<&str>,
 ) -> ComponentConfig {
     // Determine source based on whether it's a local component or registry component
     let source = if let Some(wasm_path) = &config.wasm {
@@ -451,7 +483,7 @@ fn create_tool_component(
         ComponentSource::Local(wasm_path.clone())
     } else if let Some(repo_ref) = &config.repo {
         // Registry component with repository reference
-        parse_component_source(repo_ref, default_registry)
+        parse_registry_uri_to_source(repo_ref)
     } else {
         // This shouldn't happen due to validation, but provide a fallback
         ComponentSource::Local(String::from("unknown.wasm"))
@@ -544,7 +576,7 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
         .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
 
-    let mut ftl_config = FtlConfig::parse(&ftl_content)?;
+    let ftl_config = FtlConfig::parse(&ftl_content)?;
 
     // Validate auth configuration for local development
     if config.validate_local_auth
@@ -560,115 +592,15 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
         ));
     }
 
-    // Convert all relative paths to absolute paths based on project directory
-    let abs_project_path = config
-        .project_path
-        .canonicalize()
-        .unwrap_or_else(|_| config.project_path.to_path_buf());
+    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+
+    // Component paths are now absolute, no need for resolution
 
     // Create a temporary directory for FTL artifacts
     let temp_dir = tempfile::Builder::new()
         .prefix("ftlup-")
         .tempdir()
         .context("Failed to create temporary directory")?;
-
-    // Download MCP components if they're from registries
-    let default_registry = ftl_config.project.default_registry.as_deref();
-
-    // Download MCP gateway (skip in test environment or if not downloading)
-    // Check for NEXTEST env var (set by nextest) or if we're in cfg(test)
-    let is_test = std::env::var("NEXTEST").is_ok() || cfg!(test);
-    if !ftl_config.mcp.gateway.to_lowercase().ends_with(".wasm")
-        && config.download_components
-        && !is_test
-    {
-        let resolved_url =
-            crate::registry::resolve_registry_url(&ftl_config.mcp.gateway, default_registry);
-        let wasm_path = temp_dir.path().join("mcp-gateway.wasm");
-        eprintln!("Pulling MCP gateway from {resolved_url}...");
-        if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
-        {
-            eprintln!("Warning: Failed to pull MCP gateway: {e}. Will use OCI reference directly.");
-        } else {
-            ftl_config.mcp.gateway = wasm_path.to_string_lossy().to_string();
-        }
-    }
-
-    // Download MCP authorizer if auth is enabled (skip in test environment or if not downloading)
-    if ftl_config.is_auth_enabled()
-        && !ftl_config.mcp.authorizer.to_lowercase().ends_with(".wasm")
-        && config.download_components
-        && !is_test
-    {
-        let resolved_url =
-            crate::registry::resolve_registry_url(&ftl_config.mcp.authorizer, default_registry);
-        let wasm_path = temp_dir.path().join("mcp-authorizer.wasm");
-        eprintln!("Pulling MCP authorizer from {resolved_url}...");
-        if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
-        {
-            eprintln!(
-                "Warning: Failed to pull MCP authorizer: {e}. Will use OCI reference directly."
-            );
-        } else {
-            ftl_config.mcp.authorizer = wasm_path.to_string_lossy().to_string();
-        }
-    }
-
-    // Process tools and download registry components if needed
-    for (tool_name, tool_config) in &mut ftl_config.tools {
-        if let Some(repo_ref) = &tool_config.repo {
-            // This is a registry component - pull it using wkg (skip in test environment or if not downloading)
-            if config.download_components && !is_test {
-                let resolved_url =
-                    crate::registry::resolve_registry_url(repo_ref, default_registry);
-
-                // Download to temp directory with a descriptive name
-                let wasm_filename = format!("{tool_name}.wasm");
-                let wasm_path = temp_dir.path().join(&wasm_filename);
-
-                eprintln!("Pulling registry component {tool_name} from {resolved_url}...");
-                crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
-                    .with_context(|| {
-                        format!("Failed to pull component {tool_name} from {resolved_url}")
-                    })?;
-
-                // Update config to use the downloaded WASM file
-                tool_config.repo = None;
-                tool_config.wasm = Some(wasm_path.to_string_lossy().to_string());
-            } else {
-                // In test environment, convert to OCI reference
-                let resolved_url =
-                    crate::registry::resolve_registry_url(repo_ref, default_registry);
-                tool_config.repo = None;
-                tool_config.wasm = Some(format!("oci://{resolved_url}"));
-            }
-        } else {
-            // Local component - update paths to be absolute
-            let tool_path = tool_config.get_path(tool_name);
-            if !tool_path.starts_with('/') {
-                tool_config.path = Some(
-                    abs_project_path
-                        .join(&tool_path)
-                        .to_string_lossy()
-                        .to_string(),
-                );
-            }
-
-            // Also make the wasm path absolute (only for local components)
-            if let Some(wasm_path) = &tool_config.wasm {
-                if !wasm_path.starts_with('/') {
-                    tool_config.wasm = Some(
-                        abs_project_path
-                            .join(wasm_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    );
-                }
-            }
-        }
-    }
-
-    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
 
     // Create spin.toml in the temp directory
     let temp_file = temp_dir.path().join("spin.toml");

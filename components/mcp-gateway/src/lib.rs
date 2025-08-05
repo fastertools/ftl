@@ -1,5 +1,6 @@
 mod gateway;
 mod mcp_types;
+mod middleware;
 
 use spin_sdk::http::{IntoResponse, Request};
 use spin_sdk::http_component;
