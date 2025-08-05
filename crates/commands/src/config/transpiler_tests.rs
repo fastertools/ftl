@@ -21,8 +21,9 @@ fn test_transpile_minimal_config() {
             version: "0.1.0".to_string(),
             description: "Test project".to_string(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -78,6 +79,11 @@ fn test_generate_temp_spin_toml_absolute_paths() {
 [project]
 name = "test-project"
 version = "0.1.0"
+access_control = "public"
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
 
 [tools.my-tool]
 path = "my-tool"
@@ -176,8 +182,9 @@ fn test_transpile_with_tools() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec!["Test Author <test@example.com>".to_string()],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -242,8 +249,9 @@ fn test_transpile_with_variables() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -273,17 +281,9 @@ fn test_transpile_with_auth() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "private".to_string(),
         },
-        auth: AuthConfig {
-            enabled: true,
-            authkit: Some(AuthKitConfig {
-                issuer: "https://my-tenant.authkit.app".to_string(),
-                audience: "mcp-api".to_string(),
-                required_scopes: String::new(),
-            }),
-            oidc: None,
-            static_token: None,
-        },
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -294,8 +294,15 @@ fn test_transpile_with_auth() {
     // Check auth configuration
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
     assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
-    assert!(result.contains("mcp_jwt_issuer = { default = \"https://my-tenant.authkit.app\" }"));
-    assert!(result.contains("mcp_jwt_audience = { default = \"mcp-api\" }"));
+    assert!(
+        result.contains(
+            "mcp_jwt_issuer = { default = \"https://divine-lion-50-staging.authkit.app\" }"
+        )
+    );
+    assert!(result.contains("mcp_jwt_audience = { default = \"\" }"));
+
+    // For private mode without OIDC, tenant_id should be required
+    assert!(result.contains("mcp_tenant_id = { required = true }"));
 
     // Validate and check auth variables
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -307,6 +314,10 @@ fn test_transpile_with_auth() {
         &spin_config.variables["mcp_provider_type"],
         SpinVariable::Default { default } if default == "jwt"
     ));
+    assert!(matches!(
+        &spin_config.variables["mcp_tenant_id"],
+        SpinVariable::Required { required: true }
+    ));
 }
 
 #[test]
@@ -317,23 +328,19 @@ fn test_transpile_with_oidc_auth() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "private".to_string(),
         },
-        auth: AuthConfig {
-            enabled: true,
-            authkit: None,
-            oidc: Some(OidcConfig {
-                issuer: "https://auth.example.com".to_string(),
-                audience: "api".to_string(),
-                jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
-                public_key: String::new(),
-                algorithm: String::new(),
-                required_scopes: String::new(),
-                authorize_endpoint: "https://auth.example.com/authorize".to_string(),
-                token_endpoint: "https://auth.example.com/token".to_string(),
-                userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
-            }),
-            static_token: None,
-        },
+        oidc: Some(OidcConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: "api".to_string(),
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: "https://auth.example.com/authorize".to_string(),
+            token_endpoint: "https://auth.example.com/token".to_string(),
+            userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
+        }),
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -348,34 +355,34 @@ fn test_transpile_with_oidc_auth() {
         "mcp_jwt_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
     ));
 
+    // For private mode with OIDC, tenant_id should be empty (not required)
+    assert!(result.contains("mcp_tenant_id = { default = \"\" }"));
+
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
     assert!(matches!(
         &spin_config.variables["mcp_provider_type"],
         SpinVariable::Default { default } if default == "jwt"
     ));
+    assert!(matches!(
+        &spin_config.variables["mcp_tenant_id"],
+        SpinVariable::Default { default } if default.is_empty()
+    ));
 }
 
+// Static token auth is no longer supported in the new configuration
+// This test is replaced with a test for public access control
 #[test]
-fn test_transpile_with_static_token_auth() {
+fn test_transpile_with_public_access() {
     let config = FtlConfig {
         project: ProjectConfig {
-            name: "static-auth-project".to_string(),
+            name: "public-project".to_string(),
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig {
-            enabled: true,
-            authkit: None,
-            oidc: None,
-            static_token: Some(StaticTokenConfig {
-                tokens:
-                    "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
-                        .to_string(),
-                required_scopes: "read".to_string(),
-            }),
-        },
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -383,25 +390,20 @@ fn test_transpile_with_static_token_auth() {
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    println!("Generated TOML with static token auth:\n{result}");
+    println!("Generated TOML with public access:\n{result}");
 
-    // Check auth is enabled
-    assert!(result.contains("auth_enabled = { default = \"true\" }"));
+    // Check auth is disabled for public access
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
 
-    // Check static provider type
-    assert!(result.contains("mcp_provider_type = { default = \"static\" }"));
-    assert!(result.contains("mcp_static_tokens = { default = \"dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600\" }"));
-    assert!(result.contains("mcp_jwt_required_scopes = { default = \"read\" }"));
-
-    // Check component names
+    // Check component names - no auth components
     assert!(result.contains("[component.mcp]"));
-    assert!(result.contains("[component.ftl-mcp-gateway]"));
+    assert!(!result.contains("[component.ftl-mcp-gateway]"));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
     assert!(matches!(
-        &spin_config.variables["mcp_provider_type"],
-        SpinVariable::Default { default } if default == "static"
+        &spin_config.variables["auth_enabled"],
+        SpinVariable::Default { default } if default == "false"
     ));
 }
 
@@ -413,8 +415,9 @@ fn test_transpile_with_custom_gateway_uris() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig {
             gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
@@ -508,8 +511,9 @@ fn test_transpile_with_application_variables() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: app_vars,
@@ -625,17 +629,9 @@ fn test_transpile_complete_example() {
                 "John Doe <john@example.com>".to_string(),
                 "Jane Smith <jane@example.com>".to_string(),
             ],
+            access_control: "private".to_string(),
         },
-        auth: AuthConfig {
-            enabled: true,
-            authkit: Some(AuthKitConfig {
-                issuer: "https://example.authkit.app".to_string(),
-                audience: "complete-example-api".to_string(),
-                required_scopes: String::new(),
-            }),
-            oidc: None,
-            static_token: None,
-        },
+        oidc: None,
         tools,
         mcp: McpConfig {
             gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
@@ -661,7 +657,7 @@ fn test_transpile_complete_example() {
     );
     assert_eq!(spin_config.application.authors.len(), 2);
 
-    // Check all components exist
+    // Check all components exist - private mode without OIDC has auth components
     assert!(spin_config.component.contains_key("mcp"));
     assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
     assert!(spin_config.component.contains_key("database"));
@@ -760,8 +756,9 @@ fn test_transpile_with_build_profiles() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -828,8 +825,9 @@ fn test_transpile_with_special_characters() {
             version: "0.1.0".to_string(),
             description: "Testing \"special\" characters & symbols".to_string(),
             authors: vec!["Author <test@example.com> (Company & Co.)".to_string()],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: app_vars,
@@ -861,8 +859,9 @@ fn test_transpile_empty_collections() {
             version: "0.1.0".to_string(),
             description: String::new(), // Empty description
             authors: vec![],            // Empty authors
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools: HashMap::new(), // No tools
         mcp: McpConfig::default(),
         variables: HashMap::new(), // No variables
@@ -984,8 +983,9 @@ fn test_http_trigger_generation() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1014,20 +1014,16 @@ fn test_http_trigger_generation() {
 
 #[test]
 fn test_auth_disabled_omits_authorizer() {
-    // Test that when auth is disabled, the authorizer component is completely omitted
+    // Test that when auth is disabled (public access), the authorizer component is completely omitted
     let config = FtlConfig {
         project: ProjectConfig {
             name: "no-auth-project".to_string(),
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig {
-            enabled: false,
-            authkit: None,
-            oidc: None,
-            static_token: None,
-        },
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1078,24 +1074,16 @@ fn test_auth_disabled_omits_authorizer() {
 
 #[test]
 fn test_auth_enabled_includes_authorizer() {
-    // Test that when auth is enabled, all auth components are included
+    // Test that when auth is enabled (private access), all auth components are included
     let config = FtlConfig {
         project: ProjectConfig {
             name: "auth-project".to_string(),
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "private".to_string(),
         },
-        auth: AuthConfig {
-            enabled: true,
-            authkit: Some(AuthKitConfig {
-                issuer: "https://example.authkit.app".to_string(),
-                audience: "test-api".to_string(),
-                required_scopes: String::new(),
-            }),
-            oidc: None,
-            static_token: None,
-        },
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1110,6 +1098,7 @@ fn test_auth_enabled_includes_authorizer() {
 
     // Check that MCP authorizer component IS present
     assert!(result.contains("[component.mcp]"));
+    assert!(result.contains("[component.ftl-mcp-gateway]"));
 
     // Check that wildcard route is present
     assert!(result.contains("route = \"/...\""));
@@ -1155,7 +1144,7 @@ fn test_auth_enabled_includes_authorizer() {
 
 #[test]
 fn test_auth_disabled_with_tools() {
-    // Test that tools work correctly when auth is disabled
+    // Test that tools work correctly when auth is disabled (public access)
     let mut tools = HashMap::new();
     tools.insert(
         "my-tool".to_string(),
@@ -1181,13 +1170,9 @@ fn test_auth_disabled_with_tools() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig {
-            enabled: false,
-            authkit: None,
-            oidc: None,
-            static_token: None,
-        },
+        oidc: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),

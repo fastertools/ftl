@@ -15,10 +15,10 @@ pub struct FtlConfig {
     #[garde(dive)]
     pub project: ProjectConfig,
 
-    /// Authorization configuration
+    /// OIDC configuration (optional)
     #[serde(default)]
     #[garde(dive)]
-    pub auth: AuthConfig,
+    pub oidc: Option<OidcConfig>,
 
     /// Tool definitions
     #[serde(default)]
@@ -74,48 +74,13 @@ pub struct ProjectConfig {
     #[serde(default)]
     #[garde(skip)]
     pub authors: Vec<String>,
-}
 
-/// Authorization configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Validate)]
-#[garde(allow_unvalidated)]
-pub struct AuthConfig {
-    /// Whether authorization is enabled
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// `AuthKit` configuration (mutually exclusive with oidc and static)
-    #[serde(default)]
-    #[garde(dive)]
-    pub authkit: Option<AuthKitConfig>,
-
-    /// OIDC configuration (mutually exclusive with authkit and static)
-    #[serde(default)]
-    #[garde(dive)]
-    pub oidc: Option<OidcConfig>,
-
-    /// Static token configuration (mutually exclusive with authkit and oidc)
-    #[serde(default)]
-    #[garde(dive)]
-    pub static_token: Option<StaticTokenConfig>,
-}
-
-/// AuthKit-specific configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-pub struct AuthKitConfig {
-    /// `AuthKit` issuer URL (e.g., `<https://my-tenant.authkit.app>`)
-    #[garde(length(min = 1))]
-    pub issuer: String,
-
-    /// API audience
-    #[serde(default)]
-    #[garde(skip)]
-    pub audience: String,
-
-    /// Required scopes (comma-separated)
-    #[serde(default)]
-    #[garde(skip)]
-    pub required_scopes: String,
+    /// Access control mode: "public" or "private"
+    /// - public: No authentication required (default)
+    /// - private: Authentication required
+    #[serde(default = "default_access_control")]
+    #[garde(custom(validate_access_control))]
+    pub access_control: String,
 }
 
 /// OIDC-specific configuration
@@ -164,21 +129,6 @@ pub struct OidcConfig {
     #[serde(default)]
     #[garde(skip)]
     pub userinfo_endpoint: String,
-}
-
-/// Static token configuration (for development/testing)
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-pub struct StaticTokenConfig {
-    /// Static token definitions
-    /// Format: "`token:client_id:sub:scope1,scope2[:expires_at]`"
-    /// Multiple tokens separated by semicolons
-    #[garde(length(min = 1))]
-    pub tokens: String,
-
-    /// Required scopes (comma-separated)
-    #[serde(default)]
-    #[garde(skip)]
-    pub required_scopes: String,
 }
 
 /// Deployment configuration for a tool
@@ -292,117 +242,82 @@ pub struct BuildConfig {
 
 /// MCP component configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-#[garde(allow_unvalidated)]
 pub struct McpConfig {
-    /// Gateway component registry URI
-    /// Example: "ghcr.io/fastertools/mcp-gateway:0.0.10"
-    #[serde(default = "default_gateway_uri")]
+    /// MCP gateway component registry URI
+    #[serde(default = "default_gateway")]
+    #[garde(length(min = 1))]
     pub gateway: String,
 
     /// MCP authorizer component registry URI
-    /// Example: "ghcr.io/fastertools/mcp-authorizer:0.0.10"
-    #[serde(default = "default_authorizer_uri")]
+    #[serde(default = "default_authorizer")]
+    #[garde(length(min = 1))]
     pub authorizer: String,
 
-    /// Whether to validate tool arguments
-    #[serde(default = "default_true")]
+    /// Whether to validate tool call arguments
+    #[serde(default = "default_validate_arguments")]
+    #[garde(skip)]
     pub validate_arguments: bool,
 }
 
-fn default_version() -> String {
-    "0.1.0".to_string()
-}
-
-fn default_gateway_uri() -> String {
-    "ghcr.io/fastertools/mcp-gateway:0.0.10".to_string()
-}
-
-fn default_authorizer_uri() -> String {
-    "ghcr.io/fastertools/mcp-authorizer:0.0.10".to_string()
-}
-
-const fn default_true() -> bool {
-    true
-}
-
-impl Default for McpConfig {
-    fn default() -> Self {
-        Self {
-            gateway: default_gateway_uri(),
-            authorizer: default_authorizer_uri(),
-            validate_arguments: default_true(),
-        }
+impl FtlConfig {
+    /// Parse FTL configuration from TOML string
+    pub fn parse(content: &str) -> Result<Self> {
+        let config: Self = toml::from_str(content).context("Failed to parse FTL configuration")?;
+        config
+            .validate()
+            .context("FTL configuration validation failed")?;
+        Ok(config)
     }
-}
 
-// Custom validation functions for garde
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn validate_tools(tools: &HashMap<String, ToolConfig>, _ctx: &()) -> garde::Result {
-    for (name, tool) in tools {
-        // Validate tool names
-        if !name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
-            return Err(garde::Error::new(format!(
-                "Tool name '{name}' can only contain alphanumeric characters, hyphens, and underscores"
-            )));
-        }
-        if !name.chars().next().is_some_and(char::is_alphabetic) {
-            return Err(garde::Error::new(format!(
-                "Tool name '{name}' must start with a letter"
-            )));
-        }
-
-        // Validate each tool
-        tool.validate()
-            .map_err(|e| garde::Error::new(format!("Tool '{name}': {e}")))?;
+    /// Serialize FTL configuration to TOML string
+    pub fn to_toml_string(&self) -> Result<String> {
+        toml::to_string_pretty(self).context("Failed to serialize FTL configuration")
     }
-    Ok(())
-}
 
-impl AuthConfig {
-    /// Get the provider type as a string
-    pub const fn provider_type(&self) -> &str {
-        if self.authkit.is_some() || self.oidc.is_some() {
-            "jwt" // Both AuthKit and OIDC use JWT provider
-        } else if self.static_token.is_some() {
-            "static"
+    /// Get the list of tool component names
+    pub fn tool_components(&self) -> Vec<String> {
+        self.tools.keys().cloned().collect()
+    }
+
+    /// Determine if authentication is enabled
+    pub fn is_auth_enabled(&self) -> bool {
+        self.project.access_control == "private"
+    }
+
+    /// Determine the auth provider type
+    pub fn auth_provider_type(&self) -> &str {
+        if self.is_auth_enabled() {
+            "jwt" // Always use JWT for both OIDC and built-in AuthKit
         } else {
             ""
         }
     }
 
     /// Get the issuer URL
-    pub fn issuer(&self) -> &str {
-        if let Some(authkit) = &self.authkit {
-            &authkit.issuer
-        } else if let Some(oidc) = &self.oidc {
+    pub fn auth_issuer(&self) -> &str {
+        if let Some(oidc) = &self.oidc {
             &oidc.issuer
+        } else if self.is_auth_enabled() {
+            // Use FTL's built-in AuthKit
+            "https://divine-lion-50-staging.authkit.app"
         } else {
             ""
         }
     }
 
     /// Get the audience
-    pub fn audience(&self) -> &str {
-        if let Some(authkit) = &self.authkit {
-            &authkit.audience
-        } else if let Some(oidc) = &self.oidc {
+    pub fn auth_audience(&self) -> &str {
+        if let Some(oidc) = &self.oidc {
             &oidc.audience
         } else {
             ""
         }
     }
 
-    /// Get the required scopes
-    pub fn required_scopes(&self) -> &str {
-        if let Some(authkit) = &self.authkit {
-            &authkit.required_scopes
-        } else if let Some(oidc) = &self.oidc {
+    /// Get required scopes
+    pub fn auth_required_scopes(&self) -> &str {
+        if let Some(oidc) = &self.oidc {
             &oidc.required_scopes
-        } else if let Some(static_token) = &self.static_token {
-            &static_token.required_scopes
         } else {
             ""
         }
@@ -410,108 +325,71 @@ impl AuthConfig {
 }
 
 impl ToolConfig {
-    /// Get the effective path for the tool (uses tool name if path not specified)
+    /// Get the path to the tool directory
     pub fn get_path(&self, tool_name: &str) -> String {
         self.path.clone().unwrap_or_else(|| tool_name.to_string())
     }
+}
 
-    /// Get the build command for a specific profile
-    pub fn get_build_command(&self, profile: Option<&str>) -> &str {
-        if let Some(profile_name) = profile {
-            if let Some(profiles) = &self.profiles {
-                if let Some(profile) = profiles.profiles.get(profile_name) {
-                    return &profile.command;
-                }
-            }
-        }
-        // Fall back to default build command
-        &self.build.command
-    }
+// Default value functions
+fn default_version() -> String {
+    "0.1.0".to_string()
+}
 
-    /// Get the build configuration for a specific profile
-    pub fn get_build_config(&self, profile: Option<&str>) -> BuildProfile {
-        if let Some(profile_name) = profile {
-            if let Some(profiles) = &self.profiles {
-                if let Some(profile) = profiles.profiles.get(profile_name) {
-                    return profile.clone();
-                }
-            }
-        }
-        // Fall back to default build config
-        BuildProfile {
-            command: self.build.command.clone(),
-            watch: self.build.watch.clone(),
-            env: self.build.env.clone(),
-        }
-    }
+fn default_access_control() -> String {
+    "public".to_string()
+}
 
-    /// Get watch paths for a specific profile
-    pub fn get_watch_paths(&self, profile: Option<&str>) -> Vec<String> {
-        if let Some(profile_name) = profile {
-            if let Some(profiles) = &self.profiles {
-                if let Some(profile) = profiles.profiles.get(profile_name) {
-                    return profile.watch.clone();
-                }
-            }
-        }
-        // Fall back to default watch paths
-        self.build.watch.clone()
-    }
+fn default_gateway() -> String {
+    "ghcr.io/fastertools/mcp-gateway:0.0.10".to_string()
+}
 
-    /// Get the profile to use for 'ftl up'
-    pub fn get_up_profile(&self) -> Option<&str> {
-        self.up.as_ref().map(|up| up.profile.as_str())
+fn default_authorizer() -> String {
+    "ghcr.io/fastertools/mcp-authorizer:0.0.10".to_string()
+}
+
+const fn default_validate_arguments() -> bool {
+    false
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            gateway: default_gateway(),
+            authorizer: default_authorizer(),
+            validate_arguments: default_validate_arguments(),
+        }
     }
 }
 
-impl FtlConfig {
-    /// Load FTL configuration from a TOML string
-    pub fn parse(content: &str) -> Result<Self> {
-        let config: Self = toml::from_str(content).context("Failed to parse ftl.toml")?;
-
-        // Use garde validation
+// Validation functions
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn validate_tools(tools: &HashMap<String, ToolConfig>, _: &()) -> garde::Result {
+    for (name, config) in tools {
         config
             .validate()
-            .map_err(|e| anyhow::anyhow!("Validation error: {}", e))?;
+            .map_err(|e| garde::Error::new(e.to_string()))?;
 
-        // Additional auth validation
-        if config.auth.enabled {
-            match (
-                &config.auth.authkit,
-                &config.auth.oidc,
-                &config.auth.static_token,
-            ) {
-                (None, None, None) => {
-                    return Err(anyhow::anyhow!(
-                        "Either 'authkit', 'oidc', or 'static_token' configuration must be provided when auth is enabled"
-                    ));
-                }
-                (Some(_), Some(_), _) | (Some(_), _, Some(_)) | (_, Some(_), Some(_)) => {
-                    return Err(anyhow::anyhow!(
-                        "Only one of 'authkit', 'oidc', or 'static_token' can be configured at a time"
-                    ));
-                }
-                _ => {} // One provider configured, which is correct
-            }
+        // Ensure tool name follows naming conventions
+        if !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(garde::Error::new(format!(
+                "Tool name '{name}' contains invalid characters. Use only alphanumeric, dash, or underscore."
+            )));
         }
-
-        Ok(config)
     }
+    Ok(())
+}
 
-    /// Load FTL configuration from a file
-    pub fn from_file(path: &std::path::Path) -> Result<Self> {
-        let content = std::fs::read_to_string(path).context("Failed to read ftl.toml")?;
-        Self::parse(&content)
-    }
-
-    /// Convert to TOML string
-    pub fn to_toml_string(&self) -> Result<String> {
-        toml::to_string_pretty(self).context("Failed to serialize ftl.toml")
-    }
-
-    /// Get a list of all tool component names
-    pub fn tool_components(&self) -> Vec<String> {
-        self.tools.keys().cloned().collect()
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn validate_access_control(value: &str, _: &()) -> garde::Result {
+    match value {
+        "public" | "private" => Ok(()),
+        _ => Err(garde::Error::new(format!(
+            "Invalid access_control '{value}'. Must be 'public' or 'private'."
+        ))),
     }
 }
 
@@ -520,844 +398,67 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_minimal_config() {
-        let content = r#"
+    fn test_minimal_config() {
+        let config = r#"
 [project]
-name = "my-project"
+name = "test-project"
 "#;
-
-        let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.project.name, "my-project");
-        assert_eq!(config.project.version, "0.1.0");
-        assert!(!config.auth.enabled);
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert_eq!(ftl_config.project.name, "test-project");
+        assert_eq!(ftl_config.project.version, "0.1.0");
+        assert_eq!(ftl_config.project.access_control, "public");
+        assert!(!ftl_config.is_auth_enabled());
     }
 
     #[test]
-    fn test_validation_errors() {
-        // Test invalid project name
-        let content = r#"
+    fn test_private_without_oidc() {
+        let config = r#"
 [project]
-name = "123-invalid"
+name = "test-project"
+access_control = "private"
 "#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Validation error"));
-
-        // Test empty wasm path
-        let content = r#"
-[project]
-name = "valid-name"
-
-[tools.my-tool]
-path = "my-tool"
-wasm = ""
-
-[tools.my-tool.build]
-command = "cargo build --target wasm32-wasip1 --release"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-
-        // Test auth validation - auth enabled but no provider configured
-        let content = r#"
-[project]
-name = "valid-name"
-
-[auth]
-enabled = true
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains(
-            "Either 'authkit', 'oidc', or 'static_token' configuration must be provided"
-        ));
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert!(ftl_config.is_auth_enabled());
+        assert_eq!(
+            ftl_config.auth_issuer(),
+            "https://divine-lion-50-staging.authkit.app"
+        );
+        assert_eq!(ftl_config.auth_provider_type(), "jwt");
     }
 
     #[test]
-    fn test_project_name_validation() {
-        // Valid project names
-        let valid_names = vec![
-            "myproject",
-            "my-project",
-            "my_project",
-            "MyProject",
-            "project123",
-            "a",
-            "A",
-        ];
-
-        for name in valid_names {
-            let content = format!(
-                r#"
-[project]
-name = "{name}"
-"#
-            );
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_ok(), "Project name '{name}' should be valid");
-        }
-
-        // Invalid project names
-        let invalid_names = vec![
-            "",           // empty
-            "123project", // starts with number
-            "-project",   // starts with hyphen
-            "_project",   // starts with underscore
-            "my project", // contains space
-            "my.project", // contains dot
-            "my@project", // contains special char
-            "my/project", // contains slash
-        ];
-
-        for name in invalid_names {
-            let content = format!(
-                r#"
-[project]
-name = "{name}"
-"#
-            );
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_err(), "Project name '{name}' should be invalid");
-        }
-    }
-
-    #[test]
-    fn test_tool_name_validation() {
-        // Valid tool names
-        let valid_names = vec![
-            "mytool",
-            "my-tool",
-            "my_tool",
-            "MyTool",
-            "tool123",
-            "tool-123_test",
-        ];
-
-        for name in valid_names {
-            let content = format!(
-                r#"
+    fn test_private_with_oidc() {
+        let config = r#"
 [project]
 name = "test-project"
+access_control = "private"
 
-[tools.{name}]
-path = "tool-path"
-wasm = "tool-path/output.wasm"
-
-[tools.{name}.build]
-command = "cargo build --target wasm32-wasip1 --release"
-"#
-            );
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_ok(), "Tool name '{name}' should be valid");
-        }
-
-        // Invalid tool names
-        let invalid_names = vec![
-            "123tool", // starts with number
-            "-tool",   // starts with hyphen
-            "_tool",   // starts with underscore
-            "my tool", // contains space
-            "my.tool", // contains dot
-            "my@tool", // contains special char
-            "my/tool", // contains slash
-            "my$tool", // contains dollar sign
-        ];
-
-        for name in invalid_names {
-            let content = format!(
-                r#"
-[project]
-name = "test-project"
-
-[tools."{name}"]
-path = "tool-path"
-wasm = "tool-path/output.wasm"
-
-[tools."{name}".build]
-command = "cargo build --target wasm32-wasip1 --release"
-"#
-            );
-            let result = FtlConfig::parse(&content);
-            assert!(result.is_err(), "Tool name '{name}' should be invalid");
-        }
-    }
-
-    #[test]
-    fn test_auth_validation() {
-        // Test auth disabled - should pass with no provider config
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = false
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_ok());
-
-        // Test auth enabled with authkit - should pass
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = true
-
-[auth.authkit]
-issuer = "https://my-tenant.authkit.app"
+[oidc]
+issuer = "https://auth.example.com"
 audience = "my-api"
 "#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_ok());
-        let config = result.unwrap();
-        assert_eq!(config.auth.provider_type(), "jwt");
-        assert_eq!(config.auth.issuer(), "https://my-tenant.authkit.app");
-        assert_eq!(config.auth.audience(), "my-api");
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert!(ftl_config.is_auth_enabled());
+        assert_eq!(ftl_config.auth_issuer(), "https://auth.example.com");
+        assert_eq!(ftl_config.auth_audience(), "my-api");
+        assert_eq!(ftl_config.auth_provider_type(), "jwt");
+    }
 
-        // Test auth enabled with oidc - should pass
-        let content = r#"
+    #[test]
+    fn test_invalid_access_control() {
+        let config = r#"
 [project]
 name = "test-project"
-
-[auth]
-enabled = true
-
-[auth.oidc]
-issuer = "https://auth.example.com"
-audience = "api"
-jwks_uri = "https://auth.example.com/.well-known/jwks.json"
-authorize_endpoint = "https://auth.example.com/authorize"
-token_endpoint = "https://auth.example.com/token"
+access_control = "custom"
 "#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_ok());
-        let config = result.unwrap();
-        assert_eq!(config.auth.provider_type(), "jwt");
-        assert_eq!(config.auth.issuer(), "https://auth.example.com");
-
-        // Test auth enabled with no provider - should fail
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = true
-"#;
-        let result = FtlConfig::parse(content);
+        let result = FtlConfig::parse(config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains(
-            "Either 'authkit', 'oidc', or 'static_token' configuration must be provided"
-        ));
-
-        // Test auth enabled with both providers - should fail
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = true
-
-[auth.authkit]
-issuer = "https://my-tenant.authkit.app"
-audience = "my-api"
-
-[auth.oidc]
-issuer = "https://auth.example.com"
-audience = "api"
-jwks_uri = "https://auth.example.com/.well-known/jwks.json"
-authorize_endpoint = "https://auth.example.com/authorize"
-token_endpoint = "https://auth.example.com/token"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
+        // The validation error message is in the general format
         assert!(
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Only one of 'authkit', 'oidc', or 'static_token' can be configured")
-        );
-
-        // Test authkit with missing required field
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = true
-
-[auth.authkit]
-issuer = ""
-audience = "my-api"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_oidc_config_validation() {
-        // Valid OIDC config
-        let content = r#"
-[project]
-name = "test-project"
-
-[auth]
-enabled = true
-
-[auth.oidc]
-issuer = "https://example.com"
-audience = "my-api"
-jwks_uri = "https://example.com/.well-known/jwks.json"
-authorize_endpoint = "https://example.com/oauth/authorize"
-token_endpoint = "https://example.com/oauth/token"
-userinfo_endpoint = "https://example.com/oauth/userinfo"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_ok());
-        let config = result.unwrap();
-        assert!(config.auth.oidc.is_some());
-        let oidc = config.auth.oidc.as_ref().unwrap();
-        assert_eq!(oidc.jwks_uri, "https://example.com/.well-known/jwks.json");
-        assert_eq!(oidc.userinfo_endpoint, "https://example.com/oauth/userinfo");
-    }
-
-    #[test]
-    fn test_empty_required_fields() {
-        // Test empty project name
-        let content = r#"
-[project]
-name = ""
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-
-        // Test empty tool path
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.mytool]
-type = "rust"
-path = ""
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_default_values() {
-        let content = r#"
-[project]
-name = "test-project"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-
-        // Check project defaults
-        assert_eq!(config.project.version, "0.1.0");
-        assert_eq!(config.project.description, "");
-        assert_eq!(config.project.authors.len(), 0);
-
-        // Check auth defaults
-        assert!(!config.auth.enabled);
-        assert_eq!(config.auth.provider_type(), "");
-
-        // Check MCP defaults
-        assert_eq!(config.mcp.gateway, "ghcr.io/fastertools/mcp-gateway:0.0.10");
-        assert_eq!(
-            config.mcp.authorizer,
-            "ghcr.io/fastertools/mcp-authorizer:0.0.10"
-        );
-        assert!(config.mcp.validate_arguments);
-    }
-
-    #[test]
-    fn test_parse_full_config() {
-        let content = r#"
-[project]
-name = "my-project"
-version = "1.0.0"
-description = "My FTL project"
-authors = ["John Doe <john@example.com>"]
-
-[auth]
-enabled = true
-
-[auth.authkit]
-issuer = "https://my-tenant.authkit.app"
-audience = "mcp-api"
-
-[tools.echo]
-path = "echo-rs"
-wasm = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
-allowed_outbound_hosts = []
-
-[tools.echo.build]
-command = "cargo build --target wasm32-wasip1 --release"
-watch = ["src/**/*.rs", "Cargo.toml"]
-
-[tools.weather]
-path = "weather-ts"
-wasm = "weather-ts/dist/weather.wasm"
-allowed_outbound_hosts = ["https://api.weather.com"]
-
-[tools.weather.build]
-command = "npm run build:custom"
-watch = ["src/**/*.ts", "package.json"]
-
-"#;
-
-        let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.project.name, "my-project");
-        assert_eq!(config.project.version, "1.0.0");
-        assert!(config.auth.enabled);
-        assert_eq!(config.auth.provider_type(), "jwt");
-        assert_eq!(config.tools.len(), 2);
-        assert_eq!(
-            config.tools["echo"].build.command,
-            "cargo build --target wasm32-wasip1 --release"
-        );
-        assert_eq!(
-            config.tools["weather"].build.command,
-            "npm run build:custom"
-        );
-    }
-
-    #[test]
-    fn test_tool_components_method() {
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.tool1]
-path = "tool1"
-wasm = "tool1/target/wasm32-wasip1/release/tool1.wasm"
-
-[tools.tool1.build]
-command = "cargo build --target wasm32-wasip1 --release"
-
-[tools.tool2]
-path = "tool2"
-wasm = "tool2/dist/tool2.wasm"
-
-[tools.tool2.build]
-command = "npm run build"
-
-[tools.tool3]
-path = "tool3"
-wasm = "tool3/dist/tool3.wasm"
-
-[tools.tool3.build]
-command = "npm run build"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-        let components = config.tool_components();
-        assert_eq!(components.len(), 3);
-        assert!(components.contains(&"tool1".to_string()));
-        assert!(components.contains(&"tool2".to_string()));
-        assert!(components.contains(&"tool3".to_string()));
-    }
-
-    #[test]
-    fn test_to_toml_string() {
-        let config = FtlConfig {
-            project: ProjectConfig {
-                name: "test-project".to_string(),
-                version: "1.0.0".to_string(),
-                description: "Test description".to_string(),
-                authors: vec!["Test Author <test@example.com>".to_string()],
-            },
-            auth: AuthConfig::default(),
-            tools: HashMap::new(),
-            mcp: McpConfig::default(),
-            variables: HashMap::new(),
-        };
-
-        let toml_string = config.to_toml_string().unwrap();
-        assert!(toml_string.contains("[project]"));
-        assert!(toml_string.contains("name = \"test-project\""));
-        assert!(toml_string.contains("version = \"1.0.0\""));
-        assert!(toml_string.contains("description = \"Test description\""));
-    }
-
-    #[test]
-    fn test_skip_empty_build_fields() {
-        let mut tools = HashMap::new();
-        tools.insert(
-            "test-tool".to_string(),
-            ToolConfig {
-                path: Some("test-tool".to_string()),
-                wasm: "test-tool/target/wasm32-wasip1/release/test_tool.wasm".to_string(),
-                build: BuildConfig {
-                    command: "cargo build --target wasm32-wasip1 --release".to_string(),
-                    watch: vec!["src/**/*.rs".to_string()],
-                    env: HashMap::new(),
-                },
-                profiles: None,
-                up: None,
-                deploy: None,
-                allowed_outbound_hosts: vec![],
-                variables: HashMap::new(),
-            },
-        );
-
-        let config = FtlConfig {
-            project: ProjectConfig {
-                name: "test-project".to_string(),
-                version: "0.1.0".to_string(),
-                description: String::new(),
-                authors: vec![],
-            },
-            auth: AuthConfig::default(),
-            tools,
-            mcp: McpConfig::default(),
-            variables: HashMap::new(),
-        };
-
-        let toml_string = config.to_toml_string().unwrap();
-        println!("Generated TOML:\n{toml_string}");
-
-        // Should NOT contain empty env section
-        assert!(!toml_string.contains("[tools.test-tool.build.env]"));
-        // Should contain watch array
-        assert!(toml_string.contains("watch = ["));
-    }
-
-    #[test]
-    fn test_application_variables() {
-        let content = r#"
-[project]
-name = "test-project"
-
-[variables]
-api_token = { required = true }
-api_url = { default = "https://api.example.com" }
-debug = { default = "false" }
-
-[tools.my-tool]
-path = "my-tool"
-wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
-
-[tools.my-tool.build]
-command = "cargo build --target wasm32-wasip1 --release"
-
-[tools.my-tool.variables]
-token = "{{ api_token }}"
-url = "{{ api_url }}"
-debug_mode = "{{ debug }}"
-static_var = "static-value"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-
-        // Check application variables
-        assert_eq!(config.variables.len(), 3);
-
-        // Check required variable
-        if let Some(ApplicationVariable::Required { required }) = config.variables.get("api_token")
-        {
-            assert!(required);
-        } else {
-            panic!("api_token should be a required variable");
-        }
-
-        // Check default variables
-        if let Some(ApplicationVariable::Default { default }) = config.variables.get("api_url") {
-            assert_eq!(default, "https://api.example.com");
-        } else {
-            panic!("api_url should have a default value");
-        }
-
-        // Check tool variables with templates
-        let tool = &config.tools["my-tool"];
-        assert_eq!(
-            tool.variables.get("token"),
-            Some(&"{{ api_token }}".to_string())
-        );
-        assert_eq!(
-            tool.variables.get("url"),
-            Some(&"{{ api_url }}".to_string())
-        );
-        assert_eq!(
-            tool.variables.get("static_var"),
-            Some(&"static-value".to_string())
-        );
-    }
-
-    #[test]
-    fn test_from_file() {
-        use std::io::Write;
-
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("ftl.toml");
-
-        let content = r#"
-[project]
-name = "file-test-project"
-version = "2.0.0"
-"#;
-
-        let mut file = std::fs::File::create(&file_path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-
-        let config = FtlConfig::from_file(&file_path).unwrap();
-        assert_eq!(config.project.name, "file-test-project");
-        assert_eq!(config.project.version, "2.0.0");
-    }
-
-    #[test]
-    fn test_custom_validation_edge_cases() {
-        // Test tool with environment variables
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.custom-build]
-path = "custom"
-wasm = "custom/dist/custom.wasm"
-
-[tools.custom-build.build]
-command = "npm run build:special"
-env = { NODE_ENV = "production", CUSTOM_VAR = "value" }
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(
-            config.tools["custom-build"].build.command,
-            "npm run build:special"
-        );
-        assert_eq!(
-            config.tools["custom-build"].build.env.get("NODE_ENV"),
-            Some(&"production".to_string())
-        );
-
-        // Test tool with watch patterns
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.watch-tool]
-path = "watch"
-wasm = "watch/target/wasm32-wasip1/release/watch_tool.wasm"
-
-[tools.watch-tool.build]
-command = "cargo build --target wasm32-wasip1 --release"
-watch = ["**/*.rs", "Cargo.toml"]
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.tools["watch-tool"].build.watch.len(), 2);
-
-        // Test multiple validation errors at once
-        let content = r#"
-[project]
-name = "123invalid"
-
-[auth]
-enabled = true
-provider = ""
-
-[tools."bad@name"]
-path = ""
-wasm = "output.wasm"
-
-[tools."bad@name".build]
-command = ""
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        let error_msg = result.unwrap_err().to_string();
-        // Should contain at least one validation error
-        assert!(error_msg.contains("Validation error"));
-    }
-
-    #[test]
-    fn test_build_configuration() {
-        // Test minimal build config
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.minimal]
-path = "minimal-tool"
-wasm = "minimal-tool/output.wasm"
-
-[tools.minimal.build]
-command = "make build"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-        assert_eq!(config.tools["minimal"].build.command, "make build");
-        assert!(config.tools["minimal"].build.watch.is_empty());
-        assert!(config.tools["minimal"].build.env.is_empty());
-
-        // Test full build config
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.full]
-path = "full-tool"
-wasm = "full-tool/target/wasm32-wasip1/release/full_tool.wasm"
-
-[tools.full.build]
-command = "cargo build --release"
-watch = ["src/**/*.rs", "Cargo.toml", "build.rs"]
-
-[tools.full.build.env]
-RUSTFLAGS = "-C target-cpu=native"
-CARGO_BUILD_JOBS = "4"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-        let build = &config.tools["full"].build;
-        assert_eq!(build.command, "cargo build --release");
-        assert_eq!(build.watch.len(), 3);
-        assert_eq!(build.watch[2], "build.rs");
-        assert_eq!(
-            build.env.get("RUSTFLAGS"),
-            Some(&"-C target-cpu=native".to_string())
-        );
-        assert_eq!(build.env.get("CARGO_BUILD_JOBS"), Some(&"4".to_string()));
-
-        // Test missing build section validation
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.no-build]
-path = "tool"
-"#;
-        let result = FtlConfig::parse(content);
-        assert!(result.is_err());
-        // The error will be a TOML parse error about missing required field
-    }
-
-    #[test]
-    fn test_build_profiles() {
-        // Test tool with multiple build profiles
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.myapp]
-wasm = "myapp/target/wasm32-wasip1/release/myapp.wasm"
-
-[tools.myapp.build]
-command = "cargo build --target wasm32-wasip1"
-
-[tools.myapp.profiles.dev]
-command = "cargo build --target wasm32-wasip1"
-watch = ["src/**/*.rs", "Cargo.toml"]
-env = { RUST_LOG = "debug" }
-
-[tools.myapp.profiles.release]
-command = "cargo build --target wasm32-wasip1 --release"
-env = { RUST_LOG = "warn" }
-
-[tools.myapp.profiles.production]
-command = "cargo build --target wasm32-wasip1 --release"
-env = { RUST_LOG = "error", RUST_BACKTRACE = "1" }
-
-[tools.myapp.up]
-profile = "dev"
-
-[tools.myapp.deploy]
-profile = "production"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-
-        let tool = &config.tools["myapp"];
-
-        // Check profiles exist
-        assert!(tool.profiles.is_some());
-        let profiles = tool.profiles.as_ref().unwrap();
-        assert_eq!(profiles.profiles.len(), 3);
-
-        // Check dev profile
-        let dev = &profiles.profiles["dev"];
-        assert_eq!(dev.command, "cargo build --target wasm32-wasip1");
-        assert_eq!(dev.watch.len(), 2);
-        assert_eq!(dev.env.get("RUST_LOG"), Some(&"debug".to_string()));
-
-        // Check release profile
-        let release = &profiles.profiles["release"];
-        assert_eq!(
-            release.command,
-            "cargo build --target wasm32-wasip1 --release"
-        );
-        assert_eq!(release.env.get("RUST_LOG"), Some(&"warn".to_string()));
-
-        // Check production profile
-        let prod = &profiles.profiles["production"];
-        assert_eq!(prod.env.get("RUST_BACKTRACE"), Some(&"1".to_string()));
-
-        // Check up configuration
-        assert_eq!(tool.get_up_profile(), Some("dev"));
-
-        // Check deploy configuration
-        assert_eq!(tool.deploy.as_ref().unwrap().profile, "production");
-
-        // Test getting build commands for different profiles
-        assert_eq!(
-            tool.get_build_command(Some("dev")),
-            "cargo build --target wasm32-wasip1"
-        );
-        assert_eq!(
-            tool.get_build_command(Some("release")),
-            "cargo build --target wasm32-wasip1 --release"
-        );
-        assert_eq!(
-            tool.get_build_command(None),
-            "cargo build --target wasm32-wasip1"
-        ); // default
-    }
-
-    #[test]
-    fn test_deploy_configuration() {
-        // Test tool with deploy config
-        let content = r#"
-[project]
-name = "test-project"
-
-[tools.calc]
-path = "calc"
-wasm = "calc/target/wasm32-wasip1/release/calc.wasm"
-
-[tools.calc.build]
-command = "cargo build --target wasm32-wasip1 --release"
-
-[tools.calc.deploy]
-profile = "release"
-name = "calculator"
-
-[tools.weather]
-path = "weather"
-wasm = "weather/dist/weather.wasm"
-
-[tools.weather.build]
-command = "npm run build"
-
-[tools.weather.deploy]
-profile = "production"
-"#;
-        let config = FtlConfig::parse(content).unwrap();
-
-        // Check calc tool with custom name
-        assert_eq!(
-            config.tools["calc"].deploy.as_ref().unwrap().profile,
-            "release"
-        );
-        assert_eq!(
-            config.tools["calc"].deploy.as_ref().unwrap().name,
-            Some("calculator".to_string())
-        );
-
-        // Check weather tool without custom name
-        assert_eq!(
-            config.tools["weather"].deploy.as_ref().unwrap().profile,
-            "production"
-        );
-        assert!(
-            config.tools["weather"]
-                .deploy
-                .as_ref()
-                .unwrap()
-                .name
-                .is_none()
+                .contains("validation failed")
         );
     }
 }

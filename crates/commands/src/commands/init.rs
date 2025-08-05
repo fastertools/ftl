@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
 
-use crate::config::ftl_config::{AuthConfig, FtlConfig, McpConfig, ProjectConfig};
+use crate::config::ftl_config::{FtlConfig, McpConfig, ProjectConfig};
 use ftl_common::{RealUserInterface, SpinInstaller, check_and_install_spin};
 use ftl_runtime::deps::{
     CommandExecutor, FileSystem, RealCommandExecutor, RealFileSystem, UserInterface,
@@ -165,8 +165,9 @@ fn create_ftl_project(
             version: "0.1.0".to_string(),
             description: "FTL MCP server for hosting MCP tools".to_string(),
             authors: vec![],
+            access_control: "public".to_string(),
         },
-        auth: AuthConfig::default(),
+        oidc: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),

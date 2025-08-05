@@ -863,9 +863,9 @@
         "description": "Request body for updating authentication configuration",
         "type": "object",
         "properties": {
-          "mode": {
+          "accessControl": {
             "type": "string",
-            "enum": ["public", "ftl-account", "user-only", "custom"]
+            "enum": ["public", "private", "custom"]
           },
           "customConfig": {
             "type": "object",
@@ -887,21 +887,9 @@
               }
             },
             "required": ["provider", "issuer"]
-          },
-          "allowedUsers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "allowedTenants": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           }
         },
-        "required": ["mode"]
+        "required": ["accessControl"]
       },
       "ListAppsResponse": {
         "description": "List of applications with pagination",
@@ -1192,9 +1180,9 @@
           "authConfig": {
             "type": "object",
             "properties": {
-              "mode": {
+              "accessControl": {
                 "type": "string",
-                "enum": ["public", "ftl-account", "user-only", "custom"]
+                "enum": ["public", "private", "custom"]
               },
               "customConfig": {
                 "type": "object",
@@ -1217,21 +1205,9 @@
                 },
                 "required": ["provider", "issuer"],
                 "additionalProperties": false
-              },
-              "allowedUsers": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "allowedTenants": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
               }
             },
-            "required": ["mode"],
+            "required": ["accessControl"],
             "additionalProperties": false
           },
           "updatedAt": {

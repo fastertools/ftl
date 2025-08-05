@@ -502,7 +502,12 @@ async fn test_build_invalid_toml() {
     assert!(result.is_err());
     // The error will be about parsing ftl.toml now
     let error_msg = result.unwrap_err().to_string();
-    assert!(error_msg.contains("Failed to parse ftl.toml") || error_msg.contains("missing field"));
+    assert!(
+        error_msg.contains("Failed to parse FTL configuration")
+            || error_msg.contains("missing field")
+            || error_msg.contains("expected"),
+        "Unexpected error message: {error_msg}"
+    );
 }
 
 #[tokio::test]

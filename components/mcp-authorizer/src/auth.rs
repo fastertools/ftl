@@ -20,6 +20,9 @@ pub struct Context {
 
     /// Raw bearer token (for forwarding if needed)
     pub raw_token: String,
+
+    /// Organization ID (optional)
+    pub org_id: Option<String>,
 }
 
 /// Extract bearer token from request

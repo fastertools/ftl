@@ -40,18 +40,10 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     // Authenticate the request - auth is always required
     match authenticate(&req, &config).await {
         Ok(auth_context) => {
-            // Log successful authentication
-            eprintln!(
-                "AUTH_SUCCESS path={} client_id={}",
-                req.path(),
-                auth_context.client_id
-            );
             // Forward authenticated request
             forward_request(req, &config, auth_context, trace_id).await
         }
         Err(auth_error) => {
-            // Log the error with more context
-            eprintln!("AUTH_ERROR path={} error={:?}", req.path(), auth_error);
             // Return authentication error
             Ok(create_error_response(&auth_error, &req, &config, trace_id))
         }
@@ -79,13 +71,26 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
         }
     };
 
+    // Check tenant restriction if configured
+    if let Some(required_tenant) = &config.tenant_id {
+        // Extract tenant ID from token (org_id for organizations, sub for individuals)
+        let token_tenant = token_info.org_id.as_ref().unwrap_or(&token_info.sub);
+
+        if token_tenant != required_tenant {
+            return Err(AuthError::Unauthorized(
+                "Access denied: invalid tenant".to_string(),
+            ));
+        }
+    }
+
     // Build auth context
     Ok(auth::Context {
         client_id: token_info.client_id,
-        user_id: token_info.sub,
+        user_id: token_info.sub.clone(),
         scopes: token_info.scopes,
         issuer: token_info.iss,
         raw_token: token.to_string(),
+        org_id: token_info.org_id,
     })
 }
 

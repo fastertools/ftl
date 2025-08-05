@@ -101,8 +101,9 @@ fn setup_project_file_mocks(fixture: &mut TestFixture, has_ftl_toml: bool) {
 /// 2. `generate_temp_spin_toml` reading ./ftl.toml  
 /// 3. deploy reading ftl.toml for `FtlConfig` parsing
 /// 4. variable loading checking and reading ftl.toml
-/// 5. `parse_deploy_config` reading the generated spin.toml
-/// 6. Component version file checks
+/// 5. `resolve_auth_config` checking and reading ftl.toml
+/// 6. `parse_deploy_config` reading the generated spin.toml
+/// 7. Component version file checks
 fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &str) {
     // Parse ftl config to generate expected spin.toml content
     let ftl_config = crate::config::ftl_config::FtlConfig::parse(ftl_toml_content).unwrap();
@@ -482,6 +483,13 @@ async fn test_deploy_success() {
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
+    // Mock: update auth config
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
@@ -655,6 +663,7 @@ async fn test_deployment_timeout() {
     // Setup all mocks for successful push
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
+    setup_auth_config_update(&mut fixture);
 
     // Mock: list apps returns empty (app doesn't exist)
     fixture
@@ -764,13 +773,16 @@ async fn test_deployment_failed_status() {
         .times(1)
         .returning(|_| {
             Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
                 app_name: "test-app".to_string(),
                 status: types::CreateAppResponseStatus::Creating,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
             })
         });
+
+    // Mock: auth config update
+    setup_auth_config_update(&mut fixture);
 
     // Mock: create deployment succeeds
     fixture
@@ -821,20 +833,20 @@ fn setup_basic_mocks(fixture: &mut TestFixture) {
     // Set up project files - ftl.toml exists with a tool
     setup_project_file_mocks(fixture, true);
 
-    // Mock: check for ftl.toml again when extracting auth variables
+    // Mock: check for ftl.toml for variables and auth config
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(0..=1)
+        .times(0..=2)  // May be called for variables and/or resolve_auth_config
         .returning(|_| true);
 
-    // Mock: read ftl.toml for variables extraction (might be called twice - once for general variables, once for auth)
+    // Mock: read ftl.toml for variables extraction and auth config
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(0..=2)
+        .times(0..=3)  // Once for general variables, once for auth variables, once for resolve_auth_config
         .returning(|_| {
             Ok(r#"[project]
 name = "test-project"
@@ -924,6 +936,15 @@ fn setup_full_mocks(fixture: &mut TestFixture) {
         .with(eq("wkg"))
         .times(1)
         .returning(|_| Ok(()));
+}
+
+fn setup_auth_config_update(fixture: &mut TestFixture) {
+    // Mock: update auth config
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
 }
 
 fn setup_successful_push(fixture: &mut TestFixture) {
@@ -1285,13 +1306,16 @@ async fn test_deploy_with_variables() {
         .times(1)
         .returning(|_| {
             Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
                 app_name: "test-app".to_string(),
                 status: types::CreateAppResponseStatus::Creating,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
             })
         });
+
+    // Mock: auth config update
+    setup_auth_config_update(&mut fixture);
 
     // Mock: create deployment with variables
     fixture
@@ -1333,7 +1357,7 @@ async fn test_deploy_with_variables() {
     )
     .await;
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Error: {result:?}");
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Deployed!")));
 }
@@ -1356,11 +1380,9 @@ async fn test_deploy_with_auth_from_ftl_toml() {
 [project]
 name = "test-app"
 version = "0.1.0"
+access_control = "private"
 
-[auth]
-enabled = true
-
-[auth.authkit]
+[oidc]
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
@@ -1392,21 +1414,21 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(move |_| Ok(ftl_content_for_build.clone()));
 
-    // Mock: check for ftl.toml again when extracting auth variables
+    // Mock: check for ftl.toml again when extracting auth variables and resolving auth config
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Once for variables, once for resolve_auth_config
         .returning(|_| true);
 
-    // Mock: read ftl.toml for variables extraction (both general and auth)
+    // Mock: read ftl.toml for variables extraction and auth config
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(2)  // Called twice: once for general variables, once for auth variables
+        .times(3)  // Once for general variables, once for auth variables, once for resolve_auth_config
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1491,6 +1513,50 @@ command = "cargo build --release --target wasm32-wasip1"
             })
         });
 
+    // Mock: update components
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "api".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string(),
+                    ),
+                    repository_name: Some("user/api".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["api".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Mock: wkg push succeeds
+    fixture
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
+
+    // Mock: update auth config based on ftl.toml (private mode)
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
     // Mock: create deployment with auth variables
     fixture
         .api_client
@@ -1551,7 +1617,7 @@ command = "cargo build --release --target wasm32-wasip1"
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Error: {result:?}");
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Deployed!")));
 }
@@ -1574,11 +1640,9 @@ async fn test_deploy_cli_variables_override_ftl_toml() {
 [project]
 name = "test-app"
 version = "0.1.0"
+access_control = "private"
 
-[auth]
-enabled = true
-
-[auth.authkit]
+[oidc]
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
@@ -1610,21 +1674,21 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(move |_| Ok(ftl_content_for_build.clone()));
 
-    // Mock: check for ftl.toml again when extracting auth variables
+    // Mock: check for ftl.toml again when extracting auth variables and resolving auth config
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Once for variables, once for resolve_auth_config
         .returning(|_| true);
 
-    // Mock: read ftl.toml for variables extraction (both general and auth)
+    // Mock: read ftl.toml for variables extraction and auth config
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(2)  // Called twice: once for general variables, once for auth variables
+        .times(3)  // Once for general variables, once for auth variables, once for resolve_auth_config
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1709,6 +1773,50 @@ command = "cargo build --release --target wasm32-wasip1"
             })
         });
 
+    // Mock: update components
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "api".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string(),
+                    ),
+                    repository_name: Some("user/api".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["api".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Mock: wkg push succeeds
+    fixture
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
+
+    // Mock: update auth config based on ftl.toml (private mode)
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
     // Mock: create deployment with auth variables
     fixture
         .api_client
@@ -1769,7 +1877,7 @@ command = "cargo build --release --target wasm32-wasip1"
     )
     .await;
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Error: {result:?}");
     let output = ui.get_output();
     assert!(output.iter().any(|s| s.contains("Deployed!")));
 }
@@ -1778,8 +1886,7 @@ command = "cargo build --release --target wasm32-wasip1"
 fn default_deploy_args() -> DeployArgs {
     DeployArgs {
         variables: vec![],
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -1791,8 +1898,7 @@ fn default_deploy_args() -> DeployArgs {
 fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
     DeployArgs {
         variables,
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -1821,9 +1927,9 @@ async fn test_auth_config_updated_before_deployment() {
         .returning(move |app_id, request| {
             call_order_clone1.lock().unwrap().push("update_auth_config");
             assert_eq!(app_id, "12345678-1234-1234-1234-123456789012");
-            match request.mode {
-                types::UpdateAuthConfigRequestMode::Public => {}
-                _ => panic!("Expected public mode"),
+            match request.access_control {
+                types::UpdateAuthConfigRequestAccessControl::Public => {}
+                _ => panic!("Expected public access control"),
             }
             // We don't care about the response structure for this test
             // Just tracking that the call happened in the right order
@@ -1893,8 +1999,7 @@ async fn test_auth_config_updated_before_deployment() {
     // Deploy with auth configuration
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: Some("public".to_string()),
-        auth_users: None,
+        access_control: Some("public".to_string()),
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -1962,6 +2067,14 @@ fn test_is_sensitive_variable() {
     assert!(!is_sensitive_variable("timeout"));
     assert!(!is_sensitive_variable("max_retries"));
     assert!(!is_sensitive_variable("api_version"));
+
+    // Test auth configuration exceptions (not sensitive)
+    assert!(!is_sensitive_variable("auth_enabled"));
+    assert!(!is_sensitive_variable("AUTH_ENABLED"));
+    assert!(!is_sensitive_variable("mcp_jwt_issuer"));
+    assert!(!is_sensitive_variable("mcp_jwt_audience"));
+    assert!(!is_sensitive_variable("mcp_provider_type"));
+    assert!(!is_sensitive_variable("mcp_jwt_jwks_uri"));
 }
 
 #[tokio::test]
@@ -1970,6 +2083,9 @@ async fn test_deploy_with_sensitive_variables() {
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
+
+    // Mock: auth config update
+    setup_auth_config_update(&mut fixture);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -1984,8 +2100,7 @@ async fn test_deploy_with_sensitive_variables() {
             "jwt_secret=jwt-secret-value".to_string(),
             "debug_mode=false".to_string(),
         ],
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2030,6 +2145,9 @@ async fn test_deploy_with_short_sensitive_values() {
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
+    // Mock: auth config update
+    setup_auth_config_update(&mut fixture);
+
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
 
@@ -2040,8 +2158,7 @@ async fn test_deploy_with_short_sensitive_values() {
             "token=xyz".to_string(),
             "secret=1234".to_string(),
         ],
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2071,20 +2188,20 @@ async fn test_deploy_dry_run() {
     // Setup project file mocks
     setup_project_file_mocks(&mut fixture, true);
 
-    // Mock: check for ftl.toml when extracting variables
+    // Mock: check for ftl.toml when extracting variables and auth config
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Once for variables, once for resolve_auth_config
         .returning(|_| true);
 
-    // Mock: read ftl.toml for variables extraction (both general and auth)
+    // Mock: read ftl.toml for variables extraction and auth config
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(2)  // Called twice: once for general variables, once for auth variables
+        .times(3)  // Once for general variables, once for auth variables, once for resolve_auth_config
         .returning(|_| {
             Ok(r#"[project]
 name = "test-project"
@@ -2140,8 +2257,7 @@ command = "echo 'Building test tool'"
             "api_url=https://api.example.com".to_string(),
             "debug_mode=true".to_string(),
         ],
-        auth_mode: Some("public".to_string()),
-        auth_users: None,
+        access_control: Some("public".to_string()),
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2167,7 +2283,7 @@ command = "echo 'Building test tool'"
     assert!(output.iter().any(|s| s.contains("test-tool")));
 
     // Check variables section with proper redaction
-    assert!(output.iter().any(|s| s.contains("Variables (3):")));
+    assert!(output.iter().any(|s| s.contains("Variables (4):")));
     assert!(output.iter().any(|s| s.contains("🔒 api_token = te***")));
     assert!(
         output
@@ -2204,20 +2320,20 @@ async fn test_deploy_dry_run_no_variables() {
     // Setup project file mocks
     setup_project_file_mocks(&mut fixture, true);
 
-    // Mock: check for ftl.toml when extracting variables
+    // Mock: check for ftl.toml when extracting variables and auth config
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)
+        .times(2)  // Once for variables, once for resolve_auth_config
         .returning(|_| true);
 
-    // Mock: read ftl.toml for variables extraction (both general and auth)
+    // Mock: read ftl.toml for variables extraction and auth config
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(2)  // Called twice: once for general variables, once for auth variables
+        .times(3)  // Once for general variables, once for auth variables, once for resolve_auth_config
         .returning(|_| {
             Ok(r#"[project]
 name = "test-project"
@@ -2264,8 +2380,7 @@ command = "echo 'Building test tool'"
     // Deploy with dry-run flag but no variables
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2277,15 +2392,17 @@ command = "echo 'Building test tool'"
 
     let output = ui.get_output();
 
-    // Should not show variables section when there are none
-    assert!(!output.iter().any(|s| s.contains("Variables")));
+    // Should show variables section with auth_enabled (not redacted)
+    assert!(output.iter().any(|s| s.contains("Variables (1):")));
+    assert!(output.iter().any(|s| s.contains("   auth_enabled = false")));
 
-    // Should not show auth section when not configured
+    // Should show auth section with public mode
     assert!(
-        !output
+        output
             .iter()
             .any(|s| s.contains("Authorization Configuration:"))
     );
+    assert!(output.iter().any(|s| s.contains("Mode: public")));
 }
 
 #[tokio::test]
@@ -2322,8 +2439,7 @@ async fn test_deploy_auth_mode_user_only() {
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: Some("user-only".to_string()),
-        auth_users: Some("user1,user2,user3".to_string()),
+        access_control: Some("private".to_string()),
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2367,8 +2483,7 @@ async fn test_deploy_auth_mode_custom() {
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: Some("custom".to_string()),
-        auth_users: None,
+        access_control: Some("custom".to_string()),
         auth_provider: Some("authkit".to_string()),
         auth_issuer: Some("https://auth.example.com".to_string()),
         auth_audience: Some("my-api".to_string()),
@@ -2416,8 +2531,7 @@ async fn test_deploy_auth_mode_custom_missing_required() {
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: Some("custom".to_string()),
-        auth_users: None,
+        access_control: Some("custom".to_string()),
         auth_provider: Some("authkit".to_string()),
         auth_issuer: None, // Missing required issuer
         auth_audience: None,
@@ -2471,8 +2585,7 @@ async fn test_deploy_invalid_auth_mode() {
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: Some("invalid-mode".to_string()),
-        auth_users: None,
+        access_control: Some("invalid-mode".to_string()),
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2485,7 +2598,7 @@ async fn test_deploy_invalid_auth_mode() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Invalid auth mode")
+            .contains("Invalid access control mode")
     );
 }
 
@@ -2579,6 +2692,13 @@ command = "cargo build --release"
 
     setup_successful_deployment(&mut fixture);
 
+    // Mock: update auth config
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
     assert!(result.is_ok());
@@ -2634,8 +2754,7 @@ command = "cargo build"
     // Dry run to test profile detection without full deployment
     let args = DeployArgs {
         variables: vec![],
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2689,8 +2808,7 @@ command = "echo 'Building test tool'"
     // Dry run to check variable handling
     let args = DeployArgs {
         variables: vec!["api_key=provided-key".to_string()], // Only provide one required var
-        auth_mode: None,
-        auth_users: None,
+        access_control: None,
         auth_provider: None,
         auth_issuer: None,
         auth_audience: None,
@@ -2813,4 +2931,319 @@ async fn test_deploy_partial_component_push_failure() {
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Failed to push"));
+}
+
+#[tokio::test]
+async fn test_deploy_auth_enabled_always_included() {
+    let mut fixture = TestFixture::new();
+
+    // Setup basic mocks
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+
+    // Mock: list apps returns empty
+    fixture
+        .api_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app
+    fixture
+        .api_client
+        .expect_create_app()
+        .times(1)
+        .returning(|_| {
+            Ok(types::CreateAppResponse {
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: types::CreateAppResponseStatus::Creating,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        });
+
+    // Mock: update auth config - should be called even when auth is disabled
+    fixture
+        .api_client
+        .expect_update_auth_config()
+        .times(1)
+        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
+    // Mock: create deployment - verify auth_enabled is always present
+    fixture
+        .api_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, req| {
+            // This is the key assertion - auth_enabled should always be present
+            assert!(
+                req.variables.contains_key("auth_enabled"),
+                "auth_enabled must always be included in deployment variables"
+            );
+            assert_eq!(
+                req.variables.get("auth_enabled"),
+                Some(&"false".to_string()),
+                "auth_enabled should be 'false' for public access control"
+            );
+
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: update components
+    fixture
+        .api_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    // Mock: app becomes active
+    fixture.api_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    let deps = fixture.to_deps();
+    let args = DeployArgs {
+        variables: vec![],
+        access_control: None, // Public access control
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {e}");
+    }
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_add_auth_variables_from_ftl() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    // Test 1: Public access control (auth disabled)
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(
+        file,
+        r#"[project]
+name = "test-app"
+version = "0.1.0"
+access_control = "public"
+"#
+    )
+    .unwrap();
+
+    // Remove unused variable
+
+    // Mock reading ftl.toml
+    let content = std::fs::read_to_string(file.path()).unwrap();
+    let mut mock_fs = MockFileSystemMock::new();
+    mock_fs
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(content.clone()));
+    let fs_arc: Arc<dyn FileSystem> = Arc::new(mock_fs);
+
+    let mut variables = HashMap::new();
+    add_auth_variables_from_ftl(&fs_arc, &mut variables).unwrap();
+
+    // auth_enabled should be present and set to "false"
+    assert_eq!(variables.get("auth_enabled"), Some(&"false".to_string()));
+    // When auth is disabled, other auth variables should NOT be present
+    assert_eq!(variables.get("mcp_provider_type"), None);
+    assert_eq!(variables.get("mcp_jwt_issuer"), None);
+
+    // Test 2: Private access control (auth enabled)
+    let mut file2 = NamedTempFile::new().unwrap();
+    writeln!(
+        file2,
+        r#"[project]
+name = "test-app"
+version = "0.1.0"
+access_control = "private"
+"#
+    )
+    .unwrap();
+
+    let content2 = std::fs::read_to_string(file2.path()).unwrap();
+    let mut mock_fs2 = MockFileSystemMock::new();
+    mock_fs2
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(content2.clone()));
+    let fs_arc2: Arc<dyn FileSystem> = Arc::new(mock_fs2);
+
+    let mut variables = HashMap::new();
+    add_auth_variables_from_ftl(&fs_arc2, &mut variables).unwrap();
+
+    // auth_enabled should be present and set to "true"
+    assert_eq!(variables.get("auth_enabled"), Some(&"true".to_string()));
+    // Provider type should be "jwt"
+    assert_eq!(variables.get("mcp_provider_type"), Some(&"jwt".to_string()));
+    // Should use FTL's built-in AuthKit issuer
+    assert_eq!(
+        variables.get("mcp_jwt_issuer"),
+        Some(&"https://divine-lion-50-staging.authkit.app".to_string())
+    );
+
+    // Test 3: Variables already provided via CLI should not be overwritten
+    let mut variables = HashMap::new();
+    variables.insert("auth_enabled".to_string(), "custom_value".to_string());
+    variables.insert(
+        "mcp_jwt_issuer".to_string(),
+        "https://custom.issuer.com".to_string(),
+    );
+
+    let content3 = std::fs::read_to_string(file2.path()).unwrap();
+    let mut mock_fs3 = MockFileSystemMock::new();
+    mock_fs3
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(content3.clone()));
+    let fs_arc3: Arc<dyn FileSystem> = Arc::new(mock_fs3);
+
+    add_auth_variables_from_ftl(&fs_arc3, &mut variables).unwrap();
+
+    // Existing values should be preserved
+    assert_eq!(
+        variables.get("auth_enabled"),
+        Some(&"custom_value".to_string())
+    );
+    assert_eq!(
+        variables.get("mcp_jwt_issuer"),
+        Some(&"https://custom.issuer.com".to_string())
+    );
+}
+
+#[test]
+fn test_resolve_auth_config_public_access() {
+    use crate::commands::deploy::DeployArgs;
+    use crate::commands::deploy::resolve_auth_config;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    // Test 1: Public access control in ftl.toml should be resolved
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(
+        file,
+        r#"[project]
+name = "test-app"
+version = "0.1.0"
+access_control = "public"
+"#
+    )
+    .unwrap();
+
+    let content = std::fs::read_to_string(file.path()).unwrap();
+    let mut mock_fs = MockFileSystemMock::new();
+    mock_fs
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| true);
+    mock_fs
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(content.clone()));
+    let fs_arc: Arc<dyn FileSystem> = Arc::new(mock_fs);
+
+    let args = DeployArgs {
+        variables: vec![],
+        access_control: None,
+        auth_provider: None,
+        auth_issuer: None,
+        auth_audience: None,
+        dry_run: false,
+    };
+
+    let result = resolve_auth_config(&fs_arc, &args).unwrap();
+
+    // Should resolve to public mode
+    assert!(result.is_some());
+    let (mode, provider, issuer, audience) = result.unwrap();
+    assert_eq!(mode, "public");
+    assert!(provider.is_none());
+    assert!(issuer.is_none());
+    assert!(audience.is_none());
+
+    // Test 2: Private access control should include auth details
+    let mut file2 = NamedTempFile::new().unwrap();
+    writeln!(
+        file2,
+        r#"[project]
+name = "test-app"
+version = "0.1.0"
+access_control = "private"
+"#
+    )
+    .unwrap();
+
+    let content2 = std::fs::read_to_string(file2.path()).unwrap();
+    let mut mock_fs2 = MockFileSystemMock::new();
+    mock_fs2
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| true);
+    mock_fs2
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(move |_| Ok(content2.clone()));
+    let fs_arc2: Arc<dyn FileSystem> = Arc::new(mock_fs2);
+
+    let result2 = resolve_auth_config(&fs_arc2, &args).unwrap();
+
+    // Should resolve to private mode with FTL AuthKit details
+    assert!(result2.is_some());
+    let (mode, provider, issuer, audience) = result2.unwrap();
+    assert_eq!(mode, "private");
+    assert_eq!(provider, Some("jwt".to_string()));
+    assert_eq!(
+        issuer,
+        Some("https://divine-lion-50-staging.authkit.app".to_string())
+    );
+    assert!(audience.is_none());
 }

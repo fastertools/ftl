@@ -1,6 +1,6 @@
 //! Request forwarding to the MCP gateway
 
-use spin_sdk::http::{Request, Response};
+use spin_sdk::http::{Headers, Request, Response};
 
 use crate::auth::Context as AuthContext;
 use crate::config::Config;
@@ -15,47 +15,8 @@ pub async fn forward_to_gateway(
     // Parse gateway URL to set the scheme and authority
     let gateway_url = url::Url::parse(&config.gateway_url)?;
 
-    // Create headers first
-    let headers = spin_sdk::http::Headers::new();
-
-    // Copy request headers
-    for (name, value) in req.headers() {
-        headers.append(&name.to_string(), &value.as_bytes().to_vec())?;
-    }
-
-    // Add authentication context headers
-    headers.append(
-        &"x-auth-client-id".to_string(),
-        &auth_context.client_id.as_bytes().to_vec(),
-    )?;
-    headers.append(
-        &"x-auth-user-id".to_string(),
-        &auth_context.user_id.as_bytes().to_vec(),
-    )?;
-    headers.append(
-        &"x-auth-issuer".to_string(),
-        &auth_context.issuer.as_bytes().to_vec(),
-    )?;
-
-    if !auth_context.scopes.is_empty() {
-        headers.append(
-            &"x-auth-scopes".to_string(),
-            &auth_context.scopes.join(" ").as_bytes().to_vec(),
-        )?;
-    }
-
-    // Forward the original authorization header
-    headers.append(
-        &"authorization".to_string(),
-        &format!("Bearer {}", auth_context.raw_token)
-            .as_bytes()
-            .to_vec(),
-    )?;
-
-    // Add trace ID if present
-    if let Some(trace_id) = &trace_id {
-        headers.append(&config.trace_header, &trace_id.as_bytes().to_vec())?;
-    }
+    // Build headers with authentication context
+    let headers = build_forwarding_headers(&req, &auth_context, trace_id.as_ref(), config)?;
 
     // Build outgoing request with the headers
     let outgoing = spin_sdk::http::OutgoingRequest::new(headers);
@@ -126,7 +87,80 @@ pub async fn forward_to_gateway(
     // Extract body
     let body = incoming_response.into_body();
 
-    // Build the final response
+    // Build response with proper headers
+    Ok(build_gateway_response(
+        status,
+        headers_vec,
+        body,
+        trace_id,
+        &config.trace_header,
+    ))
+}
+
+/// Build headers for forwarding request
+fn build_forwarding_headers(
+    req: &Request,
+    auth_context: &AuthContext,
+    trace_id: Option<&String>,
+    config: &Config,
+) -> anyhow::Result<Headers> {
+    let headers = Headers::new();
+
+    // Copy request headers
+    for (name, value) in req.headers() {
+        headers.append(&name.to_string(), &value.as_bytes().to_vec())?;
+    }
+
+    // Add authentication context headers
+    headers.append(
+        &"x-auth-client-id".to_string(),
+        &auth_context.client_id.as_bytes().to_vec(),
+    )?;
+    headers.append(
+        &"x-auth-user-id".to_string(),
+        &auth_context.user_id.as_bytes().to_vec(),
+    )?;
+    headers.append(
+        &"x-auth-issuer".to_string(),
+        &auth_context.issuer.as_bytes().to_vec(),
+    )?;
+
+    if !auth_context.scopes.is_empty() {
+        headers.append(
+            &"x-auth-scopes".to_string(),
+            &auth_context.scopes.join(" ").as_bytes().to_vec(),
+        )?;
+    }
+
+    // Add organization ID if present
+    if let Some(org_id) = &auth_context.org_id {
+        headers.append(&"x-auth-org-id".to_string(), &org_id.as_bytes().to_vec())?;
+    }
+
+    // Forward the original authorization header
+    headers.append(
+        &"authorization".to_string(),
+        &format!("Bearer {}", auth_context.raw_token)
+            .as_bytes()
+            .to_vec(),
+    )?;
+
+    // Add trace ID if present
+    if let Some(trace_id) = trace_id {
+        headers.append(&config.trace_header, &trace_id.as_bytes().to_vec())?;
+    }
+
+    Ok(headers)
+}
+
+/// Build gateway response with CORS headers
+fn build_gateway_response(
+    status: u16,
+    headers_vec: Vec<(String, String)>,
+    body: Vec<u8>,
+    trace_id: Option<String>,
+    trace_header: &str,
+) -> Response {
     let mut binding = Response::builder();
     let mut response_builder = binding.status(status);
 
@@ -149,9 +183,9 @@ pub async fn forward_to_gateway(
 
     // Add trace ID if present
     if let Some(trace_id) = trace_id {
-        response_builder = response_builder.header(&config.trace_header, trace_id);
+        response_builder = response_builder.header(trace_header, trace_id);
     }
 
     // Build the response with body
-    Ok(response_builder.body(body).build())
+    response_builder.body(body).build()
 }

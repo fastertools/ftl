@@ -45,5 +45,6 @@ pub fn verify(token: &str, provider: &StaticProvider) -> Result<TokenInfo> {
         sub: token_info.sub.clone(),
         iss: "static".to_string(), // Static provider has no issuer
         scopes: token_info.scopes.clone(),
+        org_id: token_info.org_id.clone(),
     })
 }

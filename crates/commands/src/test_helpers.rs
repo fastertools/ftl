@@ -1100,16 +1100,14 @@ pub fn test_ecr_credentials() -> types::CreateEcrTokenResponse {
 /// use ftl_commands::test_helpers::test_auth_config_response;
 ///
 /// let auth_response = test_auth_config_response();
-/// assert!(matches!(auth_response.mode, types::AuthConfigResponseMode::Public));
+/// assert!(matches!(auth_response.auth_config.access_control, types::AuthConfigResponseAuthConfigAccessControl::Public));
 /// ```
 pub fn test_auth_config_response() -> types::AuthConfigResponse {
     types::AuthConfigResponse {
         app_id: "app-12345".to_string(),
         auth_config: types::AuthConfigResponseAuthConfig {
-            mode: types::AuthConfigResponseAuthConfigMode::Public,
+            access_control: types::AuthConfigResponseAuthConfigAccessControl::Public,
             custom_config: None,
-            allowed_users: vec![],
-            allowed_tenants: vec![],
         },
         updated_at: 1_234_567_890.0,
     }

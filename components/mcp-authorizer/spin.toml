@@ -28,6 +28,9 @@ mcp_oauth_userinfo_endpoint = { default = "" }
 # Static provider settings
 mcp_static_tokens = { default = "" }
 
+# Tenant restriction (for private mode)
+mcp_tenant_id = { default = "" }
+
 [[trigger.http]]
 route = "/..."
 component = "mcp-authorizer"
@@ -61,6 +64,9 @@ mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 
 # Static provider settings
 mcp_static_tokens = "{{ mcp_static_tokens }}"
+
+# Tenant restriction (for private mode)
+mcp_tenant_id = "{{ mcp_tenant_id }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]
