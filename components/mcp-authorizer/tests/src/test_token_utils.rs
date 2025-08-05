@@ -164,12 +164,16 @@ impl TestTokenBuilder {
     }
     
     /// Build the claims
-    fn build(self) -> Claims {
+    fn build(mut self) -> Claims {
         let now = Utc::now();
         let exp = match self.expires_in {
             Some(duration) => (now + duration).timestamp(),
             None => (now + Duration::hours(1)).timestamp(), // Default 1 hour
         };
+        
+        // Extract org_id from additional claims
+        let org_id = self.additional_claims.remove("org_id")
+            .and_then(|v| v.as_str().map(String::from));
         
         let claims = Claims {
             sub: self.subject.unwrap_or_else(|| "test-user".to_string()),
@@ -180,9 +184,10 @@ impl TestTokenBuilder {
             nbf: None,
             client_id: self.client_id,
             scope: self.scopes.as_ref().map(|s| s.join(" ")),
+            org_id,
         };
         
-        // Merge additional claims
+        // Merge remaining additional claims
         let mut claims_value = serde_json::to_value(&claims).unwrap();
         if let serde_json::Value::Object(ref mut map) = claims_value {
             for (key, value) in self.additional_claims {
@@ -209,6 +214,8 @@ struct Claims {
     scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    org_id: Option<String>,
 }
 
 /// Create a simple test token with minimal configuration

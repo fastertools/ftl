@@ -170,24 +170,28 @@ enum EngCommand {
         #[arg(long, value_name = "KEY=VALUE")]
         variable: Vec<String>,
 
-        /// Set authentication mode (public, ftl-account, user-only, custom)
-        #[arg(long, value_name = "MODE")]
-        auth_mode: Option<String>,
+        /// Set access control mode (public, private, custom)
+        /// Overrides `FTL_ACCESS_CONTROL` env var and ftl.toml `auth.access_control`
+        #[arg(
+            long = "access-control",
+            value_name = "public|private|custom",
+            help_heading = "Authentication"
+        )]
+        access_control: Option<String>,
 
-        /// Allowed users for user-only mode (comma-separated)
-        #[arg(long, value_name = "USER_IDS", requires = "auth_mode")]
-        auth_users: Option<String>,
-
-        /// Custom auth provider (authkit, auth0, oidc)
-        #[arg(long, value_name = "PROVIDER", requires = "auth_mode")]
+        /// Custom auth provider (authkit, auth0, oidc, static)
+        /// Overrides `FTL_AUTH_PROVIDER` env var and ftl.toml auth provider
+        #[arg(long, value_name = "PROVIDER", help_heading = "Authentication")]
         auth_provider: Option<String>,
 
         /// Custom auth issuer URL
-        #[arg(long, value_name = "URL", requires = "auth_provider")]
+        /// Overrides `FTL_AUTH_ISSUER` env var and ftl.toml auth issuer
+        #[arg(long, value_name = "URL", help_heading = "Authentication")]
         auth_issuer: Option<String>,
 
         /// Custom auth audience
-        #[arg(long, value_name = "AUDIENCE", requires = "auth_provider")]
+        /// Overrides `FTL_AUTH_AUDIENCE` env var and ftl.toml auth audience
+        #[arg(long, value_name = "AUDIENCE", help_heading = "Authentication")]
         auth_audience: Option<String>,
 
         /// Run without making any changes (preview what would be deployed)
@@ -570,8 +574,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
         }
         EngCommand::Deploy {
             variable,
-            auth_mode,
-            auth_users,
+            access_control,
             auth_provider,
             auth_issuer,
             auth_audience,
@@ -579,8 +582,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
         } => {
             let deploy_args = ftl_commands::deploy::DeployArgs {
                 variables: variable,
-                auth_mode,
-                auth_users,
+                access_control,
                 auth_provider,
                 auth_issuer,
                 auth_audience,

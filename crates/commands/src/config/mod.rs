@@ -12,6 +12,6 @@ pub mod transpiler;
 /// Spin manifest configuration types
 pub mod spin_config;
 
-pub use ftl_config::{AuthConfig, FtlConfig, ToolConfig};
+pub use ftl_config::{FtlConfig, ToolConfig};
 pub use registry::{RegistryConfig, RegistryType};
 pub use transpiler::transpile_ftl_to_spin;

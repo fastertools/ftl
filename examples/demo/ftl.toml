@@ -3,6 +3,10 @@ name = "ftl-mcp-demo"
 version = "0.1.0"
 description = "FTL MCP server for hosting MCP tools"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+# Access control mode: "public" or "private"
+# - public: No authentication required (default)
+# - private: Authentication required
+access_control = "public"
 
 [mcp]
 # You can specify registry URIs for custom MCP authorizer and gateway components:
@@ -17,24 +21,13 @@ authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
 validate_arguments = true
 
 # ========================================
-# Access control configuration
+# OIDC Configuration (Optional)
 # ========================================
-# Access control is DISABLED by default. To enable, set auth_enabled = true
+# For private access control with custom OIDC provider
+# If omitted with private mode, uses FTL's built-in AuthKit
 
-[auth]
-enabled = false
-
-
-# Uncomment and configure one of the following auth providers when enabling auth:
-
-# For AuthKit:
-[auth.authkit]
-issuer = "https://divine-lion-50-staging.authkit.app"
-# audience = "mcp-api"  # optional
-# required_scopes = "read,write"  # optional
-
-# For OIDC (Auth0, Okta, etc.):
-# [auth.oidc]
+# For custom OIDC (Auth0, Okta, etc.):
+# [oidc]
 # issuer = "https://your-domain.auth0.com"
 # audience = "your-api-identifier"  # optional
 # jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
@@ -45,43 +38,23 @@ issuer = "https://divine-lion-50-staging.authkit.app"
 # token_endpoint = "https://your-domain.auth0.com/oauth/token"  # optional - for OAuth discovery
 # userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional - for OAuth discovery
 
-# For Static Tokens (development/testing only):
-# [auth.static_token]
-# tokens = "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
-# required_scopes = "read"  # optional
-
 # ========================================
 # Example configurations:
 # ========================================
-# AuthKit:
-#   [auth]
-#   enabled = true
-#   
-#   [auth.authkit]
-#   issuer = "https://your-tenant.authkit.app"
-#   audience = "mcp-api"  # optional
-#   required_scopes = "mcp:read,mcp:write"  # optional
+# Private mode with FTL's built-in AuthKit (default for private):
+#   [project]
+#   access_control = "private"
+#   # No [oidc] block needed - FTL will use its built-in AuthKit
 #
-# Auth0:
-#   [auth]
-#   enabled = true
+# Private mode with custom OIDC:
+#   [project]
+#   access_control = "private"
 #   
-#   [auth.oidc]
+#   [oidc]
 #   issuer = "https://your-domain.auth0.com"
-#   audience = "your-api-identifier"  # optional
+#   audience = "your-api-identifier"
 #   jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
-#   required_scopes = "read,write"  # optional
-#   authorize_endpoint = "https://your-domain.auth0.com/authorize"
-#   token_endpoint = "https://your-domain.auth0.com/oauth/token"
-#   userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
-#
-# Static Tokens (dev only):
-#   [auth]
-#   enabled = true
-#   
-#   [auth.static_token]
-#   tokens = "test-token:test-client:test-user:read,write"
-#   required_scopes = "read"
+#   required_scopes = "read,write"
 
 # ========================================
 # Application Variables

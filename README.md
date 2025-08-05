@@ -2,7 +2,7 @@
 
 # `ftl`
 
-Fast tools for AI agents
+Faster tools for AI agents
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
@@ -15,7 +15,7 @@ Fast tools for AI agents
 
 </div>
 
-FTL is a framework for polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers. It composes [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin) to present a *just works* story for adding capabilities to AI agents with performant, sandboxed, edge-ready tools.
+FTL is a framework to write and run polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
 
 Tools authored in multiple [source languages](./sdk/README.md) can run simultaneously in a single MCP server process on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
 

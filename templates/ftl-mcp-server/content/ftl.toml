@@ -3,25 +3,19 @@ name = "{{project-name | kebab_case}}"
 version = "0.1.0"
 description = "{{project-description}}"
 authors = ["{{authors}}"]
+# Access control mode: "public" or "private"
+# - public: No authentication required (default)
+# - private: Authentication required
+access_control = "public"
 
 # ========================================
-# Auth Gateway Configuration
+# OIDC Configuration (Optional)
 # ========================================
-# Authentication is DISABLED by default. To enable, set auth_enabled = true
+# For private access control with custom OIDC provider
+# If omitted with private mode, uses FTL's built-in AuthKit
 
-[auth]
-enabled = false
-
-# Uncomment and configure one of the following auth providers when enabling auth:
-
-# For AuthKit:
-# [auth.authkit]
-# issuer = "https://your-tenant.authkit.app"
-# audience = "mcp-api"  # optional
-# required_scopes = "mcp:read,mcp:write"  # optional
-
-# For OIDC (Auth0, Okta, etc.):
-# [auth.oidc]
+# For custom OIDC (Auth0, Okta, etc.):
+# [oidc]
 # issuer = "https://your-domain.auth0.com"
 # audience = "your-api-identifier"  # optional
 # jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
@@ -31,11 +25,6 @@ enabled = false
 # authorize_endpoint = "https://your-domain.auth0.com/authorize"  # optional - for OAuth discovery
 # token_endpoint = "https://your-domain.auth0.com/oauth/token"  # optional - for OAuth discovery
 # userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional - for OAuth discovery
-
-# For Static Tokens (development only):
-# [auth.static_token]
-# tokens = "dev-token:client1:user1:read,write"
-# required_scopes = "read"  # optional
 
 
 [mcp]

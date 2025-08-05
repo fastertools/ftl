@@ -15,6 +15,9 @@ pub struct Config {
 
     /// JWT provider configuration (always required)
     pub provider: Provider,
+
+    /// Required tenant ID for private mode (optional)
+    pub tenant_id: Option<String>,
 }
 
 /// Provider type enumeration
@@ -79,6 +82,9 @@ pub struct StaticTokenInfo {
 
     /// Optional expiration timestamp
     pub expires_at: Option<i64>,
+
+    /// Organization ID (optional)
+    pub org_id: Option<String>,
 }
 
 /// OAuth 2.0 endpoint configuration
@@ -102,10 +108,16 @@ impl Config {
         // Provider configuration is always required
         let provider = Provider::load()?;
 
+        // Load tenant ID for private mode
+        let tenant_id = variables::get("mcp_tenant_id")
+            .ok()
+            .filter(|s| !s.is_empty());
+
         Ok(Self {
             gateway_url,
             trace_header,
             provider,
+            tenant_id,
         })
     }
 }
@@ -223,7 +235,7 @@ impl Provider {
         use std::collections::HashMap;
 
         // Load static tokens from configuration
-        // Format: mcp_static_tokens = "token1:client1:user1:read,write;token2:client2:user2:admin"
+        // Format: mcp_static_tokens = "token1:client1:user1:read,write[:expires_at[:org_id]];token2:client2:user2:admin"
         let tokens_config = variables::get("mcp_static_tokens")
             .map_err(|_| anyhow::anyhow!("Missing mcp_static_tokens for static provider"))?;
 
@@ -262,6 +274,17 @@ impl Provider {
             // Optional expiration timestamp as 5th part
             let expires_at = parts.get(4).and_then(|s| s.parse::<i64>().ok());
 
+            // Optional org_id as 6th part (or 5th if no expiration)
+            let org_id = if expires_at.is_some() {
+                parts.get(5).map(|s| (*s).to_string())
+            } else {
+                // If 5th part is not a number, treat it as org_id
+                parts
+                    .get(4)
+                    .filter(|s| s.parse::<i64>().is_err())
+                    .map(|s| (*s).to_string())
+            };
+
             tokens.insert(
                 token,
                 StaticTokenInfo {
@@ -269,6 +292,7 @@ impl Provider {
                     sub,
                     scopes,
                     expires_at,
+                    org_id,
                 },
             );
         }

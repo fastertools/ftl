@@ -22,6 +22,9 @@ pub struct TokenInfo {
 
     /// Scopes
     pub scopes: Vec<String>,
+
+    /// Organization ID (optional)
+    pub org_id: Option<String>,
 }
 
 /// JWT Claims structure
@@ -54,6 +57,10 @@ struct Claims {
     /// Client ID
     #[serde(skip_serializing_if = "Option::is_none")]
     client_id: Option<String>,
+
+    /// Organization ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    org_id: Option<String>,
 
     /// Additional claims
     #[serde(flatten)]
@@ -138,26 +145,13 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
         Err(e) => {
             // Provide more specific error messages for common issues
             return match e.kind() {
-                jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                    eprintln!("TOKEN_ERROR type=expired");
-                    Err(AuthError::ExpiredToken)
-                }
-                jsonwebtoken::errors::ErrorKind::InvalidIssuer => {
-                    eprintln!("TOKEN_ERROR type=invalid_issuer");
-                    Err(AuthError::InvalidIssuer)
-                }
-                jsonwebtoken::errors::ErrorKind::InvalidAudience => {
-                    eprintln!("TOKEN_ERROR type=invalid_audience");
-                    Err(AuthError::InvalidAudience)
-                }
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => Err(AuthError::ExpiredToken),
+                jsonwebtoken::errors::ErrorKind::InvalidIssuer => Err(AuthError::InvalidIssuer),
+                jsonwebtoken::errors::ErrorKind::InvalidAudience => Err(AuthError::InvalidAudience),
                 jsonwebtoken::errors::ErrorKind::InvalidSignature => {
-                    eprintln!("TOKEN_ERROR type=invalid_signature");
                     Err(AuthError::InvalidSignature)
                 }
-                _ => {
-                    eprintln!("TOKEN_ERROR type=other detail={e:?}");
-                    Err(AuthError::InvalidToken(e.to_string()))
-                }
+                _ => Err(AuthError::InvalidToken(e.to_string())),
             };
         }
     };
@@ -190,6 +184,7 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
         sub: claims.sub,
         iss: claims.iss,
         scopes,
+        org_id: claims.org_id,
     })
 }
 

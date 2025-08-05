@@ -647,7 +647,12 @@ async fn test_up_watch_mode_initial_build_fails() {
     assert!(result.is_err());
     // Error should be about parsing ftl.toml
     let error_msg = result.unwrap_err().to_string();
-    assert!(error_msg.contains("Failed to parse ftl.toml") || error_msg.contains("missing field"));
+    assert!(
+        error_msg.contains("Failed to parse FTL configuration")
+            || error_msg.contains("missing field")
+            || error_msg.contains("expected"),
+        "Unexpected error message: {error_msg}"
+    );
 }
 
 #[tokio::test]
