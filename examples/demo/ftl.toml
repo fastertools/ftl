@@ -1,6 +1,6 @@
 [project]
 name = "ftl-mcp-demo"
-version = "0.1.0"
+version = "0.0.11"
 description = "FTL MCP server for hosting MCP tools"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 access_control = "public"

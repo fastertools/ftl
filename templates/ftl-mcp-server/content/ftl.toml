@@ -1,6 +1,6 @@
 [project]
 name = "{{project-name | kebab_case}}"
-version = "0.1.0"
+version = "0.0.11"
 description = "{{project-description}}"
 authors = ["{{authors}}"]
 # Access control mode: "public" or "private"
