@@ -83,7 +83,7 @@ access_control = "public"
 
 [mcp]
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
 
 [tools.my-tool]
 path = "my-tool"

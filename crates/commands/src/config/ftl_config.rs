@@ -345,7 +345,7 @@ fn default_gateway() -> String {
 }
 
 fn default_authorizer() -> String {
-    "ghcr.io/fastertools/mcp-authorizer:0.0.10".to_string()
+    "ghcr.io/fastertools/mcp-authorizer:0.0.12".to_string()
 }
 
 const fn default_validate_arguments() -> bool {
