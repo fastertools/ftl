@@ -228,12 +228,12 @@ jobs:
                 # Update gateway versions
                 if [ "${COMPONENT}" = "mcp-gateway" ]; then
                   echo "Updating gateway version to ${NEW_VERSION} in $file"
-                  sed -i "s/^version = \"[^\"]*\"/version = \"${NEW_VERSION}\"/" "$file"
+                  sed -i "s|^gateway = \"ghcr.io/fastertools/mcp-gateway:[^\"]*\"|gateway = \"ghcr.io/fastertools/mcp-gateway:${NEW_VERSION}\"|" "$file"
                 fi
                 # Update authorizer versions
                 if [ "${COMPONENT}" = "mcp-authorizer" ]; then
                   echo "Updating authorizer version to ${NEW_VERSION} in $file"
-                  sed -i "s/^authorizer_version = \"[^\"]*\"/authorizer_version = \"${NEW_VERSION}\"/" "$file"
+                  sed -i "s|^authorizer = \"ghcr.io/fastertools/mcp-authorizer:[^\"]*\"|authorizer = \"ghcr.io/fastertools/mcp-authorizer:${NEW_VERSION}\"|" "$file"
                 fi
               done
               
@@ -243,12 +243,12 @@ jobs:
                 # Update gateway versions
                 if [ "${COMPONENT}" = "mcp-gateway" ]; then
                   echo "Updating gateway version to ${NEW_VERSION} in $file"
-                  sed -i "s/^version = \"[^\"]*\"/version = \"${NEW_VERSION}\"/" "$file"
+                  sed -i "s|^gateway = \"ghcr.io/fastertools/mcp-gateway:[^\"]*\"|gateway = \"ghcr.io/fastertools/mcp-gateway:${NEW_VERSION}\"|" "$file"
                 fi
                 # Update authorizer versions
                 if [ "${COMPONENT}" = "mcp-authorizer" ]; then
                   echo "Updating authorizer version to ${NEW_VERSION} in $file"
-                  sed -i "s/^authorizer_version = \"[^\"]*\"/authorizer_version = \"${NEW_VERSION}\"/" "$file"
+                  sed -i "s|^authorizer = \"ghcr.io/fastertools/mcp-authorizer:[^\"]*\"|authorizer = \"ghcr.io/fastertools/mcp-authorizer:${NEW_VERSION}\"|" "$file"
                 fi
               done
               ;;
