@@ -1130,7 +1130,7 @@ dependencies = [
  "jsonwebtoken",
  "serde",
  "serde_json",
- "spin-sdk",
+ "spin-sdk 3.1.1",
  "url",
 ]
 
@@ -1139,13 +1139,13 @@ name = "ftl-mcp-gateway"
 version = "0.0.11"
 dependencies = [
  "anyhow",
+ "chrono",
  "ftl-sdk",
- "futures",
  "jsonschema",
  "serde",
  "serde_json",
- "spin-sdk",
- "tokio",
+ "spin-sdk 4.0.0",
+ "uuid",
 ]
 
 [[package]]
@@ -2106,6 +2106,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
+name = "metrics-collector"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ftl-sdk",
+ "schemars 1.0.4",
+ "serde",
+ "serde_json",
+ "spin-sdk 4.0.0",
+ "uuid",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2725,7 +2738,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "syn 2.0.104",
@@ -2744,7 +2757,7 @@ dependencies = [
  "proc-macro2",
  "progenitor-impl",
  "quote",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "serde_tokenstream",
@@ -3115,10 +3128,23 @@ checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "chrono",
  "dyn-clone",
- "schemars_derive",
+ "schemars_derive 0.8.22",
  "serde",
  "serde_json",
  "uuid",
+]
+
+[[package]]
+name = "schemars"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
+dependencies = [
+ "dyn-clone",
+ "ref-cast",
+ "schemars_derive 1.0.4",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3126,6 +3152,18 @@ name = "schemars_derive"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33d020396d1d138dc19f1165df7545479dcd58d93810dc5d646a16e55abefa80"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3473,10 +3511,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin-executor"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3fd5c317f89c040f882f3260e8ef933ca0c9a7b1b169ea5793dae3e552e8873"
+dependencies = [
+ "futures",
+ "once_cell",
+ "wasi 0.13.1+wasi-0.2.0",
+]
+
+[[package]]
 name = "spin-macro"
 version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "988ffe27470862bf28fe9b4f0268361040d4732cd86bcaebe45aa3d3b3e3d896"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "spin-macro"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07524b07786d812f7360ff81dc7e0a055d946aa87afea9cdbd19142b795bd440"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3502,9 +3564,33 @@ dependencies = [
  "routefinder",
  "serde",
  "serde_json",
- "spin-executor",
- "spin-macro",
+ "spin-executor 3.1.1",
+ "spin-macro 3.1.1",
  "thiserror 1.0.69",
+ "wit-bindgen",
+]
+
+[[package]]
+name = "spin-sdk"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48ce1128f028feca1cbbedb19f867328e172765dc94750a6b094ddc5e09acb3c"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "form_urlencoded",
+ "futures",
+ "http",
+ "once_cell",
+ "routefinder",
+ "serde",
+ "serde_json",
+ "spin-executor 4.0.0",
+ "spin-macro 4.0.0",
+ "thiserror 1.0.69",
+ "wasi 0.13.1+wasi-0.2.0",
  "wit-bindgen",
 ]
 
@@ -4016,7 +4102,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regress",
- "schemars",
+ "schemars 0.8.22",
  "semver",
  "serde",
  "serde_json",
@@ -4033,7 +4119,7 @@ checksum = "7560adf816a1e8dad7c63d8845ef6e31e673e39eab310d225636779230cbedeb"
 dependencies = [
  "proc-macro2",
  "quote",
- "schemars",
+ "schemars 0.8.22",
  "semver",
  "serde",
  "serde_json",
@@ -4196,11 +4282,20 @@ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasi"
+version = "0.13.1+wasi-0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f43d1c36145feb89a3e61aa0ba3e582d976a8ab77f1474aa0adb80800fe0cf8"
+dependencies = [
+ "wit-bindgen-rt 0.24.0",
+]
+
+[[package]]
+name = "wasi"
 version = "0.14.2+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
 dependencies = [
- "wit-bindgen-rt",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -4770,6 +4865,15 @@ dependencies = [
  "anyhow",
  "wit-component",
  "wit-parser",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b0780cf7046630ed70f689a098cd8d56c5c3b22f2a7379bbdb088879963ff96"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]

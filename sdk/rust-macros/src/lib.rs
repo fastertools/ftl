@@ -198,9 +198,9 @@ impl syn::parse::Parse for ToolsDefinition {
     }
 }
 
-// Extract the first line of doc comments from attributes
+// Extract all doc comments from attributes and join them
 fn extract_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
-    attrs
+    let doc_lines: Vec<String> = attrs
         .iter()
         .filter_map(|attr| {
             if attr.path().is_ident("doc") {
@@ -216,5 +216,11 @@ fn extract_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
             }
             None
         })
-        .next()
+        .collect();
+    
+    if doc_lines.is_empty() {
+        None
+    } else {
+        Some(doc_lines.join("\n"))
+    }
 }

@@ -83,27 +83,12 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     variables.insert(
         "auth_enabled".to_string(),
         SpinVariable::Default {
-            default: ftl_config.is_auth_enabled().to_string(),
+            default: ftl_config.auth.enabled.to_string(),
         },
     );
 
     // Only add other auth variables if auth is enabled
-    if ftl_config.is_auth_enabled() {
-        // Add tenant_id variable for private mode without OIDC (platform will provide the value)
-        if ftl_config.project.access_control == "private" && ftl_config.oidc.is_none() {
-            variables.insert(
-                "mcp_tenant_id".to_string(),
-                SpinVariable::Required { required: true },
-            );
-        } else {
-            // For public mode or private with OIDC, tenant_id is empty
-            variables.insert(
-                "mcp_tenant_id".to_string(),
-                SpinVariable::Default {
-                    default: String::new(),
-                },
-            );
-        }
+    if ftl_config.auth.enabled {
         // Core MCP variables
         variables.insert(
             "mcp_gateway_url".to_string(),
@@ -120,122 +105,152 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         variables.insert(
             "mcp_provider_type".to_string(),
             SpinVariable::Default {
-                default: ftl_config.auth_provider_type().to_string(),
+                default: ftl_config.auth.provider_type().to_string(),
             },
         );
 
-        // JWT provider variables (both FTL AuthKit and custom OIDC use JWT)
-        variables.insert(
-            "mcp_jwt_issuer".to_string(),
-            SpinVariable::Default {
-                default: ftl_config.auth_issuer().to_string(),
-            },
-        );
-        variables.insert(
-            "mcp_jwt_audience".to_string(),
-            SpinVariable::Default {
-                default: ftl_config.auth_audience().to_string(),
-            },
-        );
-        variables.insert(
-            "mcp_jwt_required_scopes".to_string(),
-            SpinVariable::Default {
-                default: ftl_config.auth_required_scopes().to_string(),
-            },
-        );
+        // JWT provider variables
+        if ftl_config.auth.authkit.is_some() || ftl_config.auth.oidc.is_some() {
+            variables.insert(
+                "mcp_jwt_issuer".to_string(),
+                SpinVariable::Default {
+                    default: ftl_config.auth.issuer().to_string(),
+                },
+            );
+            variables.insert(
+                "mcp_jwt_audience".to_string(),
+                SpinVariable::Default {
+                    default: ftl_config.auth.audience().to_string(),
+                },
+            );
+            variables.insert(
+                "mcp_jwt_required_scopes".to_string(),
+                SpinVariable::Default {
+                    default: ftl_config.auth.required_scopes().to_string(),
+                },
+            );
 
-        // JWKS URI - empty for FTL AuthKit (auto-derived), explicit for OIDC
-        let jwks_uri = if let Some(oidc) = &ftl_config.oidc {
-            oidc.jwks_uri.clone()
-        } else {
-            String::new()
-        };
-        variables.insert(
-            "mcp_jwt_jwks_uri".to_string(),
-            SpinVariable::Default { default: jwks_uri },
-        );
+            // JWKS URI - auto-derived for AuthKit, explicit for OIDC
+            let jwks_uri = if let Some(_authkit) = &ftl_config.auth.authkit {
+                // AuthKit auto-derives JWKS URI
+                String::new()
+            } else if let Some(oidc) = &ftl_config.auth.oidc {
+                oidc.jwks_uri.clone()
+            } else {
+                String::new()
+            };
+            variables.insert(
+                "mcp_jwt_jwks_uri".to_string(),
+                SpinVariable::Default { default: jwks_uri },
+            );
 
-        // Public key and algorithm (OIDC only)
-        if let Some(oidc) = &ftl_config.oidc {
-            variables.insert(
-                "mcp_jwt_public_key".to_string(),
-                SpinVariable::Default {
-                    default: oidc.public_key.clone(),
-                },
-            );
-            variables.insert(
-                "mcp_jwt_algorithm".to_string(),
-                SpinVariable::Default {
-                    default: oidc.algorithm.clone(),
-                },
-            );
-        } else {
-            variables.insert(
-                "mcp_jwt_public_key".to_string(),
-                SpinVariable::Default {
-                    default: String::new(),
-                },
-            );
-            variables.insert(
-                "mcp_jwt_algorithm".to_string(),
-                SpinVariable::Default {
-                    default: String::new(),
-                },
-            );
-        }
-
-        // OAuth discovery endpoints
-        if let Some(oidc) = &ftl_config.oidc {
-            variables.insert(
-                "mcp_oauth_authorize_endpoint".to_string(),
-                SpinVariable::Default {
-                    default: oidc.authorize_endpoint.clone(),
-                },
-            );
-            variables.insert(
-                "mcp_oauth_token_endpoint".to_string(),
-                SpinVariable::Default {
-                    default: oidc.token_endpoint.clone(),
-                },
-            );
-            variables.insert(
-                "mcp_oauth_userinfo_endpoint".to_string(),
-                SpinVariable::Default {
-                    default: oidc.userinfo_endpoint.clone(),
-                },
-            );
-        } else {
-            // Empty defaults for OAuth endpoints
-            let oauth_vars = [
-                "mcp_oauth_authorize_endpoint",
-                "mcp_oauth_token_endpoint",
-                "mcp_oauth_userinfo_endpoint",
-            ];
-            for var in &oauth_vars {
+            // Public key and algorithm (OIDC only)
+            if let Some(oidc) = &ftl_config.auth.oidc {
                 variables.insert(
-                    (*var).to_string(),
+                    "mcp_jwt_public_key".to_string(),
+                    SpinVariable::Default {
+                        default: oidc.public_key.clone(),
+                    },
+                );
+                variables.insert(
+                    "mcp_jwt_algorithm".to_string(),
+                    SpinVariable::Default {
+                        default: oidc.algorithm.clone(),
+                    },
+                );
+            } else {
+                variables.insert(
+                    "mcp_jwt_public_key".to_string(),
+                    SpinVariable::Default {
+                        default: String::new(),
+                    },
+                );
+                variables.insert(
+                    "mcp_jwt_algorithm".to_string(),
                     SpinVariable::Default {
                         default: String::new(),
                     },
                 );
             }
+
+            // OAuth discovery endpoints
+            if let Some(oidc) = &ftl_config.auth.oidc {
+                variables.insert(
+                    "mcp_oauth_authorize_endpoint".to_string(),
+                    SpinVariable::Default {
+                        default: oidc.authorize_endpoint.clone(),
+                    },
+                );
+                variables.insert(
+                    "mcp_oauth_token_endpoint".to_string(),
+                    SpinVariable::Default {
+                        default: oidc.token_endpoint.clone(),
+                    },
+                );
+                variables.insert(
+                    "mcp_oauth_userinfo_endpoint".to_string(),
+                    SpinVariable::Default {
+                        default: oidc.userinfo_endpoint.clone(),
+                    },
+                );
+            } else {
+                // Empty defaults for OAuth endpoints
+                let oauth_vars = [
+                    "mcp_oauth_authorize_endpoint",
+                    "mcp_oauth_token_endpoint",
+                    "mcp_oauth_userinfo_endpoint",
+                ];
+                for var in &oauth_vars {
+                    variables.insert(
+                        (*var).to_string(),
+                        SpinVariable::Default {
+                            default: String::new(),
+                        },
+                    );
+                }
+            }
         }
 
-        // Static provider variables - no longer supported in new configuration
-        variables.insert(
-            "mcp_static_tokens".to_string(),
-            SpinVariable::Default {
-                default: String::new(),
-            },
-        );
+        // Static provider variables
+        if let Some(static_token) = &ftl_config.auth.static_token {
+            variables.insert(
+                "mcp_static_tokens".to_string(),
+                SpinVariable::Default {
+                    default: static_token.tokens.clone(),
+                },
+            );
+            variables.insert(
+                "mcp_jwt_required_scopes".to_string(),
+                SpinVariable::Default {
+                    default: static_token.required_scopes.clone(),
+                },
+            );
+        } else if ftl_config.auth.static_token.is_none() {
+            // Empty default for static tokens if not using static provider
+            variables.insert(
+                "mcp_static_tokens".to_string(),
+                SpinVariable::Default {
+                    default: String::new(),
+                },
+            );
+        }
     }
+
+    // Check if middleware is enabled before moving variables
+    let middleware_enabled = variables.get("middleware_enabled")
+        .and_then(|v| match v {
+            SpinVariable::Default { default } => Some(default.as_str()),
+            _ => None,
+        })
+        .map(|s| s == "true")
+        .unwrap_or(true);
 
     spin_config.variables = variables;
 
     // Build components
     let mut components = HashMap::new();
 
-    if ftl_config.is_auth_enabled() {
+    if ftl_config.auth.enabled {
         // When auth is enabled, add authorizer as "mcp" and gateway as "ftl-mcp-gateway"
         components.insert(
             "mcp".to_string(),
@@ -250,6 +265,14 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         components.insert(
             "mcp".to_string(),
             create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
+        );
+    }
+
+    // Add metrics collector component if middleware is enabled
+    if middleware_enabled {
+        components.insert(
+            "ftl-metrics".to_string(),
+            create_metrics_collector_component(),
         );
     }
 
@@ -269,7 +292,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         redis: Vec::new(),
     };
 
-    if ftl_config.is_auth_enabled() {
+    if ftl_config.auth.enabled {
         // When auth is enabled, all routes go through authorizer
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Path("/...".to_string()),
@@ -301,19 +324,30 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         });
     }
 
+    // Add metrics collector triggers
+    if middleware_enabled {
+        // Private trigger for internal event submission
+        triggers.http.push(HttpTrigger {
+            route: RouteConfig::Private { private: true },
+            component: "ftl-metrics".to_string(),
+            executor: None,
+        });
+        
+        // Public trigger for metrics endpoints
+        triggers.http.push(HttpTrigger {
+            route: RouteConfig::Path("/metrics/...".to_string()),
+            component: "ftl-metrics".to_string(),
+            executor: None,
+        });
+    }
+
     // Generate the TOML with triggers
     spin_config.to_toml_string_with_triggers(&triggers)
 }
 
 /// Create MCP authorizer component configuration
 fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
-    // Use default if empty
-    let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-authorizer:0.0.12"
-    } else {
-        registry_uri
-    };
-    let source = parse_registry_uri_to_source(uri);
+    let source = parse_registry_uri_to_source(registry_uri);
 
     let allowed_hosts = vec![
         "http://*.spin.internal".to_string(),
@@ -383,12 +417,6 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
         "{{ mcp_static_tokens }}".to_string(),
     );
 
-    // Tenant ID for private mode
-    variables.insert(
-        "mcp_tenant_id".to_string(),
-        "{{ mcp_tenant_id }}".to_string(),
-    );
-
     ComponentConfig {
         description: String::new(),
         source,
@@ -405,14 +433,9 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(registry_uri: &str, validate_args: bool) -> ComponentConfig {
-    // Use default if empty
-    let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-gateway:0.0.10"
-    } else {
-        registry_uri
-    };
-    let source = parse_registry_uri_to_source(uri);
+fn create_gateway_component(_registry_uri: &str, validate_args: bool) -> ComponentConfig {
+    // Use absolute path to actual WASM build location
+    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm".to_string());
 
     let allowed_hosts = vec!["http://*.spin.internal".to_string()];
 
@@ -423,12 +446,53 @@ fn create_gateway_component(registry_uri: &str, validate_args: bool) -> Componen
     );
     variables.insert("validate_arguments".to_string(), validate_args.to_string());
 
+    // Middleware configuration
+    variables.insert("middleware_enabled".to_string(), "true".to_string());
+    variables.insert("middleware_stack".to_string(), "invocation_tracker".to_string());
+
+    // Invocation tracker config
+    variables.insert("invocation_tracker_enabled".to_string(), "true".to_string());
+    variables.insert("invocation_tracker_max_metrics".to_string(), "10000".to_string());
+    variables.insert("invocation_tracker_flush_interval_secs".to_string(), "60".to_string());
+    variables.insert("invocation_tracker_track_arg_size".to_string(), "true".to_string());
+    variables.insert("invocation_tracker_detailed_timing".to_string(), "true".to_string());
+
+    // Metrics export config
+    variables.insert("metrics_enabled".to_string(), "true".to_string());
+    variables.insert("metrics_path".to_string(), "/metrics".to_string());
+    variables.insert("metrics_collector_url".to_string(), "http://ftl-metrics.spin.internal/events".to_string());
+
     ComponentConfig {
         description: String::new(),
         source,
         files: Vec::new(),
         exclude_files: Vec::new(),
         allowed_outbound_hosts: allowed_hosts,
+        key_value_stores: Vec::new(),
+        environment: HashMap::new(),
+        build: None,
+        variables,
+        dependencies_inherit_configuration: false,
+        dependencies: HashMap::new(),
+    }
+}
+
+/// Create metrics collector component configuration
+fn create_metrics_collector_component() -> ComponentConfig {
+    // Use absolute path to actual WASM build location  
+    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/metrics_collector.wasm".to_string());
+
+    let mut variables = HashMap::new();
+    variables.insert("max_metrics".to_string(), "10000".to_string());
+    variables.insert("flush_interval_secs".to_string(), "60".to_string());
+    variables.insert("aggregation_window_secs".to_string(), "300".to_string());
+
+    ComponentConfig {
+        description: String::new(),
+        source,
+        files: Vec::new(),
+        exclude_files: Vec::new(),
+        allowed_outbound_hosts: vec!["http://*.spin.internal".to_string()],
         key_value_stores: Vec::new(),
         environment: HashMap::new(),
         build: None,
@@ -544,7 +608,9 @@ pub fn generate_temp_spin_toml(
         }
     }
 
-    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+    let mut spin_content = transpile_ftl_to_spin(&ftl_config)?;
+
+    // Component paths are now absolute, no need for resolution
 
     // Create a temporary directory for FTL artifacts
     let temp_dir = tempfile::Builder::new()
@@ -557,6 +623,14 @@ pub fn generate_temp_spin_toml(
 
     // Write spin.toml to temp location
     std::fs::write(&temp_file, &spin_content).context("Failed to write temporary spin.toml")?;
+
+    // Debug: Also write to /tmp/ftl/ for debugging
+    let debug_file = std::path::Path::new("/tmp/ftl/spin.toml");
+    if let Err(e) = std::fs::write(&debug_file, &spin_content) {
+        eprintln!("Warning: Failed to write debug spin.toml to /tmp/ftl/: {}", e);
+    } else {
+        eprintln!("Debug: Generated spin.toml written to /tmp/ftl/spin.toml");
+    }
 
     // Keep the directory alive (it will be cleaned up on process exit)
     let _kept_dir = temp_dir.keep();
