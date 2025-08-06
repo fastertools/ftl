@@ -23,114 +23,63 @@ FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](http
 
 ## Why?
 
+### Simple MCP Server DX across languages
+
 <details>
-<summary><strong>⤵ Simple tool DX across languages</strong></summary>
+<summary><strong>Write tools in TypeScript, Rust, Python, and Go.</strong></summary>
 
-* <details>
-  <summary><strong>🦀 Rust</strong></summary>
+Combine tools from different [source languages](./sdk/README.md) onto a single server process over the `/mcp` Streamable HTTP endpoint. See [Architecture](#architecture) for details.
 
-  ```rust
-  use ftl_sdk::{tools, text, ToolResponse};
-  use serde::Deserialize;
-  use schemars::JsonSchema;
+Tools cohabitate as isolated WebAssembly components within the server.
 
-  #[derive(Deserialize, JsonSchema)]
-  struct ProcessInput {
-      /// The message to process
-      message: String,
-  }
+Tool components can be individually distributed on OCI registries like Docker Hub and GitHub Container Registry.
 
-  tools! {
-      /// Process a message
-      fn process_message(input: ProcessInput) -> ToolResponse {
-          text!("Processed: {}", input.message)
-      }
-      
-      /// Reverse a string
-      fn reverse_text(input: ProcessInput) -> ToolResponse {
-          let reversed: String = input.message.chars().rev().collect();
-          text!("{}", reversed)
-      }
-  }
-  ```
-  </details>
-
-* <details>
-  <summary><strong>🟦 TypeScript</strong></summary>
-
-  ```typescript
-  import { createTools, ToolResponse } from 'ftl-sdk'
-  import { z } from 'zod'
-
-  // Define schemas using Zod
-  const ProcessSchema = z.object({
-    message: z.string().describe('The message to process')
-  })
-
-  const ReverseSchema = z.object({
-    text: z.string().describe('The text to reverse')
-  })
-
-  const handle = createTools({
-    processMessage: {
-      description: 'Process a message',
-      inputSchema: z.toJSONSchema(ProcessSchema),
-      handler: async (input: z.infer<typeof ProcessSchema>) => {
-        return ToolResponse.text(`Processed: ${input.message}`)
-      }
-    },
-    reverseText: {
-      description: 'Reverse a string',
-      inputSchema: z.toJSONSchema(ReverseSchema),
-      handler: async (input: z.infer<typeof ReverseSchema>) => {
-        const reversed = input.text.split('').reverse().join('')
-        return ToolResponse.text(reversed)
-      }
-    }
-  })
-
-  //@ts-ignore
-  addEventListener('fetch', (event: FetchEvent) => {
-    event.respondWith(handle(event.request))
-  })
-  ```
-  </details>
-
-- Write tools in TypeScript, Rust, Python, Go, and [more](https://component-model.bytecodealliance.org/language-support.html). Tools are organized into tool components, which serve as isolated and distributable units.
-- Combine tool components from different source languages onto a single sandboxed MCP server process that exposes an `/mcp` Streamable HTTP endpoint. See [Architecture](#architecture) for details.
-- Tool components can be distributed on OCI registries like Docker Hub and GitHub Container Registry.
-- High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in supported languages like Rust and C.
+Tool binary size and performance are influenced by choice of source language. High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in Rust.
 </details>
 
-<details>
-<summary><strong>⤵ Secure by design</strong></summary>
+### Secure by design
 
-- Tool components within the sandboxed server process are themselves [individually isolated](https://component-model.bytecodealliance.org/design/why-component-model.html#benefits-of-the-component-model) and can each expose multiple tools.
-- Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
-- MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
-- Plug in your own JWT issuer or OIDC provider with simple configuration.
+<details>
+<summary><strong>Tool components within the sandboxed server process are individually isolated.</strong></summary>
+
+Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques. 
+
+A [component](https://component-model.bytecodealliance.org/design/why-component-model.html#components) is a WebAssembly binary (which may or may not contain modules) that is restricted to interact only through the modules' imported and exported functions.
+
+Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
+
+MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
+
+Plug in your own JWT issuer with simple configuration.
+
+### Distribute and compose tools like lightweight docker images
+
+Tools are compiled to self-contained Wasm binaries that are often < 1MB.
+
+Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
+
+Mix and match individual tools in your MCP server by registry URI. Allowed outbound network calls are configurable per tool.
 </details>
 
+### Edge deployments on FTL Engine
 <details>
-<summary><strong>⤵ Distribute and compose tools like lightweight docker images</strong></summary>
+<summary><strong>FTL Engine is an end-to-end platform for running remote tools called by AI agents.</strong></summary>
 
-- Tools are compiled to self-contained Wasm binaries that are often < 1MB.
-- Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
-- Mix and match individual tools in your MCP server by registry URI. Allowed outbound network calls are configurable per tool.
-</details>
+Tool calls cold start in under half a millisecond, automatically scale up to meet demand, and scale down to zero.
 
-<details>
-<summary><strong>⤵ Edge deployments on FTL Engine</strong></summary>
+Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
 
-FTL Engine is an end-to-end platform for running remote tools called by AI agents. Tools deployed on FTL engines are powerful enough to do meaningful work themselves and snappy enough to serve as fast proxies to other servers. Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
+Cost scales predictably with usage. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out. Engine specs are fixed and scaling is completely horizontal and automatic.
 
-- Tools cold start in under half a millisecond, automatically scale up to meet demand, and scale down to zero.
-- Cost scales simply and predictably with invocations. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out of the problem. Engine specs are fixed and scaling is completely horizontal and automatic.
-- Tools are automatically deployed across the global network edge. Tool calls are routed to an Engine running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
-- Tool components are securely isolated within Engines, which are sandboxed themselves.
-- The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
-- High-performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
-- Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
+Tools are automatically deployed across the global network edge. Tool calls are routed to an Engine running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
+
+Tool components are securely isolated within Engines, which are sandboxed themselves.
+
+The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
+
+High-performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
+
+Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
 
 FTL Engine is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl eng login` command to join the waitlist.
 </details>
