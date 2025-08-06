@@ -29,7 +29,7 @@ access_control = "public"
 
 [mcp]
 # MCP components with full registry URIs
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
 authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.10"
 # You can use custom implementations by changing the URIs:
 # gateway = "ghcr.io/myorg/custom-mcp-gateway:1.0.0"
