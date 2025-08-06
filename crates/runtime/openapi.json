@@ -677,6 +677,127 @@
         }
       }
     },
+    "/v1/apps/{appId}/logs": {
+      "get": {
+        "operationId": "getAppLogs",
+        "summary": "Get application logs",
+        "description": "Retrieves recent logs for an application from the underlying platform",
+        "tags": ["Apps"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "schema": {
+              "description": "Application ID (UUID)",
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Application ID (UUID)"
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "schema": {
+              "description": "Time range for logs (e.g., \"30m\", \"1h\", \"7d\", or RFC3339/Unix timestamp)",
+              "example": "1h",
+              "default": "7d",
+              "type": "string"
+            },
+            "required": false,
+            "description": "Time range for logs (e.g., \"30m\", \"1h\", \"7d\", or RFC3339/Unix timestamp)"
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "schema": {
+              "description": "Number of log lines from the end (1-1000)",
+              "example": "100",
+              "default": "100",
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "description": "Number of log lines from the end (1-1000)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAppLogsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - app belongs to another tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/apps/{appId}/auth-config": {
       "put": {
         "operationId": "updateAuthConfig",
@@ -1168,6 +1289,39 @@
           }
         },
         "required": ["components", "changes"],
+        "additionalProperties": false
+      },
+      "GetAppLogsResponse": {
+        "description": "Application logs response",
+        "type": "object",
+        "properties": {
+          "appId": {
+            "description": "Application ID",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          },
+          "logs": {
+            "description": "Raw log output from the application",
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "tail": {
+                "description": "Number of lines requested",
+                "type": "number"
+              },
+              "since": {
+                "description": "Time range used for the query",
+                "type": "string"
+              }
+            },
+            "required": ["tail", "since"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["appId", "logs", "metadata"],
         "additionalProperties": false
       },
       "AuthConfigResponse": {

@@ -22,6 +22,7 @@ mod tests {
         list_response: Result<types::ListAppsResponse>,
         get_response: Result<types::App>,
         delete_response: Result<types::DeleteAppResponse>,
+        logs_response: Result<types::GetAppLogsResponse>,
     }
 
     #[async_trait]
@@ -92,6 +93,18 @@ mod tests {
             _request: &types::UpdateAuthConfigRequest,
         ) -> Result<types::AuthConfigResponse> {
             unimplemented!()
+        }
+
+        async fn get_app_logs(
+            &self,
+            _app_id: &str,
+            _since: Option<&str>,
+            _tail: Option<&str>,
+        ) -> Result<types::GetAppLogsResponse> {
+            match &self.logs_response {
+                Ok(resp) => Ok(resp.clone()),
+                Err(e) => Err(anyhow::anyhow!(e.to_string())),
+            }
         }
     }
 
@@ -228,6 +241,7 @@ mod tests {
             }),
             get_response: Err(anyhow::anyhow!("Not used")),
             delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -265,6 +279,7 @@ mod tests {
             }),
             get_response: Err(anyhow::anyhow!("Not used")),
             delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -308,6 +323,7 @@ mod tests {
             }),
             get_response: Err(anyhow::anyhow!("Not used")),
             delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -338,6 +354,7 @@ mod tests {
             list_response: Err(anyhow::anyhow!("Not used")),
             get_response: Ok(app),
             delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -372,6 +389,7 @@ mod tests {
             }),
             get_response: Ok(app),
             delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -400,6 +418,7 @@ mod tests {
             delete_response: Ok(types::DeleteAppResponse {
                 message: "Application deleted successfully".to_string(),
             }),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new().with_prompt_response(app_name));
@@ -429,6 +448,7 @@ mod tests {
             list_response: Err(anyhow::anyhow!("Not used")),
             get_response: Ok(app),
             delete_response: Err(anyhow::anyhow!("Should not be called")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new().with_prompt_response("wrong-name"));
@@ -460,6 +480,7 @@ mod tests {
             delete_response: Ok(types::DeleteAppResponse {
                 message: "Application deleted successfully".to_string(),
             }),
+            logs_response: Err(anyhow::anyhow!("Not used")),
         };
 
         let ui = Arc::new(MockUI::new());
@@ -478,5 +499,269 @@ mod tests {
                 .iter()
                 .any(|(msg, _)| msg.contains("Application deleted successfully"))
         );
+    }
+
+    #[tokio::test]
+    async fn test_logs_by_uuid_text_format() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let logs_content = "2025-08-06 10:15:23 [mcp-authorizer] AUTH_SUCCESS path=/\n2025-08-06 10:15:24 [mcp-authorizer] Request processed successfully\n";
+
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Ok(types::GetAppLogsResponse {
+                app_id: Uuid::parse_str(app_id).unwrap(),
+                logs: logs_content.to_string(),
+                metadata: types::GetAppLogsResponseMetadata {
+                    since: "1h".to_string(),
+                    tail: 100.0,
+                },
+            }),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result =
+            eng_cmd::logs_with_deps(app_id, "1h", 100, eng_cmd::LogsOutputFormat::Text, &deps)
+                .await;
+        assert!(result.is_ok());
+
+        let messages = ui.get_messages();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0], logs_content);
+    }
+
+    #[tokio::test]
+    async fn test_logs_by_uuid_json_format() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let logs_content = "2025-08-06 10:15:23 [mcp-authorizer] AUTH_SUCCESS\n";
+
+        let logs_response = types::GetAppLogsResponse {
+            app_id: Uuid::parse_str(app_id).unwrap(),
+            logs: logs_content.to_string(),
+            metadata: types::GetAppLogsResponseMetadata {
+                since: "30m".to_string(),
+                tail: 50.0,
+            },
+        };
+
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Ok(logs_response.clone()),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result =
+            eng_cmd::logs_with_deps(app_id, "30m", 50, eng_cmd::LogsOutputFormat::Json, &deps)
+                .await;
+        assert!(result.is_ok());
+
+        let messages = ui.get_messages();
+        assert_eq!(messages.len(), 1);
+
+        // Verify JSON output structure
+        let parsed: serde_json::Value = serde_json::from_str(&messages[0]).unwrap();
+        assert_eq!(parsed["appId"], app_id);
+        assert_eq!(parsed["logs"], logs_content);
+        assert_eq!(parsed["metadata"]["since"], "30m");
+        assert_eq!(parsed["metadata"]["tail"], 50.0);
+    }
+
+    #[tokio::test]
+    async fn test_logs_by_name() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let app_name = "test-app";
+        let logs_content = "Test log output";
+
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
+                apps: vec![create_test_app_item(
+                    app_id,
+                    app_name,
+                    types::ListAppsResponseAppsItemStatus::Active,
+                )],
+                next_token: None,
+            }),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Ok(types::GetAppLogsResponse {
+                app_id: Uuid::parse_str(app_id).unwrap(),
+                logs: logs_content.to_string(),
+                metadata: types::GetAppLogsResponseMetadata {
+                    since: "1h".to_string(),
+                    tail: 100.0,
+                },
+            }),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result =
+            eng_cmd::logs_with_deps(app_name, "1h", 100, eng_cmd::LogsOutputFormat::Text, &deps)
+                .await;
+        assert!(result.is_ok());
+
+        let messages = ui.get_messages();
+        assert_eq!(messages[0], logs_content);
+    }
+
+    #[tokio::test]
+    async fn test_logs_invalid_tail_too_small() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Should not be called")),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result = eng_cmd::logs_with_deps(
+            app_id,
+            "1h",
+            0, // Invalid: too small
+            eng_cmd::LogsOutputFormat::Text,
+            &deps,
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("tail must be between 1 and 1000")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_logs_invalid_tail_too_large() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+
+        let api_client = MockApiClient {
+            list_response: Err(anyhow::anyhow!("Not used")),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Should not be called")),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result = eng_cmd::logs_with_deps(
+            app_id,
+            "1h",
+            1001, // Invalid: too large
+            eng_cmd::LogsOutputFormat::Text,
+            &deps,
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("tail must be between 1 and 1000")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_logs_app_not_found_by_name() {
+        let app_name = "non-existent-app";
+
+        let api_client = MockApiClient {
+            list_response: Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            }),
+            get_response: Err(anyhow::anyhow!("Not used")),
+            delete_response: Err(anyhow::anyhow!("Not used")),
+            logs_response: Err(anyhow::anyhow!("Not used")),
+        };
+
+        let ui = Arc::new(MockUI::new());
+        let deps = Arc::new(EngDependencies {
+            ui: ui.clone(),
+            api_client: Arc::new(api_client),
+        });
+
+        let result =
+            eng_cmd::logs_with_deps(app_name, "1h", 100, eng_cmd::LogsOutputFormat::Text, &deps)
+                .await;
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Engine 'non-existent-app' not found")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_logs_with_different_time_ranges() {
+        let app_id = "550e8400-e29b-41d4-a716-446655440000";
+        let test_cases = vec![
+            ("30m", "Last 30 minutes"),
+            ("7d", "Last 7 days"),
+            ("2025-08-06T10:00:00Z", "RFC3339 timestamp"),
+            ("1722931200", "Unix epoch"),
+        ];
+
+        for (since, description) in test_cases {
+            let api_client = MockApiClient {
+                list_response: Err(anyhow::anyhow!("Not used")),
+                get_response: Err(anyhow::anyhow!("Not used")),
+                delete_response: Err(anyhow::anyhow!("Not used")),
+                logs_response: Ok(types::GetAppLogsResponse {
+                    app_id: Uuid::parse_str(app_id).unwrap(),
+                    logs: format!("Logs for {description}"),
+                    metadata: types::GetAppLogsResponseMetadata {
+                        since: since.to_string(),
+                        tail: 100.0,
+                    },
+                }),
+            };
+
+            let ui = Arc::new(MockUI::new());
+            let deps = Arc::new(EngDependencies {
+                ui: ui.clone(),
+                api_client: Arc::new(api_client),
+            });
+
+            let result =
+                eng_cmd::logs_with_deps(app_id, since, 100, eng_cmd::LogsOutputFormat::Text, &deps)
+                    .await;
+
+            assert!(result.is_ok(), "Failed for time range: {since}");
+            let messages = ui.get_messages();
+            assert!(messages[0].contains(description));
+        }
     }
 }

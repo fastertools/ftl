@@ -220,6 +220,26 @@ enum EngCommand {
         #[arg(short, long)]
         force: bool,
     },
+    /// Get logs for an engine
+    Logs {
+        /// Engine ID or name
+        engine_id: String,
+        /// Time range for logs (e.g., "30m", "1h", "7d", RFC3339 timestamp, or Unix epoch)
+        #[arg(short, long, default_value = "7d")]
+        since: String,
+        /// Number of log lines to retrieve (1-1000)
+        #[arg(short, long, default_value = "100")]
+        tail: u32,
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: LogsOutputFormat,
+    },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum LogsOutputFormat {
+    Text,
+    Json,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -448,6 +468,15 @@ impl From<OutputFormat> for ftl_commands::r#eng::OutputFormat {
     }
 }
 
+impl From<LogsOutputFormat> for ftl_commands::r#eng::LogsOutputFormat {
+    fn from(fmt: LogsOutputFormat) -> Self {
+        match fmt {
+            LogsOutputFormat::Text => Self::Text,
+            LogsOutputFormat::Json => Self::Json,
+        }
+    }
+}
+
 impl From<SetupCommand> for ftl_commands::setup::SetupCommand {
     fn from(cmd: SetupCommand) -> Self {
         match cmd {
@@ -612,6 +641,22 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
                 command: ftl_commands::r#eng::EngineCommand::Delete {
                     app_id: engine_id,
                     force,
+                },
+            };
+            ftl_commands::r#eng::execute(eng_args).await
+        }
+        EngCommand::Logs {
+            engine_id,
+            since,
+            tail,
+            format,
+        } => {
+            let eng_args = ftl_commands::r#eng::EngineArgs {
+                command: ftl_commands::r#eng::EngineCommand::Logs {
+                    app_id: engine_id,
+                    since,
+                    tail,
+                    format: format.into(),
                 },
             };
             ftl_commands::r#eng::execute(eng_args).await

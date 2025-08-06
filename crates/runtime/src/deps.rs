@@ -118,6 +118,14 @@ pub trait FtlApiClient: Send + Sync {
         app_id: &str,
         request: &types::UpdateAuthConfigRequest,
     ) -> Result<types::AuthConfigResponse>;
+
+    /// Get application logs
+    async fn get_app_logs(
+        &self,
+        app_id: &str,
+        since: Option<&str>,
+        tail: Option<&str>,
+    ) -> Result<types::GetAppLogsResponse>;
 }
 
 /// Time/clock operations
@@ -507,6 +515,38 @@ impl FtlApiClient for RealFtlApiClient {
             .await
             .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to update auth config: {}", e))
+    }
+
+    async fn get_app_logs(
+        &self,
+        app_id: &str,
+        since: Option<&str>,
+        tail: Option<&str>,
+    ) -> Result<types::GetAppLogsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        let mut request = self
+            .client
+            .get_app_logs()
+            .app_id(app_id)
+            .authorization(format!("Bearer {auth}"));
+
+        if let Some(since) = since {
+            request = request.since(since);
+        }
+
+        if let Some(tail) = tail {
+            request = request.tail(tail);
+        }
+
+        request
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to get app logs: {}", e))
     }
 }
 
