@@ -26,8 +26,8 @@ FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](http
 <div align="center">
 <em>Example performance: A simple Python text processing tool</em>
 
+![results details](./docs/images/results-details.png)
 ![results](./docs/images/results.png)
-![regions](./docs/images/regions.png)
 </div>
 
 ## Why?
