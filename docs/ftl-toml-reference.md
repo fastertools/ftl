@@ -1,250 +1,345 @@
-# ftl.toml Configuration Reference
+# FTL Configuration Reference (ftl.toml)
 
-The `ftl.toml` file is the main configuration file for FTL projects. It defines your project metadata, authentication settings, gateway components, tools, and variables.
+`ftl.toml` is the primary configuration file for FTL projects. It defines:
+- Project metadata and settings
+- Access control
+- Tool configurations and build settings
+- MCP gateway and authorizer component config
+- Variables and environment configuration
 
-## Table of Contents
-
-- [Project Section](#project-section)
-- [MCP Section](#mcp-section)
-- [Authentication Section](#authentication-section)
-- [Variables Section](#variables-section)
-- [Tools Section](#tools-section)
-
-## Project Section
-
-The `[project]` section contains basic metadata about your FTL project.
+## File Structure
 
 ```toml
 [project]
 name = "my-ftl-project"
 version = "0.1.0"
-description = "My FTL MCP server"
+description = "My FTL MCP toolbox"
 authors = ["Your Name <you@example.com>"]
-```
+access_control = "public"  # or "private"
 
-## MCP Section
+[oidc]  # Optional - only needed for custom OIDC providers
+issuer = "https://auth.example.com"
+audience = "my-api"
+# ... additional OIDC settings
 
-The `[mcp]` section configures the Model Context Protocol gateway and authorizer components. You can use the default FTL components or specify custom implementations.
-
-When authentication is enabled, the authorizer component handles all incoming requests at the wildcard route `/...`, validating tokens before forwarding to the internal gateway. When authentication is disabled, all requests go directly to the gateway.
-
-```toml
 [mcp]
-# Full registry URIs for MCP components
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
 authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
-validate_arguments = true
-```
+validate_arguments = false
 
-### Custom MCP Components
-
-You can use your own MCP implementations by specifying different registry URIs:
-
-```toml
-[mcp]
-# Use custom implementations
-gateway = "ghcr.io/myorg/custom-mcp-gateway:1.0.0"
-authorizer = "ghcr.io/myorg/custom-mcp-authorizer:1.0.0"
-validate_arguments = true
-```
-
-This allows you to:
-- Fork and modify the official components
-- Create entirely custom implementations
-- Use components from different registries (Docker Hub, GHCR, ECR, etc.)
-- Maintain full control over your gateway infrastructure
-
-## Authentication Section
-
-The `[auth]` section configures authentication for your MCP server.
-
-### Disabling Authentication
-
-```toml
-[auth]
-enabled = false
-```
-
-### AuthKit Configuration
-
-```toml
-[auth]
-enabled = true
-
-[auth.authkit]
-issuer = "https://your-tenant.authkit.app"
-audience = "mcp-api"  # optional
-required_scopes = "mcp:read,mcp:write"  # optional - comma-separated list of required scopes
-```
-
-### OIDC Configuration
-
-```toml
-[auth]
-enabled = true
-
-[auth.oidc]
-issuer = "https://your-domain.auth0.com"
-audience = "your-api-identifier"  # optional
-jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
-public_key = ""  # optional - PEM format public key (alternative to JWKS)
-algorithm = "RS256"  # optional - JWT signing algorithm
-required_scopes = "read,write"  # optional - comma-separated list of required scopes
-authorize_endpoint = "https://your-domain.auth0.com/authorize"  # optional - for OAuth discovery
-token_endpoint = "https://your-domain.auth0.com/oauth/token"  # optional - for OAuth discovery
-userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional - for OAuth discovery
-```
-
-### Static Token Configuration (Development Only)
-
-For development and testing, you can use static tokens:
-
-```toml
-[auth]
-enabled = true
-
-[auth.static_token]
-tokens = "dev-token:client1:user1:read,write;admin-token:admin:admin:admin:1735689600"
-required_scopes = "read"  # optional - comma-separated list of required scopes
-```
-
-Token format: `token:client_id:sub:scope1,scope2[:expires_at]`
-- Multiple tokens separated by semicolons
-- Expiration timestamp is optional (Unix timestamp)
-
-## Variables Section
-
-The `[variables]` section defines application-level variables that can be used by your tools.
-
-### Variables with Default Values
-
-```toml
 [variables]
-api_url = { default = "https://api.example.com" }
-environment = { default = "production" }
-```
+API_KEY = { default = "test-key" }
+REQUIRED_VAR = { required = true }
 
-### Required Variables
-
-```toml
-[variables]
-api_token = { required = true }
-database_url = { required = true }
-```
-
-## Tools Section
-
-Each tool in your project gets its own `[tools.<name>]` section.
-
-### Basic Tool Configuration
-
-```toml
 [tools.my-tool]
-path = "my-tool"
-wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
+path = "tools/my-tool"  # Optional, defaults to tool name
+wasm = "target/wasm32-wasip1/release/my_tool.wasm"
 allowed_outbound_hosts = ["https://api.example.com"]
 
 [tools.my-tool.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
+env = { RUST_LOG = "info" }
+
+[tools.my-tool.variables]
+TOOL_CONFIG = "value"
+```
+
+## Project Section
+
+The `[project]` section contains essential metadata about your FTL project.
+
+### Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | Yes | - | Project name (alphanumeric with dashes/underscores) |
+| `version` | string | No | "0.1.0" | Project version (SemVer format) |
+| `description` | string | No | "" | Project description |
+| `authors` | array | No | [] | List of project authors |
+| `access_control` | string | No | "public" | Access control mode: "public" or "private" |
+
+### Access Control Modes
+
+- **`public`** (default): No authentication required. The MCP endpoint is publicly accessible.
+- **`private`**: Authentication required. When set to private:
+  - Without `[oidc]` section: Uses FTL's built-in auth provider
+  - With `[oidc]` section: Uses your custom OIDC provider
+
+### Example: Using FTL's Built-in Provider
+
+Set `access_control = "private"` without an `[oidc]` section:
+
+```toml
+[project]
+name = "secure-tools"
+version = "1.0.0"
+description = "Collection of MCP tools for data processing"
+authors = ["Alice <alice@example.com>", "Bob <bob@example.com>"]
+access_control = "private"
+# No [oidc] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
+```
+
+## OIDC Section (Optional)
+
+The `[oidc]` section configures custom OpenID Connect authentication. This section is only used when `access_control = "private"`.
+
+### Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `issuer` | string | Yes | - | OIDC issuer URL |
+| `audience` | string | No | "" | Expected audience for tokens |
+| `jwks_uri` | string | No | "" | JWKS endpoint URL (auto-discovered if not set) |
+| `public_key` | string | No | "" | Public key in PEM format (alternative to JWKS) |
+| `algorithm` | string | No | "" | JWT signature algorithm (e.g., RS256, ES256) |
+| `required_scopes` | string | No | "" | Comma-separated list of required scopes |
+| `authorize_endpoint` | string | No | "" | OAuth authorization endpoint |
+| `token_endpoint` | string | No | "" | OAuth token endpoint |
+| `userinfo_endpoint` | string | No | "" | OAuth userinfo endpoint |
+
+### Example: Using Auth0
+
+```toml
+[project]
+name = "secure-tools"
+access_control = "private"
+
+[oidc]
+issuer = "https://your-tenant.auth0.com/"
+audience = "https://api.example.com"
+jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
+required_scopes = "read:data,write:data"
+```
+
+## MCP Section
+
+The `[mcp]` section configures the MCP gateway and authorizer components.
+
+### Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `gateway` | string | No | "ghcr.io/fastertools/mcp-gateway:0.0.10" | MCP gateway component registry URI |
+| `authorizer` | string | No | "ghcr.io/fastertools/mcp-authorizer:0.0.12" | MCP authorizer component registry URI |
+| `validate_arguments` | boolean | No | false | Whether to validate tool call arguments |
+
+### Example
+
+```toml
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
+validate_arguments = true  # Enable strict argument validation
+```
+
+## Variables Section
+
+The `[variables]` section defines application-level environment variables available to all components.
+
+### Syntax
+
+Variables can be defined in two ways:
+
+1. **With default value**: `VAR_NAME = { default = "value" }`
+2. **Required (no default)**: `VAR_NAME = { required = true }`
+
+### Example
+
+```toml
+[variables]
+API_ENDPOINT = { default = "https://api.example.com" }
+LOG_LEVEL = { default = "info" }
+SECRET_KEY = { required = true }  # Must be provided at runtime
+```
+
+## Tools Sections
+
+Each tool in your project is configured with a `[tools.TOOL_NAME]` section.
+
+### Tool Configuration Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `path` | string | No | Tool name | Path to tool directory relative to project root |
+| `wasm` | string | Yes | - | Path to the compiled WASM file |
+| `allowed_outbound_hosts` | array | No | [] | List of allowed external hosts |
+| `variables` | table | No | {} | Tool-specific variables |
+
+### Build Configuration
+
+The `[tools.TOOL_NAME.build]` subsection configures how the tool is built.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `command` | string | Yes | - | Build command to execute |
+| `watch` | array | No | [] | Glob patterns for files to watch in dev mode |
+| `env` | table | No | {} | Environment variables for build process |
+
+### Example: Rust Tool
+
+```toml
+[tools.data-processor]
+path = "tools/data-processor"  # Optional if folder name matches tool name
+wasm = "target/wasm32-wasip1/release/data_processor.wasm"
+allowed_outbound_hosts = [
+    "https://api.github.com",
+    "https://*.amazonaws.com"
+]
+
+[tools.data-processor.build]
+command = "cargo build --target wasm32-wasip1 --release"
+watch = ["src/**/*.rs", "Cargo.toml", "Cargo.lock"]
 env = { RUST_LOG = "debug" }
+
+[tools.data-processor.variables]
+PROCESSING_MODE = "batch"
+MAX_WORKERS = "4"
 ```
 
-### Tool Variables
-
-Tools can access application variables using template syntax:
+### Example: TypeScript Tool
 
 ```toml
-[tools.my-tool]
-variables = { 
-    api_token = "{{ api_token }}", 
-    api_url = "{{ api_url }}" 
-}
+[tools.web-scraper]
+wasm = "build/web-scraper.wasm"
+allowed_outbound_hosts = ["https://*"]  # Allow all HTTPS hosts
+
+[tools.web-scraper.build]
+command = "npm run build"
+watch = ["src/**/*.ts", "package.json"]
+env = { NODE_ENV = "production" }
+
+[tools.web-scraper.variables]
+USER_AGENT = "FTL-Scraper/1.0"
 ```
 
-### Deploy Configuration
-
-Configure how tools are deployed:
+### Example: Python Tool
 
 ```toml
-[tools.my-tool.deploy]
-name = "custom-deployed-name"  # Override the deployed component name
-profile = "release"  # or "debug"
+[tools.ml-analyzer]
+wasm = "app.wasm"
+allowed_outbound_hosts = ["https://huggingface.co"]
+
+[tools.ml-analyzer.build]
+command = "spin py2wasm app -o app.wasm"
+watch = ["*.py", "requirements.txt"]
+
+[tools.ml-analyzer.variables]
+MODEL_NAME = "bert-base-uncased"
+BATCH_SIZE = "32"
 ```
+
+## Advanced Features
 
 ### Build Profiles
 
-Define multiple build profiles:
+For complex build scenarios, you can define multiple build profiles:
 
 ```toml
-[tools.my-tool.build.profiles.dev]
-command = "cargo build --target wasm32-wasip1"
-watch = ["src/**/*.rs"]
+[tools.my-tool]
+wasm = "target/wasm32-wasip1/release/my_tool.wasm"
 
-[tools.my-tool.build.profiles.release]
+[tools.my-tool.build]
+command = "cargo build --target wasm32-wasip1"  # Default dev build
+
+[tools.my-tool.profiles.release]
 command = "cargo build --target wasm32-wasip1 --release"
+env = { CARGO_PROFILE_RELEASE_LTO = "true" }
+
+[tools.my-tool.up]
+profile = "debug"  # Profile to use for 'ftl up'
+
+[tools.my-tool.deploy]
+profile = "release"  # Profile to use for deployment
 ```
 
-### Development Mode Configuration
+### Variable Templates
 
-Configure which profile to use for `ftl up`:
+Tool variables can reference application variables using template syntax:
 
 ```toml
-[tools.my-tool.up]
-profile = "dev"
+[variables]
+BASE_URL = { default = "https://api.example.com" }
+
+[tools.api-client.variables]
+ENDPOINT = "{{ BASE_URL }}/v1"  # Will be replaced with BASE_URL value
 ```
 
 ## Complete Example
 
-```toml
-[project]
-name = "my-mcp-server"
-version = "0.1.0"
-description = "My custom MCP server with multiple tools"
-authors = ["Jane Doe <jane@example.com>"]
+Here's a complete example of an ftl.toml file for a multi-tool project with authentication:
 
+```toml
+# Project metadata
+[project]
+name = "enterprise-mcp-suite"
+version = "2.0.0"
+description = "Enterprise MCP tool suite with authentication"
+authors = ["DevOps Team <devops@company.com>"]
+access_control = "private"
+
+# Custom OIDC authentication
+[oidc]
+issuer = "https://auth.company.com"
+audience = "mcp-suite-api"
+jwks_uri = "https://auth.company.com/.well-known/jwks.json"
+required_scopes = "mcp:read,mcp:write"
+
+# MCP components configuration
 [mcp]
-# Using custom MCP components
-gateway = "ghcr.io/myorg/enhanced-mcp-gateway:2.0.0"
-authorizer = "ghcr.io/myorg/enhanced-mcp-authorizer:2.0.0"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 validate_arguments = true
 
-[auth]
-enabled = true
-
-[auth.oidc]
-issuer = "https://auth.mycompany.com"
-audience = "mcp-api"
-jwks_uri = "https://auth.mycompany.com/.well-known/jwks.json"
-required_scopes = "mcp:read,mcp:write"
-authorize_endpoint = "https://auth.mycompany.com/authorize"
-token_endpoint = "https://auth.mycompany.com/oauth/token"
-
+# Application variables
 [variables]
-api_key = { required = true }
-api_url = { default = "https://api.mycompany.com" }
-environment = { default = "production" }
+LOG_LEVEL = { default = "info" }
+API_BASE_URL = { default = "https://api.company.com" }
+SECRET_TOKEN = { required = true }
 
-[tools.data-processor]
-path = "tools/data-processor"
-wasm = "tools/data-processor/target/wasm32-wasip1/release/data_processor.wasm"
-allowed_outbound_hosts = ["https://api.mycompany.com", "https://*.s3.amazonaws.com"]
-variables = { api_key = "{{ api_key }}", api_url = "{{ api_url }}" }
+# Database query tool
+[tools.db-query]
+path = "tools/database"
+wasm = "target/wasm32-wasip1/release/db_query.wasm"
+allowed_outbound_hosts = ["postgres://db.company.com"]
 
-[tools.data-processor.build]
+[tools.db-query.build]
 command = "cargo build --target wasm32-wasip1 --release"
-watch = ["src/**/*.rs", "Cargo.toml"]
+watch = ["src/**/*.rs"]
 
-[tools.data-processor.deploy]
-name = "data-processor-v2"
-profile = "release"
+[tools.db-query.variables]
+DB_CONNECTION_STRING = "{{ DATABASE_URL }}"
+QUERY_TIMEOUT = "30"
 
-[tools.assistant]
-path = "tools/assistant"
-wasm = "tools/assistant/dist/assistant.wasm"
-allowed_outbound_hosts = ["https://api.openai.com"]
+# File processor tool
+[tools.file-processor]
+wasm = "build/processor.wasm"
+allowed_outbound_hosts = ["https://storage.company.com"]
 
-[tools.assistant.build]
-command = "npm install && npm run build"
-watch = ["src/**/*.ts", "package.json"]
+[tools.file-processor.build]
+command = "npm run build:wasm"
+watch = ["src/**/*.js", "package.json"]
+
+[tools.file-processor.variables]
+STORAGE_BUCKET = "mcp-files"
+MAX_FILE_SIZE = "10485760"  # 10MB
 ```
+
+## Migration from spin.toml
+
+If you have an existing `spin.toml` file, you can migrate to `ftl.toml` by:
+
+1. Extract project metadata to the `[project]` section
+2. Move authentication configuration to `access_control` and optionally `[oidc]`
+3. Convert Spin components to `[tools.*]` sections
+4. Update variable definitions to use the FTL format
+
+## Validation
+
+FTL validates your configuration when running commands. Common validation rules include:
+
+- Project name must be alphanumeric with dashes/underscores
+- Tool names must be valid identifiers
+- `access_control` must be either "public" or "private"
+- Required fields must be present
+- WASM paths must be specified for each tool
