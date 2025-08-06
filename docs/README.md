@@ -2,5 +2,5 @@
 
 ## Contents
 
-- [Architecture](architecture.md) - System architecture and design decisions
-- [Contributing](../CONTRIBUTING.md) - How to contribute to the project
+- [ftl.toml schema](./ftl-schema.json.md)
+- [ftl.toml reference](./ftl-toml-reference.md)

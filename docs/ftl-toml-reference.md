@@ -343,9 +343,3 @@ FTL validates your configuration when running commands. Common validation rules 
 - `access_control` must be either "public" or "private"
 - Required fields must be present
 - WASM paths must be specified for each tool
-
-## See Also
-
-- [FTL Schema Documentation](ftl-toml-schema.md) - Detailed schema information
-- [Secrets Guide](SECRETS-GUIDE.md) - Managing secrets and sensitive variables
-- [Secret Lifecycle](SECRET-LIFECYCLE.md) - How secrets flow through the system
