@@ -21,7 +21,7 @@ Tools are remote-ready and can be called over the network by any MCP client, inc
 
 Python tools can run alongside Rust tools, co-isolated within a single sandboxed MCP server process that runs efficiently on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
 
-FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote MCP servers with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
+FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for managing lag-free remote MCP servers with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
 
 ## Why?
 
@@ -30,9 +30,7 @@ FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](http
 <details>
 <summary><strong>Write tools in TypeScript, Rust, Python, and Go.</strong></summary>
 
-Combine tools from different [source languages](./sdk/README.md) onto a single server process over the `/mcp` Streamable HTTP endpoint. See [Architecture](#architecture) for details.
-
-Tools cohabitate as isolated WebAssembly components within the server.
+Combine co-isolated tools from different [source languages](./sdk/README.md) onto a single server process over the `/mcp` [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) endpoint. See [Architecture](#architecture) for details.
 
 Tool components can be individually distributed on OCI registries like Docker Hub and GitHub Container Registry.
 
@@ -42,7 +40,7 @@ Tool binary size and performance are influenced by choice of source language. Hi
 ### Secure by design
 
 <details>
-<summary><strong>Tool components within the sandboxed server process are individually isolated.</strong></summary>
+<summary><strong>Internal isolation and MCP-compliant authorization.</strong></summary>
 
 Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques.
 
@@ -50,7 +48,11 @@ A [component](https://component-model.bytecodealliance.org/design/why-component-
 
 Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
 
-MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
+Out-of-the-box support for configurable [MCP-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
+- OAuth 2.1 with appropriate security measures for both confidential and public clients.
+- OAuth 2.0 Dynamic Client Registration Protocol (RFC7591).
+- OAuth 2.0 Protected Resource Metadata (RFC9728).
+- OAuth 2.0 Authorization Server Metadata (RFC8414).
 
 Plug in your own JWT issuer with simple configuration.
 </details>
