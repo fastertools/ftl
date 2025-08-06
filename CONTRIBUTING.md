@@ -1,7 +1,5 @@
 # Contributing to FTL CLI
 
-First off, thank you for considering contributing to FTL! It's people like you that make FTL such a great tool.
-
 ## Code of Conduct
 
 This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
@@ -31,12 +29,12 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Pull Requests
 
-1. Fork the repo and create your branch from `main`
+1. Fork https://github.com/fastertools/ftl-cli and checkout a new branch from `main`
 2. If you've added code that should be tested, add tests
 3. If you've changed APIs, update the documentation
-4. Ensure the test suite passes
+4. Ensure the test suite and linter pass (`make test`, `make lint`)
 5. Make sure your code follows the existing style
-6. Issue that pull request!
+6. Open the pull request
 
 ## Development Setup
 
@@ -53,19 +51,11 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 git clone https://github.com/fastertools/ftl-cli
 cd ftl-cli
 
-# Build native code (excludes WebAssembly components by default)
-cargo build
+# Build from source
+make build
 
-# Run tests for native code
-cargo test
-
-# Build WebAssembly components using cargo-component
-# First install cargo-component if you haven't already:
-cargo install cargo-component --locked
-
-# Build individual components
-cargo component build -p mcp-authorizer --release --target wasm32-wasip1
-cargo component build -p mcp-gateway --release --target wasm32-wasip1
+# Run tests
+make test
 ```
 
 ### Project Structure
@@ -102,7 +92,6 @@ ftl-cli/
 - Use `anyhow::Result` for fallible functions in the CLI
 - Provide helpful error messages with context
 - Chain errors appropriately using `.context()`
-- Component errors follow ftl-mcp SDK patterns
 
 ### Testing
 
@@ -157,23 +146,6 @@ When adding a new CLI command:
 3. Implement the `From` trait to convert CLI types to command types
 4. Create the implementation in the appropriate module under `crates/commands/src/`
 5. Add tests for the command
-6. Update the README with the new command
-
-### Component SDK
-
-FTL uses the ftl-mcp SDK for component development:
-
-1. Component templates are maintained in the ftl-mcp repository
-2. SDK updates should be coordinated with ftl-mcp releases
-3. Test compatibility with all supported languages (Rust, TypeScript, JavaScript)
-4. Update documentation to reflect SDK changes
-
-## Release Process
-
-1. Update version numbers in all `Cargo.toml` files
-2. Create a git tag: `git tag -a v0.x.x -m "Release v0.x.x"`
-3. Push the tag: `git push origin v0.x.x`
-4. GitHub Actions will automatically create releases and publish to crates.io
 
 ## Getting Help
 

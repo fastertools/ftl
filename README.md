@@ -23,6 +23,13 @@ Python tools can run alongside Rust tools, co-isolated within a single sandboxed
 
 FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for managing lag-free MCP servers over Streamable HTTP with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
 
+<div align="center">
+<em>Example performance: A simple Python text processing tool</em>
+
+![results](./docs/images/results.png)
+![regions](./docs/images/regions.png)
+</div>
+
 ## Why?
 
 ### Simple MCP Server DX across languages
