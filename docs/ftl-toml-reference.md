@@ -1,17 +1,11 @@
 # FTL Configuration Reference (ftl.toml)
 
-This document provides a complete reference for the `ftl.toml` configuration file format used in FTL projects.
-
-## Overview
-
-The `ftl.toml` file is the primary configuration file for FTL projects. It defines:
+`ftl.toml` is the primary configuration file for FTL projects. It defines:
 - Project metadata and settings
-- Authentication and access control
+- Access control
 - Tool configurations and build settings
-- MCP gateway and authorizer components
+- MCP gateway and authorizer component config
 - Variables and environment configuration
-
-When you run FTL commands, the `ftl.toml` file is automatically transpiled to a `spin.toml` file for execution on the Spin platform.
 
 ## File Structure
 
@@ -69,18 +63,21 @@ The `[project]` section contains essential metadata about your FTL project.
 
 - **`public`** (default): No authentication required. The MCP endpoint is publicly accessible.
 - **`private`**: Authentication required. When set to private:
-  - Without `[oidc]` section: Uses FTL's built-in AuthKit authentication
+  - Without `[oidc]` section: Uses FTL's built-in auth provider
   - With `[oidc]` section: Uses your custom OIDC provider
 
-### Example
+### Example: Using FTL's Built-in Provider
+
+Set `access_control = "private"` without an `[oidc]` section:
 
 ```toml
 [project]
-name = "my-mcp-tools"
+name = "secure-tools"
 version = "1.0.0"
 description = "Collection of MCP tools for data processing"
 authors = ["Alice <alice@example.com>", "Bob <bob@example.com>"]
-access_control = "private"  # Requires authentication
+access_control = "private"
+# No [oidc] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
 ```
 
 ## OIDC Section (Optional)
@@ -113,17 +110,6 @@ issuer = "https://your-tenant.auth0.com/"
 audience = "https://api.example.com"
 jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
 required_scopes = "read:data,write:data"
-```
-
-### Example: Using FTL's Built-in AuthKit
-
-Simply set `access_control = "private"` without an `[oidc]` section:
-
-```toml
-[project]
-name = "secure-tools"
-access_control = "private"
-# No [oidc] section needed - uses FTL's AuthKit automatically
 ```
 
 ## MCP Section
