@@ -1,9 +1,8 @@
 use crate::aggregator::{MetricsAggregator, MetricEvent};
-use crate::exporters::prometheus::PrometheusExporter;
 use crate::emission::{EmissionPipeline, EmissionConfig};
 use crate::exporters::otel::{OtelEmitter, OtelEmitterConfig};
-use crate::exporters::durable::{DurableEmitter, DurableEmitterConfig, RetryConfig};
-use crate::exporters::fallback::{FallbackEmitter, FallbackEmitterConfig};
+use crate::exporters::durable::DurableEmitter;
+use crate::exporters::fallback::FallbackEmitter;
 use std::sync::OnceLock;
 use serde_json::Value;
 
@@ -30,16 +29,13 @@ impl MetricsCollector {
             
             // Add Durable emitter if enabled
             if emission_config.durable_enabled {
-                let durable_config = DurableEmitterConfig::default();
-                let retry_config = RetryConfig::default();
-                let durable_emitter = DurableEmitter::new(durable_config, retry_config);
+                let durable_emitter = DurableEmitter::new();
                 pipeline.add_emitter(Box::new(durable_emitter));
             }
             
             // Add Fallback emitter if enabled
             if emission_config.fallback_enabled {
-                let fallback_config = FallbackEmitterConfig::default();
-                let fallback_emitter = FallbackEmitter::new(fallback_config);
+                let fallback_emitter = FallbackEmitter::new();
                 pipeline.add_emitter(Box::new(fallback_emitter));
             }
             
@@ -74,21 +70,10 @@ impl MetricsCollector {
         self.aggregator.record_event(event).await;
     }
 
-    pub async fn get_prometheus_metrics(&self) -> String {
-        // Get metrics asynchronously
-        let metrics = self.aggregator.get_all_metrics().await;
-        PrometheusExporter::format(&metrics)
-    }
-
     pub async fn get_all_metrics_json(&self) -> Value {
         // Get metrics asynchronously
         let metrics = self.aggregator.get_all_metrics().await;
         serde_json::to_value(metrics).unwrap_or(serde_json::json!({}))
     }
 
-    pub async fn get_tool_metrics(&self, tool_name: &str) -> Option<Value> {
-        // Get metrics asynchronously
-        self.aggregator.get_tool_metrics(tool_name).await
-            .map(|m| serde_json::to_value(m).unwrap_or(serde_json::json!({})))
-    }
 }

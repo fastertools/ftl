@@ -43,7 +43,7 @@ impl McpGateway {
             let tracker_config = TrackerConfig {
                 enabled: true,
                 collector_url: variables::get("metrics_collector_url")
-                    .unwrap_or_else(|_| "http://metrics-collector.spin.internal/events".to_string()),
+                    .unwrap_or_else(|_| "http://tea.spin.internal/events".to_string()),
             };
             
             let tracker = InvocationTracker::new(tracker_config);
@@ -601,22 +601,23 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     // Extract tenant/user context from headers (set by upstream mcp-authorizer)
     let mut request_context = std::collections::HashMap::new();
     
-    // Look for standard auth headers
+    // Look for auth headers set by mcp-authorizer
     for (name, value) in req.headers() {
         match name.to_lowercase().as_str() {
-            "x-tenant-id" => {
-                if let Some(tenant_id) = value.as_str() {
-                    request_context.insert("tenant_id".to_string(), tenant_id.to_string());
+            "x-auth-client-id" => {
+                if let Some(client_id) = value.as_str() {
+                    // Use client_id as tenant_id (this is the standard pattern)
+                    request_context.insert("tenant_id".to_string(), client_id.to_string());
                 }
             }
-            "x-user-id" => {
+            "x-auth-user-id" => {
                 if let Some(user_id) = value.as_str() {
                     request_context.insert("user_id".to_string(), user_id.to_string());
                 }
             }
-            "x-auth-provider" => {
-                if let Some(provider) = value.as_str() {
-                    request_context.insert("auth_provider".to_string(), provider.to_string());
+            "x-auth-issuer" => {
+                if let Some(issuer) = value.as_str() {
+                    request_context.insert("auth_provider".to_string(), issuer.to_string());
                 }
             }
             _ => {}
