@@ -15,9 +15,11 @@ Faster tools for AI agents
 
 </div>
 
-FTL is a framework to write and run polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
+FTL is a framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
 
-Tools authored in multiple [source languages](./sdk/README.md) can run co-isolated in a single sandboxed MCP server process on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime), including your development machine.
+Tools are remote-ready and can be called over the network by any MCP client, including Cursor and Claude Code.
+
+Python tools can run alongside Rust tools, co-isolated within a single sandboxed MCP server process that runs efficiently on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
 
 FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for deploying and running lag-free remote MCP servers with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
 
@@ -42,7 +44,7 @@ Tool binary size and performance are influenced by choice of source language. Hi
 <details>
 <summary><strong>Tool components within the sandboxed server process are individually isolated.</strong></summary>
 
-Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques. 
+Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques.
 
 A [component](https://component-model.bytecodealliance.org/design/why-component-model.html#components) is a WebAssembly binary (which may or may not contain modules) that is restricted to interact only through the modules' imported and exported functions.
 
@@ -51,21 +53,13 @@ Allowed outbound hosts and accessible variables can be configured per individual
 MCP endpoints are secured by configurable [protocol-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 
 Plug in your own JWT issuer with simple configuration.
-
-### Distribute and compose tools like lightweight docker images
-
-Tools are compiled to self-contained Wasm binaries that are often < 1MB.
-
-Tools can be pushed and pulled directly from [OCI](https://opencontainers.org/)-compliant registries like Docker Hub, GitHub Container Registry, Amazon Elastic Container Registry, and more.
-
-Mix and match individual tools in your MCP server by registry URI. Allowed outbound network calls are configurable per tool.
 </details>
 
 ### Edge deployments on FTL Engine
 <details>
 <summary><strong>FTL Engine is an end-to-end platform for running remote tools called by AI agents.</strong></summary>
 
-Tool calls cold start in under half a millisecond, automatically scale up to meet demand, and scale down to zero.
+Tools cold start in under half a millisecond, instantly scale up to meet demand, and scale down to zero.
 
 Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
 
@@ -73,15 +67,11 @@ Cost scales predictably with usage. There are no idle costs and no price variabl
 
 Tools are automatically deployed across the global network edge. Tool calls are routed to an Engine running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
 
-Tool components are securely isolated within Engines, which are sandboxed themselves.
-
 The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
-
-High-performance programming patterns with low-level features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in languages like Rust and C to unlock SOTA compute capabilities for real-time agents. Hashing, parsing, and other deterministic compute-bound operations for agents can be implemented performantly by the tool itself.
 
 Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
 
-FTL Engine is just one possible deployment target. It is currently in early alpha with limited capacity. Run the `ftl eng login` command to join the waitlist.
+Join [Discord](https://discord.gg/ByFw4eKEU7) to request access.
 </details>
 
 ## Prerequisites
@@ -201,8 +191,7 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Tool components are individually isolated WebAssembly components with their own sandboxes.
-- Tool components are composed together with the FTL gateway components and run as a single MCP server process on the host.
+- Tool components are composed together with the FTL MCP authorizer and gateway components, runing as a single MCP server process on the host.
 - The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
 - Cross-component calls happen in memory with no network latency, while maintaining secure boundaries.
 
