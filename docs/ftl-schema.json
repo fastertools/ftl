@@ -278,7 +278,7 @@
       "required": ["profile"],
       "properties": {
         "profile": {
-          "description": "Build profile to use for deployment (e.g., \"release\", \"production\")",
+          "description": "Build profile to use for deployment (e.g., release, production)",
           "type": "string",
           "minLength": 1
         },
