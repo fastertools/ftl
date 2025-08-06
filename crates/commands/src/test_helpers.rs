@@ -346,6 +346,9 @@ type UpdateAuthConfigFn = Box<
         + Send
         + Sync,
 >;
+type GetAppLogsFn = Box<
+    dyn Fn(&str, Option<&str>, Option<&str>) -> Result<types::GetAppLogsResponse> + Send + Sync,
+>;
 
 /// Manual mock implementation for `FtlApiClient` due to mockall issues with async traits and references.
 ///
@@ -361,6 +364,7 @@ pub struct MockFtlApiClientMock {
     list_app_components: Arc<Mutex<Option<ListComponentsFn>>>,
     create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
     update_auth_config: Arc<Mutex<Option<UpdateAuthConfigFn>>>,
+    get_app_logs: Arc<Mutex<Option<GetAppLogsFn>>>,
 }
 
 impl Default for MockFtlApiClientMock {
@@ -382,6 +386,7 @@ impl MockFtlApiClientMock {
             list_app_components: Arc::new(Mutex::new(None)),
             create_ecr_token: Arc::new(Mutex::new(None)),
             update_auth_config: Arc::new(Mutex::new(None)),
+            get_app_logs: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -428,6 +433,11 @@ impl MockFtlApiClientMock {
     /// Set up expectation for `update_auth_config` method
     pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation {
         UpdateAuthConfigExpectation { mock: self }
+    }
+
+    /// Set up expectation for `get_app_logs` method
+    pub fn expect_get_app_logs(&mut self) -> GetAppLogsExpectation {
+        GetAppLogsExpectation { mock: self }
     }
 }
 
@@ -646,6 +656,31 @@ impl<'a> UpdateAuthConfigExpectation<'a> {
     }
 }
 
+/// Expectation builder for `get_app_logs` method
+pub struct GetAppLogsExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> GetAppLogsExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Set the function to call when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn(&str, Option<&str>, Option<&str>) -> Result<types::GetAppLogsResponse>
+            + Send
+            + Sync
+            + 'static,
+    {
+        *self.mock.get_app_logs.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
 #[async_trait]
 impl FtlApiClient for MockFtlApiClientMock {
     async fn create_app(
@@ -737,6 +772,19 @@ impl FtlApiClient for MockFtlApiClientMock {
             f(app_id, request)
         } else {
             Err(anyhow!("update_auth_config not mocked"))
+        }
+    }
+
+    async fn get_app_logs(
+        &self,
+        app_id: &str,
+        since: Option<&str>,
+        tail: Option<&str>,
+    ) -> Result<types::GetAppLogsResponse> {
+        if let Some(ref f) = *self.get_app_logs.lock().unwrap() {
+            f(app_id, since, tail)
+        } else {
+            Err(anyhow!("get_app_logs not mocked"))
         }
     }
 }

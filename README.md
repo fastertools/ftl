@@ -200,14 +200,14 @@ Plug it in
 {
   "mcpServers": {
     "fasterTools": {
-      "url": "https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp",
+      "url": "https://ce8860d9-518b-4122-97ab-2e664f6875d9.fwf.app/mcp",
       "transport": "http"
     }
   }
 }
 ```
 ```bash
-claude mcp add -t http faster-tools https://d2c85b78-6487-4bee-a98c-5fa32f1598af.aka.fermyon.tech/mcp
+claude mcp add -t http faster-tools https://ce8860d9-518b-4122-97ab-2e664f6875d9.fwf.app/mcp
 ```
 
 ## Architecture
@@ -215,8 +215,8 @@ claude mcp add -t http faster-tools https://d2c85b78-6487-4bee-a98c-5fa32f1598af
 ```mermaid
 graph TB
     subgraph "MCP Clients"
-        Desktops["Cursor, Claude"]
-        Agents["LangGraph, Mastra, ADK, OpenAI Responses API"]
+        Desktops["Cursor, Claude, ChatGPT"]
+        Agents["LangGraph, Mastra, ADK, OpenAI Agents SDK"]
         Realtime["11.ai, LiveKit, Pipecat"]
     end
     

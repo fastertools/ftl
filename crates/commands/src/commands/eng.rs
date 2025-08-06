@@ -25,6 +25,15 @@ pub enum OutputFormat {
     Json,
 }
 
+/// Output format for logs command
+#[derive(Debug, Clone, Copy)]
+pub enum LogsOutputFormat {
+    /// Display logs as plain text
+    Text,
+    /// Display logs as JSON
+    Json,
+}
+
 /// Execute the list subcommand
 pub async fn list_with_deps(format: OutputFormat, deps: &Arc<EngDependencies>) -> Result<()> {
     let response = deps.api_client.list_apps(None, None, None).await?;
@@ -72,6 +81,57 @@ pub async fn status_with_deps(
     match format {
         OutputFormat::Table => display_engine_status_table(&engine_info, deps),
         OutputFormat::Json => display_engine_status_json(&engine_info, deps)?,
+    }
+
+    Ok(())
+}
+
+/// Execute the logs subcommand
+pub async fn logs_with_deps(
+    engine_id: &str,
+    since: &str,
+    tail: u32,
+    format: LogsOutputFormat,
+    deps: &Arc<EngDependencies>,
+) -> Result<()> {
+    // Try to parse as UUID first
+    let app_uuid = if uuid::Uuid::parse_str(engine_id).is_ok() {
+        engine_id.to_string()
+    } else {
+        // Not a UUID, assume it's an engine name and use list_apps with name filter
+        let response = deps
+            .api_client
+            .list_apps(None, None, Some(engine_id))
+            .await?;
+
+        if response.apps.is_empty() {
+            return Err(anyhow!("Engine '{}' not found", engine_id));
+        }
+
+        response.apps[0].app_id.to_string()
+    };
+
+    // Validate tail parameter
+    if tail == 0 || tail > 1000 {
+        return Err(anyhow!("tail must be between 1 and 1000"));
+    }
+
+    // Get logs from the API
+    let logs_response = deps
+        .api_client
+        .get_app_logs(&app_uuid, Some(since), Some(&tail.to_string()))
+        .await?;
+
+    match format {
+        LogsOutputFormat::Text => {
+            // Display raw logs directly
+            deps.ui.print(&logs_response.logs);
+        }
+        LogsOutputFormat::Json => {
+            // Display full response as JSON
+            let json = serde_json::to_string_pretty(&logs_response)?;
+            deps.ui.print(&json);
+        }
     }
 
     Ok(())
@@ -244,6 +304,17 @@ pub enum EngineCommand {
         /// Force deletion without confirmation
         force: bool,
     },
+    /// Get logs for an application
+    Logs {
+        /// Application ID
+        app_id: String,
+        /// Time range for logs
+        since: String,
+        /// Number of log lines
+        tail: u32,
+        /// Output format
+        format: LogsOutputFormat,
+    },
 }
 
 impl OutputFormat {
@@ -279,6 +350,12 @@ pub async fn execute(args: EngineArgs) -> Result<()> {
         EngineCommand::List { format } => list_with_deps(format, &deps).await,
         EngineCommand::Status { app_id, format } => status_with_deps(&app_id, format, &deps).await,
         EngineCommand::Delete { app_id, force } => delete_with_deps(&app_id, force, &deps).await,
+        EngineCommand::Logs {
+            app_id,
+            since,
+            tail,
+            format,
+        } => logs_with_deps(&app_id, &since, tail, format, &deps).await,
     }
 }
 
