@@ -9,14 +9,17 @@
       "description": "Project metadata",
       "$ref": "#/$defs/ProjectConfig"
     },
-    "auth": {
-      "description": "Authorization configuration",
-      "$ref": "#/$defs/AuthConfig",
+    "oidc": {
+      "description": "OpenID Connect authentication configuration (optional)",
+      "$ref": "#/$defs/OidcConfig"
+    },
+    "mcp": {
+      "description": "MCP component configuration",
+      "$ref": "#/$defs/McpConfig",
       "default": {
-        "enabled": false,
-        "provider": "",
-        "issuer": "",
-        "audience": ""
+        "gateway": "ghcr.io/fastertools/mcp-gateway:0.0.10",
+        "authorizer": "ghcr.io/fastertools/mcp-authorizer:0.0.12",
+        "validate_arguments": false
       }
     },
     "tools": {
@@ -26,15 +29,6 @@
         "$ref": "#/$defs/ToolConfig"
       },
       "default": {}
-    },
-    "gateway": {
-      "description": "Gateway component configuration",
-      "$ref": "#/$defs/GatewayConfig",
-      "default": {
-        "version": "",
-        "authorizer_version": "",
-        "validate_arguments": true
-      }
     },
     "variables": {
       "description": "Application-level variables",
@@ -54,12 +48,14 @@
         "name": {
           "description": "Project name (alphanumeric, hyphens, underscores only, must start with letter)",
           "type": "string",
-          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+          "minLength": 1
         },
         "version": {
           "description": "Semantic version (e.g., 0.1.0)",
           "type": "string",
-          "default": "0.1.0"
+          "default": "0.1.0",
+          "minLength": 1
         },
         "description": {
           "description": "Project description",
@@ -73,81 +69,89 @@
             "type": "string"
           },
           "default": []
+        },
+        "access_control": {
+          "description": "Access control mode: 'public' (no auth) or 'private' (auth required)",
+          "type": "string",
+          "enum": ["public", "private"],
+          "default": "public"
         }
       }
     },
-    "AuthConfig": {
-      "description": "Authorization configuration",
+    "OidcConfig": {
+      "description": "OpenID Connect authentication configuration",
       "type": "object",
+      "required": ["issuer"],
       "properties": {
-        "enabled": {
-          "description": "Enable authorization for this MCP server",
-          "type": "boolean",
-          "default": false
-        },
-        "provider": {
-          "description": "Authorization provider type",
-          "type": "string",
-          "default": ""
-        },
         "issuer": {
           "description": "OIDC issuer URL",
           "type": "string",
-          "default": ""
+          "minLength": 1
         },
         "audience": {
           "description": "Expected audience for tokens",
           "type": "string",
           "default": ""
         },
-        "oidc": {
-          "description": "OIDC-specific configuration",
-          "$ref": "#/$defs/OidcConfig"
-        }
-      }
-    },
-    "OidcConfig": {
-      "description": "OIDC-specific configuration",
-      "type": "object",
-      "required": ["issuer", "provider_name", "jwks_uri", "authorize_endpoint", "token_endpoint"],
-      "properties": {
-        "issuer": {
-          "description": "OIDC issuer URL",
-          "type": "string"
-        },
-        "audience": {
-          "description": "API audience",
+        "jwks_uri": {
+          "description": "JWKS endpoint URL (auto-discovered if not set)",
           "type": "string",
           "default": ""
         },
-        "provider_name": {
-          "description": "Provider name (e.g., 'auth0', 'okta')",
-          "type": "string"
+        "public_key": {
+          "description": "Public key in PEM format (alternative to JWKS)",
+          "type": "string",
+          "default": ""
         },
-        "jwks_uri": {
-          "description": "JWKS URI for token validation",
-          "type": "string"
+        "algorithm": {
+          "description": "JWT signature algorithm (e.g., RS256, ES256)",
+          "type": "string",
+          "default": ""
+        },
+        "required_scopes": {
+          "description": "Comma-separated list of required scopes",
+          "type": "string",
+          "default": ""
         },
         "authorize_endpoint": {
           "description": "OAuth authorization endpoint",
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "token_endpoint": {
           "description": "OAuth token endpoint",
-          "type": "string"
-        },
-        "userinfo_endpoint": {
-          "description": "User info endpoint for retrieving user details",
           "type": "string",
           "default": ""
         },
-        "allowed_domains": {
-          "description": "Comma-separated list of allowed email domains",
+        "userinfo_endpoint": {
+          "description": "OAuth userinfo endpoint",
           "type": "string",
           "default": ""
         }
-      },
-      "additionalProperties": false
+      }
+    },
+    "McpConfig": {
+      "description": "MCP component configuration",
+      "type": "object",
+      "properties": {
+        "gateway": {
+          "description": "MCP gateway component registry URI",
+          "type": "string",
+          "default": "ghcr.io/fastertools/mcp-gateway:0.0.10",
+          "minLength": 1
+        },
+        "authorizer": {
+          "description": "MCP authorizer component registry URI",
+          "type": "string",
+          "default": "ghcr.io/fastertools/mcp-authorizer:0.0.12",
+          "minLength": 1
+        },
+        "validate_arguments": {
+          "description": "Whether to validate tool call arguments",
+          "type": "boolean",
+          "default": false
+        }
+      }
     },
     "ToolConfig": {
       "description": "Tool configuration",
@@ -155,12 +159,13 @@
       "required": ["wasm", "build"],
       "properties": {
         "path": {
-          "description": "Path to tool directory (defaults to tool name if not specified)",
+          "description": "Path to tool directory relative to project root (defaults to tool name)",
           "type": "string"
         },
         "wasm": {
           "description": "Path to the WASM file produced by the build",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "build": {
           "description": "Build configuration",
@@ -168,7 +173,10 @@
         },
         "profiles": {
           "description": "Build profiles (optional, for advanced multi-profile builds)",
-          "$ref": "#/$defs/BuildProfiles"
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/BuildProfile"
+          }
         },
         "up": {
           "description": "Up configuration for development mode",
@@ -203,7 +211,8 @@
       "properties": {
         "command": {
           "description": "Build command to execute",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "watch": {
           "description": "Paths to watch for changes in development mode",
@@ -223,13 +232,6 @@
         }
       }
     },
-    "BuildProfiles": {
-      "description": "Build profiles for a tool",
-      "type": "object",
-      "additionalProperties": {
-        "$ref": "#/$defs/BuildProfile"
-      }
-    },
     "BuildProfile": {
       "description": "A single build profile",
       "type": "object",
@@ -237,7 +239,8 @@
       "properties": {
         "command": {
           "description": "Build command to execute",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "watch": {
           "description": "Paths to watch for changes in development mode",
@@ -264,7 +267,8 @@
       "properties": {
         "profile": {
           "description": "Build profile to use for 'ftl up'",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -275,7 +279,8 @@
       "properties": {
         "profile": {
           "description": "Build profile to use for deployment (e.g., \"release\", \"production\")",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "name": {
           "description": "Optional custom name suffix for the deployed tool",
@@ -301,7 +306,7 @@
           "type": "object",
           "properties": {
             "required": {
-              "description": "Whether the variable is required",
+              "description": "Whether the variable is required (must be true)",
               "type": "boolean",
               "const": true
             }
@@ -310,27 +315,6 @@
           "additionalProperties": false
         }
       ]
-    },
-    "GatewayConfig": {
-      "description": "Gateway component configuration",
-      "type": "object",
-      "properties": {
-        "version": {
-          "description": "MCP gateway component version (leave empty for latest)",
-          "type": "string",
-          "default": ""
-        },
-        "authorizer_version": {
-          "description": "MCP authorizer component version (leave empty for latest)",
-          "type": "string",
-          "default": ""
-        },
-        "validate_arguments": {
-          "description": "Whether to validate tool arguments",
-          "type": "boolean",
-          "default": true
-        }
-      }
     }
   }
 }
