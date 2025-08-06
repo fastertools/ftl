@@ -253,6 +253,12 @@ pub struct McpConfig {
     #[garde(length(min = 1))]
     pub authorizer: String,
 
+    /// TEA (telemetry & event recorder) component registry URI
+    /// Example: "ghcr.io/fastertools/tea:0.0.10"
+    #[serde(default = "default_tea")]
+    #[garde(length(min = 1))]
+    pub tea: String,
+
     /// Whether to validate tool call arguments
     #[serde(default = "default_validate_arguments")]
     #[garde(skip)]
@@ -348,6 +354,10 @@ fn default_authorizer() -> String {
     "ghcr.io/fastertools/mcp-authorizer:0.0.12".to_string()
 }
 
+fn default_tea() -> String {
+    "ghcr.io/fastertools/tea:0.0.10".to_string()
+}
+
 const fn default_validate_arguments() -> bool {
     false
 }
@@ -357,6 +367,7 @@ impl Default for McpConfig {
         Self {
             gateway: default_gateway(),
             authorizer: default_authorizer(),
+            tea: default_tea(),
             validate_arguments: default_validate_arguments(),
         }
     }

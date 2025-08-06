@@ -268,11 +268,11 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         );
     }
 
-    // Add metrics collector component if middleware is enabled
+    // Add TEA (telemetry & event recorder) component if middleware is enabled
     if middleware_enabled {
         components.insert(
-            "ftl-metrics".to_string(),
-            create_metrics_collector_component(),
+            "tea".to_string(),
+            create_metrics_collector_component(&ftl_config.mcp.tea),
         );
     }
 
@@ -324,19 +324,19 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         });
     }
 
-    // Add metrics collector triggers
+    // Add TEA (telemetry & event recorder) triggers
     if middleware_enabled {
         // Private trigger for internal event submission
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Private { private: true },
-            component: "ftl-metrics".to_string(),
+            component: "tea".to_string(),
             executor: None,
         });
         
         // Public trigger for metrics endpoints
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Path("/metrics/...".to_string()),
-            component: "ftl-metrics".to_string(),
+            component: "tea".to_string(),
             executor: None,
         });
     }
@@ -433,9 +433,8 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(_registry_uri: &str, validate_args: bool) -> ComponentConfig {
-    // Use absolute path to actual WASM build location
-    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm".to_string());
+fn create_gateway_component(registry_uri: &str, validate_args: bool) -> ComponentConfig {
+    let source = parse_registry_uri_to_source(registry_uri);
 
     let allowed_hosts = vec!["http://*.spin.internal".to_string()];
 
@@ -460,7 +459,7 @@ fn create_gateway_component(_registry_uri: &str, validate_args: bool) -> Compone
     // Metrics export config
     variables.insert("metrics_enabled".to_string(), "true".to_string());
     variables.insert("metrics_path".to_string(), "/metrics".to_string());
-    variables.insert("metrics_collector_url".to_string(), "http://ftl-metrics.spin.internal/events".to_string());
+    variables.insert("metrics_collector_url".to_string(), "http://tea.spin.internal/events".to_string());
 
     ComponentConfig {
         description: String::new(),
@@ -478,9 +477,8 @@ fn create_gateway_component(_registry_uri: &str, validate_args: bool) -> Compone
 }
 
 /// Create metrics collector component configuration
-fn create_metrics_collector_component() -> ComponentConfig {
-    // Use absolute path to actual WASM build location  
-    let source = ComponentSource::Local("/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/metrics_collector.wasm".to_string());
+fn create_metrics_collector_component(registry_uri: &str) -> ComponentConfig {
+    let source = parse_registry_uri_to_source(registry_uri);
 
     let mut variables = HashMap::new();
     variables.insert("max_metrics".to_string(), "10000".to_string());

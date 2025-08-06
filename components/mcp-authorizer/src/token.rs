@@ -58,7 +58,7 @@ struct Claims {
     #[serde(skip_serializing_if = "Option::is_none")]
     client_id: Option<String>,
 
-    /// Organization ID
+    /// Organization ID (WorkOS AuthKit)
     #[serde(skip_serializing_if = "Option::is_none")]
     org_id: Option<String>,
 
@@ -176,8 +176,12 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
         }
     }
 
-    // Extract client ID (prefer explicit claim over sub)
-    let client_id = claims.client_id.as_ref().unwrap_or(&claims.sub).clone();
+    // Extract client ID (prefer org_id for tenant, then client_id, then sub)
+    let client_id = claims.org_id.as_ref()
+        .or(claims.client_id.as_ref())
+        .unwrap_or(&claims.sub)
+        .clone();
+
 
     Ok(TokenInfo {
         client_id,

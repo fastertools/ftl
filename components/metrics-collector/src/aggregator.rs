@@ -162,8 +162,4 @@ impl MetricsAggregator {
         metrics
     }
 
-    pub async fn get_tool_metrics(&self, tool_name: &str) -> Option<serde_json::Value> {
-        let metrics_map = self.tool_metrics.lock().unwrap();
-        metrics_map.get(tool_name).map(|metrics| metrics.to_json())
-    }
 }

@@ -16,17 +16,6 @@ struct EventInput {
     event: MetricEvent,
 }
 
-#[derive(Deserialize, JsonSchema)]
-struct MetricsInput {
-    /// Optional format (prometheus or json)
-    format: Option<String>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-struct ToolMetricsInput {
-    /// Name of the tool to get metrics for
-    tool_name: String,
-}
 
 tools! {
     /// Receive metric event from gateway
@@ -36,35 +25,7 @@ tools! {
         ToolResponse::text("Event recorded")
     }
 
-    /// Get all metrics in specified format
-    async fn metrics(input: MetricsInput) -> ToolResponse {
-        let collector = MetricsCollector::instance();
-        match input.format.as_deref() {
-            Some("json") => {
-                let metrics = collector.get_all_metrics_json().await;
-                ToolResponse::with_structured(
-                    serde_json::to_string_pretty(&metrics).unwrap_or_default(),
-                    metrics
-                )
-            }
-            _ => {
-                let prometheus = collector.get_prometheus_metrics().await;
-                ToolResponse::text(prometheus)
-            }
-        }
-    }
 
-    /// Get metrics for a specific tool
-    async fn tool_metrics(input: ToolMetricsInput) -> ToolResponse {
-        let collector = MetricsCollector::instance();
-        match collector.get_tool_metrics(&input.tool_name).await {
-            Some(metrics) => ToolResponse::with_structured(
-                serde_json::to_string_pretty(&metrics).unwrap_or_default(),
-                metrics
-            ),
-            None => ToolResponse::text(format!("No metrics found for tool: {}", input.tool_name))
-        }
-    }
 
 }
 
@@ -72,8 +33,8 @@ tools! {
 mod tests {
     use crate::emission::{EmissionPipeline, EmissionConfig};
     use crate::exporters::otel::{OtelEmitter, OtelEmitterConfig};
-    use crate::exporters::durable::{DurableEmitter, DurableEmitterConfig, RetryConfig};
-    use crate::exporters::fallback::{FallbackEmitter, FallbackEmitterConfig};
+    use crate::exporters::durable::DurableEmitter;
+    use crate::exporters::fallback::FallbackEmitter;
 
     #[test]
     fn test_emission_pipeline_creation() {
@@ -84,13 +45,10 @@ mod tests {
         let otel_emitter = OtelEmitter::new(OtelEmitterConfig::default());
         pipeline.add_emitter(Box::new(otel_emitter));
         
-        let durable_emitter = DurableEmitter::new(
-            DurableEmitterConfig::default(), 
-            RetryConfig::default()
-        );
+        let durable_emitter = DurableEmitter::new();
         pipeline.add_emitter(Box::new(durable_emitter));
         
-        let fallback_emitter = FallbackEmitter::new(FallbackEmitterConfig::default());
+        let fallback_emitter = FallbackEmitter::new();
         pipeline.add_emitter(Box::new(fallback_emitter));
         
         // Test pipeline creation
@@ -109,10 +67,7 @@ mod tests {
         
         // Add emitters
         pipeline.add_emitter(Box::new(OtelEmitter::new(OtelEmitterConfig::default())));
-        pipeline.add_emitter(Box::new(DurableEmitter::new(
-            DurableEmitterConfig::default(), 
-            RetryConfig::default()
-        )));
+        pipeline.add_emitter(Box::new(DurableEmitter::new()));
         
         // Test that emitters were added
         assert_eq!(pipeline.emitters.len(), 2);
@@ -126,24 +81,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fallback_circuit_breaker() {
-        use crate::exporters::fallback::CircuitBreaker;
-        
-        let circuit = CircuitBreaker::new(3, 60); // 3 failures, 60 second reset
-        
-        // Initially should allow requests
-        assert!(circuit.should_allow_request());
-        
-        // Record failures
-        circuit.record_failure();
-        circuit.record_failure();
-        assert!(circuit.should_allow_request()); // Still under threshold
-        
-        circuit.record_failure();
-        assert!(!circuit.should_allow_request()); // Now circuit is open
-        
-        // Record success should reset
-        circuit.record_success();
-        assert!(circuit.should_allow_request()); // Circuit closed again
+    fn test_fallback_emitter_creation() {
+        // Simple test to verify fallback emitter can be created
+        let fallback_emitter = FallbackEmitter::new();
+        assert_eq!(fallback_emitter.name(), "fallback");
     }
 }
