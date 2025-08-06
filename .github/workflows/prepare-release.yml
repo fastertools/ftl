@@ -68,7 +68,9 @@ jobs:
       
       - name: Setup Rust
         if: inputs.component != 'sdk-typescript' && inputs.component != 'sdk-python' && inputs.component != 'sdk-go'
-        uses: dtolnay/rust-toolchain@stable
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: prepare-release
       
       - name: Determine version
         id: version
