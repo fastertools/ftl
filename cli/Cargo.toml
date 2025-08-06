@@ -1,6 +1,6 @@
 [package]
 name = "ftl-cli"
-version = "0.0.38"
+version = "0.0.39"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
