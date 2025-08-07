@@ -309,6 +309,25 @@ check_dependencies() {
         echo "✓ found"
     fi
     
+    # Check for Docker (required for deployments)
+    echo -n "  Checking for Docker... "
+    if ! command_exists "docker"; then
+        echo "❌ not found"
+        echo ""
+        info "⚠️  Docker is required for deploying to FTL Engine"
+        echo "     Install Docker Desktop from: https://docs.docker.com/desktop/"
+        echo ""
+    else
+        echo "✓ found"
+        # Check if Docker daemon is running
+        if ! docker info >/dev/null 2>&1; then
+            echo ""
+            info "⚠️  Docker is installed but not running"
+            echo "     Please start Docker Desktop and try again"
+            echo ""
+        fi
+    fi
+    
     echo ""
 }
 
@@ -478,6 +497,13 @@ main() {
         info "Note: To develop MCP tools, you'll need language-specific dependencies:"
         echo "  • For Rust tools: Install Rust and run 'rustup target add wasm32-wasip1'"
         echo "  • For TypeScript/JavaScript tools: Install Node.js and npm"
+        
+        # Remind about Docker if not installed
+        if ! command_exists "docker"; then
+            echo ""
+            info "To deploy to FTL Engine, you'll need Docker:"
+            echo "  • Install Docker Desktop from: https://docs.docker.com/desktop/"
+        fi
     else
         echo ""
         info "Verify installation with:"
