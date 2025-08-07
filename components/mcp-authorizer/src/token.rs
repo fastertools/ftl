@@ -58,7 +58,7 @@ struct Claims {
     #[serde(skip_serializing_if = "Option::is_none")]
     client_id: Option<String>,
 
-    /// Organization ID (WorkOS AuthKit)
+    /// Organization ID
     #[serde(skip_serializing_if = "Option::is_none")]
     org_id: Option<String>,
 

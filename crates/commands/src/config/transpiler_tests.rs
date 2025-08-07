@@ -422,6 +422,7 @@ fn test_transpile_with_custom_gateway_uris() {
         mcp: McpConfig {
             gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
             authorizer: "ghcr.io/myorg/custom-authorizer:2.0.0".to_string(),
+            tea: "ghcr.io/fastertools/tea:0.0.10".to_string(),
             validate_arguments: true,
         },
         variables: HashMap::new(),
@@ -636,6 +637,7 @@ fn test_transpile_complete_example() {
         mcp: McpConfig {
             gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
             authorizer: "ghcr.io/example/auth:3.0.0".to_string(),
+            tea: "ghcr.io/fastertools/tea:0.0.10".to_string(),
             validate_arguments: false,
         },
         variables: app_vars,
@@ -1001,9 +1003,9 @@ fn test_http_trigger_generation() {
     assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
     assert!(!result.contains("route = \"/.well-known/oauth-authorization-server\""));
 
-    // Count private route triggers (2 tools = 2, gateway is not private when auth is disabled)
+    // Count private route triggers (2 tools + 1 TEA component = 3, gateway is not private when auth is disabled)
     let private_count = result.matches("route = { private = true }").count();
-    assert_eq!(private_count, 2);
+    assert_eq!(private_count, 3);
 
     // Each tool should have a trigger
     let tool1_triggers = result.matches("component = \"tool1\"").count();

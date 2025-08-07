@@ -109,8 +109,8 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             },
         );
 
-        // JWT provider variables
-        if ftl_config.oidc.is_some() {
+        // JWT provider variables (for both OIDC and AuthKit)
+        if ftl_config.is_auth_enabled() {
             variables.insert(
                 "mcp_jwt_issuer".to_string(),
                 SpinVariable::Default {
@@ -230,6 +230,23 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             // Empty default for static tokens if not using static provider
             variables.insert(
                 "mcp_static_tokens".to_string(),
+                SpinVariable::Default {
+                    default: String::new(),
+                },
+            );
+        }
+
+        // Tenant ID for multi-tenant deployments
+        if ftl_config.oidc.is_none() && ftl_config.is_auth_enabled() {
+            // AuthKit mode - tenant_id is required
+            variables.insert(
+                "mcp_tenant_id".to_string(),
+                SpinVariable::Required { required: true },
+            );
+        } else {
+            // OIDC mode or auth disabled - tenant_id has empty default
+            variables.insert(
+                "mcp_tenant_id".to_string(),
                 SpinVariable::Default {
                     default: String::new(),
                 },
