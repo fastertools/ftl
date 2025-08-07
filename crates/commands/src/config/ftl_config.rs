@@ -81,6 +81,12 @@ pub struct ProjectConfig {
     #[serde(default = "default_access_control")]
     #[garde(custom(validate_access_control))]
     pub access_control: String,
+
+    /// Default registry for component references
+    /// Example: "ghcr.io/myorg" or "docker.io"
+    #[serde(default)]
+    #[garde(skip)]
+    pub default_registry: Option<String>,
 }
 
 /// OIDC-specific configuration
@@ -146,45 +152,45 @@ pub struct DeployConfig {
 }
 
 /// Tool configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolConfig {
     /// Path to tool directory relative to project root
-    /// Defaults to the tool name if not specified
+    /// Required for local components, ignored for registry components
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[garde(skip)]
     pub path: Option<String>,
 
-    /// Path to the WASM file produced by the build
-    #[garde(length(min = 1))]
-    pub wasm: String,
+    /// Path to the WASM file produced by the build (for local components)
+    /// Mutually exclusive with `repo`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wasm: Option<String>,
 
-    /// Build configuration
-    #[garde(dive)]
-    pub build: BuildConfig,
+    /// Repository reference for pre-built component (e.g., "ghcr.io/org/tool:latest")
+    /// Mutually exclusive with `wasm`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+
+    /// Build configuration (required for local components with `wasm`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<BuildConfig>,
 
     /// Build profiles (optional, for advanced multi-profile builds)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[garde(skip)]
     pub profiles: Option<BuildProfiles>,
 
     /// Up configuration for development mode
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[garde(skip)]
     pub up: Option<UpConfig>,
 
     /// Deployment configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[garde(skip)]
     pub deploy: Option<DeployConfig>,
 
     /// Allowed outbound hosts for the tool
     #[serde(default)]
-    #[garde(skip)]
     pub allowed_outbound_hosts: Vec<String>,
 
     /// Variables to pass to the tool at runtime
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    #[garde(skip)]
     pub variables: HashMap<String, String>,
 }
 
@@ -265,7 +271,7 @@ impl FtlConfig {
         let config: Self = toml::from_str(content).context("Failed to parse FTL configuration")?;
         config
             .validate()
-            .context("FTL configuration validation failed")?;
+            .map_err(|e| anyhow::anyhow!("FTL configuration validation failed: {}", e))?;
         Ok(config)
     }
 
@@ -329,6 +335,57 @@ impl ToolConfig {
     pub fn get_path(&self, tool_name: &str) -> String {
         self.path.clone().unwrap_or_else(|| tool_name.to_string())
     }
+
+    /// Validate the tool configuration
+    pub fn validate(&self) -> Result<(), garde::Report> {
+        let mut report = garde::Report::new();
+
+        // Ensure exactly one of `wasm` or `repo` is set
+        match (&self.wasm, &self.repo) {
+            (None, None) => {
+                report.append(
+                    garde::Path::empty(),
+                    garde::Error::new("Tool must specify either 'wasm' (for local components) or 'repo' (for registry components)")
+                );
+                return Err(report);
+            }
+            (Some(_), Some(_)) => {
+                report.append(
+                    garde::Path::empty(),
+                    garde::Error::new("Tool cannot specify both 'wasm' and 'repo'. Use 'wasm' for local components or 'repo' for registry components")
+                );
+                return Err(report);
+            }
+            _ => {}
+        }
+
+        // If `wasm` is set (local component), ensure `build` is present
+        if self.wasm.is_some() && self.build.is_none() {
+            report.append(
+                garde::Path::empty(),
+                garde::Error::new(
+                    "Local components with 'wasm' field must include a 'build' configuration",
+                ),
+            );
+            return Err(report);
+        }
+
+        // If `repo` is set (registry component), ensure `build` is NOT present
+        if self.repo.is_some() && self.build.is_some() {
+            report.append(
+                garde::Path::empty(),
+                garde::Error::new("Registry components with 'repo' field should not include a 'build' configuration")
+            );
+            return Err(report);
+        }
+
+        // Validate build config if present
+        if let Some(build) = &self.build {
+            build.validate()?;
+        }
+
+        Ok(())
+    }
 }
 
 // Default value functions
@@ -368,7 +425,7 @@ fn validate_tools(tools: &HashMap<String, ToolConfig>, _: &()) -> garde::Result 
     for (name, config) in tools {
         config
             .validate()
-            .map_err(|e| garde::Error::new(e.to_string()))?;
+            .map_err(|e| garde::Error::new(format!("Tool '{name}': {e}")))?;
 
         // Ensure tool name follows naming conventions
         if !name
@@ -459,6 +516,130 @@ access_control = "custom"
                 .unwrap_err()
                 .to_string()
                 .contains("validation failed")
+        );
+    }
+
+    #[test]
+    fn test_mixed_local_and_registry_tools() {
+        let config = r#"
+[project]
+name = "py-tools"
+version = "0.1.0"
+description = "FTL MCP server for hosting MCP tools"
+access_control = "private"
+default_registry = "ghcr.io/fastertools"
+
+[tools.example-py]
+path = "example-py"
+wasm = "example-py/app.wasm"
+allowed_outbound_hosts = []
+
+[tools.example-py.build]
+command = "make build"
+watch = [
+    "src/**/*.py",
+    "pyproject.toml",
+]
+
+[tools.example-rs]
+repo = "ghcr.io/fastertools/example-rs:latest"
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
+validate_arguments = false
+"#;
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert_eq!(ftl_config.project.name, "py-tools");
+        assert_eq!(ftl_config.project.access_control, "private");
+
+        // Check local tool
+        let py_tool = &ftl_config.tools["example-py"];
+        assert_eq!(py_tool.wasm, Some("example-py/app.wasm".to_string()));
+        assert!(py_tool.repo.is_none());
+        assert!(py_tool.build.is_some());
+
+        // Check registry tool
+        let rs_tool = &ftl_config.tools["example-rs"];
+        assert!(rs_tool.wasm.is_none());
+        assert_eq!(
+            rs_tool.repo,
+            Some("ghcr.io/fastertools/example-rs:latest".to_string())
+        );
+        assert!(rs_tool.build.is_none());
+    }
+
+    #[test]
+    fn test_tool_validation_errors() {
+        // Test missing both wasm and repo
+        let config = r#"
+[project]
+name = "test"
+
+[tools.broken]
+path = "broken"
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must specify either 'wasm'")
+                || err.contains("must specify either 'wasm'")
+        );
+
+        // Test having both wasm and repo
+        let config = r#"
+[project]
+name = "test"
+
+[tools.broken]
+wasm = "broken/app.wasm"
+repo = "ghcr.io/org/broken:latest"
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cannot specify both")
+        );
+
+        // Test local component without build
+        let config = r#"
+[project]
+name = "test"
+
+[tools.broken]
+wasm = "broken/app.wasm"
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must include a 'build' configuration")
+        );
+
+        // Test registry component with build
+        let config = r#"
+[project]
+name = "test"
+
+[tools.broken]
+repo = "ghcr.io/org/broken:latest"
+
+[tools.broken.build]
+command = "make build"
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("should not include a 'build' configuration")
         );
     }
 }

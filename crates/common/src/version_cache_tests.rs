@@ -191,6 +191,10 @@ impl UserInterface for TestUIWithUpdateChoice {
     fn clear_screen(&self) {
         self.inner.clear_screen();
     }
+
+    fn prompt_confirm(&self, _prompt: &str, default: bool) -> Result<bool, anyhow::Error> {
+        Ok(default)
+    }
 }
 
 struct TestUIWithDismissChoice {
@@ -243,6 +247,10 @@ impl UserInterface for TestUIWithDismissChoice {
     fn clear_screen(&self) {
         self.inner.clear_screen();
     }
+
+    fn prompt_confirm(&self, _prompt: &str, default: bool) -> Result<bool, anyhow::Error> {
+        Ok(default)
+    }
 }
 
 struct TestUIUpdateFails {
@@ -285,6 +293,10 @@ impl UserInterface for TestUIUpdateFails {
 
     fn clear_screen(&self) {
         self.inner.clear_screen();
+    }
+
+    fn prompt_confirm(&self, _prompt: &str, default: bool) -> Result<bool, anyhow::Error> {
+        Ok(default)
     }
 }
 

@@ -35,6 +35,8 @@ lint:
 # Run tests
 test:
 	cargo nextest run
+
+test-all: test
 	cd components/mcp-authorizer && spin build && spin test
 	cd components/mcp-gateway && spin build && spin test
 
@@ -73,9 +75,13 @@ pre-push:
 
 build:
 	cargo build
-	cargo wasm
+
+build-all: build
+	cargo build-wasm
 
 # Build release
 build-release:
 	cargo build --release
-	cargo wasm --release
+
+build-all-release: build-release
+	cargo build-wasm --release

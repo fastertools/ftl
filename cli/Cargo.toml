@@ -10,7 +10,7 @@ homepage.workspace = true
 documentation = "https://crates.io/crates/ftl-cli"
 keywords = ["wasm", "mcp", "tools", "cli", "webassembly"]
 categories = ["command-line-utilities", "development-tools", "wasm"]
-description = "CLI for FTL"
+description = "Faster tools for AI agents"
 readme = "../README.md"
 exclude = ["demo_hash", "toolkit-*"]
 

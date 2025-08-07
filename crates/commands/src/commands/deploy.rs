@@ -66,47 +66,80 @@ pub struct DeployDependencies {
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) -> Result<()> {
-    if args.dry_run {
-        deps.ui.print_styled(
-            &format!("{} Deploying project to FTL Engine (DRY RUN)", "▶"),
-            MessageStyle::Bold,
-        );
+    // Try to parse ftl.toml early to get project name, but handle if it doesn't exist
+    let ftl_config_result = deps
+        .file_system
+        .read_to_string(Path::new("ftl.toml"))
+        .and_then(|content| crate::config::ftl_config::FtlConfig::parse(&content));
+
+    // Display deployment header with project name if available
+    if let Ok(ref ftl_config) = ftl_config_result {
+        let project_name = &ftl_config.project.name;
+        if args.dry_run {
+            deps.ui.print_styled(
+                &format!("{} Deploying {} to FTL Engine (DRY RUN)", "▶", project_name),
+                MessageStyle::Bold,
+            );
+        } else {
+            deps.ui.print_styled(
+                &format!("{} Deploying {} to FTL Engine", "▶", project_name),
+                MessageStyle::Bold,
+            );
+        }
     } else {
-        deps.ui.print_styled(
-            &format!("{} Deploying project to FTL Engine", "▶"),
-            MessageStyle::Bold,
-        );
+        // Fallback message if ftl.toml not found yet
+        if args.dry_run {
+            deps.ui.print_styled(
+                &format!("{} Deploying project to FTL Engine (DRY RUN)", "▶"),
+                MessageStyle::Bold,
+            );
+        } else {
+            deps.ui.print_styled(
+                &format!("{} Deploying project to FTL Engine", "▶"),
+                MessageStyle::Bold,
+            );
+        }
     }
     deps.ui.print("");
 
-    // Generate temporary spin.toml from ftl.toml
-    let temp_spin_toml =
-        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &PathBuf::from("."))?;
+    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
+        &crate::config::transpiler::GenerateSpinConfig {
+            file_system: &deps.file_system,
+            project_path: &PathBuf::from("."),
+            download_components: true,
+            validate_local_auth: false,
+        },
+    )?;
 
     // We must have a temp spin.toml since ftl.toml is required
     let manifest_path = temp_spin_toml
         .ok_or_else(|| anyhow!("No ftl.toml found. Not in an FTL project directory?"))?;
 
+    // If we couldn't parse ftl.toml earlier, try again now that we know it exists
+    let ftl_config = if let Ok(config) = ftl_config_result {
+        config
+    } else {
+        let ftl_content = deps.file_system.read_to_string(Path::new("ftl.toml"))?;
+        crate::config::ftl_config::FtlConfig::parse(&ftl_content)?
+    };
+
     // Run the deployment with the manifest path
     // Clean up is handled by tempfile crate when temp_spin_toml goes out of scope
-    execute_deploy_inner(deps.clone(), args, manifest_path, true).await
+    execute_deploy_inner(deps.clone(), args, manifest_path, ftl_config, true).await
 }
 
 /// Inner deployment logic separated for proper cleanup handling
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 async fn execute_deploy_inner(
     deps: Arc<DeployDependencies>,
     args: DeployArgs,
     manifest_path: PathBuf,
+    ftl_config: crate::config::ftl_config::FtlConfig,
     _is_temp_manifest: bool,
 ) -> Result<()> {
     // Create a spinner for status updates
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
-
-    // Parse ftl.toml to determine build profiles and deploy names
-    let ftl_content = deps.file_system.read_to_string(Path::new("ftl.toml"))?;
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
 
     // Determine which build profile to use for deployment
     // For now, use release mode if any tool has deploy.profile = "release" or no profile specified
@@ -184,6 +217,77 @@ async fn execute_deploy_inner(
         );
         return Ok(());
     }
+
+    // Check if engine exists and show confirmation before proceeding
+    if !args.yes && !args.dry_run {
+        spinner.finish_and_clear();
+
+        // Check if engine already exists
+        let check_spinner = deps.ui.create_spinner();
+        check_spinner.set_message("Checking engine status...");
+        check_spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
+
+        let existing_apps = deps
+            .api_client
+            .list_apps(None, None, Some(&config.app_name))
+            .await
+            .map_err(|e| anyhow!("Failed to check existing apps: {}", e))?;
+
+        check_spinner.finish_and_clear();
+
+        deps.ui.print("");
+        deps.ui
+            .print_styled("Deployment Summary", MessageStyle::Cyan);
+        deps.ui.print("");
+        let app_name = &config.app_name;
+        deps.ui.print(&format!("Engine: {app_name}"));
+        let component_count = config.components.len();
+        deps.ui
+            .print(&format!("Components: {component_count} tools"));
+        let profile = if use_release { "release" } else { "debug" };
+        deps.ui.print(&format!("Build Profile: {profile}"));
+
+        if existing_apps.apps.is_empty() {
+            deps.ui.print("");
+            deps.ui
+                .print_styled("This will create a new engine.", MessageStyle::Cyan);
+        } else {
+            let app = &existing_apps.apps[0];
+            deps.ui.print("");
+            deps.ui
+                .print_styled("⚠ Existing engine found", MessageStyle::Yellow);
+            deps.ui.print(&format!("  Status: {:?}", app.status));
+            if let Some(url) = &app.provider_url {
+                deps.ui.print(&format!("  Current URL: {url}"));
+            }
+            if !app.updated_at.is_empty() {
+                let updated_at = &app.updated_at;
+                deps.ui.print(&format!("  Last Updated: {updated_at}"));
+            }
+            deps.ui.print("");
+            deps.ui.print_styled(
+                "This deployment will update the existing engine.",
+                MessageStyle::Yellow,
+            );
+        }
+
+        deps.ui.print("");
+
+        if !deps.ui.prompt_confirm("Continue with deployment?", true)? {
+            deps.ui
+                .print_styled("Deployment cancelled", MessageStyle::Yellow);
+            return Ok(());
+        }
+
+        deps.ui.print("");
+    } else {
+        // For automated deployment (args.yes == true), we still need to clear the spinner
+        spinner.finish_and_clear();
+    }
+
+    // Create new spinner for the rest of the deployment
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
     // Get ECR credentials
     spinner.set_message("Getting registry credentials...");
@@ -266,21 +370,8 @@ async fn execute_deploy_inner(
 
     // Deploy to FTL
     deps.ui.print("");
-    let spinner = deps.ui.create_spinner();
-    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
-    spinner.set_message("Starting engine deployment...");
 
-    // Refresh credentials before deployment in case the token expired
-    let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
-        Ok(creds) => creds,
-        Err(e) => {
-            spinner.finish_and_clear();
-            return Err(anyhow!("Failed to refresh authentication token: {}", e));
-        }
-    };
-
-    // Show deployment variables
-    deps.ui.print("");
+    // Show deployment variables first, before creating any spinners
     if parsed_variables.is_empty() {
         deps.ui
             .print_styled("→ No variables to deploy", MessageStyle::Yellow);
@@ -318,6 +409,22 @@ async fn execute_deploy_inner(
             deps.ui.print(&format!("{icon}{key} = {display_value}"));
         }
     }
+
+    deps.ui.print("");
+
+    // Now create the spinner for deployment after all output is done
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
+    spinner.set_message("Starting engine deployment...");
+
+    // Refresh credentials before deployment in case the token expired
+    let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
+        Ok(creds) => creds,
+        Err(e) => {
+            spinner.finish_and_clear();
+            return Err(anyhow!("Failed to refresh authentication token: {}", e));
+        }
+    };
 
     let deployment = deploy_to_ftl_with_progress(
         deps.clone(),
@@ -439,7 +546,8 @@ fn display_dry_run_summary(
     // Engine information
     deps.ui
         .print_styled("Engine Configuration:", MessageStyle::Cyan);
-    deps.ui.print(&format!("  Name: {}", config.app_name));
+    let app_name = &config.app_name;
+    deps.ui.print(&format!("  Name: {app_name}"));
     deps.ui.print(&format!(
         "  Build Profile: {}",
         if use_release { "release" } else { "debug" }
@@ -455,14 +563,15 @@ fn display_dry_run_summary(
             .cloned()
             .unwrap_or_else(|| component.name.clone());
 
-        deps.ui
-            .print(&format!("  • {} (v{})", deploy_name, component.version));
-        deps.ui
-            .print(&format!("    Source: {}", component.source_path));
+        let version = &component.version;
+        deps.ui.print(&format!("  • {deploy_name} (v{version})"));
+        let source_path = &component.source_path;
+        deps.ui.print(&format!("    Source: {source_path}"));
         if let Some(hosts) = &component.allowed_outbound_hosts {
             if !hosts.is_empty() {
+                let hosts_str = hosts.join(", ");
                 deps.ui
-                    .print(&format!("    Allowed outbound hosts: {}", hosts.join(", ")));
+                    .print(&format!("    Allowed outbound hosts: {hosts_str}"));
             }
         }
     }
@@ -728,38 +837,53 @@ pub fn parse_deploy_config(
 
     let mut components = Vec::new();
 
-    // Look for components that are local files (not from registry)
+    // Look for user components (not MCP system components)
     if let Some(components_table) = toml.get("component").and_then(|c| c.as_table()) {
         for (name, component) in components_table {
+            // Skip MCP system components
+            if name == "mcp" || name == "ftl-mcp-gateway" {
+                continue;
+            }
+
             if let Some(source) = component.get("source") {
-                // Check if source is a local file (string) vs registry (table)
-                if let Some(source_path) = source.as_str() {
-                    // Skip if it's a system component (from registry)
-                    if !source_path.contains("ghcr.io")
-                        && source_path.to_lowercase().ends_with(".wasm")
-                    {
-                        // Try to extract version
-                        let version = extract_component_version(file_system, name, source_path)?;
+                // Both local files and registry components should be deployed
+                // The source_path will be the actual local path to the WASM file
+                let source_path = if let Some(path) = source.as_str() {
+                    // Local file source
+                    path.to_string()
+                } else if source.is_table() {
+                    // Registry source - skip for now, will be handled separately if needed
+                    // User components from registries should be pulled locally first
+                    continue;
+                } else {
+                    continue;
+                };
 
-                        // Extract allowed_outbound_hosts if present
-                        let allowed_outbound_hosts = component
-                            .get("allowed_outbound_hosts")
-                            .and_then(|hosts| hosts.as_array())
-                            .map(|arr| {
-                                arr.iter()
-                                    .filter_map(|v| v.as_str())
-                                    .map(std::string::ToString::to_string)
-                                    .collect()
-                            });
-
-                        components.push(ComponentInfo {
-                            name: name.clone(),
-                            source_path: source_path.to_string(),
-                            version,
-                            allowed_outbound_hosts,
-                        });
-                    }
+                // Only process local WASM files
+                if !source_path.to_lowercase().ends_with(".wasm") || source_path.contains("://") {
+                    continue;
                 }
+
+                // Try to extract version
+                let version = extract_component_version(file_system, name, &source_path)?;
+
+                // Extract allowed_outbound_hosts if present
+                let allowed_outbound_hosts = component
+                    .get("allowed_outbound_hosts")
+                    .and_then(|hosts| hosts.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .map(std::string::ToString::to_string)
+                            .collect()
+                    });
+
+                components.push(ComponentInfo {
+                    name: name.clone(),
+                    source_path,
+                    version,
+                    allowed_outbound_hosts,
+                });
             }
         }
     }
@@ -1020,7 +1144,8 @@ async fn ensure_components_and_push(
 
             // Push component with version tag
             pb.set_message(&format!("Pushing v{}...", component.version));
-            let versioned_tag = format!("{}:{}", repository_uri, component.version);
+            let version = &component.version;
+            let versioned_tag = format!("{repository_uri}:{version}");
             let output = deps
                 .command_executor
                 .execute(
@@ -1198,6 +1323,8 @@ pub struct DeployArgs {
     pub auth_audience: Option<String>,
     /// Run without making any changes (preview what would be deployed)
     pub dry_run: bool,
+    /// Skip confirmation prompt
+    pub yes: bool,
 }
 
 /// Auth configuration resolved from various sources

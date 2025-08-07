@@ -28,7 +28,7 @@ pub struct ComponentBuildInfo {
 
 /// Build command configuration
 pub struct BuildConfig {
-    /// Path to the toolbox
+    /// Path to the project
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,
@@ -59,9 +59,14 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         return handle_export(&config, &deps, &working_path, export_format);
     }
 
-    // Generate temporary spin.toml from ftl.toml
-    let temp_spin_toml =
-        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &working_path)?;
+    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
+        &crate::config::transpiler::GenerateSpinConfig {
+            file_system: &deps.file_system,
+            project_path: &working_path,
+            download_components: false,
+            validate_local_auth: false,
+        },
+    )?;
 
     // We must have a temp spin.toml since ftl.toml is required
     let manifest_path = temp_spin_toml.ok_or_else(|| {
@@ -369,7 +374,7 @@ async fn run_build_command(
 /// Build command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct BuildArgs {
-    /// Path to the toolbox
+    /// Path to the project
     pub path: Option<PathBuf>,
     /// Build in release mode
     pub release: bool,

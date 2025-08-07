@@ -227,7 +227,15 @@ command = "echo 'Building test tool'"
 async fn test_deploy_no_ftl_toml() {
     let mut fixture = TestFixture::new();
 
-    // No ftl.toml - should fail
+    // Mock: First attempt to read ftl.toml for project name (will fail)
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .times(1)
+        .returning(|_| Err(anyhow::anyhow!("File not found")));
+
+    // No ftl.toml - should fail during generate_temp_spin_toml
     setup_project_file_mocks(&mut fixture, false);
 
     let deps = fixture.to_deps();
@@ -1891,6 +1899,7 @@ fn default_deploy_args() -> DeployArgs {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true, // Skip confirmation in tests
     }
 }
 
@@ -1903,6 +1912,7 @@ fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true, // Skip confirmation in tests
     }
 }
 
@@ -2004,6 +2014,7 @@ async fn test_auth_config_updated_before_deployment() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2105,6 +2116,7 @@ async fn test_deploy_with_sensitive_variables() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2163,6 +2175,7 @@ async fn test_deploy_with_short_sensitive_values() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2262,6 +2275,7 @@ command = "echo 'Building test tool'"
         auth_issuer: None,
         auth_audience: None,
         dry_run: true,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2385,6 +2399,7 @@ command = "echo 'Building test tool'"
         auth_issuer: None,
         auth_audience: None,
         dry_run: true,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2444,6 +2459,7 @@ async fn test_deploy_auth_mode_user_only() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2488,6 +2504,7 @@ async fn test_deploy_auth_mode_custom() {
         auth_issuer: Some("https://auth.example.com".to_string()),
         auth_audience: Some("my-api".to_string()),
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2536,6 +2553,7 @@ async fn test_deploy_auth_mode_custom_missing_required() {
         auth_issuer: None, // Missing required issuer
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2590,6 +2608,7 @@ async fn test_deploy_invalid_auth_mode() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2759,6 +2778,7 @@ command = "cargo build"
         auth_issuer: None,
         auth_audience: None,
         dry_run: true,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -2813,6 +2833,7 @@ command = "echo 'Building test tool'"
         auth_issuer: None,
         auth_audience: None,
         dry_run: true,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -3045,6 +3066,7 @@ async fn test_deploy_auth_enabled_always_included() {
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
@@ -3196,6 +3218,7 @@ access_control = "public"
         auth_issuer: None,
         auth_audience: None,
         dry_run: false,
+        yes: true,
     };
 
     let result = resolve_auth_config(&fs_arc, &args).unwrap();

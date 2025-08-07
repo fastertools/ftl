@@ -1,295 +1,158 @@
-//! Refactored registry command with dependency injection for better testability
+//! Registry command for managing container registries
 
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Result;
-use ftl_runtime::deps::{MessageStyle, UserInterface};
-use reqwest::Client;
-
-use crate::registry::{RegistryAdapter, get_registry_adapter};
+use ftl_runtime::deps::{FileSystem, UserInterface};
+use toml_edit::{DocumentMut, Item, Table};
 
 /// Dependencies for the registry command
 pub struct RegistryDependencies {
     /// User interface for output
     pub ui: Arc<dyn UserInterface>,
-    /// HTTP client for registry operations
-    pub client: Client,
+    /// File system for reading/writing config
+    pub file_system: Arc<dyn FileSystem>,
 }
 
-/// Execute the list subcommand with injected dependencies
-pub fn list_with_deps(registry: Option<&str>, deps: &Arc<RegistryDependencies>) -> Result<()> {
-    let registry_name = registry.unwrap_or("ghcr");
+/// List configured registries or show available registry types
+pub fn list_with_deps(deps: &Arc<RegistryDependencies>) -> Result<()> {
+    // Try to read ftl.toml to show current configuration
+    let ftl_path = Path::new("ftl.toml");
 
-    deps.ui.print(&format!(
-        "{} Listing components from {}",
-        styled_text("→", MessageStyle::Cyan),
-        styled_text(registry_name, MessageStyle::Bold)
-    ));
-    deps.ui.print("");
+    if deps.file_system.exists(ftl_path) {
+        let content = deps.file_system.read_to_string(ftl_path)?;
+        let doc: DocumentMut = content.parse()?;
 
-    // Get the registry adapter
-    match get_registry_adapter(registry) {
-        Ok(adapter) => {
-            deps.ui.print(&format!(
-                "{} Using {} registry",
-                styled_text("ℹ", MessageStyle::Cyan),
-                adapter.name()
-            ));
-            deps.ui.print("");
-
-            // For now, show guidance since crane ls needs specific image names
-            deps.ui.print(&format!(
-                "{} Registry listing requires crane CLI and specific image names",
-                styled_text("!", MessageStyle::Yellow)
-            ));
-            deps.ui.print("");
-            deps.ui.print("To list tags for a specific image, use:");
-            deps.ui.print(&format!(
-                "  crane ls {}",
-                adapter.get_registry_url("IMAGE_NAME")
-            ));
-            deps.ui.print("");
-            deps.ui.print("Browse components at:");
-
-            match registry_name {
-                "ghcr" => {
-                    deps.ui.print("  - GitHub Container Registry: https://github.com/orgs/fastertools/packages");
-                }
-                "docker" => {
-                    deps.ui.print("  - Docker Hub: https://hub.docker.com/");
-                }
-                _ => {
-                    deps.ui.print(&format!("  - Registry: {registry_name}"));
-                }
+        if let Some(project) = doc.get("project") {
+            if let Some(default_registry) = project.get("default_registry") {
+                deps.ui.print("Current registry configuration:");
+                deps.ui.print("");
+                // Extract the string value without quotes
+                let registry_str = if let Some(s) = default_registry.as_str() {
+                    s.to_string()
+                } else {
+                    default_registry.to_string().trim_matches('"').to_string()
+                };
+                deps.ui
+                    .print(&format!("  Default registry: {registry_str}"));
+                deps.ui.print("");
+            } else {
+                deps.ui.print("No default registry configured.");
+                deps.ui.print("");
             }
         }
-        Err(e) => {
-            deps.ui.print(&format!(
-                "{} Error: {}",
-                styled_text("✗", MessageStyle::Red),
-                e
-            ));
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-/// Execute the search subcommand with injected dependencies
-pub fn search_with_deps(
-    query: &str,
-    registry: Option<&str>,
-    deps: &Arc<RegistryDependencies>,
-) -> Result<()> {
-    let registry_name = registry.unwrap_or("ghcr");
-
-    deps.ui.print(&format!(
-        "{} Searching for '{}' in {}",
-        styled_text("→", MessageStyle::Cyan),
-        styled_text(query, MessageStyle::Bold),
-        registry_name
-    ));
-    deps.ui.print("");
-
-    // Get the registry adapter
-    match get_registry_adapter(registry) {
-        Ok(adapter) => {
-            deps.ui.print(&format!(
-                "{} Using {} registry",
-                styled_text("ℹ", MessageStyle::Cyan),
-                adapter.name()
-            ));
-            deps.ui.print("");
-
-            deps.ui.print(&format!(
-                "{} Registry search not yet implemented via crane",
-                styled_text("!", MessageStyle::Yellow)
-            ));
-            deps.ui.print("");
-            deps.ui.print("For now, you can search at:");
-
-            match registry_name {
-                "ghcr" => {
-                    deps.ui.print(&format!(
-                        "  - GitHub Packages: https://github.com/search?q={query}&type=registrypackages"
-                    ));
-                }
-                "docker" => {
-                    deps.ui.print(&format!(
-                        "  - Docker Hub: https://hub.docker.com/search?q={query}"
-                    ));
-                }
-                _ => {
-                    deps.ui
-                        .print(&format!("  - Search manually in {registry_name} registry"));
-                }
-            }
-        }
-        Err(e) => {
-            deps.ui.print(&format!(
-                "{} Error: {}",
-                styled_text("✗", MessageStyle::Red),
-                e
-            ));
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-/// Execute the info subcommand with injected dependencies
-pub async fn info_with_deps(component: &str, deps: &Arc<RegistryDependencies>) -> Result<()> {
-    deps.ui.print(&format!(
-        "{} Getting info for component: {}",
-        styled_text("→", MessageStyle::Cyan),
-        styled_text(component, MessageStyle::Bold)
-    ));
-    deps.ui.print("");
-
-    // Try to determine registry from component name or use default
-    let registry = if component.contains("ghcr.io") {
-        Some("ghcr")
-    } else if component.contains("docker.io") {
-        Some("docker")
     } else {
-        None // Use default
-    };
-
-    match get_registry_adapter(registry) {
-        Ok(adapter) => {
-            deps.ui.print(&format!(
-                "{} Using {} registry",
-                styled_text("ℹ", MessageStyle::Cyan),
-                adapter.name()
-            ));
-            deps.ui.print("");
-
-            // Check if component exists
-            deps.ui.print(&format!(
-                "{} Checking if component exists...",
-                styled_text("→", MessageStyle::Cyan)
-            ));
-
-            match adapter.verify_image_exists(&deps.client, component).await {
-                Ok(true) => {
-                    deps.ui.print(&format!(
-                        "{} Component exists in registry",
-                        styled_text("✓", MessageStyle::Green)
-                    ));
-
-                    // Try to get registry components for more info
-                    match adapter
-                        .get_registry_components(&deps.client, component)
-                        .await
-                    {
-                        Ok(components) => {
-                            deps.ui.print("");
-                            deps.ui.print("Component details:");
-                            deps.ui
-                                .print(&format!("  Registry: {}", components.registry_domain));
-                            deps.ui
-                                .print(&format!("  Package:  {}", components.package_name));
-                            deps.ui
-                                .print(&format!("  Version:  {}", components.version));
-                        }
-                        Err(e) => {
-                            deps.ui.print(&format!(
-                                "{} Could not get component details: {}",
-                                styled_text("!", MessageStyle::Yellow),
-                                e
-                            ));
-                        }
-                    }
-                }
-                Ok(false) => {
-                    deps.ui.print(&format!(
-                        "{} Component not found in registry",
-                        styled_text("✗", MessageStyle::Red)
-                    ));
-                }
-                Err(e) => {
-                    deps.ui.print(&format!(
-                        "{} Error checking component: {}",
-                        styled_text("!", MessageStyle::Yellow),
-                        e
-                    ));
-                }
-            }
-
-            deps.ui.print("");
-            deps.ui.print("Component reference formats:");
-            deps.ui.print("  - ghcr.io/username/component:version");
-            deps.ui.print("  - docker.io/username/component:version");
-            deps.ui
-                .print("  - component-name (searches default registry)");
-        }
-        Err(e) => {
-            deps.ui.print(&format!(
-                "{} Error: {}",
-                styled_text("✗", MessageStyle::Red),
-                e
-            ));
-            return Err(e);
-        }
+        deps.ui.print("No ftl.toml found in current directory.");
+        deps.ui.print("");
     }
+
+    deps.ui.print("Available registry types:");
+    deps.ui
+        .print("  • ghcr.io         - GitHub Container Registry");
+    deps.ui.print("  • docker.io       - Docker Hub");
+    deps.ui
+        .print("  • Custom URL      - Any OCI-compatible registry");
+    deps.ui.print("");
+    deps.ui.print("Authentication:");
+    deps.ui
+        .print("  Use 'docker login' to authenticate with any registry");
 
     Ok(())
 }
 
-// Helper function to format styled text (since we're not using console crate directly)
-const fn styled_text(text: &str, _style: MessageStyle) -> &str {
-    text
+/// Set the default registry in ftl.toml
+pub fn set_default_registry(deps: &Arc<RegistryDependencies>, registry_url: &str) -> Result<()> {
+    let ftl_path = Path::new("ftl.toml");
+
+    if !deps.file_system.exists(ftl_path) {
+        return Err(anyhow::anyhow!("No ftl.toml found. Run 'ftl init' first."));
+    }
+
+    // Read and parse the existing file
+    let content = deps.file_system.read_to_string(ftl_path)?;
+    let mut doc: DocumentMut = content.parse()?;
+
+    // Ensure project section exists
+    if doc.get("project").is_none() {
+        doc["project"] = Item::Table(Table::default());
+    }
+
+    // Set the default_registry field
+    doc["project"]["default_registry"] = Item::Value(registry_url.into());
+
+    // Write back to file
+    deps.file_system.write_string(ftl_path, &doc.to_string())?;
+
+    deps.ui
+        .print(&format!("✓ Default registry set to: {registry_url}"));
+    deps.ui.print("");
+    deps.ui.print("You can now use short component names:");
+    deps.ui
+        .print("  my-component:1.0.0  # Will resolve to {}/my-component:1.0.0");
+
+    Ok(())
 }
 
-/// Registry command arguments (matches CLI parser)
-#[derive(Debug, Clone)]
-pub struct RegistryArgs {
-    /// Subcommand
-    pub command: RegistryCommand,
+/// Remove the default registry from ftl.toml
+pub fn remove_default_registry(deps: &Arc<RegistryDependencies>) -> Result<()> {
+    let ftl_path = Path::new("ftl.toml");
+
+    if !deps.file_system.exists(ftl_path) {
+        return Err(anyhow::anyhow!("No ftl.toml found."));
+    }
+
+    // Read and parse the existing file
+    let content = deps.file_system.read_to_string(ftl_path)?;
+    let mut doc: DocumentMut = content.parse()?;
+
+    // Remove the default_registry field if it exists
+    if let Some(project) = doc.get_mut("project") {
+        if let Some(table) = project.as_table_mut() {
+            table.remove("default_registry");
+        }
+    }
+
+    // Write back to file
+    deps.file_system.write_string(ftl_path, &doc.to_string())?;
+
+    deps.ui.print("✓ Default registry removed");
+    deps.ui
+        .print("  Components will now require full registry URLs");
+
+    Ok(())
 }
 
-/// Registry subcommands
-#[derive(Debug, Clone)]
-pub enum RegistryCommand {
-    /// List available components
-    List {
-        /// Registry URL
-        registry: Option<String>,
-    },
-    /// Search for components
-    Search {
-        /// Search query
-        query: String,
-        /// Registry URL
-        registry: Option<String>,
-    },
-    /// Get info about a component
-    Info {
-        /// Component name
-        component: String,
-    },
-}
-
-/// Execute the registry command with default dependencies
-pub async fn execute(args: RegistryArgs) -> Result<()> {
+/// Execute registry command
+pub fn execute(action: RegistryAction) -> Result<()> {
     use ftl_common::RealUserInterface;
+    use ftl_runtime::deps::RealFileSystem;
 
     let ui = Arc::new(RealUserInterface);
-    let client = Client::new();
     let deps = Arc::new(RegistryDependencies {
         ui: ui.clone(),
-        client,
+        file_system: Arc::new(RealFileSystem),
     });
 
-    match args.command {
-        RegistryCommand::List { registry } => list_with_deps(registry.as_deref(), &deps),
-        RegistryCommand::Search { query, registry } => {
-            search_with_deps(&query, registry.as_deref(), &deps)
-        }
-        RegistryCommand::Info { component } => info_with_deps(&component, &deps).await,
+    match action {
+        RegistryAction::List => list_with_deps(&deps),
+        RegistryAction::Set { url } => set_default_registry(&deps, &url),
+        RegistryAction::Remove => remove_default_registry(&deps),
     }
+}
+
+/// Registry command actions
+#[derive(Debug, Clone)]
+pub enum RegistryAction {
+    /// List registries or show current configuration
+    List,
+    /// Set the default registry
+    Set {
+        /// Registry URL (e.g., "ghcr.io/myorg")
+        url: String,
+    },
+    /// Remove the default registry
+    Remove,
 }
 
 #[cfg(test)]
