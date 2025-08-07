@@ -30,6 +30,7 @@ impl ToolsManifest {
     }
 
     /// Get all tools
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to Vec deref
     pub fn get_tools(&self) -> &[Tool] {
         &self.tools
     }

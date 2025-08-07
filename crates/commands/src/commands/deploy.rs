@@ -193,13 +193,111 @@ async fn execute_deploy_inner(
         })
         .collect();
 
-    // Parse variables from command line
-    let mut parsed_variables = parse_variables(&args.variables)?;
+    // Parse variables following precedence: CLI flags > env vars > ftl.toml
+    let mut parsed_variables = HashMap::new();
 
-    // If we have ftl.toml, extract variables and auth configuration
-    if deps.file_system.exists(Path::new("ftl.toml")) {
-        add_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
-        add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
+    // Step 1: Load from ftl.toml first (lowest priority)
+    // Note: We use the already-parsed ftl_config to avoid re-reading the file
+    add_variables_from_config(&ftl_config, &mut parsed_variables);
+    add_auth_variables_from_config(&ftl_config, &mut parsed_variables);
+
+    // Step 2: Override with environment variables (middle priority)
+    // Spin uses SPIN_VARIABLE_ prefix for runtime variables
+    for (key, value) in std::env::vars() {
+        if let Some(var_name) = key.strip_prefix("SPIN_VARIABLE_") {
+            parsed_variables.insert(var_name.to_string(), value);
+        }
+    }
+
+    // Also handle FTL_ACCESS_CONTROL env var which affects auth_enabled
+    if let Ok(access_control) = std::env::var("FTL_ACCESS_CONTROL") {
+        match access_control.as_str() {
+            "public" => {
+                parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
+            }
+            "private" | "custom" => {
+                parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
+
+                // Set provider type based on mode
+                if access_control == "private" {
+                    // Use FTL's AuthKit for private mode (unless overridden by SPIN_VARIABLE_)
+                    if !parsed_variables.contains_key("mcp_provider_type") {
+                        parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    }
+                    if !parsed_variables.contains_key("mcp_jwt_issuer") {
+                        parsed_variables.insert(
+                            "mcp_jwt_issuer".to_string(),
+                            "https://divine-lion-50-staging.authkit.app".to_string(),
+                        );
+                    }
+                }
+            }
+            _ => {} // Invalid values handled later
+        }
+    }
+
+    // Apply other FTL_ env vars for auth configuration
+    if let Ok(provider) = std::env::var("FTL_AUTH_PROVIDER") {
+        parsed_variables.insert("mcp_provider_type".to_string(), provider);
+    }
+    if let Ok(issuer) = std::env::var("FTL_AUTH_ISSUER") {
+        parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer);
+    }
+    if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
+        parsed_variables.insert("mcp_jwt_audience".to_string(), audience);
+    }
+
+    // Step 3: Override with CLI variables (highest priority)
+    let cli_variables = parse_variables(&args.variables)?;
+    for (key, value) in cli_variables {
+        parsed_variables.insert(key, value);
+    }
+
+    // Step 4: Handle auth-related CLI flags which should also affect variables
+    // The --access-control flag should override auth_enabled and related variables
+    if let Some(access_control) = &args.access_control {
+        match access_control.as_str() {
+            "public" => {
+                // Disable auth
+                parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
+            }
+            "private" | "custom" => {
+                // Enable auth
+                parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
+
+                // For custom mode, also set provider details if provided
+                if access_control == "custom" {
+                    if let Some(provider) = &args.auth_provider {
+                        parsed_variables.insert("mcp_provider_type".to_string(), provider.clone());
+                    }
+                    if let Some(issuer) = &args.auth_issuer {
+                        parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
+                    }
+                    if let Some(audience) = &args.auth_audience {
+                        parsed_variables.insert("mcp_jwt_audience".to_string(), audience.clone());
+                    }
+                } else if access_control == "private" {
+                    // For private mode without custom OIDC, use FTL's AuthKit
+                    // Check if we need to override issuer for tenant-scoped AuthKit
+                    if args.auth_issuer.is_none()
+                        && !parsed_variables.contains_key("mcp_jwt_issuer")
+                    {
+                        parsed_variables.insert(
+                            "mcp_jwt_issuer".to_string(),
+                            "https://divine-lion-50-staging.authkit.app".to_string(),
+                        );
+                    }
+                    if args.auth_provider.is_none()
+                        && !parsed_variables.contains_key("mcp_provider_type")
+                    {
+                        parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    }
+                }
+            }
+            _ => {
+                // Invalid value will be caught later in resolve_auth_config
+            }
+        }
     }
 
     // If this is a dry run, display summary and exit
@@ -690,49 +788,40 @@ async fn update_auth_config(
     Ok(())
 }
 
-/// Add auth-related variables from ftl.toml to the variables map
-fn add_auth_variables_from_ftl(
-    file_system: &Arc<dyn FileSystem>,
+/// Add auth-related variables from parsed `FtlConfig` to the variables map
+fn add_auth_variables_from_config(
+    config: &crate::config::ftl_config::FtlConfig,
     variables: &mut HashMap<String, String>,
-) -> Result<()> {
-    use crate::config::ftl_config::FtlConfig;
-
-    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
-    let config = FtlConfig::parse(&content)?;
-
-    // Always add auth_enabled variable if not already provided via command line
-    if !variables.contains_key("auth_enabled") {
-        variables.insert(
-            "auth_enabled".to_string(),
-            config.is_auth_enabled().to_string(),
-        );
-    }
+) {
+    // Always add auth_enabled variable (will be overridden by env/CLI if present)
+    variables.insert(
+        "auth_enabled".to_string(),
+        config.is_auth_enabled().to_string(),
+    );
 
     // Only add other auth-related variables if auth is enabled
     if config.is_auth_enabled() {
         // Add provider type
-        if !variables.contains_key("mcp_provider_type") {
-            variables.insert(
-                "mcp_provider_type".to_string(),
-                config.auth_provider_type().to_string(),
-            );
-        }
+        variables.insert(
+            "mcp_provider_type".to_string(),
+            config.auth_provider_type().to_string(),
+        );
 
         // Add issuer
         let issuer = config.auth_issuer();
-        if !issuer.is_empty() && !variables.contains_key("mcp_jwt_issuer") {
+        if !issuer.is_empty() {
             variables.insert("mcp_jwt_issuer".to_string(), issuer.to_string());
         }
 
         // Add audience
         let audience = config.auth_audience();
-        if !audience.is_empty() && !variables.contains_key("mcp_jwt_audience") {
+        if !audience.is_empty() {
             variables.insert("mcp_jwt_audience".to_string(), audience.to_string());
         }
 
         // Add required scopes
         let required_scopes = config.auth_required_scopes();
-        if !required_scopes.is_empty() && !variables.contains_key("mcp_jwt_required_scopes") {
+        if !required_scopes.is_empty() {
             variables.insert(
                 "mcp_jwt_required_scopes".to_string(),
                 required_scopes.to_string(),
@@ -743,39 +832,33 @@ fn add_auth_variables_from_ftl(
     // Add OIDC-specific variables if present and auth is enabled
     if config.is_auth_enabled() {
         if let Some(oidc) = &config.oidc {
-            if !oidc.jwks_uri.is_empty() && !variables.contains_key("mcp_jwt_jwks_uri") {
+            if !oidc.jwks_uri.is_empty() {
                 variables.insert("mcp_jwt_jwks_uri".to_string(), oidc.jwks_uri.clone());
             }
 
-            if !oidc.public_key.is_empty() && !variables.contains_key("mcp_jwt_public_key") {
+            if !oidc.public_key.is_empty() {
                 variables.insert("mcp_jwt_public_key".to_string(), oidc.public_key.clone());
             }
 
-            if !oidc.algorithm.is_empty() && !variables.contains_key("mcp_jwt_algorithm") {
+            if !oidc.algorithm.is_empty() {
                 variables.insert("mcp_jwt_algorithm".to_string(), oidc.algorithm.clone());
             }
 
-            if !oidc.authorize_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_authorize_endpoint")
-            {
+            if !oidc.authorize_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_authorize_endpoint".to_string(),
                     oidc.authorize_endpoint.clone(),
                 );
             }
 
-            if !oidc.token_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_token_endpoint")
-            {
+            if !oidc.token_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_token_endpoint".to_string(),
                     oidc.token_endpoint.clone(),
                 );
             }
 
-            if !oidc.userinfo_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_userinfo_endpoint")
-            {
+            if !oidc.userinfo_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_userinfo_endpoint".to_string(),
                     oidc.userinfo_endpoint.clone(),
@@ -783,38 +866,29 @@ fn add_auth_variables_from_ftl(
             }
         }
     }
-
-    Ok(())
 }
 
-/// Add general variables from ftl.toml to the variables map
-fn add_variables_from_ftl(
-    file_system: &Arc<dyn FileSystem>,
+/// Add general variables from parsed `FtlConfig` to the variables map
+fn add_variables_from_config(
+    config: &crate::config::ftl_config::FtlConfig,
     variables: &mut HashMap<String, String>,
-) -> Result<()> {
-    use crate::config::ftl_config::{ApplicationVariable, FtlConfig};
-
-    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
-    let config = FtlConfig::parse(&content)?;
+) {
+    use crate::config::ftl_config::ApplicationVariable;
 
     // Add application-level variables that have default values
     // Required variables without defaults must be provided via CLI or env vars
     for (name, var) in &config.variables {
-        // Only add if not already provided via command line
-        if !variables.contains_key(name) {
-            match var {
-                ApplicationVariable::Default { default } => {
-                    variables.insert(name.clone(), default.clone());
-                }
-                ApplicationVariable::Required { .. } => {
-                    // Required variables must be provided at runtime
-                    // We don't add them here, they'll be handled by Spin
-                }
+        match var {
+            ApplicationVariable::Default { default } => {
+                // Always add defaults from ftl.toml (will be overridden by env/CLI if present)
+                variables.insert(name.clone(), default.clone());
+            }
+            ApplicationVariable::Required { .. } => {
+                // Required variables must be provided at runtime
+                // We don't add them here, they'll be handled by Spin
             }
         }
     }
-
-    Ok(())
 }
 
 /// Parse deployment configuration from spin.toml

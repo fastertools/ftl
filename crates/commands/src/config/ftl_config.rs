@@ -312,6 +312,7 @@ impl FtlConfig {
     }
 
     /// Get the audience
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to String deref
     pub fn auth_audience(&self) -> &str {
         if let Some(oidc) = &self.oidc {
             &oidc.audience
@@ -321,6 +322,7 @@ impl FtlConfig {
     }
 
     /// Get required scopes
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to String deref
     pub fn auth_required_scopes(&self) -> &str {
         if let Some(oidc) = &self.oidc {
             &oidc.required_scopes
