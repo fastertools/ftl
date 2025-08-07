@@ -24,8 +24,8 @@ audience = "my-api"
 # ... additional OIDC settings
 
 [mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 validate_arguments = false
 
 [variables]
@@ -155,8 +155,8 @@ The `[mcp]` section configures the MCP gateway and authorizer components.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `gateway` | string | No | "ghcr.io/fastertools/mcp-gateway:0.0.10" | MCP gateway component registry URI |
-| `authorizer` | string | No | "ghcr.io/fastertools/mcp-authorizer:0.0.12" | MCP authorizer component registry URI |
+| `gateway` | string | No | "ghcr.io/fastertools/mcp-gateway:0.0.11" | MCP gateway component registry URI |
+| `authorizer` | string | No | "ghcr.io/fastertools/mcp-authorizer:0.0.13" | MCP authorizer component registry URI |
 | `validate_arguments` | boolean | No | false | Whether to validate tool call arguments |
 
 ### Component References
