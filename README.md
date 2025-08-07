@@ -17,9 +17,9 @@ Faster tools for AI agents
 
 FTL is a framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
 
-FTL MCP servers work over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http), with spec-compliant [authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) options that work out-of-the-box with compatible clients like Cursor and Claude Code.
-
 Python, Rust, TypeScript, and Go tools can run co-isolated alongside each other within a single sandboxed MCP server process on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
+
+FTL MCP servers work over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http), with spec-compliant [authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) options that work out-of-the-box with compatible clients like Cursor and Claude Code.
 
 FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for running lag-free MCP servers on the network edge, with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
 
