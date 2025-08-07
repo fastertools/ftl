@@ -1895,9 +1895,7 @@ fn default_deploy_args() -> DeployArgs {
     DeployArgs {
         variables: vec![],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
@@ -1908,9 +1906,7 @@ fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
     DeployArgs {
         variables,
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
@@ -2010,9 +2006,7 @@ async fn test_auth_config_updated_before_deployment() {
     let args = DeployArgs {
         variables: vec![],
         access_control: Some("public".to_string()),
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -2112,9 +2106,7 @@ async fn test_deploy_with_sensitive_variables() {
             "debug_mode=false".to_string(),
         ],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -2171,9 +2163,7 @@ async fn test_deploy_with_short_sensitive_values() {
             "secret=1234".to_string(),
         ],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -2271,9 +2261,7 @@ command = "echo 'Building test tool'"
             "debug_mode=true".to_string(),
         ],
         access_control: Some("public".to_string()),
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: true,
         yes: true,
     };
@@ -2395,9 +2383,7 @@ command = "echo 'Building test tool'"
     let args = DeployArgs {
         variables: vec![],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: true,
         yes: true,
     };
@@ -2455,9 +2441,7 @@ async fn test_deploy_auth_mode_user_only() {
     let args = DeployArgs {
         variables: vec![],
         access_control: Some("private".to_string()),
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -2499,10 +2483,8 @@ async fn test_deploy_auth_mode_custom() {
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
-        access_control: Some("custom".to_string()),
-        auth_provider: Some("authkit".to_string()),
-        auth_issuer: Some("https://auth.example.com".to_string()),
-        auth_audience: Some("my-api".to_string()),
+        access_control: Some("private".to_string()),
+        jwt_issuer: Some("https://auth.example.com".to_string()),
         dry_run: false,
         yes: true,
     };
@@ -2511,60 +2493,7 @@ async fn test_deploy_auth_mode_custom() {
     assert!(result.is_ok());
 }
 
-#[tokio::test]
-async fn test_deploy_auth_mode_custom_missing_required() {
-    let mut fixture = TestFixture::new();
-
-    setup_full_mocks(&mut fixture);
-    setup_successful_push(&mut fixture);
-
-    // Mock: list apps
-    fixture
-        .api_client
-        .expect_list_apps()
-        .times(1)
-        .returning(|_, _, _| {
-            Ok(types::ListAppsResponse {
-                apps: vec![],
-                next_token: None,
-            })
-        });
-
-    // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
-
-    let deps = fixture.to_deps();
-    let args = DeployArgs {
-        variables: vec![],
-        access_control: Some("custom".to_string()),
-        auth_provider: Some("authkit".to_string()),
-        auth_issuer: None, // Missing required issuer
-        auth_audience: None,
-        dry_run: false,
-        yes: true,
-    };
-
-    let result = execute_with_deps(deps, args).await;
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Custom auth mode requires --auth-provider and --auth-issuer")
-    );
-}
+// Test removed: private mode without issuer is now valid (uses FTL's AuthKit)
 
 #[tokio::test]
 async fn test_deploy_invalid_auth_mode() {
@@ -2604,9 +2533,7 @@ async fn test_deploy_invalid_auth_mode() {
     let args = DeployArgs {
         variables: vec![],
         access_control: Some("invalid-mode".to_string()),
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -2774,9 +2701,7 @@ command = "cargo build"
     let args = DeployArgs {
         variables: vec![],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: true,
         yes: true,
     };
@@ -2829,9 +2754,7 @@ command = "echo 'Building test tool'"
     let args = DeployArgs {
         variables: vec!["api_key=provided-key".to_string()], // Only provide one required var
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: true,
         yes: true,
     };
@@ -3062,9 +2985,7 @@ async fn test_deploy_auth_enabled_always_included() {
     let args = DeployArgs {
         variables: vec![],
         access_control: None, // Public access control
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };
@@ -3173,9 +3094,7 @@ access_control = "public"
     let args = DeployArgs {
         variables: vec![],
         access_control: None,
-        auth_provider: None,
-        auth_issuer: None,
-        auth_audience: None,
+        jwt_issuer: None,
         dry_run: false,
         yes: true,
     };

@@ -240,7 +240,7 @@ async fn execute_deploy_inner(
     if let Ok(provider) = std::env::var("FTL_AUTH_PROVIDER") {
         parsed_variables.insert("mcp_provider_type".to_string(), provider);
     }
-    if let Ok(issuer) = std::env::var("FTL_AUTH_ISSUER") {
+    if let Ok(issuer) = std::env::var("FTL_JWT_ISSUER") {
         parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer);
     }
     if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
@@ -255,41 +255,32 @@ async fn execute_deploy_inner(
 
     // Step 4: Handle auth-related CLI flags which should also affect variables
     // The --access-control flag should override auth_enabled and related variables
+    // IMPORTANT: If --auth-issuer is provided, treat it as custom auth regardless of access_control
     if let Some(access_control) = &args.access_control {
         match access_control.as_str() {
             "public" => {
                 // Disable auth
                 parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
             }
-            "private" | "custom" => {
+            "private" => {
                 // Enable auth
                 parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
 
-                // For custom mode, also set provider details if provided
-                if access_control == "custom" {
-                    if let Some(provider) = &args.auth_provider {
-                        parsed_variables.insert("mcp_provider_type".to_string(), provider.clone());
-                    }
-                    if let Some(issuer) = &args.auth_issuer {
-                        parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
-                    }
-                    if let Some(audience) = &args.auth_audience {
-                        parsed_variables.insert("mcp_jwt_audience".to_string(), audience.clone());
-                    }
+                // If jwt_issuer is provided, treat as custom auth
+                if let Some(issuer) = &args.jwt_issuer {
+                    // Custom auth mode with custom issuer
+                    parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
                 } else if access_control == "private" {
                     // For private mode without custom OIDC, use FTL's AuthKit
                     // Check if we need to override issuer for tenant-scoped AuthKit
-                    if args.auth_issuer.is_none()
-                        && !parsed_variables.contains_key("mcp_jwt_issuer")
-                    {
+                    if !parsed_variables.contains_key("mcp_jwt_issuer") {
                         parsed_variables.insert(
                             "mcp_jwt_issuer".to_string(),
                             "https://divine-lion-50-staging.authkit.app".to_string(),
                         );
                     }
-                    if args.auth_provider.is_none()
-                        && !parsed_variables.contains_key("mcp_provider_type")
-                    {
+                    if !parsed_variables.contains_key("mcp_provider_type") {
                         parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
                     }
                 }
@@ -1389,12 +1380,8 @@ pub struct DeployArgs {
     pub variables: Vec<String>,
     /// Access control mode to set for the deployed app
     pub access_control: Option<String>,
-    /// Custom auth provider (authkit, auth0, oidc)
-    pub auth_provider: Option<String>,
-    /// Custom auth issuer URL
-    pub auth_issuer: Option<String>,
-    /// Custom auth audience
-    pub auth_audience: Option<String>,
+    /// JWT issuer URL
+    pub jwt_issuer: Option<String>,
     /// Run without making any changes (preview what would be deployed)
     pub dry_run: bool,
     /// Skip confirmation prompt
@@ -1461,7 +1448,7 @@ fn resolve_auth_config(
     if let Ok(provider) = std::env::var("FTL_AUTH_PROVIDER") {
         auth_provider = Some(provider);
     }
-    if let Ok(issuer) = std::env::var("FTL_AUTH_ISSUER") {
+    if let Ok(issuer) = std::env::var("FTL_JWT_ISSUER") {
         auth_issuer = Some(issuer);
     }
     if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
@@ -1469,17 +1456,20 @@ fn resolve_auth_config(
     }
 
     // Override with CLI flags (highest priority)
-    if let Some(mode) = &args.access_control {
-        auth_mode = Some(mode.clone());
-    }
-    if let Some(provider) = &args.auth_provider {
-        auth_provider = Some(provider.clone());
-    }
-    if let Some(issuer) = &args.auth_issuer {
+    // IMPORTANT: If --jwt-issuer is provided, treat as custom auth
+    if let Some(issuer) = &args.jwt_issuer {
+        // When jwt_issuer is explicitly provided, this is custom auth
+        auth_mode = Some("custom".to_string());
         auth_issuer = Some(issuer.clone());
+        // Always use jwt provider for custom auth
+        auth_provider = Some("jwt".to_string());
     }
-    if let Some(audience) = &args.auth_audience {
-        auth_audience = Some(audience.clone());
+
+    // Set access control mode if provided and no custom issuer override
+    if let Some(mode) = &args.access_control {
+        if args.jwt_issuer.is_none() {
+            auth_mode = Some(mode.clone());
+        }
     }
 
     // Return None if no auth mode is configured
