@@ -13,9 +13,10 @@
 [project]
 name = "my-ftl-project"
 version = "0.1.0"
-description = "My FTL MCP toolbox"
+description = "My FTL MCP project"
 authors = ["Your Name <you@example.com>"]
 access_control = "public"  # or "private"
+default_registry = "ghcr.io/myorg"  # Optional: default registry for components
 
 [oidc]  # Optional - only needed for custom OIDC providers
 issuer = "https://auth.example.com"
@@ -58,6 +59,7 @@ The `[project]` section contains essential metadata about your FTL project.
 | `description` | string | No | "" | Project description |
 | `authors` | array | No | [] | List of project authors |
 | `access_control` | string | No | "public" | Access control mode: "public" or "private" |
+| `default_registry` | string | No | - | Default registry for component references (e.g., "ghcr.io/myorg") |
 
 ### Access Control Modes
 
@@ -66,7 +68,7 @@ The `[project]` section contains essential metadata about your FTL project.
   - Without `[oidc]` section: Uses FTL's built-in auth provider
   - With `[oidc]` section: Uses your custom OIDC provider
 
-### Example: Using FTL's Built-in Provider
+#### Example: Using FTL's Built-in Provider
 
 Set `access_control = "private"` without an `[oidc]` section:
 
@@ -78,6 +80,39 @@ description = "Collection of MCP tools for data processing"
 authors = ["Alice <alice@example.com>", "Bob <bob@example.com>"]
 access_control = "private"
 # No [oidc] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
+```
+
+### Default Registry
+
+The `default_registry` field simplifies component references throughout your configuration. When set, you can use short component names that will be automatically prefixed with the registry URL.
+
+#### Example: Using Default Registry
+
+```toml
+[project]
+name = "my-project"
+default_registry = "ghcr.io/myorg"
+
+[mcp]
+# Short references - will resolve to ghcr.io/myorg/...
+gateway = "mcp-gateway:1.0.0"
+authorizer = "mcp-authorizer:1.0.0"
+
+[tools.my-tool]
+# Component from registry using short reference
+wasm = "some-component:1.0.0"  # Resolves to ghcr.io/myorg/some-component:1.0.0
+allowed_outbound_hosts = ["https://api.example.com"]
+# Note: build section is omitted for registry components
+```
+
+Without a default registry, you must use full component references:
+
+```toml
+[tools.my-tool]
+# Full registry reference required
+wasm = "ghcr.io/myorg/some-component:1.0.0"
+allowed_outbound_hosts = ["https://api.example.com"]
+# Note: build section is omitted for registry components
 ```
 
 ## OIDC Section (Optional)
@@ -124,6 +159,13 @@ The `[mcp]` section configures the MCP gateway and authorizer components.
 | `authorizer` | string | No | "ghcr.io/fastertools/mcp-authorizer:0.0.12" | MCP authorizer component registry URI |
 | `validate_arguments` | boolean | No | false | Whether to validate tool call arguments |
 
+### Component References
+
+Components can be specified as:
+- **Full registry URLs**: `ghcr.io/fastertools/mcp-gateway:0.0.11`
+- **Short references** (when `default_registry` is set): `mcp-gateway:0.0.11`
+- **Local paths**: `target/wasm32-wasip1/release/my_component.wasm`
+
 ### Example
 
 ```toml
@@ -131,6 +173,17 @@ The `[mcp]` section configures the MCP gateway and authorizer components.
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
 authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 validate_arguments = true  # Enable strict argument validation
+```
+
+With default registry:
+
+```toml
+[project]
+default_registry = "ghcr.io/fastertools"
+
+[mcp]
+gateway = "mcp-gateway:0.0.11"  # Resolves to ghcr.io/fastertools/mcp-gateway:0.0.11
+authorizer = "mcp-authorizer:0.0.13"
 ```
 
 ## Variables Section
@@ -155,24 +208,31 @@ SECRET_KEY = { required = true }  # Must be provided at runtime
 
 ## Tools Sections
 
-Each tool in your project is configured with a `[tools.TOOL_NAME]` section.
+Each tool in your project is configured with a `[tools.TOOL_NAME]` section. Tools can be either built locally or pulled from a registry.
 
 ### Tool Configuration Fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `path` | string | No | Tool name | Path to tool directory relative to project root |
-| `wasm` | string | Yes | - | Path to the compiled WASM file |
+| `path` | string | No | Tool name | Path to tool directory (for local tools only) |
+| `wasm` | string | Yes | - | Path to WASM file OR registry reference |
 | `allowed_outbound_hosts` | array | No | [] | List of allowed external hosts |
 | `variables` | table | No | {} | Tool-specific variables |
 
+### Component Sources
+
+The `wasm` field can specify either:
+1. **Local file path**: `"target/wasm32-wasip1/release/my_tool.wasm"`
+2. **Registry reference**: `"ghcr.io/org/component:1.0.0"`
+3. **Short registry reference** (with default_registry): `"component:1.0.0"`
+
 ### Build Configuration
 
-The `[tools.TOOL_NAME.build]` subsection configures how the tool is built.
+The `[tools.TOOL_NAME.build]` subsection configures how the tool is built. **This section is only required for locally-built tools, not for registry components.**
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `command` | string | Yes | - | Build command to execute |
+| `command` | string | Yes* | - | Build command to execute (*for local tools) |
 | `watch` | array | No | [] | Glob patterns for files to watch in dev mode |
 | `env` | table | No | {} | Environment variables for build process |
 
@@ -227,6 +287,41 @@ watch = ["*.py", "requirements.txt"]
 [tools.ml-analyzer.variables]
 MODEL_NAME = "bert-base-uncased"
 BATCH_SIZE = "32"
+```
+
+### Example: Registry Component
+
+```toml
+# Using a pre-built component from a registry
+[tools.json-formatter]
+wasm = "ghcr.io/fastertools/ftl-tool-json-formatter:0.0.1"
+allowed_outbound_hosts = []  # No external access needed
+
+[tools.json-formatter.variables]
+INDENT_SIZE = "2"
+# Note: No build section needed for registry components
+```
+
+### Example: Mixed Local and Registry Components
+
+```toml
+[project]
+name = "my-project"
+default_registry = "ghcr.io/myorg"
+
+# Local component with build configuration
+[tools.custom-processor]
+path = "tools/processor"
+wasm = "target/wasm32-wasip1/release/processor.wasm"
+
+[tools.custom-processor.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
+# Registry component using short reference
+[tools.data-validator]
+wasm = "validator:2.1.0"  # Resolves to ghcr.io/myorg/validator:2.1.0
+allowed_outbound_hosts = ["https://api.validator.com"]
+# No build section for registry components
 ```
 
 ## Advanced Features
@@ -325,6 +420,48 @@ STORAGE_BUCKET = "mcp-files"
 MAX_FILE_SIZE = "10485760"  # 10MB
 ```
 
+## Registry Management
+
+FTL supports pulling components from OCI-compatible registries. Authentication is handled through Docker's credential store.
+
+### Setting up Registry Authentication
+
+Use `docker login` to authenticate with any registry:
+
+```bash
+# GitHub Container Registry
+docker login ghcr.io
+
+# Docker Hub
+docker login docker.io
+
+# AWS ECR
+aws ecr get-login-password | docker login --username AWS --password-stdin 123456789.dkr.ecr.us-west-2.amazonaws.com
+```
+
+### Registry CLI Commands
+
+FTL provides commands to manage registry configuration:
+
+```bash
+# List current registry configuration
+ftl registry list
+
+# Set default registry
+ftl registry set ghcr.io/myorg
+
+# Remove default registry
+ftl registry remove
+```
+
+### Using Registry Components
+
+Components from registries are automatically pulled during deployment. Specify them using:
+
+1. **Full registry URLs**: `ghcr.io/org/component:1.0.0`
+2. **Short names** (with default_registry): `component:1.0.0`
+3. **Latest tags**: Automatically resolved to the latest semantic version
+
 ## Migration from spin.toml
 
 If you have an existing `spin.toml` file, you can migrate to `ftl.toml` by:
@@ -333,6 +470,10 @@ If you have an existing `spin.toml` file, you can migrate to `ftl.toml` by:
 2. Move authentication configuration to `access_control` and optionally `[oidc]`
 3. Convert Spin components to `[tools.*]` sections
 4. Update variable definitions to use the FTL format
+
+## Export to spin.toml
+
+Run `ftl build --export spin` in any `ftl` project to generate a `spin.toml` from your `ftl.toml`.
 
 ## Validation
 

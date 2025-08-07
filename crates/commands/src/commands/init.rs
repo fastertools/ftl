@@ -166,6 +166,7 @@ fn create_ftl_project(
             description: "FTL MCP server for hosting MCP tools".to_string(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),

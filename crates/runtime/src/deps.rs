@@ -170,6 +170,9 @@ pub trait UserInterface: Send + Sync {
     /// Prompt for selection
     fn prompt_select(&self, prompt: &str, items: &[&str], default: usize) -> Result<usize>;
 
+    /// Prompt for yes/no confirmation
+    fn prompt_confirm(&self, prompt: &str, default: bool) -> Result<bool>;
+
     /// Clear the screen
     fn clear_screen(&self);
 }

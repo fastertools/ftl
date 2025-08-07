@@ -75,6 +75,12 @@
           "type": "string",
           "enum": ["public", "private"],
           "default": "public"
+        },
+        "default_registry": {
+          "description": "Default registry for component references (e.g., 'ghcr.io/myorg')",
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._\\-/]*[a-zA-Z0-9]$",
+          "minLength": 1
         }
       }
     },
@@ -156,19 +162,19 @@
     "ToolConfig": {
       "description": "Tool configuration",
       "type": "object",
-      "required": ["wasm", "build"],
+      "required": ["wasm"],
       "properties": {
         "path": {
-          "description": "Path to tool directory relative to project root (defaults to tool name)",
+          "description": "Path to tool directory relative to project root (for local tools only, defaults to tool name)",
           "type": "string"
         },
         "wasm": {
-          "description": "Path to the WASM file produced by the build",
+          "description": "Path to WASM file (local) or registry reference (e.g., 'ghcr.io/org/component:1.0.0')",
           "type": "string",
           "minLength": 1
         },
         "build": {
-          "description": "Build configuration",
+          "description": "Build configuration (required for local tools, omitted for registry components)",
           "$ref": "#/$defs/BuildConfig"
         },
         "profiles": {

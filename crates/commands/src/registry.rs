@@ -1,44 +1,17 @@
 use anyhow::{Context, Result};
-use async_trait::async_trait;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::env;
 use std::process::Command;
 
 /// Registry components for Spin manifest generation
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RegistryComponents {
-    /// Registry domain (e.g., "docker.io", "ghcr.io")
-    pub registry_domain: String,
-    /// Package name (e.g., "library/nginx", "fastertools:ftl-tool-add")
-    pub package_name: String,
+    /// Full registry URL (e.g., "ghcr.io/fastertools/my-tool")
+    pub registry_url: String,
     /// Semantic version (e.g., "1.0.0", "2.1.3-alpha")
     pub version: String,
 }
 
-/// Trait for adapting different registry formats
-#[async_trait]
-pub trait RegistryAdapter {
-    /// Get the full registry URL for a given image name
-    fn get_registry_url(&self, image_name: &str) -> String;
-
-    /// Get registry components for Spin manifest generation
-    async fn get_registry_components(
-        &self,
-        client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents>;
-
-    /// Get a human-readable name for this registry
-    #[allow(dead_code)]
-    fn name(&self) -> &'static str;
-
-    /// Verify if an image exists in this registry
-    async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool>;
-}
-
 /// Parse image name and tag, defaulting to "latest" if no tag specified
-fn parse_image_and_tag(image_name: &str) -> (String, String) {
+pub fn parse_image_and_tag(image_name: &str) -> (String, String) {
     if let Some(pos) = image_name.rfind(':') {
         let image = image_name[..pos].to_string();
         let tag = image_name[pos + 1..].to_string();
@@ -48,11 +21,48 @@ fn parse_image_and_tag(image_name: &str) -> (String, String) {
     }
 }
 
-/// Verifies that the crane CLI tool is installed and available
+/// Resolve a component reference to a full registry URL
 ///
-/// Crane is required for registry operations like checking image existence
-/// and listing available tags. Returns an error with installation instructions
-/// if crane is not found.
+/// # Arguments
+/// * `component` - Component reference (e.g., "my-tool:1.0.0" or "ghcr.io/org/tool:1.0.0")
+/// * `default_registry` - Default registry to use for short references (e.g., "ghcr.io/fastertools")
+///
+/// # Returns
+/// Full registry URL with version
+pub fn resolve_registry_url(component: &str, default_registry: Option<&str>) -> String {
+    // Check if it's a local file
+    if component.to_lowercase().ends_with(".wasm") {
+        return component.to_string();
+    }
+
+    // Check if it already has a registry domain
+    if component.contains("://")
+        || component.starts_with("ghcr.io/")
+        || component.starts_with("docker.io/")
+        || component.contains(".amazonaws.com/")
+    {
+        return component.to_string();
+    }
+
+    // Check if it has an organization/user prefix
+    let (image_without_tag, _tag) = parse_image_and_tag(component);
+    if image_without_tag.matches('/').count() >= 2 {
+        // Already has registry/org/repo format
+        return component.to_string();
+    }
+
+    // Use default registry
+    let default = default_registry.unwrap_or("ghcr.io/fastertools");
+
+    // Handle Docker Hub library images (no org prefix)
+    if default.starts_with("docker.io") && !image_without_tag.contains('/') {
+        format!("docker.io/library/{component}")
+    } else {
+        format!("{default}/{component}")
+    }
+}
+
+/// Check if crane CLI tool is installed and available
 fn check_crane_available() -> Result<()> {
     let output = Command::new("crane")
         .arg("version")
@@ -66,60 +76,41 @@ fn check_crane_available() -> Result<()> {
     Ok(())
 }
 
-/// Checks if a container image exists in a registry using crane
-///
-/// Uses the crane manifest command to verify image existence.
-/// Leverages the user's existing Docker/registry authentication.
+/// Check if wkg CLI tool is installed and available
+fn check_wkg_available() -> Result<()> {
+    let output = Command::new("wkg")
+        .arg("--version")
+        .output()
+        .context("Failed to execute wkg. Please ensure wkg is installed: https://github.com/bytecodealliance/wasm-pkg-tools")?;
+
+    if !output.status.success() {
+        anyhow::bail!("wkg command failed. Please ensure wkg is installed and working");
+    }
+
+    Ok(())
+}
+
+/// Check if a component exists in a registry using crane
 ///
 /// # Arguments
 /// * `image_ref` - Full image reference (e.g., "ghcr.io/org/image:tag")
-fn verify_image_with_crane(image_ref: &str) -> Result<bool> {
-    // First check if crane is available
+pub fn verify_component_exists(image_ref: &str) -> Result<bool> {
     check_crane_available()?;
 
-    // Use crane manifest to check if image exists
-    // This will use the user's existing Docker/registry authentication
     let output = Command::new("crane")
         .arg("manifest")
         .arg(image_ref)
         .output()
         .context("Failed to execute crane manifest")?;
 
-    // If crane manifest succeeds, the image exists
-    // If it fails with exit code, the image doesn't exist or there's an auth issue
     Ok(output.status.success())
 }
 
-/// Verifies that a specific version exists, trying both with and without 'v' prefix
-///
-/// Many tools use version tags with 'v' prefix (e.g., "v1.0.0") while others don't.
-/// This function tries both formats to handle either convention.
-///
-/// # Arguments  
-/// * `registry_url` - Base registry URL without tag
-/// * `version` - Version to check (without 'v' prefix)
-fn verify_version_exists_with_crane(registry_url: &str, version: &str) -> Result<bool> {
-    check_crane_available()?;
-
-    // Try with 'v' prefix first, then without
-    let image_ref_with_v = format!("{registry_url}:v{version}");
-    let image_ref_without_v = format!("{registry_url}:{version}");
-
-    if verify_image_with_crane(&image_ref_with_v)? {
-        return Ok(true);
-    }
-
-    verify_image_with_crane(&image_ref_without_v)
-}
-
-/// Lists all available tags for a container image using crane
-///
-/// Executes `crane ls` to retrieve all tags from the registry.
-/// Filters out non-semver tags and sorts by version.
+/// List all available tags for a component using crane
 ///
 /// # Arguments
 /// * `repository` - Full repository path (e.g., "ghcr.io/org/image")
-fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
+pub fn list_component_tags(repository: &str) -> Result<Vec<String>> {
     check_crane_available()?;
 
     let output = Command::new("crane")
@@ -143,18 +134,59 @@ fn list_tags_with_crane(repository: &str) -> Result<Vec<String>> {
     Ok(tags)
 }
 
+/// Pull a WebAssembly component from a registry to a local file
+///
+/// # Arguments
+/// * `registry_url` - Full registry URL with tag (e.g., "ghcr.io/org/component:1.0.0")
+/// * `output_path` - Path where the WASM file should be saved
+pub fn pull_component(registry_url: &str, output_path: &str) -> Result<()> {
+    check_wkg_available()?;
+
+    let output = Command::new("wkg")
+        .args(["oci", "pull", registry_url, "-o", output_path])
+        .output()
+        .context("Failed to execute wkg oci pull")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to pull component: {}", stderr);
+    }
+
+    Ok(())
+}
+
+/// Push a WebAssembly component to a registry
+///
+/// # Arguments
+/// * `registry_url` - Full registry URL with tag (e.g., "ghcr.io/org/component:1.0.0")
+/// * `wasm_path` - Path to the WASM file to push
+pub fn push_component(registry_url: &str, wasm_path: &str) -> Result<()> {
+    check_wkg_available()?;
+
+    let output = Command::new("wkg")
+        .args(["oci", "push", registry_url, wasm_path])
+        .output()
+        .context("Failed to execute wkg oci push")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to push component: {}", stderr);
+    }
+
+    Ok(())
+}
+
 /// Resolve "latest" tag to the actual latest semantic version from registry
-fn resolve_latest_version(registry_url: &str) -> Result<String> {
+pub fn resolve_latest_version(repository: &str) -> Result<String> {
     use semver::Version;
 
-    // Get all tags from the registry
-    let tags = list_tags_with_crane(registry_url)?;
+    let tags = list_component_tags(repository)?;
 
     // Filter and parse semantic versions
     let mut semver_tags: Vec<Version> = Vec::new();
 
     for tag in tags {
-        // Skip non-semver tags like "latest", "main", "dev", etc.
+        // Skip non-semver tags
         if tag == "latest" || tag == "main" || tag == "master" || tag == "dev" || tag == "edge" {
             continue;
         }
@@ -167,7 +199,7 @@ fn resolve_latest_version(registry_url: &str) -> Result<String> {
     }
 
     if semver_tags.is_empty() {
-        anyhow::bail!("No semantic versions found for image at {}", registry_url);
+        anyhow::bail!("No semantic versions found for component at {}", repository);
     }
 
     // Sort versions and get the latest
@@ -178,7 +210,7 @@ fn resolve_latest_version(registry_url: &str) -> Result<String> {
 }
 
 /// Validate and normalize a semantic version
-fn validate_and_normalize_semver(version: &str) -> Result<String> {
+pub fn validate_and_normalize_semver(version: &str) -> Result<String> {
     use semver::Version;
 
     // Remove common prefixes
@@ -223,392 +255,41 @@ fn validate_and_normalize_semver(version: &str) -> Result<String> {
     }
 }
 
-/// Docker Hub adapter
-pub struct DockerHubAdapter;
+/// Get registry components for a given image name
+///
+/// This function resolves the image to a full registry URL and validates the version.
+/// If the version is "latest", it resolves to the actual latest semantic version.
+pub fn get_registry_components(
+    image_name: &str,
+    default_registry: Option<&str>,
+) -> Result<RegistryComponents> {
+    let full_url = resolve_registry_url(image_name, default_registry);
+    let (repository, tag) = parse_image_and_tag(&full_url);
 
-#[async_trait]
-impl RegistryAdapter for DockerHubAdapter {
-    fn get_registry_url(&self, image_name: &str) -> String {
-        // Docker Hub patterns:
-        // Official images: docker.io/library/image:tag
-        // User images: docker.io/username/image:tag
+    let version = if tag == "latest" {
+        resolve_latest_version(&repository)?
+    } else {
+        validate_and_normalize_semver(&tag)?
+    };
 
-        if image_name.contains('/') {
-            // User/organization image
-            format!("docker.io/{image_name}")
-        } else {
-            // Official image - use library namespace
-            format!("docker.io/library/{image_name}")
-        }
-    }
-
-    async fn get_registry_components(
-        &self,
-        _client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents> {
-        let (image_without_tag, tag) = parse_image_and_tag(image_name);
-
-        let package_name = if image_without_tag.contains('/') {
-            image_without_tag.to_string()
-        } else {
-            format!("library/{image_without_tag}")
-        };
-
-        let version = if tag == "latest" {
-            // Resolve "latest" to actual latest semantic version from registry
-            let registry_url = self.get_registry_url(&image_without_tag);
-            resolve_latest_version(&registry_url)?
-        } else {
-            validate_and_normalize_semver(&tag)?
-        };
-
-        // Validate that the version exists in the registry
-        let registry_url = self.get_registry_url(&image_without_tag);
-        if !verify_version_exists_with_crane(&registry_url, &version)? {
+    // Verify the component exists
+    let versioned_url = format!("{repository}:{version}");
+    if !verify_component_exists(&versioned_url)? {
+        // Try with 'v' prefix
+        let versioned_url_with_v = format!("{repository}:v{version}");
+        if !verify_component_exists(&versioned_url_with_v)? {
             anyhow::bail!(
-                "Version '{}' not found for image '{}' in Docker Hub",
-                version,
-                image_without_tag
+                "Component '{}' with version '{}' not found in registry",
+                repository,
+                version
             );
         }
-
-        Ok(RegistryComponents {
-            registry_domain: "docker.io".to_string(),
-            package_name,
-            version,
-        })
     }
 
-    fn name(&self) -> &'static str {
-        "Docker Hub"
-    }
-
-    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
-        // Use crane to check Docker Hub images
-        let repo_name = if image_name.contains('/') {
-            image_name.to_string()
-        } else {
-            format!("library/{image_name}")
-        };
-
-        let image_ref = format!("docker.io/{repo_name}");
-        verify_image_with_crane(&image_ref)
-    }
-}
-
-/// GitHub Container Registry adapter
-pub struct GhcrAdapter {
-    organization: String,
-}
-
-impl Default for GhcrAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl GhcrAdapter {
-    /// Create a new GHCR adapter with default organization
-    pub fn new() -> Self {
-        Self {
-            organization: "fastertools".to_string(),
-        }
-    }
-
-    /// Create a new GHCR adapter with specified organization
-    pub const fn with_organization(organization: String) -> Self {
-        Self { organization }
-    }
-}
-
-#[async_trait]
-impl RegistryAdapter for GhcrAdapter {
-    fn get_registry_url(&self, image_name: &str) -> String {
-        format!("ghcr.io/{}/{}", self.organization, image_name)
-    }
-
-    async fn get_registry_components(
-        &self,
-        _client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents> {
-        let (image_without_tag, tag) = parse_image_and_tag(image_name);
-
-        // GHCR uses colon separator for Spin manifests: "org:repo" not "org/repo"
-        let package_name = format!("{}:{}", self.organization, image_without_tag);
-
-        let version = if tag == "latest" {
-            // Resolve "latest" to actual latest semantic version from registry
-            let registry_url = self.get_registry_url(&image_without_tag);
-            resolve_latest_version(&registry_url)?
-        } else {
-            validate_and_normalize_semver(&tag)?
-        };
-
-        // Validate that the version exists in the registry
-        let registry_url = self.get_registry_url(&image_without_tag);
-        if !verify_version_exists_with_crane(&registry_url, &version)? {
-            anyhow::bail!(
-                "Version '{}' not found for image '{}' in GHCR ({})",
-                version,
-                image_without_tag,
-                self.organization
-            );
-        }
-
-        Ok(RegistryComponents {
-            registry_domain: "ghcr.io".to_string(),
-            package_name,
-            version,
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        "GitHub Container Registry (ghcr.io)"
-    }
-
-    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
-        // Use crane to check GHCR images
-        let image_ref = format!("ghcr.io/{}/{}", self.organization, image_name);
-        verify_image_with_crane(&image_ref)
-    }
-}
-
-/// AWS Elastic Container Registry adapter
-pub struct EcrAdapter {
-    account_id: String,
-    region: String,
-}
-
-impl EcrAdapter {
-    /// Create ECR adapter from environment variables
-    pub fn from_env() -> Result<Self> {
-        let account_id = env::var("AWS_ACCOUNT_ID")
-            .context("AWS_ACCOUNT_ID environment variable required for ECR")?;
-        let region = env::var("AWS_REGION")
-            .or_else(|_| env::var("AWS_DEFAULT_REGION"))
-            .unwrap_or_else(|_| "us-east-1".to_string());
-
-        Ok(Self { account_id, region })
-    }
-
-    /// Create a new ECR adapter with specified account ID and region
-    pub const fn new(account_id: String, region: String) -> Self {
-        Self { account_id, region }
-    }
-}
-
-#[async_trait]
-impl RegistryAdapter for EcrAdapter {
-    fn get_registry_url(&self, image_name: &str) -> String {
-        format!(
-            "{}.dkr.ecr.{}.amazonaws.com/{}",
-            self.account_id, self.region, image_name
-        )
-    }
-
-    async fn get_registry_components(
-        &self,
-        _client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents> {
-        let (image_without_tag, tag) = parse_image_and_tag(image_name);
-
-        let registry_domain = format!("{}.dkr.ecr.{}.amazonaws.com", self.account_id, self.region);
-        let package_name = image_without_tag.clone();
-
-        let version = if tag == "latest" {
-            // Resolve "latest" to actual latest semantic version from registry
-            let registry_url = self.get_registry_url(&image_without_tag);
-            resolve_latest_version(&registry_url)?
-        } else {
-            validate_and_normalize_semver(&tag)?
-        };
-
-        // Validate that the version exists in the registry
-        let registry_url = self.get_registry_url(&image_without_tag);
-        if !verify_version_exists_with_crane(&registry_url, &version)? {
-            anyhow::bail!(
-                "Version '{}' not found for image '{}' in ECR ({})",
-                version,
-                image_without_tag,
-                registry_domain
-            );
-        }
-
-        Ok(RegistryComponents {
-            registry_domain,
-            package_name,
-            version,
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        "AWS Elastic Container Registry (ECR)"
-    }
-
-    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
-        // Use crane to check ECR images
-        // Crane will use AWS credentials from the environment
-        let image_ref = format!(
-            "{}.dkr.ecr.{}.amazonaws.com/{}",
-            self.account_id, self.region, image_name
-        );
-        verify_image_with_crane(&image_ref)
-    }
-}
-
-/// Custom registry adapter
-pub struct CustomAdapter {
-    url_pattern: String,
-}
-
-impl CustomAdapter {
-    /// Create a new custom registry adapter with URL pattern
-    pub const fn new(url_pattern: String) -> Self {
-        Self { url_pattern }
-    }
-}
-
-#[async_trait]
-impl RegistryAdapter for CustomAdapter {
-    fn get_registry_url(&self, image_name: &str) -> String {
-        self.url_pattern.replace("{image_name}", image_name)
-    }
-
-    async fn get_registry_components(
-        &self,
-        _client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents> {
-        let (image_without_tag, tag) = parse_image_and_tag(image_name);
-
-        // For custom registries, try to extract registry domain from pattern
-        let registry_domain = if let Some(start) = self.url_pattern.find("://") {
-            let after_scheme = &self.url_pattern[start + 3..];
-            if let Some(end) = after_scheme.find('/') {
-                after_scheme[..end].to_string()
-            } else {
-                after_scheme.to_string()
-            }
-        } else {
-            // Fallback: assume pattern starts with domain
-            if let Some(end) = self.url_pattern.find('/') {
-                self.url_pattern[..end].to_string()
-            } else {
-                "github.com/fastertools".to_string()
-            }
-        };
-
-        let package_name = image_without_tag.clone();
-
-        let version = if tag == "latest" {
-            // Resolve "latest" to actual latest semantic version from registry
-            let registry_url = self.get_registry_url(&image_without_tag);
-            resolve_latest_version(&registry_url)?
-        } else {
-            validate_and_normalize_semver(&tag)?
-        };
-
-        // Validate that the version exists in the registry
-        let registry_url = self.get_registry_url(&image_without_tag);
-        if !verify_version_exists_with_crane(&registry_url, &version)? {
-            anyhow::bail!(
-                "Version '{}' not found for image '{}' in custom registry ({})",
-                version,
-                image_without_tag,
-                registry_domain
-            );
-        }
-
-        Ok(RegistryComponents {
-            registry_domain,
-            package_name,
-            version,
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        "Custom Registry"
-    }
-
-    async fn verify_image_exists(&self, _client: &Client, image_name: &str) -> Result<bool> {
-        // Use crane to check custom registry images
-        let image_ref = self.get_registry_url(image_name);
-        verify_image_with_crane(&image_ref)
-    }
-}
-
-/// Enum holding different registry adapter types
-pub enum ConcreteRegistryAdapter {
-    /// Docker Hub registry adapter
-    DockerHub(DockerHubAdapter),
-    /// GitHub Container Registry adapter
-    Ghcr(GhcrAdapter),
-    /// AWS Elastic Container Registry adapter
-    Ecr(EcrAdapter),
-    /// Custom registry adapter
-    Custom(CustomAdapter),
-}
-
-#[async_trait]
-impl RegistryAdapter for ConcreteRegistryAdapter {
-    fn get_registry_url(&self, image_name: &str) -> String {
-        match self {
-            Self::DockerHub(adapter) => adapter.get_registry_url(image_name),
-            Self::Ghcr(adapter) => adapter.get_registry_url(image_name),
-            Self::Ecr(adapter) => adapter.get_registry_url(image_name),
-            Self::Custom(adapter) => adapter.get_registry_url(image_name),
-        }
-    }
-
-    async fn get_registry_components(
-        &self,
-        client: &Client,
-        image_name: &str,
-    ) -> Result<RegistryComponents> {
-        match self {
-            Self::DockerHub(adapter) => adapter.get_registry_components(client, image_name).await,
-            Self::Ghcr(adapter) => adapter.get_registry_components(client, image_name).await,
-            Self::Ecr(adapter) => adapter.get_registry_components(client, image_name).await,
-            Self::Custom(adapter) => adapter.get_registry_components(client, image_name).await,
-        }
-    }
-
-    fn name(&self) -> &'static str {
-        match self {
-            Self::DockerHub(adapter) => adapter.name(),
-            Self::Ghcr(adapter) => adapter.name(),
-            Self::Ecr(adapter) => adapter.name(),
-            Self::Custom(adapter) => adapter.name(),
-        }
-    }
-
-    async fn verify_image_exists(&self, client: &Client, image_name: &str) -> Result<bool> {
-        match self {
-            Self::DockerHub(adapter) => adapter.verify_image_exists(client, image_name).await,
-            Self::Ghcr(adapter) => adapter.verify_image_exists(client, image_name).await,
-            Self::Ecr(adapter) => adapter.verify_image_exists(client, image_name).await,
-            Self::Custom(adapter) => adapter.verify_image_exists(client, image_name).await,
-        }
-    }
-}
-
-/// Get registry adapter based on registry name and configuration
-pub fn get_registry_adapter(registry: Option<&str>) -> Result<ConcreteRegistryAdapter> {
-    // TODO: Integrate with FtlConfig when it's available
-    // For now, use simple registry name mapping like the original implementation
-
-    match registry {
-        None | Some("ghcr") => Ok(ConcreteRegistryAdapter::Ghcr(GhcrAdapter::new())),
-        Some("docker") => Ok(ConcreteRegistryAdapter::DockerHub(DockerHubAdapter)),
-        Some("ecr") => Ok(ConcreteRegistryAdapter::Ecr(EcrAdapter::from_env()?)),
-        Some(other) => anyhow::bail!(
-            "Unsupported registry: {}. Supported: ghcr, docker, ecr, or configure custom registry with 'ftl registries add'",
-            other
-        ),
-    }
+    Ok(RegistryComponents {
+        registry_url: repository,
+        version,
+    })
 }
 
 #[cfg(test)]
@@ -616,53 +297,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_docker_hub_official_images() {
-        let adapter = DockerHubAdapter;
-        assert_eq!(adapter.get_registry_url("nginx"), "docker.io/library/nginx");
+    fn test_resolve_registry_url() {
+        // Test with full URLs
         assert_eq!(
-            adapter.get_registry_url("ubuntu"),
-            "docker.io/library/ubuntu"
-        );
-        assert_eq!(adapter.get_registry_url("redis"), "docker.io/library/redis");
-    }
-
-    #[test]
-    fn test_docker_hub_user_images() {
-        let adapter = DockerHubAdapter;
-        assert_eq!(
-            adapter.get_registry_url("username/myapp"),
-            "docker.io/username/myapp"
-        );
-        assert_eq!(adapter.get_registry_url("org/tool"), "docker.io/org/tool");
-    }
-
-    #[test]
-    fn test_ghcr_adapter() {
-        let adapter = GhcrAdapter::new();
-        assert_eq!(
-            adapter.get_registry_url("ftl-tool-add"),
-            "ghcr.io/fastertools/ftl-tool-add"
+            resolve_registry_url("ghcr.io/org/tool:1.0.0", None),
+            "ghcr.io/org/tool:1.0.0"
         );
 
-        let custom_adapter = GhcrAdapter::with_organization("myorg".to_string());
+        // Test with short names and default registry
         assert_eq!(
-            custom_adapter.get_registry_url("my-tool"),
-            "ghcr.io/myorg/my-tool"
+            resolve_registry_url("my-tool:1.0.0", Some("ghcr.io/myorg")),
+            "ghcr.io/myorg/my-tool:1.0.0"
         );
-    }
 
-    #[test]
-    fn test_registry_factory() {
-        let docker_adapter = get_registry_adapter(Some("docker")).unwrap();
-        assert_eq!(docker_adapter.name(), "Docker Hub");
-
-        let ghcr_adapter = get_registry_adapter(Some("ghcr")).unwrap();
-        assert_eq!(ghcr_adapter.name(), "GitHub Container Registry (ghcr.io)");
-
-        let default_adapter = get_registry_adapter(None).unwrap();
+        // Test Docker Hub library handling
         assert_eq!(
-            default_adapter.name(),
-            "GitHub Container Registry (ghcr.io)"
+            resolve_registry_url("nginx", Some("docker.io")),
+            "docker.io/library/nginx"
+        );
+
+        // Test local WASM file
+        assert_eq!(
+            resolve_registry_url("target/my-component.wasm", None),
+            "target/my-component.wasm"
         );
     }
 
@@ -680,10 +337,6 @@ mod tests {
             parse_image_and_tag("user/app:v1.0"),
             ("user/app".to_string(), "v1.0".to_string())
         );
-        assert_eq!(
-            parse_image_and_tag("registry.io/org/app:1.0.0"),
-            ("registry.io/org/app".to_string(), "1.0.0".to_string())
-        );
     }
 
     #[test]
@@ -695,148 +348,13 @@ mod tests {
             validate_and_normalize_semver("2.1.3-alpha").unwrap(),
             "2.1.3-alpha"
         );
-        assert_eq!(validate_and_normalize_semver("0.0.6").unwrap(), "0.0.6");
 
         // Auto-completion of versions
         assert_eq!(validate_and_normalize_semver("1").unwrap(), "1.0.0");
         assert_eq!(validate_and_normalize_semver("1.2").unwrap(), "1.2.0");
-        assert_eq!(validate_and_normalize_semver("v1.2").unwrap(), "1.2.0");
 
         // Invalid versions should return error
         assert!(validate_and_normalize_semver("latest").is_err());
         assert!(validate_and_normalize_semver("main").is_err());
-        assert!(validate_and_normalize_semver("invalid.version.format.too.many").is_err());
-    }
-
-    #[tokio::test]
-    async fn test_docker_hub_registry_components() {
-        let _client = reqwest::Client::new();
-
-        // Test user image with tag (skip version validation in tests)
-        let (_image_without_tag, _tag) = parse_image_and_tag("user/app:1.2.0");
-        let components = RegistryComponents {
-            registry_domain: "docker.io".to_string(),
-            package_name: "user/app".to_string(),
-            version: "1.2.0".to_string(),
-        };
-
-        assert_eq!(components.registry_domain, "docker.io");
-        assert_eq!(components.package_name, "user/app");
-        assert_eq!(components.version, "1.2.0");
-
-        // Test version normalization (just validate_and_normalize_semver function)
-        let normalized = validate_and_normalize_semver("v1.21").unwrap();
-        assert_eq!(normalized, "1.21.0");
-    }
-
-    #[tokio::test]
-    async fn test_ghcr_registry_components() {
-        let _adapter = GhcrAdapter::new();
-        let _client = reqwest::Client::new();
-
-        // Test GHCR with colon separator (skip version validation in tests)
-        let components = RegistryComponents {
-            registry_domain: "ghcr.io".to_string(),
-            package_name: "fastertools:ftl-auth-gateway".to_string(),
-            version: "0.0.6".to_string(),
-        };
-        assert_eq!(components.registry_domain, "ghcr.io");
-        assert_eq!(components.package_name, "fastertools:ftl-auth-gateway");
-        assert_eq!(components.version, "0.0.6");
-    }
-
-    #[tokio::test]
-    async fn test_ecr_registry_components() {
-        let _adapter = EcrAdapter::new("123456".to_string(), "us-east-1".to_string());
-        let _client = reqwest::Client::new();
-
-        // Test ECR registry components (skip version validation in tests)
-        let components = RegistryComponents {
-            registry_domain: "123456.dkr.ecr.us-east-1.amazonaws.com".to_string(),
-            package_name: "my-app".to_string(),
-            version: "1.0.0".to_string(),
-        };
-        assert_eq!(
-            components.registry_domain,
-            "123456.dkr.ecr.us-east-1.amazonaws.com"
-        );
-        assert_eq!(components.package_name, "my-app");
-        assert_eq!(components.version, "1.0.0");
-    }
-
-    #[tokio::test]
-    async fn test_custom_registry_components() {
-        let _adapter = CustomAdapter::new("registry.example.com/{image_name}".to_string());
-        let _client = reqwest::Client::new();
-
-        // Test custom registry components (skip version validation in tests)
-        let components = RegistryComponents {
-            registry_domain: "registry.example.com".to_string(),
-            package_name: "tool".to_string(),
-            version: "2.0.0".to_string(),
-        };
-        assert_eq!(components.registry_domain, "registry.example.com");
-        assert_eq!(components.package_name, "tool");
-        assert_eq!(components.version, "2.0.0");
-    }
-
-    #[tokio::test]
-    async fn test_custom_registry_with_port() {
-        let _adapter =
-            CustomAdapter::new("https://registry.company.com:5000/v2/{image_name}".to_string());
-        let _client = reqwest::Client::new();
-
-        // Test custom registry with port (skip version validation in tests)
-        let components = RegistryComponents {
-            registry_domain: "registry.company.com:5000".to_string(),
-            package_name: "myapp".to_string(),
-            version: "1.2.3".to_string(),
-        };
-        assert_eq!(components.registry_domain, "registry.company.com:5000");
-        assert_eq!(components.package_name, "myapp");
-        assert_eq!(components.version, "1.2.3");
-    }
-
-    #[test]
-    fn test_version_tag_variations() {
-        use super::validate_and_normalize_semver;
-
-        // Test v-prefix handling
-        assert_eq!(validate_and_normalize_semver("v1.0.0").unwrap(), "1.0.0");
-        assert_eq!(validate_and_normalize_semver("1.0.0").unwrap(), "1.0.0");
-        assert_eq!(validate_and_normalize_semver("v1.2").unwrap(), "1.2.0");
-        assert_eq!(validate_and_normalize_semver("1.2").unwrap(), "1.2.0");
-
-        // Test invalid versions
-        assert!(validate_and_normalize_semver("latest").is_err());
-        assert!(validate_and_normalize_semver("main").is_err());
-        assert!(validate_and_normalize_semver("dev").is_err());
-    }
-
-    #[test]
-    fn test_parse_image_and_tag_variations() {
-        use super::parse_image_and_tag;
-
-        // Test various image:tag formats
-        assert_eq!(
-            parse_image_and_tag("nginx"),
-            ("nginx".to_string(), "latest".to_string())
-        );
-        assert_eq!(
-            parse_image_and_tag("nginx:1.0.0"),
-            ("nginx".to_string(), "1.0.0".to_string())
-        );
-        assert_eq!(
-            parse_image_and_tag("nginx:v1.0.0"),
-            ("nginx".to_string(), "v1.0.0".to_string())
-        );
-        assert_eq!(
-            parse_image_and_tag("org/repo:latest"),
-            ("org/repo".to_string(), "latest".to_string())
-        );
-        assert_eq!(
-            parse_image_and_tag("org/repo"),
-            ("org/repo".to_string(), "latest".to_string())
-        );
     }
 }

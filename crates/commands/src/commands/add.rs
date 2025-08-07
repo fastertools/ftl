@@ -63,10 +63,15 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
 
-    // Generate temporary spin.toml from ftl.toml
-    let temp_spin_toml =
-        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &PathBuf::from("."))?
-            .ok_or_else(|| anyhow::anyhow!("No ftl.toml found"))?;
+    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
+        &crate::config::transpiler::GenerateSpinConfig {
+            file_system: &deps.file_system,
+            project_path: &PathBuf::from("."),
+            download_components: false,
+            validate_local_auth: false,
+        },
+    )?
+    .ok_or_else(|| anyhow::anyhow!("No ftl.toml found"))?;
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
@@ -272,8 +277,9 @@ fn update_ftl_toml(
         component_name.to_string(),
         ToolConfig {
             path: Some(component_name.to_string()),
-            wasm: wasm_path,
-            build,
+            wasm: Some(wasm_path),
+            repo: None,
+            build: Some(build),
             profiles: None,
             up: None,
             deploy: None,

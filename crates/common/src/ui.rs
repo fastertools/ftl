@@ -78,6 +78,16 @@ impl UserInterface for RealUserInterface {
             .map_err(|e| anyhow::anyhow!("Failed to get selection: {}", e))
     }
 
+    fn prompt_confirm(&self, prompt: &str, default: bool) -> Result<bool> {
+        use dialoguer::{Confirm, theme::ColorfulTheme};
+
+        Confirm::with_theme(&ColorfulTheme::default())
+            .with_prompt(prompt)
+            .default(default)
+            .interact()
+            .map_err(|e| anyhow::anyhow!("Failed to get confirmation: {}", e))
+    }
+
     fn clear_screen(&self) {
         print!("\x1B[2J\x1B[1;1H");
     }
@@ -199,6 +209,11 @@ impl UserInterface for TestUserInterface {
 
     fn prompt_select(&self, _prompt: &str, _items: &[&str], default: usize) -> Result<usize> {
         // In test mode, return the default selection
+        Ok(default)
+    }
+
+    fn prompt_confirm(&self, _prompt: &str, default: bool) -> Result<bool> {
+        // In test mode, return the default value
         Ok(default)
     }
 

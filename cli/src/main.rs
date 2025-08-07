@@ -15,28 +15,26 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize a new FTL toolbox
+    /// Initialize a new FTL project
     Init(InitArgs),
-    /// Build a toolbox
+    /// Build a project
     Build(BuildArgs),
     /// Start the Spin development server
     Up(UpArgs),
-    /// Publish a component to the registry
-    Publish(PublishArgs),
     /// Set up FTL dependencies
     Setup(SetupArgs),
     /// Update FTL CLI to the latest version
     Update(UpdateArgs),
-    /// Add new components to your toolbox
+    /// Add new components to your project
     Add(AddArgs),
-    /// Run tests for your toolbox
+    /// Run tests for your project
     Test(TestArgs),
     /// Manage FTL component registry
     Registry(RegistryArgs),
-    /// Manage pre-built tool components
-    Tools(ToolsArgs),
     /// Manage remote tools on FTL Engine
     Eng(EngArgs),
+    /// Manage WASM components
+    Component(ComponentArgs),
 }
 
 // Simple command wrappers - just forward arguments
@@ -52,7 +50,7 @@ struct InitArgs {
 
 #[derive(Debug, Args)]
 struct BuildArgs {
-    /// Path to the toolbox
+    /// Path to the project
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Build in release mode
@@ -68,7 +66,7 @@ struct BuildArgs {
 
 #[derive(Debug, Args)]
 struct UpArgs {
-    /// Path to the toolbox
+    /// Path to the project
     path: Option<PathBuf>,
     /// Port to listen on
     #[arg(short, long)]
@@ -85,19 +83,6 @@ struct UpArgs {
     /// Directory for component logs (default: .ftl/logs)
     #[arg(long)]
     log_dir: Option<PathBuf>,
-}
-
-#[derive(Debug, Args)]
-struct PublishArgs {
-    /// Path to the component directory
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Container registry URL
-    #[arg(short, long)]
-    registry: Option<String>,
-    /// Tag for the published image
-    #[arg(short, long)]
-    tag: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -141,6 +126,57 @@ struct TestArgs {
 struct EngArgs {
     #[command(subcommand)]
     command: EngCommand,
+}
+
+#[derive(Debug, Args)]
+struct ComponentArgs {
+    #[command(subcommand)]
+    command: ComponentCommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum ComponentCommand {
+    /// Publish a component to a registry
+    Publish {
+        /// Path to component directory or WASM file
+        path: PathBuf,
+        /// Registry URL (e.g., "ghcr.io/myorg")
+        #[arg(short, long)]
+        registry: Option<String>,
+        /// Component name (derives from path if not specified)
+        #[arg(short, long)]
+        name: Option<String>,
+        /// Version tag (defaults to "latest")
+        #[arg(short, long)]
+        tag: Option<String>,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
+    },
+    /// Pull a component from a registry
+    Pull {
+        /// Component reference (e.g., "mycomp:1.0.0" or "ghcr.io/org/comp:latest")
+        component: String,
+        /// Output path for the WASM file
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Overwrite existing file
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// List component versions in a registry
+    List {
+        /// Repository to list (e.g., "myorg/mycomponent")
+        repository: String,
+        /// Registry URL override
+        #[arg(short, long)]
+        registry: Option<String>,
+    },
+    /// Inspect a component's metadata
+    Inspect {
+        /// Component reference to inspect
+        component: String,
+    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -197,6 +233,10 @@ enum EngCommand {
         /// Run without making any changes (preview what would be deployed)
         #[arg(long)]
         dry_run: bool,
+
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
     },
     /// List all engines
     List {
@@ -292,92 +332,15 @@ struct RegistryArgs {
 
 #[derive(Debug, Clone, Subcommand)]
 enum RegistryCommand {
-    /// Search for components in the registry
-    Search {
-        /// Search query
-        query: String,
-        /// Registry to search
-        #[arg(short, long)]
-        registry: Option<String>,
+    /// List configured registries or show current configuration
+    List,
+    /// Set the default registry
+    Set {
+        /// Registry URL (e.g., "ghcr.io/myorg")
+        url: String,
     },
-    /// List available components
-    List {
-        /// Registry to list from
-        #[arg(short, long)]
-        registry: Option<String>,
-    },
-    /// Get information about a component
-    Info {
-        /// Component reference
-        component: String,
-    },
-}
-
-#[derive(Debug, Args)]
-struct ToolsArgs {
-    #[command(subcommand)]
-    command: ToolsCommand,
-}
-
-#[derive(Debug, Clone, Subcommand)]
-enum ToolsCommand {
-    /// List available pre-built tools
-    List {
-        /// Filter by category
-        #[arg(short, long)]
-        category: Option<String>,
-        /// Filter by keyword in name or description
-        #[arg(short, long)]
-        filter: Option<String>,
-        /// Registry to use (overrides config)
-        #[arg(short, long)]
-        registry: Option<String>,
-        /// Show additional details
-        #[arg(short, long)]
-        verbose: bool,
-        /// List from all enabled registries
-        #[arg(short, long)]
-        all: bool,
-        /// Query registry directly, skip manifest
-        #[arg(short, long)]
-        direct: bool,
-    },
-    /// Add pre-built tools to your project
-    Add {
-        /// Tool names to add (can include registry prefix like docker:tool-name)
-        tools: Vec<String>,
-        /// Registry to use (overrides config and tool prefix)
-        #[arg(short, long)]
-        registry: Option<String>,
-        /// Version/tag to use (overrides tool:version syntax)
-        #[arg(short, long)]
-        version: Option<String>,
-        /// Skip confirmation prompt
-        #[arg(short = 'y', long)]
-        yes: bool,
-    },
-    /// Update existing tools in your project
-    Update {
-        /// Tool names to update (can include registry prefix like docker:tool-name)
-        tools: Vec<String>,
-        /// Registry to use (overrides config and tool prefix)
-        #[arg(short, long)]
-        registry: Option<String>,
-        /// Version/tag to update to (overrides tool:version syntax)
-        #[arg(short, long)]
-        version: Option<String>,
-        /// Skip confirmation prompt
-        #[arg(short = 'y', long)]
-        yes: bool,
-    },
-    /// Remove tools from your project
-    Remove {
-        /// Tool names to remove
-        tools: Vec<String>,
-        /// Skip confirmation prompt
-        #[arg(short = 'y', long)]
-        yes: bool,
-    },
+    /// Remove the default registry
+    Remove,
 }
 
 // Conversion implementations
@@ -411,16 +374,6 @@ impl From<UpArgs> for ftl_commands::up::UpArgs {
             watch: args.watch,
             clear: args.clear,
             log_dir: args.log_dir,
-        }
-    }
-}
-
-impl From<PublishArgs> for ftl_commands::publish::PublishArgs {
-    fn from(args: PublishArgs) -> Self {
-        Self {
-            path: args.path,
-            registry: args.registry,
-            tag: args.tag,
         }
     }
 }
@@ -506,74 +459,62 @@ impl From<SetupArgs> for ftl_commands::setup::SetupArgs {
     }
 }
 
-impl From<RegistryCommand> for ftl_commands::registry_command::RegistryCommand {
+impl From<RegistryCommand> for ftl_commands::commands::registry::RegistryAction {
     fn from(cmd: RegistryCommand) -> Self {
         match cmd {
-            RegistryCommand::Search { query, registry } => Self::Search { query, registry },
-            RegistryCommand::List { registry } => Self::List { registry },
-            RegistryCommand::Info { component } => Self::Info { component },
+            RegistryCommand::List => Self::List,
+            RegistryCommand::Set { url } => Self::Set { url },
+            RegistryCommand::Remove => Self::Remove,
         }
     }
 }
 
-impl From<RegistryArgs> for ftl_commands::registry_command::RegistryArgs {
+impl From<RegistryArgs> for ftl_commands::commands::registry::RegistryAction {
     fn from(args: RegistryArgs) -> Self {
-        Self {
-            command: args.command.into(),
-        }
+        args.command.into()
     }
 }
 
-impl From<ToolsCommand> for ftl_commands::tools::ToolsCommand {
-    fn from(cmd: ToolsCommand) -> Self {
+impl From<ComponentCommand> for ftl_commands::commands::component::ComponentAction {
+    fn from(cmd: ComponentCommand) -> Self {
         match cmd {
-            ToolsCommand::List {
-                category,
-                filter,
+            ComponentCommand::Publish {
+                path,
                 registry,
-                verbose,
-                all,
-                direct,
+                name,
+                tag,
+                yes,
+            } => Self::Publish {
+                path,
+                registry,
+                name,
+                tag,
+                yes,
+            },
+            ComponentCommand::Pull {
+                component,
+                output,
+                force,
+            } => Self::Pull {
+                component,
+                output,
+                force,
+            },
+            ComponentCommand::List {
+                repository,
+                registry,
             } => Self::List {
-                category,
-                filter,
+                repository,
                 registry,
-                verbose,
-                all,
-                direct,
             },
-            ToolsCommand::Add {
-                tools,
-                registry,
-                version,
-                yes,
-            } => Self::Add {
-                tools,
-                registry,
-                version,
-                yes,
-            },
-            ToolsCommand::Update {
-                tools,
-                registry,
-                version,
-                yes,
-            } => Self::Update {
-                tools,
-                registry,
-                version,
-                yes,
-            },
-            ToolsCommand::Remove { tools, yes } => Self::Remove { tools, yes },
+            ComponentCommand::Inspect { component } => Self::Inspect { component },
         }
     }
 }
 
-impl From<ToolsArgs> for ftl_commands::tools::ToolsArgs {
-    fn from(args: ToolsArgs) -> Self {
-        Self {
-            command: args.command.into(),
-        }
+impl From<ComponentArgs> for ftl_commands::commands::component::ComponentAction {
+    fn from(args: ComponentArgs) -> Self {
+        args.command.into()
     }
 }
 
@@ -608,6 +549,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
             auth_issuer,
             auth_audience,
             dry_run,
+            yes,
         } => {
             let deploy_args = ftl_commands::deploy::DeployArgs {
                 variables: variable,
@@ -616,6 +558,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
                 auth_issuer,
                 auth_audience,
                 dry_run,
+                yes,
             };
             ftl_commands::deploy::execute(deploy_args).await
         }
@@ -680,13 +623,12 @@ async fn main() -> Result<()> {
         Commands::Init(args) => ftl_commands::init::execute(args.into()).await,
         Commands::Build(args) => ftl_commands::build::execute(args.into()).await,
         Commands::Up(args) => ftl_commands::up::execute(args.into()).await,
-        Commands::Publish(args) => ftl_commands::publish::execute(args.into()).await,
         Commands::Setup(args) => ftl_commands::setup::execute(args.into()).await,
         Commands::Update(args) => ftl_commands::update::execute(args.into()).await,
         Commands::Add(args) => ftl_commands::add::execute(args.into()).await,
         Commands::Test(args) => ftl_commands::test::execute(args.into()).await,
-        Commands::Registry(args) => ftl_commands::registry_command::execute(args.into()).await,
-        Commands::Tools(args) => ftl_commands::tools::execute(args.into()).await,
+        Commands::Registry(args) => ftl_commands::commands::registry::execute(args.into()),
         Commands::Eng(args) => handle_eng_command(args).await,
+        Commands::Component(args) => ftl_commands::commands::component::execute(args.into()).await,
     }
 }

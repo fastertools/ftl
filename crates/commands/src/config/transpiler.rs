@@ -13,25 +13,11 @@ use ftl_runtime::deps::FileSystem;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Parse a registry URI into a Spin source configuration
-/// Example: "ghcr.io/myorg/my-component:1.0.0" -> `ComponentSource::Registry`
-fn parse_registry_uri_to_source(uri: &str) -> ComponentSource {
-    // Split by the last colon to separate version tag
-    if let Some((image, version)) = uri.rsplit_once(':') {
-        // Split the image part by the first slash to get registry and package
-        if let Some((registry, package)) = image.split_once('/') {
-            // Convert package from "owner/name" format to "owner:name" format for Spin
-            let package = package.replace('/', ":");
-            return ComponentSource::Registry {
-                registry: registry.to_string(),
-                package,
-                version: version.to_string(),
-            };
-        }
-    }
-
-    // If parsing fails, return as a local path (shouldn't happen with valid URIs)
-    ComponentSource::Local(uri.to_string())
+/// Parse a component source into a Spin source configuration
+/// Handles both registry URIs and local files, using `default_registry` when needed
+fn parse_component_source(source: &str, _default_registry: Option<&str>) -> ComponentSource {
+    // For local WASM files, use them directly
+    ComponentSource::Local(source.to_string())
 }
 
 /// Transpile an FTL configuration to Spin configuration
@@ -235,21 +221,32 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     // Build components
     let mut components = HashMap::new();
 
+    // Get default registry from project config
+    let default_registry = ftl_config.project.default_registry.as_deref();
+
     if ftl_config.is_auth_enabled() {
         // When auth is enabled, add authorizer as "mcp" and gateway as "ftl-mcp-gateway"
         components.insert(
             "mcp".to_string(),
-            create_mcp_component(&ftl_config.mcp.authorizer),
+            create_mcp_component(&ftl_config.mcp.authorizer, default_registry),
         );
         components.insert(
             "ftl-mcp-gateway".to_string(),
-            create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
+            create_gateway_component(
+                &ftl_config.mcp.gateway,
+                ftl_config.mcp.validate_arguments,
+                default_registry,
+            ),
         );
     } else {
         // When auth is disabled, add gateway as "mcp" for consistent route naming
         components.insert(
             "mcp".to_string(),
-            create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
+            create_gateway_component(
+                &ftl_config.mcp.gateway,
+                ftl_config.mcp.validate_arguments,
+                default_registry,
+            ),
         );
     }
 
@@ -257,7 +254,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     for (tool_name, tool_config) in &ftl_config.tools {
         components.insert(
             tool_name.clone(),
-            create_tool_component(tool_name, tool_config),
+            create_tool_component(tool_name, tool_config, default_registry),
         );
     }
 
@@ -306,14 +303,14 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 }
 
 /// Create MCP authorizer component configuration
-fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
+fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> ComponentConfig {
     // Use default if empty
     let uri = if registry_uri.is_empty() {
         "ghcr.io/fastertools/mcp-authorizer:0.0.12"
     } else {
         registry_uri
     };
-    let source = parse_registry_uri_to_source(uri);
+    let source = parse_component_source(uri, default_registry);
 
     let allowed_hosts = vec![
         "http://*.spin.internal".to_string(),
@@ -405,14 +402,18 @@ fn create_mcp_component(registry_uri: &str) -> ComponentConfig {
 }
 
 /// Create gateway component configuration
-fn create_gateway_component(registry_uri: &str, validate_args: bool) -> ComponentConfig {
+fn create_gateway_component(
+    registry_uri: &str,
+    validate_args: bool,
+    default_registry: Option<&str>,
+) -> ComponentConfig {
     // Use default if empty
     let uri = if registry_uri.is_empty() {
         "ghcr.io/fastertools/mcp-gateway:0.0.10"
     } else {
         registry_uri
     };
-    let source = parse_registry_uri_to_source(uri);
+    let source = parse_component_source(uri, default_registry);
 
     let allowed_hosts = vec!["http://*.spin.internal".to_string()];
 
@@ -439,8 +440,22 @@ fn create_gateway_component(registry_uri: &str, validate_args: bool) -> Componen
 }
 
 /// Create tool component configuration
-fn create_tool_component(name: &str, config: &ToolConfig) -> ComponentConfig {
-    let source = ComponentSource::Local(config.wasm.clone());
+fn create_tool_component(
+    name: &str,
+    config: &ToolConfig,
+    default_registry: Option<&str>,
+) -> ComponentConfig {
+    // Determine source based on whether it's a local component or registry component
+    let source = if let Some(wasm_path) = &config.wasm {
+        // Local component with wasm file path
+        ComponentSource::Local(wasm_path.clone())
+    } else if let Some(repo_ref) = &config.repo {
+        // Registry component with repository reference
+        parse_component_source(repo_ref, default_registry)
+    } else {
+        // This shouldn't happen due to validation, but provide a fallback
+        ComponentSource::Local(String::from("unknown.wasm"))
+    };
 
     let allowed_hosts = config
         .allowed_outbound_hosts
@@ -448,13 +463,15 @@ fn create_tool_component(name: &str, config: &ToolConfig) -> ComponentConfig {
         .map(String::clone)
         .collect();
 
-    // Build configuration
-    let tool_path = config.get_path(name);
-    let build = Some(ComponentBuildConfig {
-        command: config.build.command.clone(),
-        workdir: tool_path,
-        watch: config.build.watch.clone(),
-        environment: config.build.env.clone(),
+    // Build configuration (only if build config exists)
+    let build = config.build.as_ref().map(|build_config| {
+        let tool_path = config.get_path(name);
+        ComponentBuildConfig {
+            command: build_config.command.clone(),
+            workdir: tool_path,
+            watch: build_config.watch.clone(),
+            environment: build_config.env.clone(),
+        }
     });
 
     // Variables - pass through as-is (including template references)
@@ -498,59 +515,160 @@ pub fn ensure_spin_toml(file_system: &Arc<dyn FileSystem>, path: &std::path::Pat
     Ok(())
 }
 
+/// Configuration for generating temporary spin.toml
+pub struct GenerateSpinConfig<'a> {
+    /// File system abstraction
+    pub file_system: &'a Arc<dyn FileSystem>,
+    /// Path to the project directory
+    pub project_path: &'a std::path::Path,
+    /// Whether to download registry components
+    pub download_components: bool,
+    /// Whether to validate auth config for local development
+    pub validate_local_auth: bool,
+}
+
 /// Generate spin.toml from ftl.toml in a temporary location
 /// Returns the path to the temporary spin.toml file, or None if ftl.toml doesn't exist
-pub fn generate_temp_spin_toml(
-    file_system: &Arc<dyn FileSystem>,
-    project_path: &std::path::Path,
-) -> Result<Option<std::path::PathBuf>> {
-    let ftl_toml_path = project_path.join("ftl.toml");
+#[allow(clippy::too_many_lines)]
+pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std::path::PathBuf>> {
+    let ftl_toml_path = config.project_path.join("ftl.toml");
 
     // If ftl.toml doesn't exist, return None
-    if !file_system.exists(&ftl_toml_path) {
+    if !config.file_system.exists(&ftl_toml_path) {
         return Ok(None);
     }
 
     // Read and parse ftl.toml
-    let ftl_content = file_system
+    let ftl_content = config
+        .file_system
         .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
 
     let mut ftl_config = FtlConfig::parse(&ftl_content)?;
 
-    // Convert all relative paths to absolute paths based on project directory
-    let abs_project_path = project_path
-        .canonicalize()
-        .unwrap_or_else(|_| project_path.to_path_buf());
-
-    // Update tool paths to be absolute
-    for (tool_name, tool_config) in &mut ftl_config.tools {
-        let tool_path = tool_config.get_path(tool_name);
-        if !tool_path.starts_with('/') {
-            tool_config.path = Some(
-                abs_project_path
-                    .join(&tool_path)
-                    .to_string_lossy()
-                    .to_string(),
-            );
-        }
-
-        // Also make the wasm path absolute
-        if !tool_config.wasm.starts_with('/') {
-            tool_config.wasm = abs_project_path
-                .join(&tool_config.wasm)
-                .to_string_lossy()
-                .to_string();
-        }
+    // Validate auth configuration for local development
+    if config.validate_local_auth
+        && ftl_config.project.access_control == "private"
+        && ftl_config.oidc.is_none()
+    {
+        return Err(anyhow::anyhow!(
+            "Private access control requires OIDC configuration for local development.\n\
+            \n\
+            To fix this, either:\n\
+            1. Add an [oidc] section to your ftl.toml with your OIDC provider details\n\
+            2. Set access_control = \"public\"\n"
+        ));
     }
 
-    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+    // Convert all relative paths to absolute paths based on project directory
+    let abs_project_path = config
+        .project_path
+        .canonicalize()
+        .unwrap_or_else(|_| config.project_path.to_path_buf());
 
     // Create a temporary directory for FTL artifacts
     let temp_dir = tempfile::Builder::new()
         .prefix("ftlup-")
         .tempdir()
         .context("Failed to create temporary directory")?;
+
+    // Download MCP components if they're from registries
+    let default_registry = ftl_config.project.default_registry.as_deref();
+
+    // Download MCP gateway (skip in test environment or if not downloading)
+    // Check for NEXTEST env var (set by nextest) or if we're in cfg(test)
+    let is_test = std::env::var("NEXTEST").is_ok() || cfg!(test);
+    if !ftl_config.mcp.gateway.to_lowercase().ends_with(".wasm")
+        && config.download_components
+        && !is_test
+    {
+        let resolved_url =
+            crate::registry::resolve_registry_url(&ftl_config.mcp.gateway, default_registry);
+        let wasm_path = temp_dir.path().join("mcp-gateway.wasm");
+        eprintln!("Pulling MCP gateway from {resolved_url}...");
+        if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
+        {
+            eprintln!("Warning: Failed to pull MCP gateway: {e}. Will use OCI reference directly.");
+        } else {
+            ftl_config.mcp.gateway = wasm_path.to_string_lossy().to_string();
+        }
+    }
+
+    // Download MCP authorizer if auth is enabled (skip in test environment or if not downloading)
+    if ftl_config.is_auth_enabled()
+        && !ftl_config.mcp.authorizer.to_lowercase().ends_with(".wasm")
+        && config.download_components
+        && !is_test
+    {
+        let resolved_url =
+            crate::registry::resolve_registry_url(&ftl_config.mcp.authorizer, default_registry);
+        let wasm_path = temp_dir.path().join("mcp-authorizer.wasm");
+        eprintln!("Pulling MCP authorizer from {resolved_url}...");
+        if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
+        {
+            eprintln!(
+                "Warning: Failed to pull MCP authorizer: {e}. Will use OCI reference directly."
+            );
+        } else {
+            ftl_config.mcp.authorizer = wasm_path.to_string_lossy().to_string();
+        }
+    }
+
+    // Process tools and download registry components if needed
+    for (tool_name, tool_config) in &mut ftl_config.tools {
+        if let Some(repo_ref) = &tool_config.repo {
+            // This is a registry component - pull it using wkg (skip in test environment or if not downloading)
+            if config.download_components && !is_test {
+                let resolved_url =
+                    crate::registry::resolve_registry_url(repo_ref, default_registry);
+
+                // Download to temp directory with a descriptive name
+                let wasm_filename = format!("{tool_name}.wasm");
+                let wasm_path = temp_dir.path().join(&wasm_filename);
+
+                eprintln!("Pulling registry component {tool_name} from {resolved_url}...");
+                crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
+                    .with_context(|| {
+                        format!("Failed to pull component {tool_name} from {resolved_url}")
+                    })?;
+
+                // Update config to use the downloaded WASM file
+                tool_config.repo = None;
+                tool_config.wasm = Some(wasm_path.to_string_lossy().to_string());
+            } else {
+                // In test environment, convert to OCI reference
+                let resolved_url =
+                    crate::registry::resolve_registry_url(repo_ref, default_registry);
+                tool_config.repo = None;
+                tool_config.wasm = Some(format!("oci://{resolved_url}"));
+            }
+        } else {
+            // Local component - update paths to be absolute
+            let tool_path = tool_config.get_path(tool_name);
+            if !tool_path.starts_with('/') {
+                tool_config.path = Some(
+                    abs_project_path
+                        .join(&tool_path)
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
+
+            // Also make the wasm path absolute (only for local components)
+            if let Some(wasm_path) = &tool_config.wasm {
+                if !wasm_path.starts_with('/') {
+                    tool_config.wasm = Some(
+                        abs_project_path
+                            .join(wasm_path)
+                            .to_string_lossy()
+                            .to_string(),
+                    );
+                }
+            }
+        }
+    }
+
+    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
 
     // Create spin.toml in the temp directory
     let temp_file = temp_dir.path().join("spin.toml");

@@ -39,7 +39,7 @@ pub trait SignalHandler: Send + Sync {
 
 /// Up command configuration
 pub struct UpConfig {
-    /// Path to the toolbox
+    /// Path to the project
     pub path: Option<PathBuf>,
     /// Port to listen on
     pub port: u16,
@@ -77,9 +77,14 @@ pub struct UpDependencies {
 pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
     let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
-    // Generate temporary spin.toml from ftl.toml
-    let temp_spin_toml =
-        crate::config::transpiler::generate_temp_spin_toml(&deps.file_system, &project_path)?;
+    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
+        &crate::config::transpiler::GenerateSpinConfig {
+            file_system: &deps.file_system,
+            project_path: &project_path,
+            download_components: true,
+            validate_local_auth: true,
+        },
+    )?;
 
     // We must have a temp spin.toml since ftl.toml is required
     let manifest_path = temp_spin_toml.ok_or_else(|| {
@@ -611,7 +616,7 @@ async fn build_single_component_with_deps(
 /// Up command arguments (matches CLI parser)
 #[derive(Debug, Clone)]
 pub struct UpArgs {
-    /// Path to the toolbox
+    /// Path to the project
     pub path: Option<PathBuf>,
     /// Port to listen on
     pub port: Option<u16>,

@@ -180,6 +180,10 @@ mod tests {
         }
 
         fn clear_screen(&self) {}
+
+        fn prompt_confirm(&self, _prompt: &str, default: bool) -> Result<bool> {
+            Ok(default)
+        }
     }
 
     struct MockProgress;

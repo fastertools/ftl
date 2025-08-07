@@ -22,6 +22,7 @@ fn test_transpile_minimal_config() {
             description: "Test project".to_string(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -101,7 +102,13 @@ command = "cargo build --release --target wasm32-wasip1"
     let fs: Arc<dyn FileSystem> = Arc::new(fs_mock);
 
     // Generate temp spin.toml
-    let result = generate_temp_spin_toml(&fs, project_path).unwrap();
+    let result = generate_temp_spin_toml(&GenerateSpinConfig {
+        file_system: &fs,
+        project_path,
+        download_components: false,
+        validate_local_auth: false,
+    })
+    .unwrap();
     assert!(result.is_some());
 
     let temp_path = result.unwrap();
@@ -145,12 +152,13 @@ fn test_transpile_with_tools() {
         "echo-tool".to_string(),
         ToolConfig {
             path: Some("echo-tool".to_string()),
-            wasm: "echo-tool/target/wasm32-wasip1/release/echo_tool.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("echo-tool/target/wasm32-wasip1/release/echo_tool.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -162,12 +170,13 @@ fn test_transpile_with_tools() {
         "weather".to_string(),
         ToolConfig {
             path: Some("weather-ts".to_string()),
-            wasm: "weather-ts/dist/weather.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("weather-ts/dist/weather.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "npm run build:custom".to_string(),
                 watch: vec!["src/**/*.ts".to_string()],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -183,6 +192,7 @@ fn test_transpile_with_tools() {
             description: String::new(),
             authors: vec!["Test Author <test@example.com>".to_string()],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -229,12 +239,13 @@ fn test_transpile_with_variables() {
         "api-tool".to_string(),
         ToolConfig {
             path: Some("api-tool".to_string()),
-            wasm: "api-tool/target/wasm32-wasip1/release/api_tool.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("api-tool/target/wasm32-wasip1/release/api_tool.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -250,6 +261,7 @@ fn test_transpile_with_variables() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -282,6 +294,7 @@ fn test_transpile_with_auth() {
             description: String::new(),
             authors: vec![],
             access_control: "private".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -329,6 +342,7 @@ fn test_transpile_with_oidc_auth() {
             description: String::new(),
             authors: vec![],
             access_control: "private".to_string(),
+            default_registry: None,
         },
         oidc: Some(OidcConfig {
             issuer: "https://auth.example.com".to_string(),
@@ -381,6 +395,7 @@ fn test_transpile_with_public_access() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -416,6 +431,7 @@ fn test_transpile_with_custom_gateway_uris() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -440,9 +456,8 @@ fn test_transpile_with_custom_gateway_uris() {
 
     // Gateway component should exist with custom URI (named "mcp")
     assert!(result.contains("[component.mcp]"));
-    assert!(result.contains("[component.mcp.source]"));
-    assert!(result.contains("package = \"myorg:custom-gateway\""));
-    assert!(result.contains("version = \"2.0.0\""));
+    // Now we just use a simple source string, not a structured registry format
+    assert!(result.contains("source = \"ghcr.io/myorg/custom-gateway:2.0.0\""));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -451,19 +466,12 @@ fn test_transpile_with_custom_gateway_uris() {
     assert!(spin_config.component.contains_key("mcp"));
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
-    // Gateway component should exist with custom source
+    // Gateway component should have a local source (string path)
     let gateway_component = &spin_config.component["mcp"];
-    if let ComponentSource::Registry {
-        registry,
-        package,
-        version,
-    } = &gateway_component.source
-    {
-        assert_eq!(registry, "ghcr.io");
-        assert_eq!(package, "myorg:custom-gateway");
-        assert_eq!(version, "2.0.0");
+    if let ComponentSource::Local(path) = &gateway_component.source {
+        assert_eq!(path, "ghcr.io/myorg/custom-gateway:2.0.0");
     } else {
-        panic!("Gateway component should have registry source");
+        panic!("Expected gateway component to have local source");
     }
 }
 
@@ -491,12 +499,13 @@ fn test_transpile_with_application_variables() {
         "api-consumer".to_string(),
         ToolConfig {
             path: Some("api-consumer".to_string()),
-            wasm: "api-consumer/target/wasm32-wasip1/release/api_consumer.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("api-consumer/target/wasm32-wasip1/release/api_consumer.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -512,6 +521,7 @@ fn test_transpile_with_application_variables() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -579,12 +589,13 @@ fn test_transpile_complete_example() {
         "database".to_string(),
         ToolConfig {
             path: Some("tools/database".to_string()),
-            wasm: "tools/database/target/wasm32-wasip1/release/database.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("tools/database/target/wasm32-wasip1/release/database.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "cargo build --target wasm32-wasip1 --release".to_string(),
                 watch: vec!["src/**/*.rs".to_string(), "Cargo.toml".to_string()],
                 env: db_env,
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -602,12 +613,13 @@ fn test_transpile_complete_example() {
         "api-client".to_string(),
         ToolConfig {
             path: Some("tools/api".to_string()),
-            wasm: "tools/api/dist/api.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("tools/api/dist/api.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "npm run build".to_string(),
                 watch: vec!["src/**/*.ts".to_string(), "package.json".to_string()],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -630,6 +642,7 @@ fn test_transpile_complete_example() {
                 "Jane Smith <jane@example.com>".to_string(),
             ],
             access_control: "private".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -731,12 +744,13 @@ fn test_transpile_with_build_profiles() {
         "profiled-tool".to_string(),
         ToolConfig {
             path: Some("profiled".to_string()),
-            wasm: "profiled/target/wasm32-wasip1/release/profiled.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("profiled/target/wasm32-wasip1/release/profiled.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "cargo build --target wasm32-wasip1".to_string(),
                 watch: vec!["src/**/*.rs".to_string()],
                 env: HashMap::new(),
-            },
+            }),
             profiles: Some(BuildProfiles { profiles }),
             up: Some(UpConfig {
                 profile: "dev".to_string(),
@@ -757,6 +771,7 @@ fn test_transpile_with_build_profiles() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -799,8 +814,9 @@ fn test_transpile_with_special_characters() {
         "special-chars".to_string(),
         ToolConfig {
             path: Some("tools/special".to_string()),
-            wasm: "tools/special/output.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("tools/special/output.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "npm run build -- --config=\"production\"".to_string(),
                 watch: vec!["src/**/*.{ts,tsx}".to_string()],
                 env: HashMap::from([
@@ -810,7 +826,7 @@ fn test_transpile_with_special_characters() {
                         "https://api.example.com/v1".to_string(),
                     ),
                 ]),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -826,6 +842,7 @@ fn test_transpile_with_special_characters() {
             description: "Testing \"special\" characters & symbols".to_string(),
             authors: vec!["Author <test@example.com> (Company & Co.)".to_string()],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -860,6 +877,7 @@ fn test_transpile_empty_collections() {
             description: String::new(), // Empty description
             authors: vec![],            // Empty authors
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(), // No tools
@@ -885,55 +903,24 @@ fn test_transpile_empty_collections() {
 }
 
 #[test]
-fn test_registry_uri_parsing() {
-    // Test various registry URI formats
+fn test_parse_component_source() {
+    // Test that parse_component_source now just returns local paths
+    // Since we're downloading registry components with wkg, everything becomes a local path
+
     let test_cases = vec![
-        (
-            "ghcr.io/myorg/my-tool:1.0.0",
-            ComponentSource::Registry {
-                registry: "ghcr.io".to_string(),
-                package: "myorg:my-tool".to_string(),
-                version: "1.0.0".to_string(),
-            },
-        ),
-        (
-            "docker.io/namespace/component:v2.1.0-beta",
-            ComponentSource::Registry {
-                registry: "docker.io".to_string(),
-                package: "namespace:component".to_string(),
-                version: "v2.1.0-beta".to_string(),
-            },
-        ),
-        (
-            "registry.example.com:5000/org/suborg/tool:latest",
-            ComponentSource::Registry {
-                registry: "registry.example.com:5000".to_string(),
-                package: "org:suborg:tool".to_string(),
-                version: "latest".to_string(),
-            },
-        ),
+        ("app.wasm", "app.wasm"),
+        ("/path/to/app.wasm", "/path/to/app.wasm"),
+        // Even registry URLs are now treated as local paths (will be downloaded by wkg)
+        ("ghcr.io/myorg/my-tool:1.0.0", "ghcr.io/myorg/my-tool:1.0.0"),
     ];
 
-    for (uri, expected) in test_cases {
-        let result = parse_registry_uri_to_source(uri);
-        match (result, expected) {
-            (
-                ComponentSource::Registry {
-                    registry: r1,
-                    package: p1,
-                    version: v1,
-                },
-                ComponentSource::Registry {
-                    registry: r2,
-                    package: p2,
-                    version: v2,
-                },
-            ) => {
-                assert_eq!(r1, r2, "Registry mismatch for URI: {uri}");
-                assert_eq!(p1, p2, "Package mismatch for URI: {uri}");
-                assert_eq!(v1, v2, "Version mismatch for URI: {uri}");
+    for (input, expected) in test_cases {
+        let result = parse_component_source(input, None);
+        match result {
+            ComponentSource::Local(path) => {
+                assert_eq!(path, expected, "Path mismatch for input: {input}");
             }
-            _ => panic!("Unexpected parse result for URI: {uri}"),
+            _ => panic!("Expected Local source for input: {input}"),
         }
     }
 }
@@ -946,12 +933,13 @@ fn test_http_trigger_generation() {
         "tool1".to_string(),
         ToolConfig {
             path: Some("tool1".to_string()),
-            wasm: "tool1/output.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("tool1/output.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "make".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -963,12 +951,13 @@ fn test_http_trigger_generation() {
         "tool2".to_string(),
         ToolConfig {
             path: Some("tool2".to_string()),
-            wasm: "tool2/output.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("tool2/output.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "make".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -984,6 +973,7 @@ fn test_http_trigger_generation() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
@@ -1022,6 +1012,7 @@ fn test_auth_disabled_omits_authorizer() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -1082,6 +1073,7 @@ fn test_auth_enabled_includes_authorizer() {
             description: String::new(),
             authors: vec![],
             access_control: "private".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools: HashMap::new(),
@@ -1150,12 +1142,13 @@ fn test_auth_disabled_with_tools() {
         "my-tool".to_string(),
         ToolConfig {
             path: Some("my-tool".to_string()),
-            wasm: "my-tool/output.wasm".to_string(),
-            build: BuildConfig {
+            wasm: Some("my-tool/output.wasm".to_string()),
+            repo: None,
+            build: Some(BuildConfig {
                 command: "make".to_string(),
                 watch: vec![],
                 env: HashMap::new(),
-            },
+            }),
             profiles: None,
             up: None,
             deploy: None,
@@ -1171,6 +1164,7 @@ fn test_auth_disabled_with_tools() {
             description: String::new(),
             authors: vec![],
             access_control: "public".to_string(),
+            default_registry: None,
         },
         oidc: None,
         tools,
