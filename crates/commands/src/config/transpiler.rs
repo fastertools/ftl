@@ -306,7 +306,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> ComponentConfig {
     // Use default if empty
     let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-authorizer:0.0.12"
+        "ghcr.io/fastertools/mcp-authorizer:0.0.13"
     } else {
         registry_uri
     };
@@ -409,7 +409,7 @@ fn create_gateway_component(
 ) -> ComponentConfig {
     // Use default if empty
     let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-gateway:0.0.10"
+        "ghcr.io/fastertools/mcp-gateway:0.0.11"
     } else {
         registry_uri
     };

@@ -398,11 +398,11 @@ fn default_access_control() -> String {
 }
 
 fn default_gateway() -> String {
-    "ghcr.io/fastertools/mcp-gateway:0.0.10".to_string()
+    "ghcr.io/fastertools/mcp-gateway:0.0.11".to_string()
 }
 
 fn default_authorizer() -> String {
-    "ghcr.io/fastertools/mcp-authorizer:0.0.12".to_string()
+    "ghcr.io/fastertools/mcp-authorizer:0.0.13".to_string()
 }
 
 const fn default_validate_arguments() -> bool {
@@ -545,8 +545,8 @@ watch = [
 repo = "ghcr.io/fastertools/example-rs:latest"
 
 [mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.10"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 validate_arguments = false
 "#;
         let ftl_config = FtlConfig::parse(config).unwrap();

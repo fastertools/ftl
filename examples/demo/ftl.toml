@@ -13,7 +13,7 @@ access_control = "public"
 # See https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
 # Default components:
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.12"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 # If true, the gateway component should automatically validate tool call arguments based on tool schema.
 validate_arguments = true
 

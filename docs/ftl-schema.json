@@ -17,8 +17,8 @@
       "description": "MCP component configuration",
       "$ref": "#/$defs/McpConfig",
       "default": {
-        "gateway": "ghcr.io/fastertools/mcp-gateway:0.0.10",
-        "authorizer": "ghcr.io/fastertools/mcp-authorizer:0.0.12",
+        "gateway": "ghcr.io/fastertools/mcp-gateway:0.0.11",
+        "authorizer": "ghcr.io/fastertools/mcp-authorizer:0.0.13",
         "validate_arguments": false
       }
     },
@@ -143,13 +143,13 @@
         "gateway": {
           "description": "MCP gateway component registry URI",
           "type": "string",
-          "default": "ghcr.io/fastertools/mcp-gateway:0.0.10",
+          "default": "ghcr.io/fastertools/mcp-gateway:0.0.11",
           "minLength": 1
         },
         "authorizer": {
           "description": "MCP authorizer component registry URI",
           "type": "string",
-          "default": "ghcr.io/fastertools/mcp-authorizer:0.0.12",
+          "default": "ghcr.io/fastertools/mcp-authorizer:0.0.13",
           "minLength": 1
         },
         "validate_arguments": {
