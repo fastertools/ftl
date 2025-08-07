@@ -370,7 +370,7 @@ async fn execute_deploy_inner(
 
     // Deploy to FTL
     deps.ui.print("");
-    
+
     // Show deployment variables first, before creating any spinners
     if parsed_variables.is_empty() {
         deps.ui
@@ -411,7 +411,7 @@ async fn execute_deploy_inner(
     }
 
     deps.ui.print("");
-    
+
     // Now create the spinner for deployment after all output is done
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
