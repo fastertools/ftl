@@ -180,6 +180,82 @@ install_spin() {
     return 1
 }
 
+# Install wkg if not present
+install_wkg() {
+    info "wkg is required for pulling WebAssembly components from registries."
+    echo ""
+    
+    if [ "$AUTO_YES" = false ]; then
+        read -p "Would you like to install wkg automatically? [Y/n] " -n 1 -r </dev/tty
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            info "Skipping wkg installation. You can install it manually later:"
+            echo "  cargo install wkg"
+            echo "  # or download from: https://github.com/bytecodealliance/wasm-pkg-tools/releases"
+            return 1
+        fi
+    fi
+    
+    info "Installing wkg..."
+    
+    # Check if cargo is available (preferred method)
+    if command_exists "cargo"; then
+        info "Installing wkg using cargo..."
+        if confirm_exec "Install wkg via cargo" cargo install wkg; then
+            success "✓ wkg installed successfully!"
+            return 0
+        else
+            info "Failed to install wkg via cargo, trying binary download..."
+        fi
+    fi
+    
+    # Fallback to downloading pre-built binary
+    local platform=$(detect_platform)
+    local wkg_version="0.11.0"  # Update this as needed
+    local wkg_url=""
+    
+    case "$platform" in
+        x86_64-apple-darwin)
+            wkg_url="https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v${wkg_version}/wkg-x86_64-apple-darwin"
+            ;;
+        aarch64-apple-darwin)
+            wkg_url="https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v${wkg_version}/wkg-aarch64-apple-darwin"
+            ;;
+        x86_64-unknown-linux-gnu)
+            wkg_url="https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v${wkg_version}/wkg-x86_64-unknown-linux-gnu"
+            ;;
+        aarch64-unknown-linux-gnu)
+            wkg_url="https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v${wkg_version}/wkg-aarch64-unknown-linux-gnu"
+            ;;
+        *)
+            error "Unsupported platform for automatic wkg installation. Please install manually: cargo install wkg"
+            ;;
+    esac
+    
+    if [ -n "$wkg_url" ]; then
+        info "Downloading wkg from GitHub releases..."
+        
+        # Download binary directly (not a tar.gz)
+        if confirm_exec "Download wkg binary" curl -fsSL "$wkg_url" -o wkg; then
+            # Make it executable
+            chmod +x wkg
+            
+            # Move wkg to /usr/local/bin
+            info "Moving wkg to /usr/local/bin..."
+            if sudo mv ./wkg /usr/local/bin/wkg; then
+                success "✓ wkg installed successfully!"
+                return 0
+            else
+                error "Failed to move wkg to /usr/local/bin. Please run: sudo mv ./wkg /usr/local/bin/wkg"
+            fi
+        else
+            error "Failed to download wkg"
+        fi
+    fi
+    
+    return 1
+}
+
 # Check dependencies
 check_dependencies() {
     info "Checking dependencies..."
@@ -218,6 +294,21 @@ check_dependencies() {
         echo "✓ found"
     fi
     
+    # Check for wkg
+    echo -n "  Checking for wkg... "
+    if ! command_exists "wkg"; then
+        echo "❌ not found"
+        echo ""
+        # Offer to install wkg automatically
+        if ! install_wkg; then
+            echo ""
+            info "⚠️  Warning: wkg is required for pulling registry components"
+            echo ""
+        fi
+    else
+        echo "✓ found"
+    fi
+    
     echo ""
 }
 
@@ -231,10 +322,11 @@ main() {
         info "This script will:"
         echo "  1. Check dependencies (gh CLI temporarily required)"
         echo "  2. Install Spin if not present (with your permission)"
-        echo "  3. Find the latest FTL release"
-        echo "  4. Download the FTL binary"
-        echo "  5. Install it to ~/.local/bin or /usr/local/bin"
-        echo "  6. Set up FTL templates"
+        echo "  3. Install wkg if not present (with your permission)"
+        echo "  4. Find the latest FTL release"
+        echo "  5. Download the FTL binary"
+        echo "  6. Install it to ~/.local/bin or /usr/local/bin"
+        echo "  7. Set up FTL templates"
         echo ""
         read -p "Continue? [Y/n] " -n 1 -r </dev/tty
         echo
@@ -288,13 +380,13 @@ main() {
     
     # Ask user where to install
     if [ "$AUTO_YES" = true ]; then
-        # Default to ~/.local/bin in auto mode
+        # Default to /usr/local/bin in auto mode
         INSTALL_CHOICE="1"
     else
         info "Where would you like to install ftl?"
         echo ""
-        echo "  1) ~/.local/bin (user directory) - Recommended"
-        echo "  2) /usr/local/bin (requires sudo)"
+        echo "  1) /usr/local/bin - Recommended"
+        echo "  2) ~/.local/bin (user directory)"
         echo "  3) Skip installation (manual setup)"
         echo ""
         read -p "Select an option [1-3]: " -n 1 -r INSTALL_CHOICE </dev/tty
@@ -303,6 +395,16 @@ main() {
     
     case "$INSTALL_CHOICE" in
         1|"")
+            # Install to /usr/local/bin
+            info "Installing to /usr/local/bin..."
+            if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
+                INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
+                success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
+            else
+                error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
+            fi
+            ;;
+        2)
             # Install to ~/.local/bin
             info "Installing to ~/.local/bin..."
             mkdir -p ~/.local/bin
@@ -333,16 +435,6 @@ main() {
                     echo ""
                     echo "Add the above line to your shell's configuration file"
                 fi
-            fi
-            ;;
-        2)
-            # Install to /usr/local/bin
-            info "Installing to /usr/local/bin..."
-            if sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}; then
-                INSTALL_PATH="/usr/local/bin/${BINARY_NAME}"
-                success "✓ Installed to /usr/local/bin/${BINARY_NAME}"
-            else
-                error "Failed to install to /usr/local/bin. Please run manually: sudo mv ./${BINARY_NAME} /usr/local/bin/${BINARY_NAME}"
             fi
             ;;
         3)
@@ -392,13 +484,6 @@ main() {
         echo "  ${BINARY_NAME} --version"
     fi
     
-    # Final reminder about Spin if not installed
-    if ! command_exists "spin"; then
-        echo ""
-        info "Remember: Spin is required for FTL to function. Install it with:"
-        echo "  curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash"
-        echo "  sudo mv ./spin /usr/local/bin/spin"
-    fi
 }
 
 # Parse command line arguments

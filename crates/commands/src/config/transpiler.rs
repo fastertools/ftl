@@ -588,7 +588,9 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
         eprintln!("Pulling MCP gateway from {resolved_url}...");
         if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
         {
-            eprintln!("Warning: Failed to pull MCP gateway: {e}. Will use OCI reference directly.");
+            eprintln!("Error: Failed to pull MCP gateway: {e}");
+            eprintln!("Please ensure wkg is installed: cargo install wkg");
+            return Err(anyhow::anyhow!("Failed to pull required MCP gateway component"));
         } else {
             ftl_config.mcp.gateway = wasm_path.to_string_lossy().to_string();
         }
@@ -606,9 +608,9 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
         eprintln!("Pulling MCP authorizer from {resolved_url}...");
         if let Err(e) = crate::registry::pull_component(&resolved_url, &wasm_path.to_string_lossy())
         {
-            eprintln!(
-                "Warning: Failed to pull MCP authorizer: {e}. Will use OCI reference directly."
-            );
+            eprintln!("Error: Failed to pull MCP authorizer: {e}");
+            eprintln!("Please ensure wkg is installed: cargo install wkg");
+            return Err(anyhow::anyhow!("Failed to pull required MCP authorizer component"));
         } else {
             ftl_config.mcp.authorizer = wasm_path.to_string_lossy().to_string();
         }
