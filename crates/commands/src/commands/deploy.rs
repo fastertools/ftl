@@ -280,6 +280,9 @@ async fn execute_deploy_inner(
         }
 
         deps.ui.print("");
+    } else {
+        // For automated deployment (args.yes == true), we still need to clear the spinner
+        spinner.finish_and_clear();
     }
 
     // Create new spinner for the rest of the deployment
@@ -367,21 +370,8 @@ async fn execute_deploy_inner(
 
     // Deploy to FTL
     deps.ui.print("");
-    let spinner = deps.ui.create_spinner();
-    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
-    spinner.set_message("Starting engine deployment...");
-
-    // Refresh credentials before deployment in case the token expired
-    let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
-        Ok(creds) => creds,
-        Err(e) => {
-            spinner.finish_and_clear();
-            return Err(anyhow!("Failed to refresh authentication token: {}", e));
-        }
-    };
-
-    // Show deployment variables
-    deps.ui.print("");
+    
+    // Show deployment variables first, before creating any spinners
     if parsed_variables.is_empty() {
         deps.ui
             .print_styled("→ No variables to deploy", MessageStyle::Yellow);
@@ -419,6 +409,22 @@ async fn execute_deploy_inner(
             deps.ui.print(&format!("{icon}{key} = {display_value}"));
         }
     }
+
+    deps.ui.print("");
+    
+    // Now create the spinner for deployment after all output is done
+    let spinner = deps.ui.create_spinner();
+    spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
+    spinner.set_message("Starting engine deployment...");
+
+    // Refresh credentials before deployment in case the token expired
+    let _fresh_credentials = match deps.credentials_provider.get_or_refresh_credentials().await {
+        Ok(creds) => creds,
+        Err(e) => {
+            spinner.finish_and_clear();
+            return Err(anyhow!("Failed to refresh authentication token: {}", e));
+        }
+    };
 
     let deployment = deploy_to_ftl_with_progress(
         deps.clone(),
