@@ -15,153 +15,118 @@ Faster tools for AI agents
 
 </div>
 
-FTL is a framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers on [WebAssembly components](https://component-model.bytecodealliance.org/design/why-component-model.html) via [Spin](https://github.com/spinframework/spin).
+FTL (Faster Tools) is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
 
-Python, Rust, TypeScript, and Go tools can run co-isolated alongside each other within a single sandboxed MCP server process on any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
+We believe the future of AI tooling shouldn't be locked into proprietary ecosystems. FTL is our commitment to that vision, built entirely on:
 
-FTL MCP servers work over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http), with spec-compliant [authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) options that work out-of-the-box with compatible clients like Cursor and Claude Code.
+- WebAssembly (WASM): For secure, sandboxed execution with sub-millisecond cold starts.
+- The [Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html): To compose tools written in different languages (Rust, Python, Go, TS) into a single application.
+- [Spin](https://github.com/spinframework/spin): The CNCF-hosted developer tool and runtime for building and running WASM applications.
 
-FTL Engine is a new agent tool platform powered by [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure)'s globally distributed edge compute network. It aims to be a complete surface for running lag-free MCP servers on the network edge, with sub-millisecond cold starts and consistently low latency across geographic regions. Talk to us on [Discord](https://discord.gg/ByFw4eKEU7) to request early access.
+This foundation ensures that what you build with FTL today will be compatible with the open, interoperable ecosystem of tomorrow.
 
-<div align="center">
-<em>Example: A Python text processing tool called from 5 continents</em>
+## FTL vs. FTL Engine
+- **ftl** (This Repo): The open-source framework and CLI for building MCP servers that can run anywhere Spin apps are supported.
+- **FTL Engine**: Our optional, managed platform for deploying ftl applications to a globally distributed edge network for the simplest path to production
 
-![results summary](./docs/images/results-summary.png)
-![results details](./docs/images/results-details.png)
-![results](./docs/images/results.png)
-</div>
+### Features
 
-## Why?
+- **Polyglot by Design**: SDKs for Python, Rust, TypeScript, and Go let you write tools in the best language for the job.
+- **Seamless Composition**: Mix and match tools written in different languages within a single MCP server.
+- **Secure & Sandboxed**: Each tool runs in an isolated WASM sandbox, with no access to the host system unless explicitly granted
+- **Run Anywhere**: Deploy to any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
+- **MCP Compliant**: Out-of-the-box support for [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) and spec-compliant [Authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
+- **Blazing Fast**: Sub-millisecond cold starts and near-native performance, powered by Wasmtime.
 
-### Simple MCP Server DX across languages
+## Quick Start
+### Prerequisites
 
-<details>
-<summary><strong>Write tools in TypeScript, Rust, Python, and Go.</strong></summary>
-
-Combine co-isolated tools from different [source languages](./sdk/README.md) onto a single server process over the `/mcp` [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) endpoint. See [Architecture](#architecture) for details.
-
-Tool components can be individually distributed on OCI registries like Docker Hub and GitHub Container Registry.
-
-Tool binary size and performance are influenced by choice of source language. High performance features like [SIMD](https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md) are available in Rust.
-</details>
-
-### Secure by design
-
-<details>
-<summary><strong>Internal isolation and MCP-compliant authorization.</strong></summary>
-
-Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques.
-
-A [component](https://component-model.bytecodealliance.org/design/why-component-model.html#components) is a WebAssembly binary (which may or may not contain modules) that is restricted to interact only through the modules' imported and exported functions.
-
-Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
-
-Out-of-the-box support for configurable [MCP-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization), including
-- Spec-compliant OAuth 2.1 implementation
-- OAuth 2.0 Dynamic Client Registration Protocol (RFC7591).
-- OAuth 2.0 Protected Resource Metadata (RFC9728).
-- OAuth 2.0 Authorization Server Metadata (RFC8414).
-
-Plug in your own JWT issuer with simple configuration.
-</details>
-
-### Edge deployments on FTL Engine
-<details>
-<summary><strong>FTL Engine is an end-to-end platform for running remote tools called by AI agents.</strong></summary>
-
-Tools cold start in under half a millisecond, instantly scale up to meet demand, and scale down to zero.
-
-Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
-
-Cost scales predictably with usage. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out. Engine specs are fixed and scaling is completely horizontal and automatic.
-
-Tools are automatically deployed across the global network edge. Tool calls are routed to an Engine running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
-
-The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
-
-Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
-
-Join [Discord](https://discord.gg/ByFw4eKEU7) to request access.
-</details>
-
-## Prerequisites
-
-To build tools in different languages, you'll need the corresponding toolchains:
+To build tools in different languages, you'll need their corresponding toolchains:
 
 - **Rust**: `cargo` (via [rustup](https://rustup.rs/))
 - **TypeScript/JavaScript**: `node` and `npm` (via [Node.js](https://nodejs.org/))
 - **Python**: `python3` and `componentize-py` (install with `pip install componentize-py`)
 - **Go**: `go` and `tinygo` (via [Go](https://golang.org/) and [TinyGo](https://tinygo.org/))
 
-## Quick Start
+### Installing and Updating 
 
-Install `ftl`
+To get `ftl` installed run the [install script](install.sh). Download and run manually or download and install with curl/wget:
 ```bash
-curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+curl -o- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+```
+```bash
+wget -qO- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
 ```
 
-Create a new project
+### Create a new project and scaafold a tool
 ```bash
-ftl init faster-tools && cd faster-tools
+ftl init hal9000
+
+cd hal9000
+
+ftl add open-pod-bay --language rust
 ```
 
-Scaffold tools
-```bash
-ftl add
-```
-
-Develop and serve locally
+### Run the Local Development Server
 ```bash
 ftl up --watch
+
+→ Starting development server with auto-rebuild...
+
+👀 Watching for file changes
+
+Serving http://127.0.0.1:3000
+Available Routes:
+  mcp: http://127.0.0.1:3000 (wildcard)
 ```
 
-Try it out with your MCP client
+### Connect your MCP Client
+
+Example mcp.json config
 ```json
 {
   "mcpServers": {
-    "fasterTools": {
-      "url": "http://127.0.0.1:3000/mcp",
+    "hal9000": {
+      "url": "http://127.0.0.1:3000",
       "transport": "http"
     }
   }
 }
 ```
 
+#### Add To Claude Code
 ```bash
-claude mcp add -t http faster-tools http://127.0.0.1:3000/mcp
+claude mcp add -t http faster-tools http://127.0.0.1:3000
 ```
 
-### Ready to deploy?
+## Ready to Deploy? 
 
-Join [Discord](https://discord.gg/ByFw4eKEU7) to request access.
+### Deploying to FTL Engine
 
-Log in to FTL Engine
+For the simplest path to a production-grade, globally-distributed deployment, you can use FTL Engine. It handles scaling, security, and distribution for you on Akamai's edge network.
+
+First join [Discord](https://discord.gg/ByFw4eKEU7) to request early access. 
+
+#### Log in to FTL Engine
 ```bash
 ftl eng login
 ```
 
-Deploy
+#### Deploy
 ```bash
 ftl eng deploy
-```
 
-Plug it in to `mcp.json` or equivalent.
-```json
-{
-  "mcpServers": {
-    "fasterTools": {
-      "url": "https://ce8860d9-518b-4122-97ab-2e664f6875d9.fwf.app/mcp",
-      "transport": "http"
-    }
-  }
-}
-```
+▶ Deploying project to FTL Engine
+→ Configuring MCP authorization settings...
+✓ MCP authorization set to: public
+✓ Deployed!
 
-```bash
-claude mcp add -t http faster-tools https://ce8860d9-518b-4122-97ab-2e664f6875d9.fwf.app/mcp
+  MCP URL: https://8e264fc0-xxxx-aaaa-9999-9f5ab760092a.fwf.app
 ```
 
 ## Architecture
+
+FTL composes your individual tool components with our gateway and authorizer components into a single Spin application. All calls between components happen securely in-memory, eliminating network latency between your tools.
 
 ```mermaid
 graph TB
@@ -203,9 +168,53 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-- Tool components are composed together with the FTL MCP authorizer and gateway components, runing as a single MCP server process on the host.
-- The FTL gateway components handle protocol complexity, auth, tool argument validation, and tool component routing.
-- Cross-component calls happen in memory with no network latency, while maintaining secure boundaries.
+### Fast Anywhere is the World
+<div align="center">
+<em>Example: A Python text processing tool called from 5 continents</em>
+
+![results summary](./docs/images/results-summary.png)
+![results details](./docs/images/results-details.png)
+![results](./docs/images/results.png)
+</div>
+
+
+### Secure by design
+
+<details>
+<summary><strong>Internal isolation and MCP-compliant authorization.</strong></summary>
+
+Each WebAssembly module executes within a [sandboxed](https://webassembly.org/docs/security/) environment separated from the host runtime using fault isolation techniques.
+
+A [component](https://component-model.bytecodealliance.org/design/why-component-model.html#components) is a WebAssembly binary (which may or may not contain modules) that is restricted to interact only through the modules' imported and exported functions.
+
+Allowed outbound hosts and accessible variables can be configured per individual tool component within a server.
+
+Out-of-the-box support for configurable [MCP-compliant authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization), including
+- Spec-compliant OAuth 2.1 implementation
+- OAuth 2.0 Dynamic Client Registration Protocol (RFC7591).
+- OAuth 2.0 Protected Resource Metadata (RFC9728).
+- OAuth 2.0 Authorization Server Metadata (RFC8414).
+
+Plug in your own JWT issuer with simple configuration.
+</details>
+
+### Edge deployments on FTL Engine
+<details>
+<summary><strong>FTL Engine is an end-to-end platform for running remote tools called by AI agents.</strong></summary>
+
+Tools cold start in under half a millisecond, instantly scale up to meet demand, and scale down to zero.
+
+Engines run on [Fermyon Wasm Functions](https://www.fermyon.com/wasm-functions) and [Akamai](https://www.akamai.com/why-akamai/global-infrastructure), the most globally distributed edge compute network.
+
+Cost scales predictably with usage. There are no idle costs and no price variables like execution duration, region, memory, provisioned concurrency, reserved concurrency, [etc](https://aws.amazon.com/lambda/pricing/). Cold starts and init phases are architected out. Engine specs are fixed and scaling is completely horizontal and automatic.
+
+Tools are automatically deployed across the global network edge. Tool calls are routed to an Engine running on the most optimal Akamai edge PoP, enabling consistently low latency across geographic regions.
+
+The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
+
+Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
+</details>
+
 
 ## Contributing
 
@@ -221,3 +230,4 @@ FTL is built on top of these excellent projects:
 - [Spin](https://github.com/fermyon/spin)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [WebAssembly](https://webassembly.org)
+
