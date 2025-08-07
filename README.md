@@ -119,13 +119,14 @@ Try it out with your MCP client
 ```json
 {
   "mcpServers": {
-    "fastTools": {
+    "fasterTools": {
       "url": "http://127.0.0.1:3000/mcp",
       "transport": "http"
     }
   }
 }
 ```
+
 ```bash
 claude mcp add -t http faster-tools http://127.0.0.1:3000/mcp
 ```
@@ -144,7 +145,7 @@ Deploy
 ftl eng deploy
 ```
 
-Plug it in
+Plug it in to `mcp.json` or equivalent.
 ```json
 {
   "mcpServers": {
@@ -155,6 +156,7 @@ Plug it in
   }
 }
 ```
+
 ```bash
 claude mcp add -t http faster-tools https://ce8860d9-518b-4122-97ab-2e664f6875d9.fwf.app/mcp
 ```
