@@ -1,6 +1,6 @@
 use super::context::MiddlewareContext;
-use super::types::{MiddlewareError, Middleware};
 use super::invocation_tracker::InvocationTracker;
+use super::types::{Middleware, MiddlewareError};
 
 pub struct MiddlewarePipeline {
     invocation_tracker: Option<InvocationTracker>,
@@ -20,7 +20,10 @@ impl MiddlewarePipeline {
     pub async fn pre_process(&self, ctx: &mut MiddlewareContext) -> Result<(), MiddlewareError> {
         if let Some(tracker) = &self.invocation_tracker {
             if let Err(err) = tracker.pre_process(ctx).await {
-                eprintln!("Middleware pre_process error: {} (fatal: {})", err.message, err.is_fatal);
+                eprintln!(
+                    "Middleware pre_process error: {} (fatal: {})",
+                    err.message, err.is_fatal
+                );
                 if err.is_fatal {
                     return Err(err);
                 }
@@ -32,7 +35,10 @@ impl MiddlewarePipeline {
     pub async fn post_process(&self, ctx: &mut MiddlewareContext) -> Result<(), MiddlewareError> {
         if let Some(tracker) = &self.invocation_tracker {
             if let Err(err) = tracker.post_process(ctx).await {
-                eprintln!("Middleware post_process error: {} (fatal: {})", err.message, err.is_fatal);
+                eprintln!(
+                    "Middleware post_process error: {} (fatal: {})",
+                    err.message, err.is_fatal
+                );
                 if err.is_fatal {
                     return Err(err);
                 }
@@ -51,7 +57,11 @@ impl MiddlewarePipeline {
     }
 
     pub fn len(&self) -> usize {
-        if self.invocation_tracker.is_some() { 1 } else { 0 }
+        if self.invocation_tracker.is_some() {
+            1
+        } else {
+            0
+        }
     }
 
     pub fn is_empty(&self) -> bool {

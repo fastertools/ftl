@@ -8,8 +8,9 @@ use crate::mcp_types::{
     ToolContent, ToolMetadata, ToolResponse,
 };
 use crate::middleware::{
-    context::MiddlewareContext, invocation_tracker::{InvocationTracker, TrackerConfig},
-    pipeline::{MiddlewarePipeline, MiddlewareBuilder},
+    context::MiddlewareContext,
+    invocation_tracker::{InvocationTracker, TrackerConfig},
+    pipeline::{MiddlewareBuilder, MiddlewarePipeline},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +34,7 @@ impl McpGateway {
     pub fn new(config: GatewayConfig) -> Self {
         // Build middleware pipeline
         let mut builder = MiddlewareBuilder::new();
-        
+
         // Add InvocationTracker if enabled
         if variables::get("invocation_tracker_enabled")
             .unwrap_or_else(|_| "true".to_string())
@@ -45,10 +46,10 @@ impl McpGateway {
                 collector_url: variables::get("metrics_collector_url")
                     .unwrap_or_else(|_| "http://tea.spin.internal/events".to_string()),
             };
-            
+
             let tracker = InvocationTracker::new(tracker_config);
             builder = builder.with_invocation_tracker(tracker);
-            
+
             Self {
                 config,
                 middleware_pipeline: builder.build(),
@@ -377,12 +378,12 @@ impl McpGateway {
 
         // Create middleware context
         let mut ctx = MiddlewareContext::new(params.name.clone(), component_name.clone());
-        
+
         // Add tenant/user context from request headers
         for (key, value) in &self.request_context {
             ctx.metadata.additional.insert(key.clone(), value.clone());
         }
-        
+
         // Set request size if we have arguments
         if let Ok(serialized) = serde_json::to_vec(&tool_arguments) {
             ctx.set_request_size(serialized.len());
@@ -426,7 +427,7 @@ impl McpGateway {
         ctx.timing.tool_execution_start = Some(std::time::Instant::now());
 
         let tool_result = spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await;
-        
+
         // Mark tool execution end
         ctx.timing.tool_execution_end = Some(std::time::Instant::now());
 
@@ -442,11 +443,13 @@ impl McpGateway {
                         Ok(tool_response) => {
                             // Set success in context
                             ctx.set_tool_success(true, Some(body.len()));
-                            
+
                             match serde_json::to_value(tool_response) {
                                 Ok(value) => JsonRpcResponse::success(request_id.clone(), value),
                                 Err(e) => {
-                                    ctx.set_error(format!("Failed to serialize tool response: {e}"));
+                                    ctx.set_error(format!(
+                                        "Failed to serialize tool response: {e}"
+                                    ));
                                     JsonRpcResponse::error(
                                         request_id.clone(),
                                         ErrorCode::INTERNAL_ERROR.0,
@@ -467,8 +470,10 @@ impl McpGateway {
                 } else {
                     // Error response from tool
                     let error_text = String::from_utf8_lossy(body);
-                    ctx.set_error(format!("Tool execution failed (status {status}): {error_text}"));
-                    
+                    ctx.set_error(format!(
+                        "Tool execution failed (status {status}): {error_text}"
+                    ));
+
                     let tool_response = ToolResponse {
                         content: vec![ToolContent::Text {
                             text: format!("Tool execution failed (status {status}): {error_text}"),
@@ -550,7 +555,6 @@ pub async fn handle_mcp_request(req: Request) -> Response {
             .build();
     }
 
-
     // Only accept POST requests for JSON-RPC
     if *req.method() != Method::Post {
         return Response::builder()
@@ -600,7 +604,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
 
     // Extract tenant/user context from headers (set by upstream mcp-authorizer)
     let mut request_context = std::collections::HashMap::new();
-    
+
     // Look for auth headers set by mcp-authorizer
     for (name, value) in req.headers() {
         match name.to_lowercase().as_str() {
@@ -638,7 +642,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         validate_arguments,
     };
     let mut gateway = McpGateway::new(config);
-    
+
     // Store request context for middleware to access
     gateway.set_request_context(request_context);
 

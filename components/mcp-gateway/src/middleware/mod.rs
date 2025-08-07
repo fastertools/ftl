@@ -5,5 +5,5 @@ pub mod types;
 
 pub use context::MiddlewareContext;
 pub use invocation_tracker::InvocationTracker;
-pub use pipeline::{MiddlewarePipeline, MiddlewareBuilder};
+pub use pipeline::{MiddlewareBuilder, MiddlewarePipeline};
 pub use types::{Middleware, MiddlewareError};

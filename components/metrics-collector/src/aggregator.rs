@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -35,35 +35,41 @@ impl ToolMetrics {
 
     pub fn record_invocation(&self, success: bool, duration_ms: u64, request_size: Option<usize>) {
         self.invocation_count.fetch_add(1, Ordering::Relaxed);
-        
+
         if success {
             self.success_count.fetch_add(1, Ordering::Relaxed);
         } else {
             self.failure_count.fetch_add(1, Ordering::Relaxed);
         }
-        
-        self.total_duration_ms.fetch_add(duration_ms, Ordering::Relaxed);
-        
+
+        self.total_duration_ms
+            .fetch_add(duration_ms, Ordering::Relaxed);
+
         if let Some(size) = request_size {
-            self.total_request_size.fetch_add(size as u64, Ordering::Relaxed);
+            self.total_request_size
+                .fetch_add(size as u64, Ordering::Relaxed);
         }
-        
+
         // Update min/max duration
-        let _ = self.min_duration_ms.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            if duration_ms < current {
-                Some(duration_ms)
-            } else {
-                None
-            }
-        });
-        
-        let _ = self.max_duration_ms.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            if duration_ms > current {
-                Some(duration_ms)
-            } else {
-                None
-            }
-        });
+        let _ = self
+            .min_duration_ms
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                if duration_ms < current {
+                    Some(duration_ms)
+                } else {
+                    None
+                }
+            });
+
+        let _ = self
+            .max_duration_ms
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                if duration_ms > current {
+                    Some(duration_ms)
+                } else {
+                    None
+                }
+            });
     }
 
     pub fn to_json(&self) -> serde_json::Value {
@@ -114,52 +120,48 @@ impl MetricsAggregator {
     }
 
     pub async fn record_event(&self, event: MetricEvent) {
-        
         // Increment global counters
-        self.global_metrics.total_invocations.fetch_add(1, Ordering::Relaxed);
-        
+        self.global_metrics
+            .total_invocations
+            .fetch_add(1, Ordering::Relaxed);
+
         // Get or create tool metrics
         let tool_metrics = {
             let mut metrics_map = self.tool_metrics.lock().unwrap();
-            
+
             // Enforce max metrics limit with simple eviction
             if metrics_map.len() > self.max_metrics {
                 if let Some(first_key) = metrics_map.keys().next().cloned() {
                     metrics_map.remove(&first_key);
                 }
             }
-            
-            metrics_map.entry(event.tool_name.clone())
+
+            metrics_map
+                .entry(event.tool_name.clone())
                 .or_insert_with(|| Arc::new(ToolMetrics::new()))
                 .clone()
         };
-        
+
         // Record the invocation (outside the lock)
-        tool_metrics.record_invocation(
-            event.success,
-            event.duration_ms as u64,
-            event.request_size,
-        );
-        
+        tool_metrics.record_invocation(event.success, event.duration_ms as u64, event.request_size);
     }
 
     pub async fn get_all_metrics(&self) -> HashMap<String, serde_json::Value> {
         let mut metrics = HashMap::new();
-        
+
         // Add global metrics
         metrics.insert("_global".to_string(), serde_json::json!({
             "total_invocations": self.global_metrics.total_invocations.load(Ordering::Relaxed),
             "active_invocations": self.global_metrics.active_invocations.load(Ordering::Relaxed),
             "peak_concurrency": self.global_metrics.peak_concurrency.load(Ordering::Relaxed),
         }));
-        
+
         // Add tool metrics
         let metrics_map = self.tool_metrics.lock().unwrap();
         for (key, value) in metrics_map.iter() {
             metrics.insert(key.clone(), value.to_json());
         }
-        
+
         metrics
     }
-
 }

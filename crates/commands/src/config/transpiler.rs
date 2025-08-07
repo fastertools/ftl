@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// Parse a registry URI to a component source
 fn parse_registry_uri_to_source(registry_uri: &str) -> ComponentSource {
     // Use registry URI directly - Spin will handle OCI resolution
-    ComponentSource::Local(format!("oci://{}", registry_uri))
+    ComponentSource::Local(format!("oci://{registry_uri}"))
 }
 
 /// Transpile an FTL configuration to Spin configuration
@@ -201,13 +201,13 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     }
 
     // Check if middleware is enabled before moving variables
-    let middleware_enabled = variables.get("middleware_enabled")
+    let middleware_enabled = variables
+        .get("middleware_enabled")
         .and_then(|v| match v {
             SpinVariable::Default { default } => Some(default.as_str()),
             _ => None,
         })
-        .map(|s| s == "true")
-        .unwrap_or(true);
+        .is_none_or(|s| s == "true");
 
     spin_config.variables = variables;
 
@@ -222,19 +222,13 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         );
         components.insert(
             "ftl-mcp-gateway".to_string(),
-            create_gateway_component(
-                &ftl_config.mcp.gateway,
-                ftl_config.mcp.validate_arguments,
-            ),
+            create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
         );
     } else {
         // When auth is disabled, add gateway as "mcp" for consistent route naming
         components.insert(
             "mcp".to_string(),
-            create_gateway_component(
-                &ftl_config.mcp.gateway,
-                ftl_config.mcp.validate_arguments,
-            ),
+            create_gateway_component(&ftl_config.mcp.gateway, ftl_config.mcp.validate_arguments),
         );
     }
 
@@ -302,7 +296,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             component: "tea".to_string(),
             executor: None,
         });
-        
+
         // Public trigger for metrics endpoints
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Path("/metrics/...".to_string()),
@@ -417,19 +411,37 @@ fn create_gateway_component(registry_uri: &str, validate_args: bool) -> Componen
 
     // Middleware configuration
     variables.insert("middleware_enabled".to_string(), "true".to_string());
-    variables.insert("middleware_stack".to_string(), "invocation_tracker".to_string());
+    variables.insert(
+        "middleware_stack".to_string(),
+        "invocation_tracker".to_string(),
+    );
 
     // Invocation tracker config
     variables.insert("invocation_tracker_enabled".to_string(), "true".to_string());
-    variables.insert("invocation_tracker_max_metrics".to_string(), "10000".to_string());
-    variables.insert("invocation_tracker_flush_interval_secs".to_string(), "60".to_string());
-    variables.insert("invocation_tracker_track_arg_size".to_string(), "true".to_string());
-    variables.insert("invocation_tracker_detailed_timing".to_string(), "true".to_string());
+    variables.insert(
+        "invocation_tracker_max_metrics".to_string(),
+        "10000".to_string(),
+    );
+    variables.insert(
+        "invocation_tracker_flush_interval_secs".to_string(),
+        "60".to_string(),
+    );
+    variables.insert(
+        "invocation_tracker_track_arg_size".to_string(),
+        "true".to_string(),
+    );
+    variables.insert(
+        "invocation_tracker_detailed_timing".to_string(),
+        "true".to_string(),
+    );
 
     // Metrics export config
     variables.insert("metrics_enabled".to_string(), "true".to_string());
     variables.insert("metrics_path".to_string(), "/metrics".to_string());
-    variables.insert("metrics_collector_url".to_string(), "http://tea.spin.internal/events".to_string());
+    variables.insert(
+        "metrics_collector_url".to_string(),
+        "http://tea.spin.internal/events".to_string(),
+    );
 
     ComponentConfig {
         description: String::new(),
@@ -471,10 +483,7 @@ fn create_metrics_collector_component(registry_uri: &str) -> ComponentConfig {
 }
 
 /// Create tool component configuration
-fn create_tool_component(
-    name: &str,
-    config: &ToolConfig,
-) -> ComponentConfig {
+fn create_tool_component(name: &str, config: &ToolConfig) -> ComponentConfig {
     // Determine source based on whether it's a local component or registry component
     let source = if let Some(wasm_path) = &config.wasm {
         // Local component with wasm file path

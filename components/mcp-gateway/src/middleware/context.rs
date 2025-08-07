@@ -62,8 +62,12 @@ pub struct ToolResult {
 
 impl MiddlewareContext {
     pub fn new(tool_name: String, component_name: String) -> Self {
-        let request_id = format!("{}-{}", uuid::Uuid::new_v4(), chrono::Utc::now().timestamp_millis());
-        
+        let request_id = format!(
+            "{}-{}",
+            uuid::Uuid::new_v4(),
+            chrono::Utc::now().timestamp_millis()
+        );
+
         Self {
             request_id,
             tool_name,

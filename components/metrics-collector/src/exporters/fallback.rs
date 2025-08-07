@@ -19,19 +19,20 @@ impl FallbackEmitter {
 }
 
 impl MetricsEmitter for FallbackEmitter {
-    fn emit_event(&self, event: MetricEvent) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
-        Box::pin(async move {
-            self.store_to_backup(&event).await
-        })
+    fn emit_event(
+        &self,
+        event: MetricEvent,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
+        Box::pin(async move { self.store_to_backup(&event).await })
     }
-    
+
     fn name(&self) -> &'static str {
         "fallback"
     }
-    
-    fn health_check(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
-        Box::pin(async move {
-            true
-        })
+
+    fn health_check(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
+        Box::pin(async move { true })
     }
 }

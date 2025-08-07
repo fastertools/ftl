@@ -78,22 +78,22 @@ impl OtelEmitter {
             batch: Vec::new(),
         }
     }
-    
+
     /// Convert MetricEvent to OTEL metrics
     fn convert_to_otel_metrics(&self, event: &MetricEvent) -> Vec<OtelMetric> {
         let mut metrics = Vec::new();
         let timestamp = event.timestamp;
-        
+
         // Base attributes from the event
         let mut base_attributes = HashMap::new();
         base_attributes.insert("tool_name".to_string(), event.tool_name.clone());
         base_attributes.insert("component_name".to_string(), event.component_name.clone());
-        
+
         // Add metadata as attributes
         for (key, value) in &event.metadata {
             base_attributes.insert(key.clone(), value.clone());
         }
-        
+
         // Tool invocation counter
         metrics.push(OtelMetric {
             name: "ftl_tool_invocations_total".to_string(),
@@ -106,11 +106,11 @@ impl OtelEmitter {
                 attributes: base_attributes.clone(),
             }],
         });
-        
+
         // Success/failure counter
         let success_value = if event.success { 1.0 } else { 0.0 };
         let failure_value = if event.success { 0.0 } else { 1.0 };
-        
+
         metrics.push(OtelMetric {
             name: "ftl_tool_success_total".to_string(),
             description: "Total number of successful tool invocations".to_string(),
@@ -122,7 +122,7 @@ impl OtelEmitter {
                 attributes: base_attributes.clone(),
             }],
         });
-        
+
         metrics.push(OtelMetric {
             name: "ftl_tool_failures_total".to_string(),
             description: "Total number of failed tool invocations".to_string(),
@@ -134,7 +134,7 @@ impl OtelEmitter {
                 attributes: base_attributes.clone(),
             }],
         });
-        
+
         // Duration histogram
         metrics.push(OtelMetric {
             name: "ftl_tool_duration_ms".to_string(),
@@ -147,7 +147,7 @@ impl OtelEmitter {
                 attributes: base_attributes.clone(),
             }],
         });
-        
+
         // Request size gauge (if available)
         if let Some(size) = event.request_size {
             metrics.push(OtelMetric {
@@ -162,15 +162,18 @@ impl OtelEmitter {
                 }],
             });
         }
-        
+
         metrics
     }
-    
+
     /// Create OTEL resource information
     fn create_resource(&self) -> OtelResource {
         let mut attributes = HashMap::new();
-        attributes.insert("deployment.environment".to_string(), "development".to_string());
-        
+        attributes.insert(
+            "deployment.environment".to_string(),
+            "development".to_string(),
+        );
+
         OtelResource {
             service_name: self.config.service_name.clone(),
             service_version: self.config.service_version.clone(),
@@ -178,33 +181,38 @@ impl OtelEmitter {
             attributes,
         }
     }
-    
+
     /// Stub: Send metrics to OTEL endpoint
     async fn send_metrics(&self, payload: &OtelMetricsPayload) -> Result<(), String> {
         // STUBBED: In real implementation, this would send HTTP request to OTEL endpoint
         // For now, we just log the structured payload
-        
+
         let json_payload = serde_json::to_string_pretty(payload)
             .map_err(|e| format!("Failed to serialize OTEL payload: {}", e))?;
-            
+
         println!("OTEL: Sending metrics to {}", self.config.endpoint);
         println!("OTEL: {}", json_payload);
-        
+
         // Simulate success
         Ok(())
     }
 }
 
 impl MetricsEmitter for OtelEmitter {
-    fn emit_event(&self, event: MetricEvent) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
+    fn emit_event(
+        &self,
+        event: MetricEvent,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
         Box::pin(self.emit_event_impl(event))
     }
-    
+
     fn name(&self) -> &'static str {
         "otel"
     }
-    
-    fn health_check(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
+
+    fn health_check(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
         Box::pin(async { true }) // STUBBED: In real implementation, this would ping the OTEL endpoint
     }
 }
@@ -213,13 +221,13 @@ impl OtelEmitter {
     async fn emit_event_impl(&self, event: MetricEvent) -> EmissionResult {
         // Convert event to OTEL metrics
         let otel_metrics = self.convert_to_otel_metrics(&event);
-        
+
         // Create payload
         let payload = OtelMetricsPayload {
             resource: self.create_resource(),
             metrics: otel_metrics,
         };
-        
+
         // Send to OTEL endpoint (stubbed)
         match self.send_metrics(&payload).await {
             Ok(()) => EmissionResult::Success,

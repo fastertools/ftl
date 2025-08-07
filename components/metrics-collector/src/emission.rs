@@ -42,11 +42,14 @@ impl Default for EmissionConfig {
 /// Trait for emitting metric events to external systems
 pub trait MetricsEmitter: Send + Sync {
     /// Emit a metric event to the target system
-    fn emit_event(&self, event: MetricEvent) -> Pin<Box<dyn Future<Output = EmissionResult> + Send + '_>>;
-    
+    fn emit_event(
+        &self,
+        event: MetricEvent,
+    ) -> Pin<Box<dyn Future<Output = EmissionResult> + Send + '_>>;
+
     /// Get the name/type of this emitter for logging
     fn name(&self) -> &'static str;
-    
+
     /// Check if this emitter is healthy/available
     fn health_check(&self) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         Box::pin(async { true }) // Default implementation
@@ -66,32 +69,32 @@ impl EmissionPipeline {
             config,
         }
     }
-    
+
     pub fn add_emitter(&mut self, emitter: Box<dyn MetricsEmitter>) {
         self.emitters.push(emitter);
     }
-    
+
     /// Emit event to all configured emitters
     pub async fn emit_event(&self, event: &MetricEvent) -> Vec<(String, EmissionResult)> {
         let mut results = Vec::new();
-        
+
         for emitter in &self.emitters {
             let result = emitter.emit_event(event.clone()).await;
             results.push((emitter.name().to_string(), result));
         }
-        
+
         results
     }
-    
+
     /// Get health status of all emitters
     pub async fn health_status(&self) -> Vec<(String, bool)> {
         let mut status = Vec::new();
-        
+
         for emitter in &self.emitters {
             let healthy = emitter.health_check().await;
             status.push((emitter.name().to_string(), healthy));
         }
-        
+
         status
     }
 }

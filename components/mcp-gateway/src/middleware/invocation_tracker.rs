@@ -37,21 +37,25 @@ pub struct InvocationTracker {
 
 impl InvocationTracker {
     pub fn new(config: TrackerConfig) -> Self {
-        Self {
-            config,
-        }
+        Self { config }
     }
 }
 
 impl Middleware for InvocationTracker {
     async fn pre_process(&self, ctx: &mut MiddlewareContext) -> Result<(), MiddlewareError> {
-        eprintln!("InvocationTracker::pre_process - tool: {}, component: {}", ctx.tool_name, ctx.component_name);
+        eprintln!(
+            "InvocationTracker::pre_process - tool: {}, component: {}",
+            ctx.tool_name, ctx.component_name
+        );
         Ok(())
     }
 
     async fn post_process(&self, ctx: &mut MiddlewareContext) -> Result<(), MiddlewareError> {
-        eprintln!("InvocationTracker::post_process - enabled: {}, tool: {}", self.config.enabled, ctx.tool_name);
-        
+        eprintln!(
+            "InvocationTracker::post_process - enabled: {}, tool: {}",
+            self.config.enabled, ctx.tool_name
+        );
+
         if !self.config.enabled {
             eprintln!("InvocationTracker disabled, skipping");
             return Ok(());
@@ -59,12 +63,12 @@ impl Middleware for InvocationTracker {
 
         // Extract tenant/OIDC context from extensions if available
         let mut metadata = HashMap::new();
-        
+
         // Check for tenant ID (would be set by upstream auth middleware)
         if let Some(tenant_id) = ctx.extensions.get::<String>() {
             metadata.insert("tenant_id".to_string(), tenant_id.clone());
         }
-        
+
         // Check for authenticated user context from authorizer (NO PII)
         if let Some(user_id) = ctx.metadata.additional.get("user_id") {
             metadata.insert("user_id".to_string(), user_id.clone());
@@ -81,9 +85,7 @@ impl Middleware for InvocationTracker {
                 .as_millis() as u64,
             tool_name: ctx.tool_name.clone(),
             component_name: ctx.component_name.clone(),
-            duration_ms: ctx.timing.tool_duration()
-                .unwrap_or_default()
-                .as_secs_f64() * 1000.0,
+            duration_ms: ctx.timing.tool_duration().unwrap_or_default().as_secs_f64() * 1000.0,
             success: ctx.is_success(),
             request_size: ctx.request_size(),
             metadata,
@@ -94,15 +96,14 @@ impl Middleware for InvocationTracker {
         let event_input = serde_json::json!({
             "event": event
         });
-        
-        
+
         let req = Request::builder()
             .method(http::Method::Post)
             .uri(&self.config.collector_url)
             .header("Content-Type", "application/json")
             .body(serde_json::to_vec(&event_input).unwrap_or_default())
             .build();
-        
+
         // Fire and forget for sub-1ms performance
         let response_result: Result<spin_sdk::http::Response, _> = spin_sdk::http::send(req).await;
         match response_result {

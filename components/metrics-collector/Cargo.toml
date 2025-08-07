@@ -1,7 +1,15 @@
 [package]
 name = "metrics-collector"
+authors.workspace = true
+description = "Metrics collector component for telemetry aggregation and export"
 version = "0.1.0"
-edition = "2021"
+license.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+keywords = ["metrics", "telemetry", "webassembly", "spin"]
+categories = ["web-programming", "wasm"]
+publish = false
 
 [lib]
 crate-type = ["cdylib"]

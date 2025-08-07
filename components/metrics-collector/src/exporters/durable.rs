@@ -33,7 +33,9 @@ impl PlatformEvent {
         Self {
             event_time: event.timestamp,
             event_source: event.component_name.clone(),
-            event_name: event.metadata.get("event_name")
+            event_name: event
+                .metadata
+                .get("event_name")
                 .cloned()
                 .unwrap_or_else(|| "ToolInvoked".to_string()),
             user_identity: event.metadata.get("user_id").cloned(),
@@ -53,26 +55,33 @@ impl DurableEmitter {
     }
 
     async fn emit_to_console(&self, platform_event: &PlatformEvent) -> EmissionResult {
-        println!("PLATFORM_EVENT: {}", serde_json::to_string_pretty(platform_event).unwrap_or_else(|_| "Failed to serialize event".to_string()));
+        println!(
+            "PLATFORM_EVENT: {}",
+            serde_json::to_string_pretty(platform_event)
+                .unwrap_or_else(|_| "Failed to serialize event".to_string())
+        );
         EmissionResult::Success
     }
 }
 
 impl MetricsEmitter for DurableEmitter {
-    fn emit_event(&self, event: MetricEvent) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
+    fn emit_event(
+        &self,
+        event: MetricEvent,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = EmissionResult> + Send + '_>> {
         Box::pin(async move {
             let platform_event = PlatformEvent::from_metric_event(&event);
             self.emit_to_console(&platform_event).await
         })
     }
-    
+
     fn name(&self) -> &'static str {
         "durable"
     }
-    
-    fn health_check(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
-        Box::pin(async move {
-            true
-        })
+
+    fn health_check(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
+        Box::pin(async move { true })
     }
 }

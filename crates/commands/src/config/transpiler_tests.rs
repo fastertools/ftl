@@ -120,10 +120,10 @@ command = "cargo build --release --target wasm32-wasip1"
     // Note: We can't check exact paths because canonicalize() may resolve symlinks
     // (e.g., /var -> /private/var on macOS)
 
-    // Check that MCP components use absolute paths 
+    // Check that MCP components use OCI URIs
     assert!(
-        spin_content.contains("source = \"/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm\""),
-        "Expected MCP gateway to use absolute path in:\n{spin_content}"
+        spin_content.contains("source = \"oci://ghcr.io/fastertools/mcp-gateway:0.0.10\""),
+        "Expected MCP gateway to use OCI URI in:\n{spin_content}"
     );
 
     // Check that tool components still use relative paths (current architecture)
@@ -323,7 +323,7 @@ fn test_transpile_with_auth() {
     ));
     assert!(matches!(
         &spin_config.variables["mcp_static_tokens"],
-        SpinVariable::Default { default } if default == ""
+        SpinVariable::Default { default } if default.is_empty()
     ));
 }
 
@@ -428,6 +428,7 @@ fn test_transpile_with_custom_gateway_uris() {
         mcp: McpConfig {
             gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
             authorizer: "ghcr.io/myorg/custom-authorizer:2.0.0".to_string(),
+            tea: "ghcr.io/fastertools/tea:0.0.10".to_string(),
             validate_arguments: true,
         },
         variables: HashMap::new(),
@@ -447,7 +448,7 @@ fn test_transpile_with_custom_gateway_uris() {
     // Gateway component should exist with custom URI (named "mcp")
     assert!(result.contains("[component.mcp]"));
     // Gateway uses absolute path in main's architecture, not registry URI
-    assert!(result.contains("source = \"/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm\""));
+    assert!(result.contains("source = \"oci://ghcr.io/myorg/custom-gateway:2.0.0\""));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -456,10 +457,13 @@ fn test_transpile_with_custom_gateway_uris() {
     assert!(spin_config.component.contains_key("mcp"));
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
-    // Gateway component should have a local source (absolute path)
+    // Gateway component should have a local source (OCI URI)
     let gateway_component = &spin_config.component["mcp"];
     if let ComponentSource::Local(path) = &gateway_component.source {
-        assert_eq!(path, "/Users/coreyryan/data/mashh/ftl-cli/target/wasm32-wasip1/release/ftl_mcp_gateway.wasm");
+        assert_eq!(
+            path,
+            "oci://ghcr.io/myorg/custom-gateway:2.0.0"
+        );
     } else {
         panic!("Expected gateway component to have local source");
     }
@@ -639,6 +643,7 @@ fn test_transpile_complete_example() {
         mcp: McpConfig {
             gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
             authorizer: "ghcr.io/example/auth:3.0.0".to_string(),
+            tea: "ghcr.io/fastertools/tea:0.0.10".to_string(),
             validate_arguments: false,
         },
         variables: app_vars,
@@ -898,8 +903,14 @@ fn test_parse_component_source() {
     // Since we're downloading registry components with wkg, everything becomes a local path
 
     let test_cases = vec![
-        ("ghcr.io/myorg/my-tool:1.0.0", "oci://ghcr.io/myorg/my-tool:1.0.0"),
-        ("docker.io/library/hello:latest", "oci://docker.io/library/hello:latest"),
+        (
+            "ghcr.io/myorg/my-tool:1.0.0",
+            "oci://ghcr.io/myorg/my-tool:1.0.0",
+        ),
+        (
+            "docker.io/library/hello:latest",
+            "oci://docker.io/library/hello:latest",
+        ),
     ];
 
     for (input, expected) in test_cases {

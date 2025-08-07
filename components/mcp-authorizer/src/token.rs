@@ -177,11 +177,12 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
     }
 
     // Extract client ID (prefer org_id for tenant, then client_id, then sub)
-    let client_id = claims.org_id.as_ref()
+    let client_id = claims
+        .org_id
+        .as_ref()
         .or(claims.client_id.as_ref())
         .unwrap_or(&claims.sub)
         .clone();
-
 
     Ok(TokenInfo {
         client_id,
