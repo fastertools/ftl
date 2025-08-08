@@ -67,7 +67,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.target }}
-          cache-key: release-${{ matrix.target }}
+          cache-key: release-${{ matrix.target }}-v189
           install-system-deps: 'true'
 
       - name: Build

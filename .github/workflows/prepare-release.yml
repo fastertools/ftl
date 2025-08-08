@@ -70,7 +70,7 @@ jobs:
         if: inputs.component != 'sdk-typescript' && inputs.component != 'sdk-python' && inputs.component != 'sdk-go'
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: prepare-release
+          cache-key: prepare-release-v189
       
       - name: Determine version
         id: version

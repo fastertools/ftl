@@ -67,7 +67,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: release-sdk-rust
+          cache-key: release-sdk-rust-v189
       
       - name: Verify crates can be published
         run: |
