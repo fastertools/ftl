@@ -168,7 +168,7 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-### Fast Anywhere is the World
+### Fast Anywhere in the World
 <div align="center">
 <em>Example: A Python text processing tool called from 5 continents</em>
 
