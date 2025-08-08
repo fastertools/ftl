@@ -464,7 +464,6 @@ jobs:
       - name: Setup Rust for WASM
         uses: ./.github/actions/setup-rust
         with:
-          toolchain: '1.86.0'
           targets: wasm32-wasip1
           cache-key: ci-wasm
           cache-targets: 'true'
