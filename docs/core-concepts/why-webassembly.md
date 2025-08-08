@@ -1,196 +1,103 @@
 # Why WebAssembly?
 
-FTL is built entirely on WebAssembly (WASM). This choice isn't just technical - it's fundamental to enabling FTL's unique capabilities. Let's explore why.
+fastertools is built entirely on WebAssembly (WASM). This isn't an arbitrary technical choice—it is the core technology that allows us to solve the fundamental challenges of building modern tools necassary to support the growing needs of AI applications. 
 
-## The AI Tools Challenge
+To understand why, we first need to define the problem we set out to solve.
 
-AI tools have unique requirements that traditional architectures struggle to address:
+## The Real Challenge: Building for the Model Context Protocol (MCP)
 
-### Security Concerns
-- **Untrusted Code**: AI tools often come from various sources and may contain bugs or malicious code
-- **Isolation Needed**: Tools should not be able to access sensitive system resources or interfere with each other
-- **Sandboxing Required**: Traditional processes offer weak isolation and high overhead
+The AI ecosystem is standardizing on the Model Context Protocol (MCP) for how AI agents discover and use tools. While this standard is powerful, building a server that correctly implements it is incredibly difficult.
 
-### Performance Requirements
-- **Fast Startup**: AI workflows need tools to start quickly, not wait for language runtimes
-- **Minimal Overhead**: Every millisecond counts in AI interactions
-- **Resource Efficiency**: Tools should use minimal memory and CPU
+The real challenge is a combination of three complex problems:
 
-### Portability Needs
-- **Cross-Platform**: Tools should run identically on macOS, Linux, Windows, and cloud environments
-- **Deployment Flexibility**: Same tools should work locally, in containers, and serverless environments
-- **Version Consistency**: Eliminate "works on my machine" problems
+- **Protocol & Auth Complexity**: A production-ready MCP server must correctly implement the full protocol specification, including a secure, spec-compliant OAuth flow for authentication. This has proved to be a significant engineering effort in itself.
 
-## WebAssembly's Solutions
+- **Polyglot Development**: Developers want to write tools in the best language for the job—Python for data science, Rust for high-speed processing, TypeScript for its ecosystem. How do you run all these different languages in a single, cohesive server that presents as one endpoint to the AI model?
 
-WebAssembly addresses these challenges uniquely:
+- **Deployment & Performance**: AI interactions will demand near-instantaneous response times as models get better and real time applications become more common. How do you package this complex, multi-language application and deploy it so that it has sub-millisecond cold starts and runs efficiently anywhere?
 
-### 🛡️ Security Through Sandboxing
+Existing solutions force a choice: you can have one, maybe two of these, but not all three. You could build a single-language server, wrestle with complex and fragile Foreign Function Interfaces (FFIs), or spin up a fleet of slow, heavy containers for each tool.
 
-```
-┌─────────────────────────────────────────┐
-│              Host System                │
-├─────────────────────────────────────────┤
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│ │ WASM Tool 1 │ │ WASM Tool 2 │ │  ...    │ │
-│ │   (Rust)    │ │  (Python)   │ │         │ │
-│ └─────────────┘ └─────────────┘ └─────────┘ │
-│          │              │                  │
-│     ┌─────────────────────────────────────┐ │
-│     │      WASM Runtime (Wasmtime)       │ │
-│     └─────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-```
+This is the problem fastertools solves: We provide zero-to-OAuth-authenticated MCP tooling in less than five minutes. WebAssembly is the key that makes this possible.
 
-**Key Benefits:**
-- **Memory Isolation**: Tools cannot access memory outside their sandbox
-- **Capability-Based Security**: Tools only get explicitly granted permissions
-- **No System Access**: Tools cannot directly access files, network, or OS resources
-- **Crash Isolation**: A tool crash doesn't affect other tools or the host system
 
-### ⚡ Performance Advantages
+## How WebAssembly Solves the MCP Challenge
+WASM provides a portable, high-performance, and secure compilation target. It addresses each of the core challenges in a way no other technology can.
 
-**Near-Native Speed:**
-- WASM compiles to efficient machine code
-- No interpretation overhead like traditional scripting languages
-- Optimized by mature compiler toolchains (LLVM, etc.)
+### Security Through Sandboxing
 
-**Fast Startup:**
-```
-Traditional Process:     ~100-500ms
-WASM Component:         ~1-5ms
-```
+- **Zero-Trust by Default**: Every WASM module runs in a completely isolated sandbox. It has no access to the file system, network, environment variables, or even system clocks unless the host explicitly grants it that capability.
 
-**Memory Efficiency:**
-- Linear memory model with precise garbage collection
-- No language runtime overhead for compiled languages
-- Shared-nothing architecture reduces memory pressure
+- **Secure Composition**: A bug or vulnerability in a Python tool cannot affect a Rust tool running alongside it. This allows safer composition of tools/code into a single server process.
 
-### 🌍 Universal Portability
+This robust, capability-based security is what allows fastertools to handle and execute untrusted user tool code with confidence.
 
-**Write Once, Run Anywhere:**
-```
-Source Code (Rust/Python/Go)
-         ↓
-    Compile to WASM
-         ↓
-Run on: macOS | Linux | Windows | Cloud | Browser
-```
+### Performance Through Ahead-of-Time (AOT) Compilation
 
-**Consistent Behavior:**
-- Identical execution across all platforms
-- No differences in floating-point operations, memory layout, or system calls
-- Same security guarantees everywhere
+The latency of an AI agent's response is the sum of the model's thinking time and the tool's execution time. As models get faster, the tools they use are becoming the new performance bottleneck.
 
-## Real-World Impact
+- **Near-Native Speed**: WASM is a pre-compiled binary format. There is no interpreter or JIT compiler in the hot path, meaning code runs nearly as fast as native machine code.
 
-Let's compare FTL's approach with alternatives:
+- **Sub-Millisecond Cold Starts**: Unlike containers or traditional language runtimes that can take hundreds of milliseconds to initialize, a WASM module can be instantiated and ready to execute in microseconds. This is critical for the "serverless" model of AI tooling.
 
-### Traditional Approach: Native Binaries
+### Portability and The Component Model
+
+This is the magic that solves the polyglot problem. Standard WASM lets you run one language anywhere. The **WebAssembly Component Model** lets you run *all* languages *together*.
+
+The Component Model defines a stable, language-agnostic Application Binary Interface (ABI). It's like a universal adapter that allows a function written in Rust to seamlessly call a function written in Python as if it were a native function call, with the runtime handling the complex data marshalling behind the scenes.
+
 ```bash
-# Different binaries needed for each platform
-tool-macos-arm64
-tool-linux-x86_64  
-tool-windows-x86_64
-# Security through OS permissions (weak)
-# Direct system access (dangerous)
-```
-
-### Container Approach: Docker
-```bash
-# Heavy containers for each tool
-docker run --rm tool1:latest  # ~100MB+ per tool
-docker run --rm tool2:latest  # Another ~100MB+
-# Better isolation but high overhead
-# Still platform-specific base images
-```
-
-### FTL Approach: WebAssembly
-```bash
-# Single .wasm file runs everywhere
-tool1.wasm          # ~1-5MB, works on all platforms
-tool2.wasm          # Strong security, fast startup
-# Universal binary format
-```
-
-## The Component Model Advantage
-
-Standard WebAssembly is great for single-language applications, but FTL uses the **WebAssembly Component Model** which enables:
-
-### Language Interoperability
-```rust
 // Rust tool
 #[tool]
 fn process_data(input: String) -> String { ... }
-```
 
-```python
-# Python tool  
+// Python tool
 @tool
 def analyze_data(data: str) -> str: ...
 ```
 
-Both compile to components that can call each other seamlessly.
-
-### Interface Types
-```wit
-// Shared interface definition
-interface math-tools {
-  add: func(a: f64, b: f64) -> f64
-  multiply: func(numbers: list<f64>) -> f64  
-}
-```
-
-This interface can be implemented in any language and called from any other language.
+Because of the Component Model, we can compile both of these tools into interoperable components. This unlocks a powerful concept:
 
 ### Composition Without Coordination
-Tools written by different teams in different languages can work together without:
+
+Tools written by different teams in different languages can now work together without:
+
 - Shared dependencies
-- Version conflicts  
+- Version conflicts
 - Runtime coordination
 - Protocol negotiation
 
-## Why Not Alternatives?
+This eliminates fragile, hand-written FFIs and slow, network-based communication between services. You simply write your tools, and FTL composes them into a single, high-performance binary that runs identically on your laptop and in the cloud.
 
-### Why Not Native Processes?
-- ❌ **Security**: Weak isolation, full system access
-- ❌ **Portability**: Platform-specific binaries
-- ❌ **Overhead**: Process creation is expensive
-- ❌ **Dependencies**: DLL hell, version conflicts
+## The Force Multiplier: Performance at the Edge
 
-### Why Not Containers?
-- ❌ **Size**: Hundreds of MB per tool
-- ❌ **Startup**: Slow container initialization
-- ❌ **Complexity**: Image management, orchestration
-- ❌ **Resource Usage**: High memory and storage overhead
+Alright. So we've talked about security, cold start times, portability, and composition and the power they provide.
 
-### Why Not JavaScript/V8?
-- ❌ **Language Lock-in**: JavaScript only (mostly)
-- ❌ **Performance**: Interpretation overhead
-- ❌ **Memory Model**: Garbage collection pauses
-- ❌ **Standards**: Proprietary runtime APIs
+What happens when you take all of that and leverage a global edge network? Performance results that almost feels like magic--but aren't'.
 
-### Why Not Language-Specific Solutions?
-- ❌ **Silos**: Python can't easily call Rust, Go can't call Python
-- ❌ **FFI Complexity**: Foreign function interfaces are fragile
-- ❌ **Deployment**: Multiple runtimes needed
-- ❌ **Security**: Shared memory spaces
+Because a WASM component is a tiny, self-contained binary, it can be distributed globally and instantiated instantly at the edge location closest to the user or AI agent. This dramatically reduces network latency, which is often the biggest bottleneck in application performance, combined with in-memory process communication results in staggering response times.
 
-## FTL's WebAssembly Benefits
+### Where the Rubber Meets The Road
 
-By choosing WebAssembly, FTL delivers:
+![FTL Performance Metrics](../images/results-summary.png)
+![FTL Performance Metrics](../images/results-details.png)
+![FTL Performance Metrics](../images/results.png)
 
-✅ **True Polyglot Programming**: Write each tool in the best language for the job  
-✅ **Zero Trust Security**: Every tool runs in a secure sandbox  
-✅ **Near-Native Performance**: Fast execution with minimal overhead  
-✅ **Universal Deployment**: One binary format for all platforms  
-✅ **Minimal Dependencies**: No language runtimes needed in production  
-✅ **Future-Proof**: Built on evolving W3C standards  
+As you can see this isn't just theoretical. These are screenshots of a k6 load test against a Python tool, traditionally the slowest of our supported languages, deployed on our FTL Engine. The results speak for themselves:
 
-## Learning More
+- Global Average Response Time: 33ms
+- Global P95 Response Time: 131ms
+- ~56k requests / ~700 requests a second / 0 failures
 
-- **Component Model**: Learn how components communicate in [The Component Model](./component-model.md)
-- **Architecture**: See how WASM fits into FTL's overall design in [FTL Architecture](./architecture.md)
-- **Implementation**: Understand the development workflow in [Project Lifecycle](./lifecycle.md)
+And these aren't cherry picked. We specifically chose to run this globally targeting a slower language. If it's traffic just in the US/Europe expect 33ms to be closer to the P95.
 
-WebAssembly isn't just a technical choice for FTL - it's the foundation that makes true polyglot AI tools possible while maintaining security, performance, and portability.
+### Some Perspective
+
+Let's try and put some of these results in perspective. A typical "cold start" for a Python function in a container on a traditional cloud provider can range from 500ms to over 2 seconds.
+
+Lambda generally can be expected to have a cold start time in the 100-200ms range.
+
+Our P95 of 131ms **globally** isn't just an improvement; it's a fundamental change in what's possible.
+
+Results like these are possible because we've eliminated the traditional layers of overhead. There is no container to boot, no OS to virtualize, and no language runtime to initialize. The combination of instant WASM cold starts and reduced network travel time from the edge results in consistently fast global performance that is simply not achievable with other architectures.
+

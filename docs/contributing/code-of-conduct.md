@@ -2,13 +2,13 @@
 
 ## Our Commitment
 
-In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in the FTL project and our community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in the fastertools project and our community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 ## Our Standards
 
 Examples of behavior that contributes to creating a positive environment include:
 
-### ✅ **Positive Behavior**
+### **Positive Behavior**
 - **Being welcoming and inclusive** to newcomers and people of all backgrounds
 - **Using respectful language** in all interactions, written and verbal
 - **Being considerate of different viewpoints** and experiences
@@ -17,14 +17,15 @@ Examples of behavior that contributes to creating a positive environment include
 - **Showing empathy** towards other community members
 - **Helping others learn** and grow their skills
 
-### ❌ **Unacceptable Behavior**
+### **Zero Tolerance Behaior**
 - **Harassment** of any kind, including unwelcome sexual attention or advances
 - **Trolling, insulting comments,** or personal attacks
 - **Public or private harassment** of any community member
 - **Publishing private information** without explicit permission
 - **Discrimination** based on protected characteristics
 - **Spam or off-topic content** that disrupts community discussions
-- **Other conduct** which could reasonably be considered inappropriate in a professional setting
+
+#### In short: **If your mom would be ashamed, probably don't do/say that thing**
 
 ## Our Responsibilities
 
@@ -43,7 +44,7 @@ This Code of Conduct applies within all project spaces, and also applies when an
 
 ## Community Guidelines
 
-### 💬 **Communication Standards**
+### **Communication Standards**
 
 #### In GitHub Issues and Pull Requests
 - **Be specific and constructive** when reporting bugs or requesting features
@@ -52,8 +53,8 @@ This Code of Conduct applies within all project spaces, and also applies when an
 - **Stay on topic** and relevant to the issue at hand
 
 #### In Discussions and Chat
-- **Keep discussions technical** and focused on FTL
-- **Ask questions** - no question is too basic
+- **Keep discussions technical** and focused on fastertools 
+- **Ask questions** - no question is too basic. We all started somewhere.
 - **Share knowledge** and help others learn
 - **Be respectful** of different skill levels and experience
 
@@ -63,7 +64,7 @@ This Code of Conduct applies within all project spaces, and also applies when an
 - **Explain the "why"** behind your suggestions
 - **Acknowledge good work** and improvements
 
-### 🌍 **Inclusive Environment**
+### **Inclusive Environment**
 
 We welcome contributors from all backgrounds and skill levels:
 
@@ -72,7 +73,7 @@ We welcome contributors from all backgrounds and skill levels:
 - **All skill levels**: From students to senior engineers
 - **Global community**: We span timezones, cultures, and languages
 
-### 🎯 **Focus Areas**
+### **Focus Areas**
 
 Our community discussions should focus on:
 
@@ -86,7 +87,7 @@ Our community discussions should focus on:
 
 ### Reporting Process
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at [conduct@ftlengine.dev](mailto:conduct@ftlengine.dev).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team via any channel in [Contact Information](#contact-information)
 
 **When reporting, please include:**
 - Your contact information (so we can follow up)
@@ -103,7 +104,7 @@ The project team is obligated to maintain confidentiality with regard to the rep
 ### Response Timeline
 
 - **Initial acknowledgment**: Within 24 hours
-- **Investigation**: Within 1 week
+- **Investigation**: Within 2 weeks
 - **Resolution**: Varies based on complexity, but we will keep you informed
 
 ### Enforcement Actions
@@ -125,13 +126,13 @@ Depending on the severity of the violation, consequences may include:
 #### Level 3: Permanent Removal
 - **Permanent ban** from all project spaces
 - **Removal** of contributor access and privileges
-- **Public notification** (if necessary for community safety)
+- **Public notification** only in situations where it is deemed necessary for the community's safety and awareness.
 
 ## Appeal Process
 
 If you believe you have been unfairly sanctioned, you may appeal by:
 
-1. **Email the project team** at [conduct@ftlengine.dev](mailto:conduct@ftlengine.dev)
+1. **Reach out to a member of the FTL Engine Team** via Discord
 2. **Explain why you believe** the decision was incorrect
 3. **Provide any additional context** or evidence
 4. **Wait for review** by a different set of maintainers
@@ -152,9 +153,7 @@ Project maintainers should:
 ## Resources
 
 ### Internal Resources
-- **Project Documentation**: [docs/](../)
-- **Contributing Guide**: [contributing/](./README.md)
-- **Development Setup**: [development-setup.md](./development-setup.md)
+- **Project Documentation**: [docs](../)
 
 ### External Resources
 - **Contributor Covenant**: [contributor-covenant.org](https://www.contributor-covenant.org/)
@@ -163,10 +162,9 @@ Project maintainers should:
 
 ## Contact Information
 
-- **General questions**: [community@ftlengine.dev](mailto:community@ftlengine.dev)
-- **Code of conduct issues**: [conduct@ftlengine.dev](mailto:conduct@ftlengine.dev)
-- **Security concerns**: [security@ftlengine.dev](mailto:security@ftlengine.dev)
-- **GitHub Discussions**: [github.com/fastertools/ftl/discussions](https://github.com/fastertools/ftl/discussions)
+- corey@coreyr.com -- One day we'll have real emails
+- fastertools (FTL) [Discord](https://discord.gg/jDgHerNT) - All FTL Engine members can be reached here for now
+- **GitHub Discussions**: [github.com/fastertools/ftl/discussions](https://github.com/fastertools/ftl-cli/discussions)
 
 ## Acknowledgment
 
@@ -176,6 +174,4 @@ For answers to common questions about this code of conduct, see the FAQ at https
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: January 2025  
-**Next Review**: July 2025
+**Last Updated**: August 7th 2025  
