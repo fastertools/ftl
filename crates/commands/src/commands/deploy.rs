@@ -272,7 +272,7 @@ async fn execute_deploy_inner(
                     parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
                     parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
                 } else if access_control == "private" {
-                    // For private mode without custom OIDC, use FTL's AuthKit
+                    // For private mode without custom OAuth, use FTL's AuthKit
                     // Check if we need to override issuer for tenant-scoped AuthKit
                     if !parsed_variables.contains_key("mcp_jwt_issuer") {
                         parsed_variables.insert(
@@ -820,39 +820,39 @@ fn add_auth_variables_from_config(
         }
     }
 
-    // Add OIDC-specific variables if present and auth is enabled
+    // Add OAuth-specific variables if present and auth is enabled
     if config.is_auth_enabled() {
-        if let Some(oidc) = &config.oidc {
-            if !oidc.jwks_uri.is_empty() {
-                variables.insert("mcp_jwt_jwks_uri".to_string(), oidc.jwks_uri.clone());
+        if let Some(oauth) = &config.oauth {
+            if !oauth.jwks_uri.is_empty() {
+                variables.insert("mcp_jwt_jwks_uri".to_string(), oauth.jwks_uri.clone());
             }
 
-            if !oidc.public_key.is_empty() {
-                variables.insert("mcp_jwt_public_key".to_string(), oidc.public_key.clone());
+            if !oauth.public_key.is_empty() {
+                variables.insert("mcp_jwt_public_key".to_string(), oauth.public_key.clone());
             }
 
-            if !oidc.algorithm.is_empty() {
-                variables.insert("mcp_jwt_algorithm".to_string(), oidc.algorithm.clone());
+            if !oauth.algorithm.is_empty() {
+                variables.insert("mcp_jwt_algorithm".to_string(), oauth.algorithm.clone());
             }
 
-            if !oidc.authorize_endpoint.is_empty() {
+            if !oauth.authorize_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_authorize_endpoint".to_string(),
-                    oidc.authorize_endpoint.clone(),
+                    oauth.authorize_endpoint.clone(),
                 );
             }
 
-            if !oidc.token_endpoint.is_empty() {
+            if !oauth.token_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_token_endpoint".to_string(),
-                    oidc.token_endpoint.clone(),
+                    oauth.token_endpoint.clone(),
                 );
             }
 
-            if !oidc.userinfo_endpoint.is_empty() {
+            if !oauth.userinfo_endpoint.is_empty() {
                 variables.insert(
                     "mcp_oauth_userinfo_endpoint".to_string(),
-                    oidc.userinfo_endpoint.clone(),
+                    oauth.userinfo_endpoint.clone(),
                 );
             }
         }
@@ -1413,8 +1413,8 @@ fn resolve_auth_config(
         if config.project.access_control == "public" {
             auth_mode = Some("public".to_string());
         } else if config.project.access_control == "private" {
-            // Check if we have custom OIDC config
-            if config.oidc.is_some() {
+            // Check if we have custom OAuth config
+            if config.oauth.is_some() {
                 auth_mode = Some("custom".to_string());
             } else {
                 auth_mode = Some("private".to_string());
@@ -1424,13 +1424,13 @@ fn resolve_auth_config(
         // Extract provider details only when auth is enabled
         if config.is_auth_enabled() {
             // Extract provider details based on configuration
-            if let Some(oidc) = &config.oidc {
-                auth_provider = Some("oidc".to_string());
-                auth_issuer = Some(oidc.issuer.clone());
-                auth_audience = if oidc.audience.is_empty() {
+            if let Some(oauth) = &config.oauth {
+                auth_provider = Some("oauth".to_string());
+                auth_issuer = Some(oauth.issuer.clone());
+                auth_audience = if oauth.audience.is_empty() {
                     None
                 } else {
-                    Some(oidc.audience.clone())
+                    Some(oauth.audience.clone())
                 };
             } else {
                 // Using FTL's built-in AuthKit

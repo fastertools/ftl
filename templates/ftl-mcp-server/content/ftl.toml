@@ -9,13 +9,13 @@ authors = ["{{authors}}"]
 access_control = "public"
 
 # ========================================
-# OIDC Configuration (Optional)
+# OAuth Configuration (Optional)
 # ========================================
-# For private access control with custom OIDC provider
+# For private access control with custom OAuth provider
 # If omitted with private mode, uses FTL's built-in AuthKit
 
-# For custom OIDC (Auth0, Okta, etc.):
-# [oidc]
+# For custom OAuth (Auth0, Okta, etc.):
+# [oauth]
 # issuer = "https://your-domain.auth0.com"
 # audience = "your-api-identifier"  # optional
 # jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"

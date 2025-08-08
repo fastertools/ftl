@@ -32,9 +32,9 @@ fn test_authkit_provider_config() {
     assert_eq!(response.status(), 200);
 }
 
-// Test OIDC provider configuration
+// Test OAuth provider configuration
 #[spin_test]
-fn test_oidc_provider_config() {
+fn test_oauth_provider_config() {
     variables::set("mcp_jwt_issuer", "https://tenant.auth0.com");
     variables::set("mcp_jwt_jwks_uri", "https://tenant.auth0.com/.well-known/jwks.json");
     variables::set("mcp_oauth_authorize_endpoint", "https://tenant.auth0.com/authorize");

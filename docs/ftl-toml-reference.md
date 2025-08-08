@@ -18,10 +18,10 @@ authors = ["Your Name <you@example.com>"]
 access_control = "public"  # or "private"
 default_registry = "ghcr.io/myorg"  # Optional: default registry for components
 
-[oidc]  # Optional - only needed for custom OIDC providers
+[oauth]  # Optional - only needed for custom OAuth providers
 issuer = "https://auth.example.com"
 audience = "my-api"
-# ... additional OIDC settings
+# ... additional OAuth settings
 
 [mcp]
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
@@ -65,12 +65,12 @@ The `[project]` section contains essential metadata about your FTL project.
 
 - **`public`** (default): No authentication required. The MCP endpoint is publicly accessible.
 - **`private`**: Authentication required. When set to private:
-  - Without `[oidc]` section: Uses FTL's built-in auth provider
-  - With `[oidc]` section: Uses your custom OIDC provider
+  - Without `[oauth]` section: Uses FTL's built-in auth provider
+  - With `[oauth]` section: Uses your custom OAuth provider
 
 #### Example: Using FTL's Built-in Provider
 
-Set `access_control = "private"` without an `[oidc]` section:
+Set `access_control = "private"` without an `[oauth]` section:
 
 ```toml
 [project]
@@ -79,7 +79,7 @@ version = "1.0.0"
 description = "Collection of MCP tools for data processing"
 authors = ["Alice <alice@example.com>", "Bob <bob@example.com>"]
 access_control = "private"
-# No [oidc] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
+# No [oauth] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
 ```
 
 ### Default Registry
@@ -115,15 +115,15 @@ allowed_outbound_hosts = ["https://api.example.com"]
 # Note: build section is omitted for registry components
 ```
 
-## OIDC Section (Optional)
+## OAuth Section (Optional)
 
-The `[oidc]` section configures custom OpenID Connect authentication. This section is only used when `access_control = "private"`.
+The `[oauth]` section configures custom OpenID Connect authentication. This section is only used when `access_control = "private"`.
 
 ### Fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `issuer` | string | Yes | - | OIDC issuer URL |
+| `issuer` | string | Yes | - | OAuth issuer URL |
 | `audience` | string | No | "" | Expected audience for tokens |
 | `jwks_uri` | string | No | "" | JWKS endpoint URL (auto-discovered if not set) |
 | `public_key` | string | No | "" | Public key in PEM format (alternative to JWKS) |
@@ -140,7 +140,7 @@ The `[oidc]` section configures custom OpenID Connect authentication. This secti
 name = "secure-tools"
 access_control = "private"
 
-[oidc]
+[oauth]
 issuer = "https://your-tenant.auth0.com/"
 audience = "https://api.example.com"
 jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
@@ -373,8 +373,8 @@ description = "Enterprise MCP tool suite with authentication"
 authors = ["DevOps Team <devops@company.com>"]
 access_control = "private"
 
-# Custom OIDC authentication
-[oidc]
+# Custom OAuth authentication
+[oauth]
 issuer = "https://auth.company.com"
 audience = "mcp-suite-api"
 jwks_uri = "https://auth.company.com/.well-known/jwks.json"
@@ -467,7 +467,7 @@ Components from registries are automatically pulled during deployment. Specify t
 If you have an existing `spin.toml` file, you can migrate to `ftl.toml` by:
 
 1. Extract project metadata to the `[project]` section
-2. Move authentication configuration to `access_control` and optionally `[oidc]`
+2. Move authentication configuration to `access_control` and optionally `[oauth]`
 3. Convert Spin components to `[tools.*]` sections
 4. Update variable definitions to use the FTL format
 

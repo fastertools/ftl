@@ -63,10 +63,10 @@ Create a `.env` file or shell script with your auth configuration. See the proje
 }
 ```
 
-### Generic OIDC (Auth0, Keycloak, etc)
+### Generic OAuth (Auth0, Keycloak, etc)
 ```json
 {
-  "type": "oidc",
+  "type": "oauth",
   "name": "auth0",
   "issuer": "https://your-domain.auth0.com",
   "jwks_uri": "https://your-domain.auth0.com/.well-known/jwks.json",

@@ -1390,7 +1390,7 @@ name = "test-app"
 version = "0.1.0"
 access_control = "private"
 
-[oidc]
+[oauth]
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
@@ -1593,7 +1593,7 @@ command = "cargo build --release --target wasm32-wasip1"
                 Some(&"my-api".to_string())
             );
 
-            // Check that OIDC variables are not set (since we're using authkit)
+            // Check that OAuth variables are not set (since we're using authkit)
             assert!(
                 !req.variables.contains_key("auth_provider_name")
                     || req.variables.get("auth_provider_name") == Some(&String::new())
@@ -1650,7 +1650,7 @@ name = "test-app"
 version = "0.1.0"
 access_control = "private"
 
-[oidc]
+[oauth]
 issuer = "https://test.authkit.app"
 audience = "my-api"
 

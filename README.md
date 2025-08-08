@@ -212,7 +212,7 @@ Tools are automatically deployed across the global network edge. Tool calls are 
 
 The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
 
-Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
+Bring your own JWT issuer or OAuth provider via simple configuration. Or use FTL's by default.
 </details>
 
 

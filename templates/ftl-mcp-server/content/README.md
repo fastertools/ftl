@@ -50,11 +50,11 @@ Example configuration with Auth0:
 ```toml
 [auth]
 enabled = true
-provider = "oidc"
+provider = "oauth"
 issuer = "https://your-domain.auth0.com"
 audience = "your-api-identifier"  # optional
 
-[auth.oidc]
+[auth.oauth]
 provider_name = "auth0"
 jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
 authorize_endpoint = "https://your-domain.auth0.com/authorize"

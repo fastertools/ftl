@@ -216,8 +216,8 @@ enum EngCommand {
         access_control: Option<String>,
 
         /// JWT issuer URL (triggers custom auth mode)
-        /// For complex OIDC configuration, use ftl.toml [oidc] section
-        /// Overrides `FTL_JWT_ISSUER` env var and ftl.toml oidc.issuer
+        /// For complex OAuth configuration, use ftl.toml [oauth] section
+        /// Overrides `FTL_JWT_ISSUER` env var and ftl.toml oauth.issuer
         #[arg(long, value_name = "URL", help_heading = "Authentication")]
         jwt_issuer: Option<String>,
 

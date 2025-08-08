@@ -124,9 +124,9 @@ fn test_discovery_authkit_provider() {
     assert_eq!(response.status(), 200);
 }
 
-// Test discovery with OIDC provider
+// Test discovery with OAuth provider
 #[spin_test]
-fn test_discovery_oidc_provider() {
+fn test_discovery_oauth_provider() {
     variables::set("mcp_jwt_issuer", "https://auth.example.com");
     variables::set("mcp_jwt_jwks_uri", "https://auth.example.com/.well-known/jwks.json");
     variables::set("mcp_oauth_authorize_endpoint", "https://auth.example.com/authorize");
