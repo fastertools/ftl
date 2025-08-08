@@ -288,6 +288,10 @@ impl TestFixture {
 name = "test-project"
 version = "0.1.0"
 
+[mcp]
+gateway = "test-gateway.wasm"
+authorizer = "test-authorizer.wasm"
+
 [tools.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
@@ -488,6 +492,9 @@ async fn test_up_with_build() {
     )
     .await;
 
+    if let Err(e) = &result {
+        eprintln!("test_up_with_build failed with error: {:#}", e);
+    }
     assert!(result.is_ok());
 
     // Verify output includes build step
@@ -568,6 +575,10 @@ async fn test_up_with_custom_path() {
 name = "test-project"
 version = "0.1.0"
 
+[mcp]
+gateway = "test-gateway.wasm"
+authorizer = "test-authorizer.wasm"
+
 [tools.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
@@ -629,6 +640,9 @@ command = "echo 'Building test tool'"
     )
     .await;
 
+    if let Err(e) = &result {
+        eprintln!("test_up_with_custom_path failed with error: {:#}", e);
+    }
     assert!(result.is_ok());
 }
 
@@ -693,6 +707,10 @@ async fn test_up_watch_mode_file_change() {
         Ok(r#"[project]
 name = "test-app"
 version = "0.1.0"
+
+[mcp]
+gateway = "test-gateway.wasm"
+authorizer = "test-authorizer.wasm"
 
 [tools.backend]
 path = "backend"
@@ -923,6 +941,9 @@ async fn test_up_with_specific_port() {
     )
     .await;
 
+    if let Err(e) = &result {
+        eprintln!("test_up_with_specific_port failed with error: {:#}", e);
+    }
     assert!(result.is_ok());
 
     // Verify process was spawned
@@ -952,6 +973,10 @@ async fn test_up_with_clear_screen() {
         Ok(r#"[project]
 name = "test-app"
 version = "0.1.0"
+
+[mcp]
+gateway = "test-gateway.wasm"
+authorizer = "test-authorizer.wasm"
 
 [tools.backend]
 path = "backend"
