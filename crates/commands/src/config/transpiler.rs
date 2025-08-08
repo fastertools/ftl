@@ -659,15 +659,15 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
             }
 
             // Also make the wasm path absolute (only for local components)
-            if let Some(wasm_path) = &tool_config.wasm {
-                if !wasm_path.starts_with('/') {
-                    tool_config.wasm = Some(
-                        abs_project_path
-                            .join(wasm_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    );
-                }
+            if let Some(wasm_path) = &tool_config.wasm
+                && !wasm_path.starts_with('/')
+            {
+                tool_config.wasm = Some(
+                    abs_project_path
+                        .join(wasm_path)
+                        .to_string_lossy()
+                        .to_string(),
+                );
             }
         }
     }

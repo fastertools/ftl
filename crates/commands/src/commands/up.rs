@@ -535,10 +535,10 @@ async fn run_build_command_with_manifest(
     // Wait for all tasks to complete
     let mut first_error = None;
     while let Some(result) = tasks.join_next().await {
-        if let Err(e) = result? {
-            if first_error.is_none() {
-                first_error = Some(e);
-            }
+        if let Err(e) = result?
+            && first_error.is_none()
+        {
+            first_error = Some(e);
         }
     }
 
@@ -644,11 +644,11 @@ impl FileWatcher for RealFileWatcher {
 
         let mut watcher =
             notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-                if let Ok(event) = res {
-                    if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
-                        for path in event.paths {
-                            let _ = tx.send(path);
-                        }
+                if let Ok(event) = res
+                    && (event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove())
+                {
+                    for path in event.paths {
+                        let _ = tx.send(path);
                     }
                 }
             })?;

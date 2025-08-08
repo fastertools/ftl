@@ -70,7 +70,7 @@ impl ToolsManifest {
     }
 
     /// Get tools count
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.tools.len()
     }
 }

@@ -25,11 +25,11 @@ impl MockCommandExecutorMock {
         }
     }
 
-    pub fn expect_check_command_exists(&mut self) -> CheckCommandExistsExpectation {
+    pub fn expect_check_command_exists(&mut self) -> CheckCommandExistsExpectation<'_> {
         CheckCommandExistsExpectation { mock: self }
     }
 
-    pub fn expect_execute(&mut self) -> ExecuteExpectation {
+    pub fn expect_execute(&mut self) -> ExecuteExpectation<'_> {
         ExecuteExpectation {
             mock: self,
             matcher: None,

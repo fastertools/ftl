@@ -107,10 +107,10 @@ pub fn remove_default_registry(deps: &Arc<RegistryDependencies>) -> Result<()> {
     let mut doc: DocumentMut = content.parse()?;
 
     // Remove the default_registry field if it exists
-    if let Some(project) = doc.get_mut("project") {
-        if let Some(table) = project.as_table_mut() {
-            table.remove("default_registry");
-        }
+    if let Some(project) = doc.get_mut("project")
+        && let Some(table) = project.as_table_mut()
+    {
+        table.remove("default_registry");
     }
 
     // Write back to file

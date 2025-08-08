@@ -364,14 +364,13 @@ fn resolve_wasm_path(deps: &Arc<ComponentDependencies>, component_path: &Path) -
 
             for (tool_name, tool_config) in &ftl_config.tools {
                 // Match by name or path
-                if tool_name == component_name
-                    || tool_config.path.as_deref() == Some(component_path.to_str().unwrap_or(""))
+                if (tool_name == component_name
+                    || tool_config.path.as_deref() == Some(component_path.to_str().unwrap_or("")))
+                    && let Some(wasm_path) = &tool_config.wasm
                 {
-                    if let Some(wasm_path) = &tool_config.wasm {
-                        let full_wasm_path = PathBuf::from(wasm_path);
-                        if deps.file_system.exists(&full_wasm_path) {
-                            return Ok(full_wasm_path);
-                        }
+                    let full_wasm_path = PathBuf::from(wasm_path);
+                    if deps.file_system.exists(&full_wasm_path) {
+                        return Ok(full_wasm_path);
                     }
                 }
             }

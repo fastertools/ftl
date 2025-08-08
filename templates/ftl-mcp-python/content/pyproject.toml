@@ -1,7 +1,7 @@
 [project]
 name = "{{project-name | snake_case}}"
 version = "0.1.0"
-description = "An FTL MCP tool written in Python"
+description = "MCP component authored in Python"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

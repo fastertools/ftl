@@ -656,12 +656,12 @@ fn display_dry_run_summary(
         deps.ui.print(&format!("  • {deploy_name} (v{version})"));
         let source_path = &component.source_path;
         deps.ui.print(&format!("    Source: {source_path}"));
-        if let Some(hosts) = &component.allowed_outbound_hosts {
-            if !hosts.is_empty() {
-                let hosts_str = hosts.join(", ");
-                deps.ui
-                    .print(&format!("    Allowed outbound hosts: {hosts_str}"));
-            }
+        if let Some(hosts) = &component.allowed_outbound_hosts
+            && !hosts.is_empty()
+        {
+            let hosts_str = hosts.join(", ");
+            deps.ui
+                .print(&format!("    Allowed outbound hosts: {hosts_str}"));
         }
     }
     deps.ui.print("");
@@ -821,40 +821,40 @@ fn add_auth_variables_from_config(
     }
 
     // Add OAuth-specific variables if present and auth is enabled
-    if config.is_auth_enabled() {
-        if let Some(oauth) = &config.oauth {
-            if !oauth.jwks_uri.is_empty() {
-                variables.insert("mcp_jwt_jwks_uri".to_string(), oauth.jwks_uri.clone());
-            }
+    if config.is_auth_enabled()
+        && let Some(oauth) = &config.oauth
+    {
+        if !oauth.jwks_uri.is_empty() {
+            variables.insert("mcp_jwt_jwks_uri".to_string(), oauth.jwks_uri.clone());
+        }
 
-            if !oauth.public_key.is_empty() {
-                variables.insert("mcp_jwt_public_key".to_string(), oauth.public_key.clone());
-            }
+        if !oauth.public_key.is_empty() {
+            variables.insert("mcp_jwt_public_key".to_string(), oauth.public_key.clone());
+        }
 
-            if !oauth.algorithm.is_empty() {
-                variables.insert("mcp_jwt_algorithm".to_string(), oauth.algorithm.clone());
-            }
+        if !oauth.algorithm.is_empty() {
+            variables.insert("mcp_jwt_algorithm".to_string(), oauth.algorithm.clone());
+        }
 
-            if !oauth.authorize_endpoint.is_empty() {
-                variables.insert(
-                    "mcp_oauth_authorize_endpoint".to_string(),
-                    oauth.authorize_endpoint.clone(),
-                );
-            }
+        if !oauth.authorize_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_authorize_endpoint".to_string(),
+                oauth.authorize_endpoint.clone(),
+            );
+        }
 
-            if !oauth.token_endpoint.is_empty() {
-                variables.insert(
-                    "mcp_oauth_token_endpoint".to_string(),
-                    oauth.token_endpoint.clone(),
-                );
-            }
+        if !oauth.token_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_token_endpoint".to_string(),
+                oauth.token_endpoint.clone(),
+            );
+        }
 
-            if !oauth.userinfo_endpoint.is_empty() {
-                variables.insert(
-                    "mcp_oauth_userinfo_endpoint".to_string(),
-                    oauth.userinfo_endpoint.clone(),
-                );
-            }
+        if !oauth.userinfo_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_userinfo_endpoint".to_string(),
+                oauth.userinfo_endpoint.clone(),
+            );
         }
     }
 }
@@ -1021,11 +1021,10 @@ pub fn extract_component_version(
         if let Some(version_line) = go_mod_content
             .lines()
             .find(|line| line.contains("// Version:"))
+            && let Some(version_str) = version_line.split("// Version:").nth(1)
         {
-            if let Some(version_str) = version_line.split("// Version:").nth(1) {
-                let version = version_str.trim().trim_start_matches('v');
-                return Ok(version.to_string());
-            }
+            let version = version_str.trim().trim_start_matches('v');
+            return Ok(version.to_string());
         }
     }
 
@@ -1252,10 +1251,10 @@ async fn ensure_components_and_push(
     // Wait for all tasks to complete
     let mut first_error = None;
     while let Some(result) = tasks.join_next().await {
-        if let Err(e) = result? {
-            if first_error.is_none() {
-                first_error = Some(e);
-            }
+        if let Err(e) = result?
+            && first_error.is_none()
+        {
+            first_error = Some(e);
         }
     }
 
@@ -1466,10 +1465,10 @@ fn resolve_auth_config(
     }
 
     // Set access control mode if provided and no custom issuer override
-    if let Some(mode) = &args.access_control {
-        if args.jwt_issuer.is_none() {
-            auth_mode = Some(mode.clone());
-        }
+    if let Some(mode) = &args.access_control
+        && args.jwt_issuer.is_none()
+    {
+        auth_mode = Some(mode.clone());
     }
 
     // Return None if no auth mode is configured

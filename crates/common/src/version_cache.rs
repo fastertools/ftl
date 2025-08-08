@@ -144,10 +144,10 @@ impl VersionCache {
     pub fn should_prompt_for_update(&self) -> bool {
         if let Some(latest) = &self.latest_version {
             // Don't prompt if user dismissed this version
-            if let Some(dismissed) = &self.dismissed_version {
-                if dismissed == latest {
-                    return false;
-                }
+            if let Some(dismissed) = &self.dismissed_version
+                && dismissed == latest
+            {
+                return false;
             }
 
             // Check if latest is newer than current

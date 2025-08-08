@@ -203,16 +203,14 @@ fn extract_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
     attrs
         .iter()
         .filter_map(|attr| {
-            if attr.path().is_ident("doc") {
-                if let syn::Meta::NameValue(nv) = &attr.meta {
-                    if let syn::Expr::Lit(lit) = &nv.value {
-                        if let syn::Lit::Str(s) = &lit.lit {
-                            let doc = s.value();
-                            // Trim leading space that rustdoc adds
-                            return Some(doc.trim_start_matches(' ').to_string());
-                        }
-                    }
-                }
+            if attr.path().is_ident("doc")
+                && let syn::Meta::NameValue(nv) = &attr.meta
+                && let syn::Expr::Lit(lit) = &nv.value
+                && let syn::Lit::Str(s) = &lit.lit
+            {
+                let doc = s.value();
+                // Trim leading space that rustdoc adds
+                return Some(doc.trim_start_matches(' ').to_string());
             }
             None
         })
