@@ -28,16 +28,15 @@ Experience FTL's killer feature: true language interoperability. You'll learn to
 ## What You'll Learn
 
 By the end of these tutorials, you'll understand:
-- ✅ How to create and structure FTL projects
-- ✅ The basic FTL development workflow
-- ✅ How to write tools in multiple languages
-- ✅ How WebAssembly enables secure, fast execution
-- ✅ How the Component Model enables language interoperability
+- How to create and structure FTL projects
+- The basic FTL development workflow
+- How to write tools in multiple languages
+- How WebAssembly enables secure, fast execution
+- How the Component Model enables language interoperability
 
 ## Next Steps
 
 After completing these tutorials:
 - Explore [Core Concepts](../core-concepts/) to understand how FTL works under the hood
-- Check out [How-to Guides](../guides/) for solutions to specific problems
-- Browse the [SDK Reference](../sdk-reference/) for detailed API documentation
-- Look at [Examples](../../examples/) for inspiration and advanced patterns
+- Browse the [SDKs](../../sdk/README.md) for detailed API documentation
+- Look at [Examples](../../examples/README.md) for inspiration and advanced patterns

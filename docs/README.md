@@ -26,6 +26,11 @@ These are living documents. If you see something that could be improved, please 
 - [Go SDK](../sdk/go/README.md) - Complete Go API reference
 - [TypeScript SDK](../sdk/typescript/README.md) - Complete TypeScript API reference
 
+### [FTL Schema References](./ftl-schema/)
+
+- [ftl-schema.json](./ftl-schema/ftl-schema.json)
+- [ftl-toml-reference.md](./ftl-schema/ftl-toml-reference.md)
+
 ### [Contributing](./contributing/README.md)
 **Join the FTL community**
 - [Code of Conduct](./contributing/code-of-conduct.md) - Community guidelines

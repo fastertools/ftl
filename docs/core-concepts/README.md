@@ -38,6 +38,5 @@ Understanding these principles will help you work more effectively with FTL:
 ## Next Steps
 
 After understanding these concepts:
-- Apply your knowledge with [How-to Guides](../guides/)
-- Implement advanced patterns from [Examples](../../examples/)
-- Reference specific APIs in [SDK Reference](../sdk-reference/)
+- Implement advanced patterns from [Examples](../../examples/README.md)
+- Reference specific APIs in [SDKs](../../sdk/README.md)
