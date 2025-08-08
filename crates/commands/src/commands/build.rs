@@ -59,19 +59,34 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         return handle_export(&config, &deps, &working_path, export_format);
     }
 
-    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
-        &crate::config::transpiler::GenerateSpinConfig {
-            file_system: &deps.file_system,
-            project_path: &working_path,
-            download_components: false,
-            validate_local_auth: false,
-        },
+    // Parse ftl.toml
+    let ftl_toml_path = working_path.join("ftl.toml");
+    if !deps.file_system.exists(&ftl_toml_path) {
+        return Err(anyhow::anyhow!(
+            "No ftl.toml found. Run 'ftl build' from an FTL project directory or use 'ftl init' to create a new project."
+        ));
+    }
+    let ftl_content = deps
+        .file_system
+        .read_to_string(&ftl_toml_path)
+        .context("Failed to read ftl.toml")?;
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+
+    // Create spin.toml for build parsing (no component resolution needed)
+    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        &std::collections::HashMap::new(), // No resolved components for build
+        &working_path,
     )?;
 
-    // We must have a temp spin.toml since ftl.toml is required
-    let manifest_path = temp_spin_toml.ok_or_else(|| {
-        anyhow::anyhow!("No ftl.toml found. Run 'ftl build' from an FTL project directory or use 'ftl init' to create a new project.")
-    })?;
+    // Write to temp file for parsing
+    let temp_dir = tempfile::Builder::new()
+        .prefix("ftl-build-")
+        .tempdir()
+        .context("Failed to create temporary directory")?;
+    let manifest_path = temp_dir.path().join("spin.toml");
+    std::fs::write(&manifest_path, &spin_content).context("Failed to write temporary spin.toml")?;
+    let _temp_dir = temp_dir.keep();
 
     // Parse spin.toml to find components with build commands
     // For temporary files, we need to read directly since FileSystem trait doesn't know about them

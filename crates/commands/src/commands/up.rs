@@ -15,6 +15,8 @@ use ftl_runtime::deps::{
 };
 
 use crate::commands::build::parse_component_builds_from_content;
+use crate::component_resolver::{ComponentResolutionStrategy, ComponentResolver};
+use crate::config::ftl_config::FtlConfig;
 
 /// File watcher trait for testability
 #[async_trait::async_trait]
@@ -76,22 +78,56 @@ pub struct UpDependencies {
 /// Execute the up command with injected dependencies
 pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> Result<()> {
     let project_path = config.path.clone().unwrap_or_else(|| PathBuf::from("."));
+    let ftl_toml_path = project_path.join("ftl.toml");
 
-    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
-        &crate::config::transpiler::GenerateSpinConfig {
-            file_system: &deps.file_system,
-            project_path: &project_path,
-            download_components: true,
-            validate_local_auth: true,
-        },
+    // Check if ftl.toml exists
+    if !deps.file_system.exists(&ftl_toml_path) {
+        return Err(anyhow::anyhow!(
+            "No ftl.toml found. Not in an FTL project directory? Run 'ftl init' to create a new project."
+        ));
+    }
+
+    // Parse ftl.toml
+    let ftl_content = deps
+        .file_system
+        .read_to_string(&ftl_toml_path)
+        .context("Failed to read ftl.toml")?;
+    let ftl_config = FtlConfig::parse(&ftl_content)?;
+
+    // Validate auth config for local development
+    crate::config::transpiler::validate_local_auth(&ftl_config)?;
+
+    // Resolve components needed for local execution
+    let resolver = ComponentResolver::new(deps.ui.clone());
+    let resolved_components = resolver
+        .resolve_components(
+            &ftl_config,
+            ComponentResolutionStrategy::Local {
+                include_mcp: true,  // Need MCP components locally
+                include_user: true, // Need user tool components
+            },
+        )
+        .await?;
+
+    // Create spin.toml with resolved paths
+    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        resolved_components.mappings(),
+        &project_path,
     )?;
 
-    // We must have a temp spin.toml since ftl.toml is required
-    let manifest_path = temp_spin_toml.ok_or_else(|| {
-        anyhow::anyhow!("No ftl.toml found. Not in an FTL project directory? Run 'ftl init' to create a new project.")
-    })?;
+    // Write spin.toml to temporary location
+    let temp_dir = tempfile::Builder::new()
+        .prefix("ftl-up-")
+        .tempdir()
+        .context("Failed to create temporary directory")?;
+    let manifest_path = temp_dir.path().join("spin.toml");
+    std::fs::write(&manifest_path, &spin_content).context("Failed to write temporary spin.toml")?;
 
-    // Always pass true for is_temp_manifest since we always generate temp spin.toml
+    // Keep temp directory alive
+    let _temp_dir = temp_dir.keep();
+
+    // Run with the generated manifest
     if config.watch {
         run_with_watch(project_path, manifest_path.clone(), config, &deps, true).await
     } else {

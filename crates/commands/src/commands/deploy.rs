@@ -9,6 +9,7 @@ use base64::{Engine as _, engine::general_purpose};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
+use crate::component_resolver::{ComponentResolutionStrategy, ComponentResolver};
 use ftl_runtime::api_client::types;
 use ftl_runtime::deps::{
     AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem, FtlApiClient,
@@ -66,65 +67,65 @@ pub struct DeployDependencies {
 /// Execute the deploy command with injected dependencies
 #[allow(clippy::too_many_lines)]
 pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) -> Result<()> {
-    // Try to parse ftl.toml early to get project name, but handle if it doesn't exist
-    let ftl_config_result = deps
-        .file_system
-        .read_to_string(Path::new("ftl.toml"))
-        .and_then(|content| crate::config::ftl_config::FtlConfig::parse(&content));
+    let project_path = PathBuf::from(".");
+    let ftl_toml_path = project_path.join("ftl.toml");
 
-    // Display deployment header with project name if available
-    if let Ok(ref ftl_config) = ftl_config_result {
-        let project_name = &ftl_config.project.name;
-        if args.dry_run {
-            deps.ui.print_styled(
-                &format!("{} Deploying {} to FTL Engine (DRY RUN)", "▶", project_name),
-                MessageStyle::Bold,
-            );
-        } else {
-            deps.ui.print_styled(
-                &format!("{} Deploying {} to FTL Engine", "▶", project_name),
-                MessageStyle::Bold,
-            );
-        }
+    // Check if ftl.toml exists
+    if !deps.file_system.exists(&ftl_toml_path) {
+        return Err(anyhow!(
+            "No ftl.toml found. Not in an FTL project directory?"
+        ));
+    }
+
+    // Parse ftl.toml
+    let ftl_content = deps.file_system.read_to_string(&ftl_toml_path)?;
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+
+    // Display deployment header
+    let project_name = &ftl_config.project.name;
+    if args.dry_run {
+        deps.ui.print_styled(
+            &format!("{} Deploying {} to FTL Engine (DRY RUN)", "▶", project_name),
+            MessageStyle::Bold,
+        );
     } else {
-        // Fallback message if ftl.toml not found yet
-        if args.dry_run {
-            deps.ui.print_styled(
-                &format!("{} Deploying project to FTL Engine (DRY RUN)", "▶"),
-                MessageStyle::Bold,
-            );
-        } else {
-            deps.ui.print_styled(
-                &format!("{} Deploying project to FTL Engine", "▶"),
-                MessageStyle::Bold,
-            );
-        }
+        deps.ui.print_styled(
+            &format!("{} Deploying {} to FTL Engine", "▶", project_name),
+            MessageStyle::Bold,
+        );
     }
     deps.ui.print("");
 
-    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
-        &crate::config::transpiler::GenerateSpinConfig {
-            file_system: &deps.file_system,
-            project_path: &PathBuf::from("."),
-            download_components: true,
-            validate_local_auth: false,
-        },
+    // Resolve only user registry components for deployment
+    let resolver = ComponentResolver::new(deps.ui.clone());
+    let resolved_components = resolver
+        .resolve_components(
+            &ftl_config,
+            ComponentResolutionStrategy::Deploy {
+                push_user_only: true, // Only resolve user components, not MCP
+            },
+        )
+        .await?;
+
+    // Create spin.toml with resolved paths (for parsing components)
+    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        resolved_components.mappings(),
+        &project_path,
     )?;
 
-    // We must have a temp spin.toml since ftl.toml is required
-    let manifest_path = temp_spin_toml
-        .ok_or_else(|| anyhow!("No ftl.toml found. Not in an FTL project directory?"))?;
+    // Write spin.toml to temporary location
+    let temp_dir = tempfile::Builder::new()
+        .prefix("ftl-deploy-")
+        .tempdir()
+        .context("Failed to create temporary directory")?;
+    let manifest_path = temp_dir.path().join("spin.toml");
+    std::fs::write(&manifest_path, &spin_content).context("Failed to write temporary spin.toml")?;
 
-    // If we couldn't parse ftl.toml earlier, try again now that we know it exists
-    let ftl_config = if let Ok(config) = ftl_config_result {
-        config
-    } else {
-        let ftl_content = deps.file_system.read_to_string(Path::new("ftl.toml"))?;
-        crate::config::ftl_config::FtlConfig::parse(&ftl_content)?
-    };
+    // Keep temp directory alive
+    let _temp_dir = temp_dir.keep();
 
-    // Run the deployment with the manifest path
-    // Clean up is handled by tempfile crate when temp_spin_toml goes out of scope
+    // Run the deployment
     execute_deploy_inner(deps.clone(), args, manifest_path, ftl_config, true).await
 }
 

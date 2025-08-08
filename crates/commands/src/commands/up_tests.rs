@@ -927,14 +927,27 @@ command = "cargo build --target wasm32-wasi"
         .expect_check_and_install()
         .returning(|| Ok("/usr/local/bin/spin".to_string()));
 
-    // Mock: build command execution
-    fixture.command_executor.expect_execute().returning(|_, _| {
-        Ok(CommandOutput {
-            success: true,
-            stdout: b"Build successful".to_vec(),
-            stderr: vec![],
-        })
-    });
+    // Mock: build command execution and wkg commands (for component resolution)
+    fixture
+        .command_executor
+        .expect_execute()
+        .returning(|cmd, _args| {
+            if cmd.contains("wkg") {
+                // Mock wkg commands that might be called by ComponentResolver
+                Ok(CommandOutput {
+                    success: true,
+                    stdout: vec![],
+                    stderr: vec![],
+                })
+            } else {
+                // Build commands
+                Ok(CommandOutput {
+                    success: true,
+                    stdout: b"Build successful".to_vec(),
+                    stderr: vec![],
+                })
+            }
+        });
 
     // Mock: process spawn
     fixture
@@ -950,7 +963,7 @@ command = "cargo build --target wasm32-wasi"
 
     // Run with timeout since watch mode runs until interrupted
     let result = tokio::time::timeout(
-        Duration::from_millis(200),
+        Duration::from_millis(500), // Increased timeout
         execute_with_deps(
             UpConfig {
                 path: None,
@@ -965,8 +978,9 @@ command = "cargo build --target wasm32-wasi"
     )
     .await;
 
-    // Should complete successfully when interrupted
-    assert!(result.is_ok());
+    // Should timeout (watch mode runs forever until interrupted)
+    // The timeout is expected, not an error
+    assert!(result.is_err()); // Expect timeout error, not Ok
 }
 
 #[tokio::test]

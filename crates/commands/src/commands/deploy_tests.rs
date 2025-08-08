@@ -97,18 +97,21 @@ fn setup_project_file_mocks(fixture: &mut TestFixture, has_ftl_toml: bool) {
 
 /// Setup for file system mocks that handles all ftl.toml access patterns
 /// This function sets up mocks for:
-/// 1. `generate_temp_spin_toml` checking ./ftl.toml
-/// 2. `generate_temp_spin_toml` reading ./ftl.toml  
-/// 3. deploy reading ftl.toml for `FtlConfig` parsing
-/// 4. variable loading checking and reading ftl.toml
-/// 5. `resolve_auth_config` checking and reading ftl.toml
-/// 6. `parse_deploy_config` reading the generated spin.toml
-/// 7. Component version file checks
+/// 1. deploy checking if ftl.toml exists
+/// 2. deploy reading ftl.toml for `FtlConfig` parsing
+/// 3. `parse_deploy_config` reading the generated spin.toml
+/// 4. Component version file checks
 fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &str) {
     // Parse ftl config to generate expected spin.toml content
     let ftl_config = crate::config::ftl_config::FtlConfig::parse(ftl_toml_content).unwrap();
-    let expected_spin_content =
-        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+    let resolved_mappings = std::collections::HashMap::new();
+    let project_path = std::path::Path::new(".");
+    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        &resolved_mappings,
+        project_path,
+    )
+    .unwrap();
 
     // Mock for any existence check of ftl.toml (with or without ./ prefix)
     let _ftl_content_for_exists = ftl_toml_content.to_string();
@@ -187,30 +190,28 @@ command = "echo 'Building test tool'"
             .to_string()
         });
 
-        // Clone content for both mocks
-        let content_for_transpiler = content.clone();
-        let content_for_build = content.clone();
+        // Clone content for mocks
+        let content_for_read = content.clone();
 
-        // Mock: read ftl.toml for temp spin.toml generation
+        // Mock: read ftl.toml for FtlConfig parsing
         fixture
             .file_system
             .expect_read_to_string()
             .with(eq(Path::new("./ftl.toml")))
             .times(1)
-            .returning(move |_| Ok(content_for_transpiler.clone()));
-
-        // Mock: read ftl.toml again to determine build profiles
-        fixture
-            .file_system
-            .expect_read_to_string()
-            .with(eq(Path::new("ftl.toml")))
-            .times(1)
-            .returning(move |_| Ok(content_for_build.clone()));
+            .returning(move |_| Ok(content_for_read.clone()));
 
         // Generate expected spin.toml content and mock its reading
         let ftl_config = crate::config::ftl_config::FtlConfig::parse(&content).unwrap();
+        let resolved_mappings = std::collections::HashMap::new();
+        let project_path = std::path::Path::new(".");
         let expected_spin_content =
-            crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+            crate::config::transpiler::create_spin_toml_with_resolved_paths(
+                &ftl_config,
+                &resolved_mappings,
+                project_path,
+            )
+            .unwrap();
 
         // Mock: read generated spin.toml
         fixture
@@ -227,16 +228,13 @@ command = "echo 'Building test tool'"
 async fn test_deploy_no_ftl_toml() {
     let mut fixture = TestFixture::new();
 
-    // Mock: First attempt to read ftl.toml for project name (will fail)
+    // Mock: Check if ftl.toml exists (will return false)
     fixture
         .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("ftl.toml")))
+        .expect_exists()
+        .with(eq(Path::new("./ftl.toml")))
         .times(1)
-        .returning(|_| Err(anyhow::anyhow!("File not found")));
-
-    // No ftl.toml - should fail during generate_temp_spin_toml
-    setup_project_file_mocks(&mut fixture, false);
+        .returning(|_| false);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
@@ -1404,7 +1402,7 @@ command = "cargo build --release --target wasm32-wasip1"
 "#
     .to_string();
 
-    // Mock: read ftl.toml for temp spin.toml generation
+    // Mock: read ftl.toml for FtlConfig parsing
     let ftl_content_clone = ftl_content.clone();
     fixture
         .file_system
@@ -1413,30 +1411,21 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(move |_| Ok(ftl_content_clone.clone()));
 
-    // Mock: read ftl.toml again to determine build profiles
-    let ftl_content_for_build = ftl_content.clone();
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("ftl.toml")))
-        .times(1)
-        .returning(move |_| Ok(ftl_content_for_build.clone()));
-
-    // Mock: check for ftl.toml again when extracting auth variables and resolving auth config
+    // Mock: resolve_auth_config checks for ftl.toml
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now
+        .times(1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml for auth config resolution
+    // Mock: resolve_auth_config reads ftl.toml
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now (variables use parsed config)
+        .times(1)
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1484,8 +1473,14 @@ command = "cargo build --release --target wasm32-wasip1"
 
     // Generate expected spin.toml content and mock its reading
     let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
-    let expected_spin_content =
-        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+    let resolved_mappings = std::collections::HashMap::new();
+    let project_path = std::path::Path::new(".");
+    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        &resolved_mappings,
+        project_path,
+    )
+    .unwrap();
 
     // Mock: read generated spin.toml for parse_deploy_config
     fixture
@@ -1664,7 +1659,7 @@ command = "cargo build --release --target wasm32-wasip1"
 "#
     .to_string();
 
-    // Mock: read ftl.toml for temp spin.toml generation
+    // Mock: read ftl.toml for FtlConfig parsing
     let ftl_content_clone = ftl_content.clone();
     fixture
         .file_system
@@ -1673,30 +1668,21 @@ command = "cargo build --release --target wasm32-wasip1"
         .times(1)
         .returning(move |_| Ok(ftl_content_clone.clone()));
 
-    // Mock: read ftl.toml again to determine build profiles
-    let ftl_content_for_build = ftl_content.clone();
-    fixture
-        .file_system
-        .expect_read_to_string()
-        .with(eq(Path::new("ftl.toml")))
-        .times(1)
-        .returning(move |_| Ok(ftl_content_for_build.clone()));
-
-    // Mock: check for ftl.toml again when extracting auth variables and resolving auth config
+    // Mock: resolve_auth_config checks for ftl.toml
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now
+        .times(1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml for auth config resolution
+    // Mock: resolve_auth_config reads ftl.toml
     let ftl_content2 = ftl_content.clone();
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now (variables use parsed config)
+        .times(1)
         .returning(move |_| Ok(ftl_content2.clone()));
 
     // Mock: component version files don't exist (use default)
@@ -1744,8 +1730,14 @@ command = "cargo build --release --target wasm32-wasip1"
 
     // Generate expected spin.toml content and mock its reading
     let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
-    let expected_spin_content =
-        crate::config::transpiler::transpile_ftl_to_spin(&ftl_config).unwrap();
+    let resolved_mappings = std::collections::HashMap::new();
+    let project_path = std::path::Path::new(".");
+    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
+        &ftl_config,
+        &resolved_mappings,
+        project_path,
+    )
+    .unwrap();
 
     // Mock: read generated spin.toml for parse_deploy_config
     fixture
@@ -2191,20 +2183,20 @@ async fn test_deploy_dry_run() {
     // Setup project file mocks
     setup_project_file_mocks(&mut fixture, true);
 
-    // Mock: check for ftl.toml when resolving auth config
+    // Mock: resolve_auth_config checks for ftl.toml
     fixture
         .file_system
         .expect_exists()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now
+        .times(1)
         .returning(|_| true);
 
-    // Mock: read ftl.toml for auth config resolution
+    // Mock: resolve_auth_config reads ftl.toml
     fixture
         .file_system
         .expect_read_to_string()
         .with(eq(Path::new("ftl.toml")))
-        .times(1)  // Only for resolve_auth_config now (variables use parsed config)
+        .times(1)
         .returning(|_| {
             Ok(r#"[project]
 name = "test-project"

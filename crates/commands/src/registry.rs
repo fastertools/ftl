@@ -77,7 +77,7 @@ fn check_crane_available() -> Result<()> {
 }
 
 /// Check if wkg CLI tool is installed and available
-fn check_wkg_available() -> Result<()> {
+pub fn check_wkg_available() -> Result<()> {
     let output = Command::new("wkg")
         .arg("--version")
         .output()

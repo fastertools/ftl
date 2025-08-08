@@ -63,15 +63,25 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
     // Get spin path
     let spin_path = deps.spin_installer.check_and_install().await?;
 
-    let temp_spin_toml = crate::config::transpiler::generate_temp_spin_toml(
-        &crate::config::transpiler::GenerateSpinConfig {
-            file_system: &deps.file_system,
-            project_path: &PathBuf::from("."),
-            download_components: false,
-            validate_local_auth: false,
-        },
-    )?
-    .ok_or_else(|| anyhow::anyhow!("No ftl.toml found"))?;
+    // Parse ftl.toml
+    let ftl_content = deps
+        .file_system
+        .read_to_string(Path::new("ftl.toml"))
+        .context("Failed to read ftl.toml")?;
+    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+
+    // Create temporary spin.toml without downloading components
+    // Add command doesn't need resolved components
+    let spin_content = crate::config::transpiler::transpile_ftl_to_spin(&ftl_config)?;
+
+    let temp_dir = tempfile::Builder::new()
+        .prefix("ftl-add-")
+        .tempdir()
+        .context("Failed to create temporary directory")?;
+    let temp_spin_toml = temp_dir.path().join("spin.toml");
+    std::fs::write(&temp_spin_toml, &spin_content)
+        .context("Failed to write temporary spin.toml")?;
+    let _temp_dir = temp_dir.keep();
 
     // Use spin add with the appropriate ftl-mcp template
     let template_id = match selected_language {
