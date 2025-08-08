@@ -6,7 +6,7 @@ Rust SDK for building Model Context Protocol (MCP) tools that compile to WebAsse
 
 ```toml
 [dependencies]
-ftl-sdk = "0.2"
+ftl-sdk = { version = "0.2.10", features = ["macros"] }
 schemars = "0.8"  # For automatic schema generation
 serde = { version = "1.0", features = ["derive"] }
 ```
@@ -88,7 +88,7 @@ fn handle_tool(req: Request) -> anyhow::Result<impl IntoResponse> {
                 ToolMetadata {
                     name: "echo".to_string(),
                     description: Some("Echo tool".to_string()),
-                    input_schema: json!({
+                    input_schema: serde_json::json!({
                         "type": "object",
                         "properties": {
                             "message": { "type": "string" }
@@ -102,7 +102,7 @@ fn handle_tool(req: Request) -> anyhow::Result<impl IntoResponse> {
                 ToolMetadata {
                     name: "reverse".to_string(),
                     description: Some("Reverse text".to_string()),
-                    input_schema: json!({
+                    input_schema: serde_json::json!({
                         "type": "object",
                         "properties": {
                             "text": { "type": "string" }
@@ -162,10 +162,10 @@ Tools must be compiled to WebAssembly for the Spin platform:
 ```toml
 # Cargo.toml
 [dependencies]
-ftl-sdk = "0.2"
+ftl-sdk = { version = "0.2.10", features = ["macros"] }
 schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
-spin-sdk = "3.0"
+spin-sdk = "4.0"
 
 [lib]
 crate-type = ["cdylib"]
@@ -192,7 +192,7 @@ let response = text!("Hello, {}!", name);
 let response = error!("Something went wrong: {}", reason);
 
 // Response with structured content
-let data = json!({ "result": 42 });
+let data = serde_json::json!({ "result": 42 });
 let response = structured!(data, "Calculation complete");
 
 // Or use the builder methods directly
@@ -200,14 +200,14 @@ let response = ToolResponse::text("Hello, world!");
 let response = ToolResponse::error("Something went wrong");
 let response = ToolResponse::with_structured(
     "Calculation complete",
-    json!({ "result": 42 })
+    serde_json::json!({ "result": 42 })
 );
 
 // Multiple content items
 let response = ToolResponse {
     content: vec![
-        ToolContent::text("Processing complete", None),
-        ToolContent::image(base64_data, "image/png", None),
+        ToolContent::text("Processing complete"),
+        ToolContent::image(base64_data, "image/png"),
     ],
     structured_content: None,
     is_error: None,
@@ -294,3 +294,34 @@ tools! {
     }
 }
 ```
+
+## Development
+
+### Building
+
+```bash
+cargo build --target wasm32-wasip1 --release
+```
+
+### Testing
+
+```bash
+cargo test
+```
+
+### Code Quality
+
+```bash
+# Format code
+cargo fmt
+
+# Run linting
+cargo clippy
+
+# Run all checks
+make quality
+```
+
+## License
+
+Apache-2.0 - see [LICENSE](../../LICENSE) for details.

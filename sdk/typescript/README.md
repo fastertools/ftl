@@ -1,6 +1,6 @@
 # ftl-sdk (TypeScript)
 
-TypeScript SDK for building Model Context Protocol (MCP) tools that compile to WebAssembly.
+The FTL TypeScript SDK
 
 ## Installation
 
@@ -13,7 +13,7 @@ npm install ftl-sdk
 This SDK provides:
 - TypeScript type definitions for the MCP protocol
 - Zero-dependency `createTools` helper for building multiple tools per component
-- Seamless integration with Zod for schema validation
+- JSON Schema support for input/output validation
 - Full compatibility with Spin WebAssembly components
 
 ## Quick Start
@@ -24,30 +24,32 @@ The SDK includes a `createTools` helper that handles the MCP protocol for you:
 
 ```typescript
 import { createTools, ToolResponse } from 'ftl-sdk'
-import { z } from 'zod'
 
-// Define your input schemas using Zod
-const EchoSchema = z.object({
-  message: z.string().describe('The message to echo')
-})
-
-const ReverseSchema = z.object({
-  text: z.string().describe('The text to reverse')
-})
-
-// Create the tools handler
+// Create the tools handler with JSON Schema
 const handle = createTools({
   echo: {
     description: 'Echo back the input',
-    inputSchema: z.toJSONSchema(EchoSchema),
-    handler: async (input: z.infer<typeof EchoSchema>) => {
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'The message to echo' }
+      },
+      required: ['message']
+    },
+    handler: async (input: { message: string }) => {
       return ToolResponse.text(`Echo: ${input.message}`)
     }
   },
   reverse: {
     description: 'Reverse the input text',
-    inputSchema: z.toJSONSchema(ReverseSchema),
-    handler: async (input: z.infer<typeof ReverseSchema>) => {
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The text to reverse' }
+      },
+      required: ['text']
+    },
+    handler: async (input: { text: string }) => {
       return ToolResponse.text(input.text.split('').reverse().join(''))
     }
   }
@@ -57,12 +59,16 @@ const handle = createTools({
 //@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
   event.respondWith(handle(event.request))
-})
+}) 
 ```
 
 ### Manual Implementation
 
-You can also implement the protocol manually with any web framework:
+You can also implement the protocol manually with any web framework. First install the router:
+
+```bash
+npm install itty-router
+```
 
 ```typescript
 import { ToolMetadata, ToolResponse } from 'ftl-sdk';
@@ -122,31 +128,55 @@ router
 export default router;
 ```
 
-## Building to WebAssembly
+## Development and Deployment
 
-Tools must be compiled to WebAssembly to run on the Spin platform:
+### Development Setup
+
+For local development, use standard TypeScript tooling:
 
 ```json
 {
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && j2w -i build/bundle.js -o dist/my-tool.wasm"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
   },
   "devDependencies": {
-    "@spinframework/build-tools": "^1.0.1"
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
   }
 }
 ```
 
-The build process:
-1. Bundle TypeScript to ESM format using esbuild
-2. Convert JavaScript to WebAssembly using `j2w` (js-to-wasm)
+### Deployment with FTL CLI
+
+Deploy your tools using the FTL CLI, which handles WebAssembly compilation automatically:
+
+```bash
+# Build and deploy your tool
+ftl build
+ftl up
+
+# Or deploy directly
+ftl deploy
+```
+
+The FTL CLI will:
+1. Detect your TypeScript project structure
+2. Compile TypeScript to JavaScript
+3. Bundle and convert to WebAssembly for the Spin platform
+4. Deploy to the FTL tool registry
 
 ## Using with Zod
 
 The SDK integrates with Zod v4's native JSON Schema conversion:
 
 ```typescript
-import { z } from 'zod'
+import { createTools, ToolResponse } from 'ftl-sdk'
+import * as z from 'zod'
 
 // Define schema with validation rules
 const CalculatorSchema = z.object({
@@ -158,14 +188,11 @@ const CalculatorSchema = z.object({
   { message: "Cannot divide by zero" }
 )
 
-// Convert to JSON Schema - validation rules are preserved
-const jsonSchema = z.toJSONSchema(CalculatorSchema)
-
 // Use with createTools
 const handle = createTools({
   calculator: {
     description: 'Perform calculations',
-    inputSchema: jsonSchema,
+    inputSchema: z.toJSONSchema(CalculatorSchema),
     handler: async (input: z.infer<typeof CalculatorSchema>) => {
       // input is fully typed and validated by the gateway
       switch (input.operation) {
@@ -257,11 +284,8 @@ if (isTextContent(content)) {
 ## Best Practices
 
 1. **Use Zod for Schema Definition**: Leverage Zod's powerful schema capabilities and convert to JSON Schema using `z.toJSONSchema()`.
-
 2. **Trust Input Validation**: Don't validate inputs in your handler - the gateway ensures inputs match your schema.
-
 3. **Keep It Simple**: The SDK is intentionally minimal. Use it for types and basic helpers, not complex abstractions.
-
 4. **Type Safety**: Type your handler parameters directly for full type safety:
    ```typescript
    handler: async (input: z.infer<typeof MySchema>) => {
@@ -269,7 +293,6 @@ if (isTextContent(content)) {
      return ToolResponse.text(input.message)
    }
    ```
-
 5. **Error Handling**: Return `ToolResponse.error()` for business logic errors. The SDK handles exceptions automatically.
 
 ## Examples
@@ -277,8 +300,17 @@ if (isTextContent(content)) {
 See the [examples directory](https://github.com/fastertools/ftl-cli/tree/main/examples/demo) for complete examples:
 
 - `echo-ts`: Simple echo tool
-- `multi-tools-ts`: Multiple tools in one component
+- `multi-tools-ts`: Multiple tools in one component  
 - `weather-ts`: External API integration
+
+## Troubleshooting
+
+### Common Issues
+
+1. **TypeScript compilation errors**: Ensure you have TypeScript 5.0+ installed
+2. **Runtime errors**: Verify your JSON Schema matches your TypeScript interfaces
+3. **Deployment failures**: Use `ftl build` to check for compilation issues before deployment
+4. **Tool not found**: Ensure your tool names follow snake_case convention when calling from FTL CLI
 
 ## License
 

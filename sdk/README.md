@@ -6,22 +6,18 @@ Language-specific SDKs for building MCP (Model Context Protocol) tools.
 
 ### [Rust](./rust)
 - **Package**: `ftl-sdk` on [crates.io](https://crates.io/crates/ftl-sdk)
-- **Status**: Stable
 - **Features**: Zero-copy JSON handling, procedural macros, async support
 
 ### [TypeScript](./typescript)
 - **Package**: `ftl-sdk` on [npm](https://www.npmjs.com/package/ftl-sdk)
-- **Status**: Stable
 - **Features**: Full TypeScript types, tree-shaking support, zero dependencies
 
 ### [Python](./python)
 - **Package**: `ftl-sdk` on [PyPI](https://pypi.org/project/ftl-sdk)
-- **Status**: Alpha
 - **Features**: Zero dependencies (only spin-sdk), Python 3.10+ support, type hints
 
 ### [Go](./go)
 - **Package**: `github.com/fastertools/ftl-cli/sdk/go`
-- **Status**: Alpha
 - **Features**: TinyGo WASI support, zero external dependencies, idiomatic Go API
 
 ## Quick Start
