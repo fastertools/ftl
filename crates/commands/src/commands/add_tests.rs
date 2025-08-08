@@ -29,17 +29,9 @@ impl TestFixture {
 
     /// Mock that ftl.toml exists
     fn mock_ftl_toml_exists(&mut self) {
-        // First check by add command itself
         self.file_system
             .expect_exists()
             .with(eq(Path::new("ftl.toml")))
-            .times(1)
-            .returning(|_| true);
-
-        // Second check by transpiler
-        self.file_system
-            .expect_exists()
-            .with(eq(Path::new("./ftl.toml")))
             .times(1)
             .returning(|_| true);
     }
@@ -593,7 +585,7 @@ fn setup_basic_add_mocks(fixture: &mut TestFixture) {
     fixture
         .file_system
         .expect_read_to_string()
-        .with(eq(Path::new("./ftl.toml")))
+        .with(eq(Path::new("ftl.toml")))
         .times(1)
         .returning(|_| {
             Ok(r#"[project]

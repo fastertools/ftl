@@ -15,6 +15,9 @@ pub mod data;
 /// Registry infrastructure and adapters
 pub mod registry;
 
+/// Component resolver for parallel downloads
+pub mod component_resolver;
+
 #[cfg(test)]
 pub mod test_helpers;
 
