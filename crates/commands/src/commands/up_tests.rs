@@ -292,11 +292,11 @@ version = "0.1.0"
 gateway = "test-gateway.wasm"
 authorizer = "test-authorizer.wasm"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#,
         );
@@ -493,7 +493,7 @@ async fn test_up_with_build() {
     .await;
 
     if let Err(e) = &result {
-        eprintln!("test_up_with_build failed with error: {:#}", e);
+        eprintln!("test_up_with_build failed with error: {e:#}");
     }
     assert!(result.is_ok());
 
@@ -579,11 +579,11 @@ version = "0.1.0"
 gateway = "test-gateway.wasm"
 authorizer = "test-authorizer.wasm"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#
             .to_string())
@@ -599,20 +599,12 @@ command = "echo 'Building test tool'"
     fixture
         .command_executor
         .expect_execute()
-        .returning(|cmd, _| {
-            if cmd.contains("wkg") {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: vec![],
-                    stderr: vec![],
-                })
-            } else {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: vec![],
-                    stderr: vec![],
-                })
-            }
+        .returning(|_cmd, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: vec![],
+                stderr: vec![],
+            })
         });
 
     // Mock: process spawn
@@ -641,7 +633,7 @@ command = "echo 'Building test tool'"
     .await;
 
     if let Err(e) = &result {
-        eprintln!("test_up_with_custom_path failed with error: {:#}", e);
+        eprintln!("test_up_with_custom_path failed with error: {e:#}");
     }
     assert!(result.is_ok());
 }
@@ -712,11 +704,11 @@ version = "0.1.0"
 gateway = "test-gateway.wasm"
 authorizer = "test-authorizer.wasm"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
         .to_string())
@@ -898,20 +890,12 @@ async fn test_up_with_specific_port() {
     fixture
         .command_executor
         .expect_execute()
-        .returning(|cmd, _| {
-            if cmd.contains("wkg") {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: vec![],
-                    stderr: vec![],
-                })
-            } else {
-                Ok(CommandOutput {
-                    success: true,
-                    stdout: vec![],
-                    stderr: vec![],
-                })
-            }
+        .returning(|_cmd, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: vec![],
+                stderr: vec![],
+            })
         });
 
     // Mock: process spawn
@@ -942,7 +926,7 @@ async fn test_up_with_specific_port() {
     .await;
 
     if let Err(e) = &result {
-        eprintln!("test_up_with_specific_port failed with error: {:#}", e);
+        eprintln!("test_up_with_specific_port failed with error: {e:#}");
     }
     assert!(result.is_ok());
 
@@ -978,11 +962,11 @@ version = "0.1.0"
 gateway = "test-gateway.wasm"
 authorizer = "test-authorizer.wasm"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
         .to_string())

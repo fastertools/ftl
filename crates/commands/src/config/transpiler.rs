@@ -3,10 +3,10 @@
 //! This module provides pure functions for configuration transpilation.
 //! No file I/O, no downloads - just data transformation.
 
-use super::ftl_config::{ApplicationVariable, FtlConfig, ToolConfig};
+use super::ftl_config::{ApplicationVariable, ComponentConfig, FtlConfig};
 use super::spin_config::{
-    ComponentBuildConfig, ComponentConfig, ComponentSource, HttpTrigger, RouteConfig, SpinConfig,
-    SpinVariable, TriggerConfig,
+    ComponentBuildConfig, ComponentConfig as SpinComponentConfig, ComponentSource, HttpTrigger,
+    RouteConfig, SpinConfig, SpinVariable, TriggerConfig,
 };
 use anyhow::Result;
 use std::collections::HashMap;
@@ -51,11 +51,11 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     }
 
     // Add system variables
-    let tool_names = ftl_config.tool_components().join(",");
+    let component_names = ftl_config.component_names().join(",");
     variables.insert(
-        "tool_components".to_string(),
+        "component_names".to_string(),
         SpinVariable::Default {
-            default: tool_names,
+            default: component_names,
         },
     );
 
@@ -104,11 +104,11 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         );
     }
 
-    // Add tool components
-    for (tool_name, tool_config) in &ftl_config.tools {
+    // Add user components
+    for (component_name, component_config) in &ftl_config.component {
         components.insert(
-            tool_name.clone(),
-            create_tool_component(tool_name, tool_config, default_registry),
+            component_name.clone(),
+            create_user_component(component_name, component_config, default_registry),
         );
     }
 
@@ -148,24 +148,24 @@ pub fn create_spin_toml_with_resolved_paths<S: std::hash::BuildHasher>(
         make_path_absolute(&mut modified_config.mcp.authorizer, &abs_project_path);
     }
 
-    // Update tool component paths
-    for (tool_name, tool_config) in &mut modified_config.tools {
-        if let Some(resolved_path) = resolved_mappings.get(tool_name) {
+    // Update user component paths
+    for (component_name, component_config) in &mut modified_config.component {
+        if let Some(resolved_path) = resolved_mappings.get(component_name) {
             // Registry component was resolved to local path
-            tool_config.repo = None;
-            tool_config.wasm = Some(resolved_path.to_string_lossy().to_string());
-        } else if let Some(wasm_path) = &tool_config.wasm {
+            component_config.repo = None;
+            component_config.wasm = Some(resolved_path.to_string_lossy().to_string());
+        } else if let Some(wasm_path) = &component_config.wasm {
             // Local component - make path absolute
             let mut abs_wasm = wasm_path.clone();
             make_path_absolute(&mut abs_wasm, &abs_project_path);
-            tool_config.wasm = Some(abs_wasm);
+            component_config.wasm = Some(abs_wasm);
         }
 
-        // Update tool directory path if present
-        if let Some(path) = &tool_config.path {
+        // Update component directory path if present
+        if let Some(path) = &component_config.path {
             let mut abs_path = path.clone();
             make_path_absolute(&mut abs_path, &abs_project_path);
-            tool_config.path = Some(abs_path);
+            component_config.path = Some(abs_path);
         }
     }
 
@@ -371,11 +371,11 @@ fn build_triggers(ftl_config: &FtlConfig) -> TriggerConfig {
         });
     }
 
-    // Add tool endpoints
-    for tool_name in ftl_config.tools.keys() {
+    // Add component endpoints
+    for component_name in ftl_config.component.keys() {
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Private { private: true },
-            component: tool_name.clone(),
+            component: component_name.clone(),
             executor: None,
         });
     }
@@ -388,7 +388,7 @@ fn parse_component_source(source: &str, _default_registry: Option<&str>) -> Comp
     ComponentSource::Local(source.to_string())
 }
 
-fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> ComponentConfig {
+fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> SpinComponentConfig {
     let uri = if registry_uri.is_empty() {
         "ghcr.io/fastertools/mcp-authorizer:0.0.13"
     } else {
@@ -424,7 +424,7 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> C
         variables.insert((*var).to_string(), format!("{{{{ {var} }}}}"));
     }
 
-    ComponentConfig {
+    SpinComponentConfig {
         description: String::new(),
         source,
         files: Vec::new(),
@@ -443,7 +443,7 @@ fn create_gateway_component(
     registry_uri: &str,
     validate_args: bool,
     default_registry: Option<&str>,
-) -> ComponentConfig {
+) -> SpinComponentConfig {
     let uri = if registry_uri.is_empty() {
         "ghcr.io/fastertools/mcp-gateway:0.0.11"
     } else {
@@ -455,12 +455,12 @@ fn create_gateway_component(
 
     let mut variables = HashMap::new();
     variables.insert(
-        "tool_components".to_string(),
-        "{{ tool_components }}".to_string(),
+        "component_names".to_string(),
+        "{{ component_names }}".to_string(),
     );
     variables.insert("validate_arguments".to_string(), validate_args.to_string());
 
-    ComponentConfig {
+    SpinComponentConfig {
         description: String::new(),
         source,
         files: Vec::new(),
@@ -475,11 +475,11 @@ fn create_gateway_component(
     }
 }
 
-fn create_tool_component(
+fn create_user_component(
     name: &str,
-    config: &ToolConfig,
+    config: &ComponentConfig,
     default_registry: Option<&str>,
-) -> ComponentConfig {
+) -> SpinComponentConfig {
     let source = if let Some(wasm_path) = &config.wasm {
         ComponentSource::Local(wasm_path.clone())
     } else if let Some(repo_ref) = &config.repo {
@@ -495,10 +495,10 @@ fn create_tool_component(
         .collect();
 
     let build = config.build.as_ref().map(|build_config| {
-        let tool_path = config.get_path(name);
+        let component_path = config.get_path(name);
         ComponentBuildConfig {
             command: build_config.command.clone(),
-            workdir: tool_path,
+            workdir: component_path,
             watch: build_config.watch.clone(),
             environment: build_config.env.clone(),
         }
@@ -506,7 +506,7 @@ fn create_tool_component(
 
     let variables = config.variables.clone();
 
-    ComponentConfig {
+    SpinComponentConfig {
         description: String::new(),
         source,
         files: Vec::new(),

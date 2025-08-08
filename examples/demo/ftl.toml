@@ -56,149 +56,149 @@ validate_arguments = true
 # ========================================
 # Application Variables
 # ========================================
-# These variables can be used by tools and overridden at runtime
+# These variables can be used by components and overridden at runtime
 # using environment variables with the SPIN_VARIABLE_ prefix.
 # Variables with names indicating sensitivity e.g. 'key', 'secret', will be handled securely.
 # NEVER store actual secret values in ftl.toml!
 
 [variables]
 # Variables with default values.
-# These are NOT accessible to any tool components unless you explicitly configure them for that component.
-# See [tools.variables-demo] for an example.
+# These are NOT accessible to any components unless you explicitly configure them for that component.
+# See [component.variables-demo] for an example.
 # For the demo, we provide a default token value so it runs without runtime configuration.
 api_token = { default = "demo-token-12345" }
 api_url = { default = "https://api.example.com" }
 api_version = { default = "v2" }
 environment = { default = "staging" }
 
-# Echo tool (Rust)
-[tools.echo-rs]
+# Echo component (Rust)
+[component.echo-rs]
 path = "echo-rs"
 wasm = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
 allowed_outbound_hosts = []
 
-[tools.echo-rs.build]
+[component.echo-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
-# Echo tool (TypeScript)
-[tools.echo-ts]
+# Echo component (TypeScript)
+[component.echo-ts]
 path = "echo-ts"
 wasm = "echo-ts/dist/echo-ts.wasm"
 allowed_outbound_hosts = []
 
-[tools.echo-ts.build]
+[component.echo-ts.build]
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
-# Echo tool (Python)
-[tools.echo-py]
+# Echo component (Python)
+[component.echo-py]
 path = "echo-py"
 wasm = "echo-py/dist/app.wasm"
 allowed_outbound_hosts = []
 
-[tools.echo-py.build]
+[component.echo-py.build]
 command = "bash build.sh"
 watch = ["app.py", "pyproject.toml"]
 
-# Echo tool (Go)
-[tools.echo-go]
+# Echo component (Go)
+[component.echo-go]
 path = "echo-go"
 wasm = "echo-go/dist/echo-go.wasm"
 allowed_outbound_hosts = []
 
-[tools.echo-go.build]
+[component.echo-go.build]
 command = "bash build.sh"
 watch = ["main.go", "go.mod"]
 
-# Weather tool (Rust)
-[tools.weather-rs]
+# Weather component (Rust)
+[component.weather-rs]
 path = "weather-rs"
 wasm = "weather-rs/target/wasm32-wasip1/release/weather_rs.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
-[tools.weather-rs.build]
+[component.weather-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
-# Weather tool (TypeScript)
-[tools.weather-ts]
+# Weather component (TypeScript)
+[component.weather-ts]
 path = "weather-ts"
 wasm = "weather-ts/dist/weather-ts.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
-[tools.weather-ts.build]
+[component.weather-ts.build]
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
-# Weather tool (Python)
-[tools.weather-py]
+# Weather component (Python)
+[component.weather-py]
 path = "weather-py"
 wasm = "weather-py/dist/app.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
-[tools.weather-py.build]
+[component.weather-py.build]
 command = "bash build.sh"
 watch = ["app.py", "pyproject.toml"]
 
-# Weather tool (Go)
-[tools.weather-go]
+# Weather component (Go)
+[component.weather-go]
 path = "weather-go"
 wasm = "weather-go/dist/weather-go.wasm"
 allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
 
-[tools.weather-go.build]
+[component.weather-go.build]
 command = "bash build.sh"
 watch = ["main.go", "go.mod"]
 
 # Multi-tools example (Rust) - demonstrates multiple tools in one component
-[tools.multi-tools-rs]
+[component.multi-tools-rs]
 path = "multi-tools-rs"
 wasm = "multi-tools-rs/target/wasm32-wasip1/release/multi_tools_rs.wasm"
 allowed_outbound_hosts = []
 
-[tools.multi-tools-rs.build]
+[component.multi-tools-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Multi-tools example (TypeScript) - demonstrates multiple tools in one component
-[tools.multi-tools-ts]
+[component.multi-tools-ts]
 path = "multi-tools-ts"
 wasm = "multi-tools-ts/dist/multi-tools-ts.wasm"
 allowed_outbound_hosts = []
 
-[tools.multi-tools-ts.build]
+[component.multi-tools-ts.build]
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
 # Multi-tools example (Python) - demonstrates multiple tools in one component
-[tools.multi-tools-py]
+[component.multi-tools-py]
 path = "multi-tools-py"
-wasm = "multi-tools-py/dist/app.wasm"
+wasm = "multi-components-py/dist/app.wasm"
 allowed_outbound_hosts = []
 
-[tools.multi-tools-py.build]
+[component.multi-tools-py.build]
 command = "bash build.sh"
 watch = ["app.py", "pyproject.toml"]
 
 # Multi-tools example (Go) - demonstrates multiple tools in one component
-[tools.multi-tools-go]
+[component.multi-tools-go]
 path = "multi-tools-go"
 wasm = "multi-tools-go/dist/multi-tools-go.wasm"
 allowed_outbound_hosts = []
 
-[tools.multi-tools-go.build]
+[component.multi-tools-go.build]
 command = "bash build.sh"
 watch = ["main.go", "go.mod"]
 
 # Variables demo (Rust) - demonstrates using Spin variables
-[tools.variables-demo]
+[component.variables-demo]
 path = "variables-demo-rs"
 wasm = "variables-demo-rs/target/wasm32-wasip1/release/variables_demo_rs.wasm"
-# This tool uses the application variables defined above
+# This component uses the application variables defined above
 variables = { api_token = "{{ api_token }}", api_url = "{{ api_url }}", api_version = "{{ api_version }}", environment = "{{ environment }}" }
 allowed_outbound_hosts = []
 
-[tools.variables-demo.build]
+[component.variables-demo.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]

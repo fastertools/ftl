@@ -25,7 +25,7 @@ fn test_transpile_minimal_config() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -40,7 +40,7 @@ fn test_transpile_minimal_config() {
     assert!(result.contains("name = \"test-project\""));
     assert!(result.contains("version = \"0.1.0\""));
     assert!(result.contains("[variables]"));
-    assert!(result.contains("tool_components"));
+    assert!(result.contains("component_names"));
     assert!(result.contains("[[trigger.http]]"));
 
     // Auth is disabled by default, gateway is named "mcp"
@@ -87,11 +87,11 @@ access_control = "public"
 gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
 authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 
-[tools.my-tool]
-path = "my-tool"
-wasm = "my-tool/target/wasm32-wasip1/release/my_tool.wasm"
+[component.my-component]
+path = "my-component"
+wasm = "my-component/target/wasm32-wasip1/release/my_component.wasm"
 
-[tools.my-tool.build]
+[component.my-component.build]
 command = "cargo build --release --target wasm32-wasip1"
 "#;
 
@@ -107,11 +107,11 @@ command = "cargo build --release --target wasm32-wasip1"
 }
 
 #[test]
-fn test_transpile_with_tools() {
-    let mut tools = HashMap::new();
-    tools.insert(
+fn test_transpile_with_components() {
+    let mut component = HashMap::new();
+    component.insert(
         "echo-tool".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("echo-tool".to_string()),
             wasm: Some("echo-tool/target/wasm32-wasip1/release/echo_tool.wasm".to_string()),
             repo: None,
@@ -127,9 +127,9 @@ fn test_transpile_with_tools() {
             variables: HashMap::new(),
         },
     );
-    tools.insert(
+    component.insert(
         "weather".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("weather-ts".to_string()),
             wasm: Some("weather-ts/dist/weather.wasm".to_string()),
             repo: None,
@@ -156,16 +156,16 @@ fn test_transpile_with_tools() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    println!("Generated TOML with tools:\n{result}");
+    println!("Generated TOML with component:\n{result}");
 
-    // Check tools are included
+    // Check components are included
     assert!(result.contains("echo-tool") && result.contains("weather"));
     assert!(result.contains("[component.echo-tool]"));
     assert!(result.contains("echo-tool/target/wasm32-wasip1/release/echo_tool.wasm"));
@@ -179,26 +179,26 @@ fn test_transpile_with_tools() {
     assert!(spin_config.component.contains_key("echo-tool"));
     assert!(spin_config.component.contains_key("weather"));
 
-    // Verify tool components variable
-    assert!(spin_config.variables.contains_key("tool_components"));
-    if let SpinVariable::Default { default } = &spin_config.variables["tool_components"] {
+    // Verify component components variable
+    assert!(spin_config.variables.contains_key("component_names"));
+    if let SpinVariable::Default { default } = &spin_config.variables["component_names"] {
         assert!(default.contains("echo-tool"));
         assert!(default.contains("weather"));
     } else {
-        panic!("tool_components should be a default variable");
+        panic!("component_names should be a default variable");
     }
 }
 
 #[test]
 fn test_transpile_with_variables() {
-    let mut tools = HashMap::new();
+    let mut component = HashMap::new();
     let mut variables = HashMap::new();
     variables.insert("API_KEY".to_string(), "test-key".to_string());
     variables.insert("DEBUG".to_string(), "true".to_string());
 
-    tools.insert(
+    component.insert(
         "api-tool".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("api-tool".to_string()),
             wasm: Some("api-tool/target/wasm32-wasip1/release/api_tool.wasm".to_string()),
             repo: None,
@@ -225,7 +225,7 @@ fn test_transpile_with_variables() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -241,9 +241,9 @@ fn test_transpile_with_variables() {
 
     // Validate and check component variables
     let spin_config = validate_spin_toml(&result).unwrap();
-    let api_tool = &spin_config.component["api-tool"];
-    assert_eq!(api_tool.variables["API_KEY"], "test-key");
-    assert_eq!(api_tool.variables["DEBUG"], "true");
+    let api_component = &spin_config.component["api-tool"];
+    assert_eq!(api_component.variables["API_KEY"], "test-key");
+    assert_eq!(api_component.variables["DEBUG"], "true");
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn test_transpile_with_auth() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -316,7 +316,7 @@ fn test_transpile_with_oauth_auth() {
             token_endpoint: "https://auth.example.com/token".to_string(),
             userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
         }),
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -359,7 +359,7 @@ fn test_transpile_with_public_access() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -395,7 +395,7 @@ fn test_transpile_with_custom_gateway_uris() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig {
             gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
             authorizer: "ghcr.io/myorg/custom-authorizer:2.0.0".to_string(),
@@ -450,15 +450,15 @@ fn test_transpile_with_application_variables() {
         },
     );
 
-    let mut tools = HashMap::new();
-    let mut tool_vars = HashMap::new();
-    tool_vars.insert("token".to_string(), "{{ api_token }}".to_string());
-    tool_vars.insert("url".to_string(), "{{ api_url }}".to_string());
-    tool_vars.insert("version".to_string(), "v1".to_string());
+    let mut component = HashMap::new();
+    let mut component_vars = HashMap::new();
+    component_vars.insert("token".to_string(), "{{ api_token }}".to_string());
+    component_vars.insert("url".to_string(), "{{ api_url }}".to_string());
+    component_vars.insert("version".to_string(), "v1".to_string());
 
-    tools.insert(
+    component.insert(
         "api-consumer".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("api-consumer".to_string()),
             wasm: Some("api-consumer/target/wasm32-wasip1/release/api_consumer.wasm".to_string()),
             repo: None,
@@ -471,7 +471,7 @@ fn test_transpile_with_application_variables() {
             up: None,
             deploy: None,
             allowed_outbound_hosts: vec!["{{ api_url }}".to_string()],
-            variables: tool_vars,
+            variables: component_vars,
         },
     );
 
@@ -485,7 +485,7 @@ fn test_transpile_with_application_variables() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: app_vars,
     };
@@ -536,9 +536,9 @@ fn test_transpile_complete_example() {
         },
     );
 
-    let mut tools = HashMap::new();
+    let mut component = HashMap::new();
 
-    // Tool 1: Database tool with environment variables
+    // Component 1: Database component with environment variables
     let mut db_vars = HashMap::new();
     db_vars.insert("db_url".to_string(), "{{ database_url }}".to_string());
     db_vars.insert("pool_size".to_string(), "10".to_string());
@@ -546,9 +546,9 @@ fn test_transpile_complete_example() {
     let mut db_env = HashMap::new();
     db_env.insert("RUST_LOG".to_string(), "debug".to_string());
 
-    tools.insert(
+    component.insert(
         "database".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("tools/database".to_string()),
             wasm: Some("tools/database/target/wasm32-wasip1/release/database.wasm".to_string()),
             repo: None,
@@ -565,14 +565,14 @@ fn test_transpile_complete_example() {
         },
     );
 
-    // Tool 2: API tool with multiple allowed hosts
-    let mut api_tool_vars = HashMap::new();
-    api_tool_vars.insert("api_key".to_string(), "{{ api_key }}".to_string());
-    api_tool_vars.insert("log_level".to_string(), "{{ log_level }}".to_string());
+    // Component 2: API component with multiple allowed hosts
+    let mut api_component_vars = HashMap::new();
+    api_component_vars.insert("api_key".to_string(), "{{ api_key }}".to_string());
+    api_component_vars.insert("log_level".to_string(), "{{ log_level }}".to_string());
 
-    tools.insert(
+    component.insert(
         "api-client".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("tools/api".to_string()),
             wasm: Some("tools/api/dist/api.wasm".to_string()),
             repo: None,
@@ -589,7 +589,7 @@ fn test_transpile_complete_example() {
                 "https://backup.example.com".to_string(),
                 "*://cdn.example.com:*".to_string(),
             ],
-            variables: api_tool_vars,
+            variables: api_component_vars,
         },
     );
 
@@ -606,7 +606,7 @@ fn test_transpile_complete_example() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig {
             gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
             authorizer: "ghcr.io/example/auth:3.0.0".to_string(),
@@ -680,8 +680,8 @@ fn test_transpile_complete_example() {
 
 #[test]
 fn test_transpile_with_build_profiles() {
-    // Test transpilation of tools with build profiles
-    let mut tools = HashMap::new();
+    // Test transpilation of components with build profiles
+    let mut component = HashMap::new();
 
     let mut profiles = HashMap::new();
     profiles.insert(
@@ -701,9 +701,9 @@ fn test_transpile_with_build_profiles() {
         },
     );
 
-    tools.insert(
+    component.insert(
         "profiled-tool".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("profiled".to_string()),
             wasm: Some("profiled/target/wasm32-wasip1/release/profiled.wasm".to_string()),
             repo: None,
@@ -735,7 +735,7 @@ fn test_transpile_with_build_profiles() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -763,17 +763,17 @@ fn test_transpile_with_special_characters() {
         },
     );
 
-    let mut tools = HashMap::new();
-    let mut tool_vars = HashMap::new();
-    tool_vars.insert("path".to_string(), "/path/with spaces/file.txt".to_string());
-    tool_vars.insert(
+    let mut component = HashMap::new();
+    let mut component_vars = HashMap::new();
+    component_vars.insert("path".to_string(), "/path/with spaces/file.txt".to_string());
+    component_vars.insert(
         "url".to_string(),
         "https://example.com/api?key=value&foo=bar".to_string(),
     );
 
-    tools.insert(
+    component.insert(
         "special-chars".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("tools/special".to_string()),
             wasm: Some("tools/special/output.wasm".to_string()),
             repo: None,
@@ -792,7 +792,7 @@ fn test_transpile_with_special_characters() {
             up: None,
             deploy: None,
             allowed_outbound_hosts: vec!["https://api.example.com:8443".to_string()],
-            variables: tool_vars,
+            variables: component_vars,
         },
     );
 
@@ -806,7 +806,7 @@ fn test_transpile_with_special_characters() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: app_vars,
     };
@@ -841,7 +841,7 @@ fn test_transpile_empty_collections() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(), // No tools
+        component: HashMap::new(), // No components
         mcp: McpConfig::default(),
         variables: HashMap::new(), // No variables
     };
@@ -859,7 +859,7 @@ fn test_transpile_empty_collections() {
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
     // Should have system variables but no custom ones
-    assert!(spin_config.variables.contains_key("tool_components"));
+    assert!(spin_config.variables.contains_key("component_names"));
     assert!(spin_config.variables.contains_key("auth_enabled"));
 }
 
@@ -872,7 +872,10 @@ fn test_parse_component_source() {
         ("app.wasm", "app.wasm"),
         ("/path/to/app.wasm", "/path/to/app.wasm"),
         // Even registry URLs are now treated as local paths (will be downloaded by wkg)
-        ("ghcr.io/myorg/my-tool:1.0.0", "ghcr.io/myorg/my-tool:1.0.0"),
+        (
+            "ghcr.io/myorg/my-component:1.0.0",
+            "ghcr.io/myorg/my-component:1.0.0",
+        ),
     ];
 
     for (input, expected) in test_cases {
@@ -889,10 +892,10 @@ fn test_parse_component_source() {
 #[test]
 fn test_http_trigger_generation() {
     // Test that HTTP triggers are correctly generated
-    let mut tools = HashMap::new();
-    tools.insert(
+    let mut component = HashMap::new();
+    component.insert(
         "tool1".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("tool1".to_string()),
             wasm: Some("tool1/output.wasm".to_string()),
             repo: None,
@@ -908,9 +911,9 @@ fn test_http_trigger_generation() {
             variables: HashMap::new(),
         },
     );
-    tools.insert(
+    component.insert(
         "tool2".to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some("tool2".to_string()),
             wasm: Some("tool2/output.wasm".to_string()),
             repo: None,
@@ -937,7 +940,7 @@ fn test_http_trigger_generation() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -952,11 +955,11 @@ fn test_http_trigger_generation() {
     assert!(!result.contains("route = \"/.well-known/oauth-protected-resource\""));
     assert!(!result.contains("route = \"/.well-known/oauth-authorization-server\""));
 
-    // Count private route triggers (2 tools = 2, gateway is not private when auth is disabled)
+    // Count private route triggers (2 components = 2, gateway is not private when auth is disabled)
     let private_count = result.matches("route = { private = true }").count();
     assert_eq!(private_count, 2);
 
-    // Each tool should have a trigger
+    // Each component should have a trigger
     let tool1_triggers = result.matches("component = \"tool1\"").count();
     let tool2_triggers = result.matches("component = \"tool2\"").count();
     assert_eq!(tool1_triggers, 1);
@@ -976,7 +979,7 @@ fn test_auth_disabled_omits_authorizer() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -1037,7 +1040,7 @@ fn test_auth_enabled_includes_authorizer() {
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
@@ -1096,14 +1099,14 @@ fn test_auth_enabled_includes_authorizer() {
 }
 
 #[test]
-fn test_auth_disabled_with_tools() {
-    // Test that tools work correctly when auth is disabled (public access)
-    let mut tools = HashMap::new();
-    tools.insert(
-        "my-tool".to_string(),
-        ToolConfig {
-            path: Some("my-tool".to_string()),
-            wasm: Some("my-tool/output.wasm".to_string()),
+fn test_auth_disabled_with_components() {
+    // Test that components work correctly when auth is disabled (public access)
+    let mut component = HashMap::new();
+    component.insert(
+        "my-component".to_string(),
+        ComponentConfig {
+            path: Some("my-component".to_string()),
+            wasm: Some("my-component/output.wasm".to_string()),
             repo: None,
             build: Some(BuildConfig {
                 command: "make".to_string(),
@@ -1128,14 +1131,14 @@ fn test_auth_disabled_with_tools() {
             default_registry: None,
         },
         oauth: None,
-        tools,
+        component,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    println!("Generated TOML with auth disabled and tools:\n{result}");
+    println!("Generated TOML with auth disabled and component:\n{result}");
 
     // Check that auth is disabled
     assert!(result.contains("auth_enabled = { default = \"false\" }"));
@@ -1146,8 +1149,8 @@ fn test_auth_disabled_with_tools() {
     // Check that ftl-mcp-gateway component doesn't exist
     assert!(!result.contains("[component.ftl-mcp-gateway]"));
 
-    // Check that tool component exists
-    assert!(result.contains("[component.my-tool]"));
+    // Check that component component exists
+    assert!(result.contains("[component.my-component]"));
 
     // Check that wildcard route points directly to gateway
     let wildcard_routes: Vec<_> = result.match_indices("route = \"/...\"").collect();
@@ -1161,8 +1164,8 @@ fn test_auth_disabled_with_tools() {
     let after_wildcard = &result[wildcard_routes[0].0..];
     assert!(after_wildcard.contains("component = \"mcp\""));
 
-    // Check that tool has private route
-    assert!(result.contains("component = \"my-tool\""));
+    // Check that component has private route
+    assert!(result.contains("component = \"my-component\""));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -1170,5 +1173,5 @@ fn test_auth_disabled_with_tools() {
     // Verify components
     assert!(spin_config.component.contains_key("mcp")); // Gateway is named "mcp"
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
-    assert!(spin_config.component.contains_key("my-tool"));
+    assert!(spin_config.component.contains_key("my-component"));
 }

@@ -227,7 +227,7 @@ fn update_ftl_toml(
     component_name: &str,
     language: Language,
 ) -> Result<()> {
-    use crate::config::ftl_config::{BuildConfig, FtlConfig, ToolConfig};
+    use crate::config::ftl_config::{BuildConfig, ComponentConfig, FtlConfig};
     use std::collections::HashMap;
 
     // Read ftl.toml
@@ -282,10 +282,10 @@ fn update_ftl_toml(
         ),
     };
 
-    // Add the new tool
-    config.tools.insert(
+    // Add the new component
+    config.component.insert(
         component_name.to_string(),
-        ToolConfig {
+        ComponentConfig {
             path: Some(component_name.to_string()),
             wasm: Some(wasm_path),
             repo: None,
