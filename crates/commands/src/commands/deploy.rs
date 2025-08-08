@@ -742,16 +742,16 @@ async fn update_auth_config(
             // No additional config needed
         }
         "custom" => {
-            if auth_provider.is_none() || auth_issuer.is_none() {
-                return Err(anyhow!(
-                    "Custom auth mode requires --auth-provider and --auth-issuer"
-                ));
+            // Custom mode is only reached when we have OAuth config or --jwt-issuer
+            // The issuer should always be present at this point
+            if auth_issuer.is_none() {
+                return Err(anyhow!("Internal error: custom auth mode without issuer"));
             }
 
             custom_config = Some(types::UpdateAuthConfigRequestCustomConfig {
                 provider: auth_provider
-                    .unwrap()
-                    .clone()
+                    .cloned()
+                    .unwrap_or_else(|| "jwt".to_string())
                     .try_into()
                     .map_err(|_| anyhow!("Invalid provider name"))?,
                 issuer: auth_issuer
