@@ -3,7 +3,7 @@
 `ftl.toml` is the primary configuration file for FTL projects. It defines:
 - Project metadata and settings
 - Access control
-- Tool configurations and build settings
+- Component configurations and build settings
 - MCP gateway and authorizer component config
 - Variables and environment configuration
 
@@ -32,18 +32,18 @@ validate_arguments = false
 API_KEY = { default = "test-key" }
 REQUIRED_VAR = { required = true }
 
-[tools.my-tool]
-path = "tools/my-tool"  # Optional, defaults to tool name
-wasm = "target/wasm32-wasip1/release/my_tool.wasm"
+[component.my-component]
+path = "components/my-component"  # Optional, defaults to component name
+wasm = "target/wasm32-wasip1/release/my_component.wasm"
 allowed_outbound_hosts = ["https://api.example.com"]
 
-[tools.my-tool.build]
+[component.my-component.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
 env = { RUST_LOG = "info" }
 
-[tools.my-tool.variables]
-TOOL_CONFIG = "value"
+[component.my-component.variables]
+COMPONENT_CONFIG = "value"
 ```
 
 ## Project Section
@@ -98,7 +98,7 @@ default_registry = "ghcr.io/myorg"
 gateway = "mcp-gateway:1.0.0"
 authorizer = "mcp-authorizer:1.0.0"
 
-[tools.my-tool]
+[component.my-component]
 # Component from registry using short reference
 wasm = "some-component:1.0.0"  # Resolves to ghcr.io/myorg/some-component:1.0.0
 allowed_outbound_hosts = ["https://api.example.com"]
@@ -108,7 +108,7 @@ allowed_outbound_hosts = ["https://api.example.com"]
 Without a default registry, you must use full component references:
 
 ```toml
-[tools.my-tool]
+[component.my-component]
 # Full registry reference required
 wasm = "ghcr.io/myorg/some-component:1.0.0"
 allowed_outbound_hosts = ["https://api.example.com"]
@@ -206,18 +206,18 @@ LOG_LEVEL = { default = "info" }
 SECRET_KEY = { required = true }  # Must be provided at runtime
 ```
 
-## Tools Sections
+## Component Sections
 
-Each tool in your project is configured with a `[tools.TOOL_NAME]` section. Tools can be either built locally or pulled from a registry.
+Each component in your project is configured with a `[component.COMPONENT_NAME]` section. Components can be either built locally or pulled from a registry.
 
-### Tool Configuration Fields
+### Component Configuration Fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `path` | string | No | Tool name | Path to tool directory (for local tools only) |
+| `path` | string | No | Component name | Path to component directory (for local components only) |
 | `wasm` | string | Yes | - | Path to WASM file OR registry reference |
 | `allowed_outbound_hosts` | array | No | [] | List of allowed external hosts |
-| `variables` | table | No | {} | Tool-specific variables |
+| `variables` | table | No | {} | Component-specific variables |
 
 ### Component Sources
 
@@ -228,7 +228,7 @@ The `wasm` field can specify either:
 
 ### Build Configuration
 
-The `[tools.TOOL_NAME.build]` subsection configures how the tool is built. **This section is only required for locally-built tools, not for registry components.**
+The `[component.COMPONENT_NAME.build]` subsection configures how the component is built. **This section is only required for locally-built components, not for registry components.**
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
@@ -239,20 +239,20 @@ The `[tools.TOOL_NAME.build]` subsection configures how the tool is built. **Thi
 ### Example: Rust Tool
 
 ```toml
-[tools.data-processor]
-path = "tools/data-processor"  # Optional if folder name matches tool name
+[component.data-processor]
+path = "components/data-processor"  # Optional if folder name matches component name
 wasm = "target/wasm32-wasip1/release/data_processor.wasm"
 allowed_outbound_hosts = [
     "https://api.github.com",
     "https://*.amazonaws.com"
 ]
 
-[tools.data-processor.build]
+[component.data-processor.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml", "Cargo.lock"]
 env = { RUST_LOG = "debug" }
 
-[tools.data-processor.variables]
+[component.data-processor.variables]
 PROCESSING_MODE = "batch"
 MAX_WORKERS = "4"
 ```
@@ -260,31 +260,31 @@ MAX_WORKERS = "4"
 ### Example: TypeScript Tool
 
 ```toml
-[tools.web-scraper]
+[component.web-scraper]
 wasm = "build/web-scraper.wasm"
 allowed_outbound_hosts = ["https://*"]  # Allow all HTTPS hosts
 
-[tools.web-scraper.build]
+[component.web-scraper.build]
 command = "npm run build"
 watch = ["src/**/*.ts", "package.json"]
 env = { NODE_ENV = "production" }
 
-[tools.web-scraper.variables]
+[component.web-scraper.variables]
 USER_AGENT = "FTL-Scraper/1.0"
 ```
 
 ### Example: Python Tool
 
 ```toml
-[tools.ml-analyzer]
+[component.ml-analyzer]
 wasm = "app.wasm"
 allowed_outbound_hosts = ["https://huggingface.co"]
 
-[tools.ml-analyzer.build]
+[component.ml-analyzer.build]
 command = "spin py2wasm app -o app.wasm"
 watch = ["*.py", "requirements.txt"]
 
-[tools.ml-analyzer.variables]
+[component.ml-analyzer.variables]
 MODEL_NAME = "bert-base-uncased"
 BATCH_SIZE = "32"
 ```
@@ -293,11 +293,11 @@ BATCH_SIZE = "32"
 
 ```toml
 # Using a pre-built component from a registry
-[tools.json-formatter]
+[component.json-formatter]
 wasm = "ghcr.io/fastertools/ftl-tool-json-formatter:0.0.1"
 allowed_outbound_hosts = []  # No external access needed
 
-[tools.json-formatter.variables]
+[component.json-formatter.variables]
 INDENT_SIZE = "2"
 # Note: No build section needed for registry components
 ```
@@ -310,15 +310,15 @@ name = "my-project"
 default_registry = "ghcr.io/myorg"
 
 # Local component with build configuration
-[tools.custom-processor]
-path = "tools/processor"
+[component.custom-processor]
+path = "components/processor"
 wasm = "target/wasm32-wasip1/release/processor.wasm"
 
-[tools.custom-processor.build]
+[component.custom-processor.build]
 command = "cargo build --target wasm32-wasip1 --release"
 
 # Registry component using short reference
-[tools.data-validator]
+[component.data-validator]
 wasm = "validator:2.1.0"  # Resolves to ghcr.io/myorg/validator:2.1.0
 allowed_outbound_hosts = ["https://api.validator.com"]
 # No build section for registry components
@@ -331,20 +331,20 @@ allowed_outbound_hosts = ["https://api.validator.com"]
 For complex build scenarios, you can define multiple build profiles:
 
 ```toml
-[tools.my-tool]
-wasm = "target/wasm32-wasip1/release/my_tool.wasm"
+[component.my-component]
+wasm = "target/wasm32-wasip1/release/my_component.wasm"
 
-[tools.my-tool.build]
+[component.my-component.build]
 command = "cargo build --target wasm32-wasip1"  # Default dev build
 
-[tools.my-tool.profiles.release]
+[component.my-component.profiles.release]
 command = "cargo build --target wasm32-wasip1 --release"
 env = { CARGO_PROFILE_RELEASE_LTO = "true" }
 
-[tools.my-tool.up]
+[component.my-component.up]
 profile = "debug"  # Profile to use for 'ftl up'
 
-[tools.my-tool.deploy]
+[component.my-component.deploy]
 profile = "release"  # Profile to use for deployment
 ```
 
@@ -356,7 +356,7 @@ Tool variables can reference application variables using template syntax:
 [variables]
 BASE_URL = { default = "https://api.example.com" }
 
-[tools.api-client.variables]
+[component.api-client.variables]
 ENDPOINT = "{{ BASE_URL }}/v1"  # Will be replaced with BASE_URL value
 ```
 
@@ -393,29 +393,29 @@ API_BASE_URL = { default = "https://api.company.com" }
 SECRET_TOKEN = { required = true }
 
 # Database query tool
-[tools.db-query]
-path = "tools/database"
+[component.db-query]
+path = "components/database"
 wasm = "target/wasm32-wasip1/release/db_query.wasm"
 allowed_outbound_hosts = ["postgres://db.company.com"]
 
-[tools.db-query.build]
+[component.db-query.build]
 command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs"]
 
-[tools.db-query.variables]
+[component.db-query.variables]
 DB_CONNECTION_STRING = "{{ DATABASE_URL }}"
 QUERY_TIMEOUT = "30"
 
 # File processor tool
-[tools.file-processor]
+[component.file-processor]
 wasm = "build/processor.wasm"
 allowed_outbound_hosts = ["https://storage.company.com"]
 
-[tools.file-processor.build]
+[component.file-processor.build]
 command = "npm run build:wasm"
 watch = ["src/**/*.js", "package.json"]
 
-[tools.file-processor.variables]
+[component.file-processor.variables]
 STORAGE_BUCKET = "mcp-files"
 MAX_FILE_SIZE = "10485760"  # 10MB
 ```
@@ -468,7 +468,7 @@ If you have an existing `spin.toml` file, you can migrate to `ftl.toml` by:
 
 1. Extract project metadata to the `[project]` section
 2. Move authentication configuration to `access_control` and optionally `[oauth]`
-3. Convert Spin components to `[tools.*]` sections
+3. Convert Spin components to `[component.*]` sections
 4. Update variable definitions to use the FTL format
 
 ## Export to spin.toml

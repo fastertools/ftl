@@ -29,15 +29,15 @@ Configure the gateway using Spin variables:
 
 ```toml
 [variables]
-tool_components = { default = "example-tool-component" }
+component_names = { default = "example-component" }
 validate_arguments = { default = "true" }
 
 [component.mcp-gateway.variables]
-tool_components = "{{ tool_components }}"
+component_names = "{{ component_names }}"
 validate_arguments = "{{ validate_arguments }}"
 ```
 
-- `tool_components`: Comma-separated list of component names that provide tools
+- `component_names`: Comma-separated list of component names that provide tools
 - `validate_arguments`: Enable/disable JSON Schema validation of tool arguments
 
 ## Protocol Implementation

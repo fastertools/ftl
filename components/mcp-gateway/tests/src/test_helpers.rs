@@ -43,7 +43,7 @@ pub use ftl_sdk::{ToolContent, ToolMetadata, ToolResponse};
 
 // Setup default test environment
 pub fn setup_default_test_env() {
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("tool_components", "echo,calculator");
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("component_names", "echo,calculator");
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("validate_arguments", "true");
     
     // Mock the default components to prevent errors

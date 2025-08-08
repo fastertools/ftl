@@ -6,7 +6,7 @@ use crate::{ResponseData, test_helpers::*};
 
 #[spin_test]
 fn test_list_tools_empty() {
-    variables::set("tool_components", "empty_component");
+    variables::set("component_names", "empty_component");
     variables::set("validate_arguments", "true");
     
     // Mock component that returns empty tools array
@@ -27,7 +27,7 @@ fn test_list_tools_empty() {
 
 #[spin_test]
 fn test_list_tools_multiple_components() {
-    variables::set("tool_components", "math,string,data");
+    variables::set("component_names", "math,string,data");
     variables::set("validate_arguments", "true");
     
     mock_tool_component("math", vec![
@@ -129,7 +129,7 @@ fn test_list_tools_multiple_components() {
 
 #[spin_test]
 fn test_tool_metadata_completeness() {
-    variables::set("tool_components", "detailed");
+    variables::set("component_names", "detailed");
     variables::set("validate_arguments", "true");
     
     mock_tool_component("detailed", vec![

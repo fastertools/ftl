@@ -74,8 +74,8 @@ impl McpGateway {
     /// Find which component contains a specific tool
     async fn find_tool_component(&self, tool_name: &str) -> Option<(String, ToolMetadata)> {
         // Get the list of components
-        let tool_components = variables::get("tool_components").ok()?;
-        let component_names: Vec<&str> = tool_components.split(',').map(str::trim).collect();
+        let component_names_str = variables::get("component_names").ok()?;
+        let component_names: Vec<&str> = component_names_str.split(',').map(str::trim).collect();
 
         // Check each component for the tool
         for component_name in component_names {
@@ -203,20 +203,20 @@ impl McpGateway {
     }
 
     async fn handle_list_tools(&self, request: JsonRpcRequest) -> JsonRpcResponse {
-        // Get the list of tool components from the spin variable
-        let tool_components = match variables::get("tool_components") {
+        // Get the list of components from the spin variable
+        let component_names_str = match variables::get("component_names") {
             Ok(components) => components,
             Err(e) => {
                 return JsonRpcResponse::error(
                     request.id,
                     ErrorCode::INTERNAL_ERROR.0,
-                    &format!("Failed to get tool components configuration: {e}"),
+                    &format!("Failed to get components configuration: {e}"),
                 );
             }
         };
 
         // Parse the comma-separated list of component names
-        let component_names: Vec<&str> = tool_components.split(',').map(str::trim).collect();
+        let component_names: Vec<&str> = component_names_str.split(',').map(str::trim).collect();
 
         // Create futures for fetching metadata from all components in parallel
         let metadata_futures: Vec<_> = component_names

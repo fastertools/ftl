@@ -106,7 +106,7 @@ pub async fn publish_with_deps(
 
     deps.ui.print("");
     deps.ui.print("To use this component in a project:");
-    deps.ui.print(&format!("  [tools.{component_name}]"));
+    deps.ui.print(&format!("  [component.{component_name}]"));
     deps.ui.print(&format!("  wasm = \"{full_ref}\""));
 
     Ok(())

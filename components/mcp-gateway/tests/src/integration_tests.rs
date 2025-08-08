@@ -6,7 +6,7 @@ use crate::{ResponseData, test_helpers::*};
 
 #[spin_test]
 fn test_full_mcp_session_flow() {
-    variables::set("tool_components", "calculator");
+    variables::set("component_names", "calculator");
     variables::set("validate_arguments", "true");
     
     // Mock calculator component

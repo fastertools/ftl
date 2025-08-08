@@ -2,7 +2,7 @@
 
 [test-environment]
 # Core settings
-tool_components = "echo,calculator,weather"
+component_names = "echo,calculator,weather"
 validate_arguments = "true"
 
 # Mock tool configurations

@@ -33,11 +33,11 @@ spin add -t ftl-mcp-rust calculator
 
 ### 3. Register Tools
 
-Update `tool_components` in `spin.toml`:
+Update `component_names` in `spin.toml`:
 
 ```toml
 [variables]
-tool_components = { default = "greeting,calculator" }
+component_names = { default = "greeting,calculator" }
 ```
 
 ### 4. Build and Run
