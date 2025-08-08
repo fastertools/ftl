@@ -22,60 +22,85 @@ fn default_validate_arguments() -> bool {
 #[derive(Debug, Clone)]
 pub struct ToolScope {
     pub component: Option<String>,
-    pub tool: Option<String>,
+    pub readonly: bool,
 }
 
 impl ToolScope {
-    /// Parse a URL path to extract component and tool scope
-    /// Examples:
-    /// - "/" or "/mcp" -> None (all tools)
-    /// - "/calc-tools" or "/calc-tools/mcp" -> Some(component: "calc-tools")
-    /// - "/calc-tools/add" or "/calc-tools/add/mcp" -> Some(component: "calc-tools", tool: "add")
-    fn from_path(path: &str) -> Option<Self> {
-        // Remove leading slash
-        let path = path.trim_start_matches('/');
+    /// Parse a URL path to extract component scope following GitHub's pattern
+    ///
+    /// Supported patterns:
+    /// - `/mcp` -> All tools (unscoped) - returns Ok(None)
+    /// - `/mcp/readonly` -> All tools (readonly) - returns Ok(Some(...))
+    /// - `/mcp/x/{component}` -> Component tools - returns Ok(Some(...))
+    /// - `/mcp/x/{component}/readonly` -> Component tools (readonly) - returns Ok(Some(...))
+    ///
+    /// Invalid paths return Err
+    fn from_path(path: &str) -> Result<Option<Self>, String> {
+        let path = path.trim_start_matches('/').trim_end_matches('/');
 
-        // Remove trailing slash if present
-        let path = path.trim_end_matches('/');
-
-        // Empty path or just "mcp" means no scoping
+        // Handle empty, root, or just "mcp" - valid unscoped paths
         if path.is_empty() || path == "mcp" {
-            return None;
+            return Ok(None);
         }
 
-        // Split by slash to get parts
-        let parts: Vec<&str> = path.split('/').collect();
-
-        // Check if last part is "mcp" and should be ignored
-        let parts = if parts.last() == Some(&"mcp") {
-            parts.get(..parts.len().saturating_sub(1)).unwrap_or(&[])
-        } else {
-            &parts[..]
-        };
-
-        // Now match on the remaining parts
-        match parts {
-            [] | [_, _, _, ..] => None, // Empty or too many parts (invalid format)
-            [component] => Some(Self {
-                component: Some((*component).to_string()),
-                tool: None,
-            }),
-            [component, tool] => Some(Self {
-                component: Some((*component).to_string()),
-                tool: Some((*tool).to_string()),
-            }),
+        // Handle /mcp/readonly - all tools in readonly mode
+        if path == "mcp/readonly" {
+            return Ok(Some(Self {
+                component: None,
+                readonly: true,
+            }));
         }
+
+        // Must start with mcp/x/ for component scoping
+        path.strip_prefix("mcp/x/").map_or_else(
+            || {
+                if path.starts_with("mcp/") {
+                    // Path starts with mcp/ but doesn't match any valid pattern
+                    Err(format!("Invalid MCP path: /{path}"))
+                } else {
+                    // Path doesn't start with mcp
+                    Err(format!(
+                        "Invalid path: /{path}. MCP endpoints must start with /mcp"
+                    ))
+                }
+            },
+            |remaining| {
+                let parts: Vec<&str> = remaining.split('/').collect();
+
+                match parts.as_slice() {
+                    [] => Err("Invalid path: /mcp/x/ requires a component name".to_string()),
+                    [component] if !component.is_empty() => Ok(Some(Self {
+                        component: Some((*component).to_string()),
+                        readonly: false,
+                    })),
+                    [component, "readonly"] if !component.is_empty() => Ok(Some(Self {
+                        component: Some((*component).to_string()),
+                        readonly: true,
+                    })),
+                    _ => Err(format!("Invalid path: {path}")),
+                }
+            },
+        )
     }
 }
 
 pub struct McpGateway {
     config: GatewayConfig,
     scope: Option<ToolScope>,
+    allowed_toolsets: Option<Vec<String>>,
 }
 
 impl McpGateway {
-    pub fn new(config: GatewayConfig, scope: Option<ToolScope>) -> Self {
-        Self { config, scope }
+    pub fn new(
+        config: GatewayConfig,
+        scope: Option<ToolScope>,
+        allowed_toolsets: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            config,
+            scope,
+            allowed_toolsets,
+        }
     }
 
     /// Convert `snake_case` to kebab-case for component names
@@ -252,8 +277,8 @@ impl McpGateway {
         let all_component_names: Vec<&str> =
             component_names_str.split(',').map(str::trim).collect();
 
-        // Filter components based on scope
-        let component_names = if let Some(ref scope) = self.scope {
+        // Filter components based on scope and allowed_toolsets header
+        let mut component_names = if let Some(ref scope) = self.scope {
             if let Some(ref component_filter) = scope.component {
                 // Only include the specified component if it exists
                 all_component_names
@@ -267,6 +292,11 @@ impl McpGateway {
             all_component_names
         };
 
+        // Further filter by X-MCP-Toolsets header if present
+        if let Some(ref allowed) = self.allowed_toolsets {
+            component_names.retain(|name| allowed.iter().any(|a| a == name));
+        }
+
         // Create futures for fetching metadata from selected components in parallel
         let metadata_futures: Vec<_> = component_names
             .iter()
@@ -279,20 +309,16 @@ impl McpGateway {
         // Execute all futures concurrently and collect results
         let results = futures::future::join_all(metadata_futures).await;
 
-        // Process results to prefix tool names with component names
+        // Process results - only prefix tool names when unscoped
         let mut tools: Vec<ToolMetadata> = Vec::new();
+        let is_scoped = self.scope.as_ref().is_some_and(|s| s.component.is_some());
+
         for (component_name, component_tools) in results {
             for mut tool in component_tools {
-                // Filter by specific tool if scope specifies one
-                if let Some(ref scope) = self.scope
-                    && let Some(ref tool_filter) = scope.tool
-                    && tool.name != *tool_filter
-                {
-                    continue; // Skip tools that don't match the filter
+                // Only prefix tool names when unscoped (at /mcp root)
+                if !is_scoped {
+                    tool.name = format!("{}__{}", component_name, tool.name);
                 }
-
-                // Prefix the tool name with the component name using double underscore as delimiter
-                tool.name = format!("{}__{}", component_name, tool.name);
                 tools.push(tool);
             }
         }
@@ -389,59 +415,68 @@ impl McpGateway {
         )
     }
 
-    /// Validate that the tool call is allowed within the current scope
-    fn validate_scope(
-        &self,
-        request_id: Option<serde_json::Value>,
-        component_name: &str,
-        tool_name: &str,
-        full_name: &str,
-    ) -> Result<(), JsonRpcResponse> {
-        if let Some(ref scope) = self.scope {
-            if let Some(ref component_filter) = scope.component
-                && component_name != component_filter
-            {
-                return Err(JsonRpcResponse::error(
-                    request_id,
-                    ErrorCode::INVALID_PARAMS.0,
-                    &format!("Tool '{full_name}' is not accessible in the current scope"),
-                ));
-            }
-            if let Some(ref tool_filter) = scope.tool
-                && tool_name != tool_filter
-            {
-                return Err(JsonRpcResponse::error(
-                    request_id,
-                    ErrorCode::INVALID_PARAMS.0,
-                    &format!("Tool '{full_name}' is not accessible in the current scope"),
-                ));
-            }
-        }
-        Ok(())
-    }
-
     async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        // Check if in readonly mode
+        if let Some(ref scope) = self.scope
+            && scope.readonly
+        {
+            return JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INVALID_REQUEST.0,
+                "Tool execution is disabled in readonly mode",
+            );
+        }
+
         // Parse and validate parameters
         let params = match Self::parse_tool_params(request.id.clone(), request.params) {
             Ok(p) => p,
             Err(e) => return e,
         };
 
-        // Parse the component and tool names
-        let (component_name, actual_tool_name) =
+        // Determine component and tool names based on scope
+        let (component_name, actual_tool_name) = if let Some(ref scope) = self.scope {
+            if let Some(ref scoped_component) = scope.component {
+                // When scoped, tool names aren't prefixed, use scope's component
+                (scoped_component.clone(), params.name.clone())
+            } else {
+                // Unscoped but might have readonly - parse prefixed name
+                match Self::parse_tool_name(request.id.clone(), &params.name) {
+                    Ok(names) => names,
+                    Err(e) => return e,
+                }
+            }
+        } else {
+            // Unscoped - parse prefixed name
             match Self::parse_tool_name(request.id.clone(), &params.name) {
                 Ok(names) => names,
                 Err(e) => return e,
-            };
+            }
+        };
 
-        // Validate scope access
-        if let Err(e) = self.validate_scope(
-            request.id.clone(),
-            &component_name,
-            &actual_tool_name,
-            &params.name,
-        ) {
-            return e;
+        // Validate scope access if scoped
+        if let Some(ref scope) = self.scope
+            && let Some(ref scope_component) = scope.component
+            && &component_name != scope_component
+        {
+            return JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INVALID_PARAMS.0,
+                &format!(
+                    "Tool '{}' is not accessible in the current scope",
+                    params.name
+                ),
+            );
+        }
+
+        // Validate against X-MCP-Toolsets header if present
+        if let Some(ref allowed) = self.allowed_toolsets
+            && !allowed.contains(&component_name)
+        {
+            return JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INVALID_PARAMS.0,
+                &format!("Component '{component_name}' is not in the allowed toolsets"),
+            );
         }
 
         // Validate arguments if validation is enabled
@@ -525,28 +560,80 @@ impl McpGateway {
     }
 }
 
+#[allow(clippy::too_many_lines)] // This function handles the entire MCP request flow
 pub async fn handle_mcp_request(req: Request) -> Response {
-    // Extract the path to determine scoping
-    let path = req.path();
-    let scope = ToolScope::from_path(path);
-
-    // Handle CORS preflight
+    // Handle CORS preflight first
     if *req.method() == Method::Options {
         return Response::builder()
             .status(200)
             .header("Access-Control-Allow-Origin", "*")
             .header("Access-Control-Allow-Methods", "POST, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Content-Type")
+            .header(
+                "Access-Control-Allow-Headers",
+                "Content-Type, X-MCP-Toolsets, X-MCP-Readonly",
+            )
             .build();
     }
 
-    // Only accept POST requests
+    // Only accept POST requests for MCP operations
     if *req.method() != Method::Post {
         return Response::builder()
             .status(405)
             .header("Allow", "POST, OPTIONS")
-            .body("Method not allowed")
+            .header("Access-Control-Allow-Origin", "*")
+            .body(b"Method not allowed. MCP requires POST requests".to_vec())
             .build();
+    }
+
+    // Extract scope from path
+    let path = req.path();
+    let mut scope = match ToolScope::from_path(path) {
+        Ok(s) => s,
+        Err(err) => {
+            // Invalid path - return 404
+            return Response::builder()
+                .status(404)
+                .header("Content-Type", "application/json")
+                .header("Access-Control-Allow-Origin", "*")
+                .body(
+                    serde_json::to_vec(&serde_json::json!({
+                        "error": err
+                    }))
+                    .unwrap_or_else(|_| b"{\"error\":\"Not found\"}".to_vec()),
+                )
+                .build();
+        }
+    };
+
+    // Parse headers to augment scope
+    let mut allowed_toolsets: Option<Vec<String>> = None;
+
+    for (name, value) in req.headers() {
+        if name.eq_ignore_ascii_case("x-mcp-toolsets") {
+            if let Ok(toolsets_str) = std::str::from_utf8(value.as_bytes()) {
+                // Parse comma-separated list of allowed toolsets/components
+                allowed_toolsets = Some(
+                    toolsets_str
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect(),
+                );
+            }
+        } else if name.eq_ignore_ascii_case("x-mcp-readonly")
+            && let Ok(readonly_str) = std::str::from_utf8(value.as_bytes())
+            && readonly_str.eq_ignore_ascii_case("true")
+        {
+            // Force readonly mode
+            if let Some(ref mut s) = scope {
+                s.readonly = true;
+            } else {
+                scope = Some(ToolScope {
+                    component: None,
+                    readonly: true,
+                });
+            }
+        }
     }
 
     // Parse JSON-RPC request
@@ -601,7 +688,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         validate_arguments,
     };
 
-    let gateway = McpGateway::new(config, scope);
+    let gateway = McpGateway::new(config, scope, allowed_toolsets);
 
     // Handle the request
     gateway.handle_request(request).await.map_or_else(
