@@ -6,7 +6,7 @@ use crate::{ResponseData, test_helpers::*};
 
 #[spin_test]
 fn test_argument_validation_enabled() {
-    variables::set("component_names", "strict_tool");
+    variables::set("component_names", "strict-tool");
     variables::set("validate_arguments", "true");
     
     // Mock tool with strict schema
@@ -50,7 +50,7 @@ fn test_argument_validation_enabled() {
     let valid_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "strict_add",
+            "name": "strict-tool__strict_add",
             "arguments": {
                 "a": 5,
                 "b": 3
@@ -72,7 +72,7 @@ fn test_argument_validation_enabled() {
     let invalid_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "strict_add",
+            "name": "strict-tool__strict_add",
             "arguments": {
                 "a": 5
                 // Missing "b"
@@ -120,7 +120,7 @@ fn test_argument_validation_enabled() {
 
 #[spin_test]
 fn test_argument_validation_disabled() {
-    variables::set("component_names", "lenient_tool");
+    variables::set("component_names", "lenient-tool");
     variables::set("validate_arguments", "false");
     
     // Mock tool with schema
@@ -158,7 +158,7 @@ fn test_argument_validation_disabled() {
     let request_json = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "lenient_process",
+            "name": "lenient-tool__lenient_process",
             "arguments": {
                 "some_other_field": "value"
                 // Missing required_field
@@ -200,7 +200,7 @@ fn test_argument_validation_disabled() {
 
 #[spin_test]
 fn test_missing_arguments_defaults_to_empty_object() {
-    variables::set("component_names", "optional_tool");
+    variables::set("component_names", "optional-tool");
     variables::set("validate_arguments", "true");
     
     // Mock tool that accepts optional arguments
@@ -235,7 +235,7 @@ fn test_missing_arguments_defaults_to_empty_object() {
     let request_json = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "optional_params"
+            "name": "optional-tool__optional_params"
             // No arguments field
         })),
         Some(serde_json::json!(1))

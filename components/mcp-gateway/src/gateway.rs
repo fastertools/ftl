@@ -71,23 +71,6 @@ impl McpGateway {
         }
     }
 
-    /// Find which component contains a specific tool
-    async fn find_tool_component(&self, tool_name: &str) -> Option<(String, ToolMetadata)> {
-        // Get the list of components
-        let component_names_str = variables::get("component_names").ok()?;
-        let component_names: Vec<&str> = component_names_str.split(',').map(str::trim).collect();
-
-        // Check each component for the tool
-        for component_name in component_names {
-            let tools = self.fetch_component_tools(component_name).await;
-            if let Some(tool) = tools.into_iter().find(|t| t.name == tool_name) {
-                return Some((component_name.to_string(), tool));
-            }
-        }
-
-        None
-    }
-
     /// Validate tool arguments against the tool's input schema
     fn validate_arguments(
         tool_name: &str,
@@ -221,14 +204,24 @@ impl McpGateway {
         // Create futures for fetching metadata from all components in parallel
         let metadata_futures: Vec<_> = component_names
             .iter()
-            .map(|component_name| self.fetch_component_tools(component_name))
+            .map(|component_name| async move {
+                let tools = self.fetch_component_tools(component_name).await;
+                ((*component_name).to_string(), tools)
+            })
             .collect();
 
         // Execute all futures concurrently and collect results
         let results = futures::future::join_all(metadata_futures).await;
 
-        // Flatten the results to get all tools from all components
-        let tools: Vec<ToolMetadata> = results.into_iter().flatten().collect();
+        // Process results to prefix tool names with component names
+        let mut tools: Vec<ToolMetadata> = Vec::new();
+        for (component_name, component_tools) in results {
+            for mut tool in component_tools {
+                // Prefix the tool name with the component name using double underscore as delimiter
+                tool.name = format!("{}__{}", component_name, tool.name);
+                tools.push(tool);
+            }
+        }
 
         let response = ListToolsResponse { tools };
         match serde_json::to_value(response) {
@@ -305,35 +298,60 @@ impl McpGateway {
             }
         };
 
-        // Find which component contains this tool
-        let Some((component_name, tool_metadata)) = self.find_tool_component(&params.name).await
-        else {
-            return JsonRpcResponse::error(
-                request.id,
-                ErrorCode::INVALID_PARAMS.0,
-                &format!("Unknown tool: {}", params.name),
-            );
+        // Parse the component name and actual tool name from the prefixed name
+        let (component_name, actual_tool_name) = match params.name.split_once("__") {
+            Some((component, tool)) => (component.to_string(), tool.to_string()),
+            None => {
+                // If there's no double underscore delimiter, the tool name is invalid
+                return JsonRpcResponse::error(
+                    request.id,
+                    ErrorCode::INVALID_PARAMS.0,
+                    &format!(
+                        "Invalid tool name format '{}'. Expected format: 'component__toolname'",
+                        params.name
+                    ),
+                );
+            }
         };
 
         // Validate arguments if validation is enabled
         let tool_arguments = params.arguments.unwrap_or_else(|| serde_json::json!({}));
 
         if self.config.validate_arguments {
-            // Validate arguments against the tool's input schema
-            if let Err(validation_error) =
-                Self::validate_arguments(&params.name, &tool_metadata.input_schema, &tool_arguments)
-            {
-                return JsonRpcResponse::error(
-                    request.id,
-                    ErrorCode::INVALID_PARAMS.0,
-                    &format!("Invalid params: {validation_error}"),
-                );
+            // Fetch the tool metadata from the specific component for validation
+            let tools = self.fetch_component_tools(&component_name).await;
+            let tool_metadata = tools.into_iter().find(|t| t.name == actual_tool_name);
+
+            match tool_metadata {
+                Some(metadata) => {
+                    // Validate arguments against the tool's input schema
+                    if let Err(validation_error) = Self::validate_arguments(
+                        &params.name,
+                        &metadata.input_schema,
+                        &tool_arguments,
+                    ) {
+                        return JsonRpcResponse::error(
+                            request.id,
+                            ErrorCode::INVALID_PARAMS.0,
+                            &format!("Invalid params: {validation_error}"),
+                        );
+                    }
+                }
+                None => {
+                    return JsonRpcResponse::error(
+                        request.id,
+                        ErrorCode::INVALID_PARAMS.0,
+                        &format!(
+                            "Unknown tool '{actual_tool_name}' in component '{component_name}'"
+                        ),
+                    );
+                }
             }
         }
 
         // Execute the tool call
         match self
-            .execute_tool_call(&component_name, &params.name, tool_arguments)
+            .execute_tool_call(&component_name, &actual_tool_name, tool_arguments)
             .await
         {
             Ok(tool_response) => match serde_json::to_value(tool_response) {
