@@ -21,7 +21,7 @@ fn test_optional_issuer_validation_when_configured() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://expected.issuer.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Test 1: Correct issuer should work
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -33,7 +33,7 @@ fn test_optional_issuer_validation_when_configured() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -81,7 +81,7 @@ fn test_optional_issuer_empty_string() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "");  // Empty string = no validation
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -93,7 +93,7 @@ fn test_optional_issuer_empty_string() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -127,7 +127,7 @@ fn test_optional_issuer_string_support() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "my-service");  // Non-URL issuer
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -139,7 +139,7 @@ fn test_optional_issuer_string_support() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     

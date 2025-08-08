@@ -178,7 +178,7 @@ fn test_valid_token_with_public_key() {
     let public_key_pem = get_public_key_pem(&public_key);
     
     // Set up configuration with public key instead of JWKS
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.example.com");  // Use non-authkit issuer to avoid auto-derivation
     variables::set("mcp_jwt_audience", "test-audience");
     variables::set("mcp_jwt_public_key", &public_key_pem);
@@ -191,7 +191,7 @@ fn test_valid_token_with_public_key() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -301,7 +301,7 @@ fn test_malformed_jwt() {
 fn test_expired_token() {
     // Set up test configuration
     use spin_test_sdk::bindings::fermyon::spin_test_virt::variables;
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -335,7 +335,7 @@ fn test_expired_token() {
 #[spin_test]
 fn test_multiple_audiences() {
     // Set up test configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -353,7 +353,7 @@ fn test_multiple_audiences() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -463,7 +463,7 @@ fn test_string_issuer() {
     let (private_key, public_key) = generate_rsa_key_pair();
     let public_key_pem = get_public_key_pem(&public_key);
     
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "my-service"); // String issuer kept as-is
     variables::set("mcp_jwt_audience", "test-audience");
     variables::set("mcp_jwt_public_key", &public_key_pem);
@@ -477,7 +477,7 @@ fn test_string_issuer() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     

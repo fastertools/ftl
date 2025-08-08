@@ -23,7 +23,7 @@ fn test_jwt_with_test_utils() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -35,7 +35,7 @@ fn test_jwt_with_test_utils() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -71,7 +71,7 @@ fn test_token_builder_features() {
     variables::set("mcp_jwt_issuer", "https://custom.issuer.com");
     variables::set("mcp_jwt_audience", "https://api.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -83,7 +83,7 @@ fn test_token_builder_features() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -128,7 +128,7 @@ fn test_microsoft_scp_claim() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.microsoft.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -140,7 +140,7 @@ fn test_microsoft_scp_claim() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -174,7 +174,7 @@ fn test_microsoft_scp_claim() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -209,7 +209,7 @@ fn test_expired_token_creation() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Create an expired token
     let token = create_expired_token(&key_pair);
@@ -237,7 +237,7 @@ fn test_token_utils_multiple_audiences() {
     variables::set("mcp_jwt_issuer", "https://test.example.com");
     variables::set("mcp_jwt_audience", "https://api.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -249,7 +249,7 @@ fn test_token_utils_multiple_audiences() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -292,7 +292,7 @@ fn test_utils_with_scope_validation() {
     variables::set("mcp_jwt_issuer", "https://test.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     variables::set("mcp_jwt_required_scopes", "admin,write");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -304,7 +304,7 @@ fn test_utils_with_scope_validation() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     
@@ -338,7 +338,7 @@ fn test_utils_with_scope_validation() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     

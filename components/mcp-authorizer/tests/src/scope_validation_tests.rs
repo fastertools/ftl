@@ -98,7 +98,7 @@ fn mock_gateway() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }
@@ -184,7 +184,7 @@ fn test_scope_precedence() {
 #[spin_test]
 fn test_string_issuer_mismatch() {
     // Configure provider with a string issuer (not URL)
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "my-service"); // String issuer, not URL
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -219,7 +219,7 @@ fn test_string_issuer_mismatch() {
 #[spin_test]
 fn test_insufficient_scopes() {
     // Configure provider with required scopes
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -258,7 +258,7 @@ fn test_insufficient_scopes() {
 #[spin_test]
 fn test_sufficient_scopes() {
     // Configure provider with required scopes
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -300,7 +300,7 @@ fn test_sufficient_scopes() {
 #[spin_test]
 fn test_empty_required_scopes() {
     // Configure provider with empty required scopes (should accept any token)
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -342,7 +342,7 @@ fn test_empty_required_scopes() {
 #[spin_test]
 fn test_exact_scope_match() {
     // Configure provider with required scopes
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -384,7 +384,7 @@ fn test_exact_scope_match() {
 #[spin_test]
 fn test_partial_scope_match_failure() {
     // Configure provider with required scopes
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -421,7 +421,7 @@ fn test_partial_scope_match_failure() {
 #[spin_test]
 fn test_scope_validation_with_scp_claim() {
     // Configure provider with required scopes
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");

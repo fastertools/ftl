@@ -67,13 +67,14 @@ fn test_tool_routing_snake_to_kebab_case() {
     let response_json = response_data.body_json().expect("Expected JSON response");
     assert_json_rpc_success(&response_json, Some(serde_json::json!(1)));
     
-    // Should find the echo_message tool
+    // Should find the echo_message tool with component prefix
     let tools = response_json["result"]["tools"].as_array().unwrap();
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0]["name"], "echo_message");
+    assert_eq!(tools[0]["name"], "echo_tool__echo_message");
     
     // Test calling the tool
     // Re-mock the component before the tool call (spin-test limitation)
+    // Note: We mock both the snake_case (for validation) and kebab-case (for execution)
     mock_tool_component("echo-tool", vec![
         ToolMetadata {
             name: "echo_message".to_string(),
@@ -95,10 +96,20 @@ fn test_tool_routing_snake_to_kebab_case() {
         }
     ]);
     
+    // Re-mock the tool execution as well
+    mock_tool_execution("echo-tool", "echo_message", ToolResponse {
+        content: vec![ToolContent::Text {
+            text: "Echo: test message".to_string(),
+            annotations: None,
+        }],
+        structured_content: None,
+        is_error: None,
+    });
+    
     let call_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "echo_message",
+            "name": "echo_tool__echo_message",
             "arguments": {
                 "message": "test message"
             }
@@ -124,14 +135,11 @@ fn test_tool_routing_snake_to_kebab_case() {
 fn test_tool_not_found() {
     setup_default_test_env();
     
-    // Mock empty tool lists for configured components
-    mock_tool_component("echo", vec![]);
-    mock_tool_component("calculator", vec![]);
-    
+    // Test 1: Invalid tool name format (no underscore)
     let call_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "non_existent_tool",
+            "name": "invalidtoolname",
             "arguments": {}
         })),
         Some(serde_json::json!(1))
@@ -144,6 +152,27 @@ fn test_tool_not_found() {
     assert_eq!(response_data.status, 200);
     let response_json = response_data.body_json().expect("Expected JSON response");
     assert_json_rpc_error(&response_json, -32602, Some(serde_json::json!(1)));
+    assert!(response_json["error"]["message"].as_str().unwrap().contains("Invalid tool name format"));
+    
+    // Test 2: Valid format but tool doesn't exist in component
+    mock_tool_component("echo", vec![]);
+    
+    let call_request = create_json_rpc_request(
+        "tools/call",
+        Some(serde_json::json!({
+            "name": "echo__nonexistent",
+            "arguments": {}
+        })),
+        Some(serde_json::json!(2))
+    );
+    
+    let request = create_mcp_request(call_request);
+    let response = spin_test_sdk::perform_request(request);
+    let response_data = ResponseData::from_response(response);
+    
+    assert_eq!(response_data.status, 200);
+    let response_json = response_data.body_json().expect("Expected JSON response");
+    assert_json_rpc_error(&response_json, -32602, Some(serde_json::json!(2)));
     assert!(response_json["error"]["message"].as_str().unwrap().contains("Unknown tool"));
 }
 
@@ -249,7 +278,7 @@ fn test_parallel_tool_discovery() {
         .map(|t| t["name"].as_str().unwrap())
         .collect();
     
-    assert!(tool_names.contains(&"tool_1"));
-    assert!(tool_names.contains(&"tool_2"));
-    assert!(tool_names.contains(&"tool_3"));
+    assert!(tool_names.contains(&"tool1__tool_1"));
+    assert!(tool_names.contains(&"tool2__tool_2"));
+    assert!(tool_names.contains(&"tool3__tool_3"));
 }

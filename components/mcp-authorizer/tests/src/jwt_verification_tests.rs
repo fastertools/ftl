@@ -51,7 +51,7 @@ pub enum ScopeValue {
 /// Configure test provider
 pub fn configure_test_provider() {
     // Core settings - gateway URL is the full internal MCP endpoint
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_trace_header", "x-trace-id");
     
     // JWT provider settings
@@ -142,7 +142,7 @@ fn mock_mcp_gateway_success() {
     
     // Mock the gateway URL - requests will be forwarded to gateway path
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }
@@ -540,7 +540,7 @@ fn test_client_id_extraction_explicit() {
     body.write_bytes(serde_json::to_string(&body_content).unwrap().as_bytes());
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
     

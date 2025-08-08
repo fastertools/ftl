@@ -97,7 +97,7 @@ fn mock_mcp_gateway_with_id(id: u32) {
     body.write_bytes(response_json.as_bytes());
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }
@@ -106,7 +106,7 @@ fn mock_mcp_gateway_with_id(id: u32) {
 #[spin_test]
 fn test_jwks_caching() {
     // Configure provider
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -198,7 +198,7 @@ fn test_jwks_caching() {
 #[spin_test]
 fn test_jwks_cache_ttl() {
     // Configure provider
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -275,7 +275,7 @@ fn test_jwks_cache_ttl() {
 #[spin_test]
 fn test_jwks_cache_per_issuer() {
     // Configure provider with first issuer
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://issuer1.com");
     variables::set("mcp_jwt_jwks_uri", "https://issuer1.com/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");

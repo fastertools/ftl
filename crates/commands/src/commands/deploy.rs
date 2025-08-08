@@ -336,8 +336,7 @@ async fn execute_deploy_inner(
         let app_name = &config.app_name;
         deps.ui.print(&format!("Engine: {app_name}"));
         let component_count = config.components.len();
-        deps.ui
-            .print(&format!("Components: {component_count} tools"));
+        deps.ui.print(&format!("Components: {component_count}"));
         let profile = if use_release { "release" } else { "debug" };
         deps.ui.print(&format!("Build Profile: {profile}"));
 

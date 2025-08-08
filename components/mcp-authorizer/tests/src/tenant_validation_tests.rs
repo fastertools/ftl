@@ -18,7 +18,7 @@ fn test_tenant_validation_with_org_id() {
     let key_pair = TestKeyPair::generate();
     
     // Configure provider with public key
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     
@@ -33,7 +33,7 @@ fn test_tenant_validation_with_org_id() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -61,7 +61,7 @@ fn test_tenant_validation_with_sub_fallback() {
     let key_pair = TestKeyPair::generate();
     
     // Configure provider with public key
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     
@@ -76,7 +76,7 @@ fn test_tenant_validation_with_sub_fallback() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -103,7 +103,7 @@ fn test_tenant_validation_rejects_wrong_org() {
     let key_pair = TestKeyPair::generate();
     
     // Configure provider with public key
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     
@@ -139,7 +139,7 @@ fn test_tenant_validation_rejects_wrong_sub() {
     let key_pair = TestKeyPair::generate();
     
     // Configure provider with public key
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     
@@ -169,7 +169,7 @@ fn test_no_tenant_validation_when_not_configured() {
     let key_pair = TestKeyPair::generate();
     
     // Configure provider with public key
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     
@@ -184,7 +184,7 @@ fn test_no_tenant_validation_when_not_configured() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -208,7 +208,7 @@ fn test_no_tenant_validation_when_not_configured() {
 /// Test static token provider with org_id
 #[spin_test]
 fn test_static_token_with_org_id() {
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_tenant_id", "org_static");
     
@@ -223,7 +223,7 @@ fn test_static_token_with_org_id() {
     let body = gateway_response.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     
@@ -239,7 +239,7 @@ fn test_static_token_with_org_id() {
 /// Test static token rejected when org_id doesn't match
 #[spin_test]
 fn test_static_token_wrong_org_id() {
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_tenant_id", "org_expected");
     

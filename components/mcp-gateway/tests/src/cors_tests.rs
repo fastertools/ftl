@@ -34,7 +34,7 @@ fn test_cors_preflight_options() {
     );
     assert_eq!(
         response_data.find_header("access-control-allow-headers"),
-        Some(&b"Content-Type".to_vec())
+        Some(&b"Content-Type, X-MCP-Toolsets, X-MCP-Readonly".to_vec())
     );
 }
 

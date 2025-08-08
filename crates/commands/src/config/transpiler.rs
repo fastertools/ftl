@@ -244,7 +244,7 @@ fn add_core_mcp_variables(variables: &mut HashMap<String, SpinVariable>, ftl_con
     variables.insert(
         "mcp_gateway_url".to_string(),
         SpinVariable::Default {
-            default: "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string(),
+            default: "http://ftl-mcp-gateway.spin.internal".to_string(),
         },
     );
     variables.insert(

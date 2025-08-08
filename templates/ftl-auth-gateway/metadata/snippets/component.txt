@@ -17,7 +17,7 @@
 [variables]
 # Core auth settings
 auth_enabled = { default = "false" }
-auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
 auth_trace_header = { default = "X-Trace-Id" }
 
 # Provider configuration (required when auth_enabled = "true")

@@ -121,10 +121,10 @@ fn test_list_tools_multiple_components() {
         .map(|t| t["name"].as_str().unwrap())
         .collect();
     
-    assert!(tool_names.contains(&"add"));
-    assert!(tool_names.contains(&"multiply"));
-    assert!(tool_names.contains(&"concat"));
-    assert!(tool_names.contains(&"parse_json"));
+    assert!(tool_names.contains(&"math__add"));
+    assert!(tool_names.contains(&"math__multiply"));
+    assert!(tool_names.contains(&"string__concat"));
+    assert!(tool_names.contains(&"data__parse_json"));
 }
 
 #[spin_test]
@@ -182,7 +182,7 @@ fn test_tool_metadata_completeness() {
     let tool = &tools[0];
     
     // Verify all metadata fields
-    assert_eq!(tool["name"], "complete_tool");
+    assert_eq!(tool["name"], "detailed__complete_tool");
     assert_eq!(tool["title"], "Complete Tool Example");
     assert_eq!(tool["description"], "A tool with all metadata fields populated");
     

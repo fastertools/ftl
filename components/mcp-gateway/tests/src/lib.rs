@@ -17,6 +17,7 @@ mod cors_tests;
 mod json_rpc_tests;
 mod integration_tests;
 mod basic_test;
+mod clean_scoping_tests;
 
 // Response data helper to extract all needed information
 pub struct ResponseData {

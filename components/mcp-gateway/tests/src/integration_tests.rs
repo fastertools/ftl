@@ -150,7 +150,7 @@ fn test_full_mcp_session_flow() {
     let add_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "add",
+            "name": "calculator__add",
             "arguments": {
                 "a": 10.5,
                 "b": 20.3
@@ -215,7 +215,7 @@ fn test_full_mcp_session_flow() {
     let subtract_request = create_json_rpc_request(
         "tools/call",
         Some(serde_json::json!({
-            "name": "subtract",
+            "name": "calculator__subtract",
             "arguments": {
                 "a": 100,
                 "b": 42

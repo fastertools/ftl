@@ -35,7 +35,6 @@ release: clean
 publish: build
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
 	wkg oci push ghcr.io/fastertools/mcp-gateway:$$VERSION target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
-	wkg oci push ghcr.io/fastertools/mcp-gateway:latest target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
 
 # Help
 help:
