@@ -11,9 +11,10 @@ By the end of this tutorial, you'll have:
 
 ## Prerequisites
 
-- FTL CLI installed ([Installation Guide](../../README.md#installation))
+- FTL CLI installed ([Installation Guide](../../README.md#installing-and-updating))
 - Basic familiarity with command line
 - A text editor
+- Some familiarity with Rust is helpful. See our other [examples](../../examples/demo/) for other language examples
 
 ## Step 1: Initialize Your Project
 
