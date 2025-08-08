@@ -254,7 +254,7 @@ fn mock_gateway() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }
@@ -280,7 +280,7 @@ fn test_provider_cannot_have_both_key_and_jwks() {
 #[spin_test]
 fn test_no_issuer_validation() {
     // Configure provider without issuer
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", ""); // Empty issuer
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -352,7 +352,7 @@ fn test_multiple_expected_audiences() {
 #[spin_test]
 fn test_algorithm_configuration() {
     // Test that provider can be configured with specific algorithms
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal/mcp-internal");
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");

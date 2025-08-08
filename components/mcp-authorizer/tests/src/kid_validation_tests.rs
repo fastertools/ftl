@@ -102,7 +102,7 @@ fn mock_gateway() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }

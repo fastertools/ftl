@@ -8,7 +8,7 @@ description = "Authentication gateway for FTL MCP servers"
 
 [variables]
 # Core settings
-mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
 mcp_trace_header = { default = "x-trace-id" }
 mcp_provider_type = { default = "jwt" }
 

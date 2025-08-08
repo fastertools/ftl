@@ -20,7 +20,7 @@ fn mock_gateway_success_with_headers() {
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"result\":{\"tools\":[\"test-tool\"]},\"id\":1}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(response),
     );
 }
@@ -116,7 +116,7 @@ fn test_gateway_error_passthrough() {
     body.write_bytes(b"{\"error\":\"internal_server_error\",\"message\":\"Gateway failed\"}");
     
     http_handler::set_response(
-        "https://test-gateway.spin.internal/mcp-internal",
+        "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
     

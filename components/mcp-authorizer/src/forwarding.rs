@@ -45,12 +45,30 @@ pub async fn forward_to_gateway(
             .map_err(|()| anyhow::anyhow!("Failed to set authority"))?;
     }
 
-    // Use the gateway URL's path, not the incoming request's path
-    let gateway_path = gateway_url.path();
-    // For simplicity, we'll just use the gateway path without preserving query strings
-    // since MCP requests typically don't use query strings
+    // Preserve the incoming request's path and append it to the gateway URL's base path
+    let incoming_path = req.path();
+    let gateway_base_path = gateway_url.path();
+
+    // Combine the gateway base path with the incoming request path
+    // If gateway base path ends with '/' and incoming path starts with '/', avoid double slash
+    let combined_path = if gateway_base_path.ends_with('/') && incoming_path.starts_with('/') {
+        format!("{}{}", gateway_base_path, &incoming_path[1..])
+    } else if !gateway_base_path.ends_with('/') && !incoming_path.starts_with('/') {
+        format!("{gateway_base_path}/{incoming_path}")
+    } else {
+        format!("{gateway_base_path}{incoming_path}")
+    };
+
+    // Preserve query string if present
+    let query = req.query();
+    let path_with_query = if query.is_empty() {
+        combined_path
+    } else {
+        format!("{combined_path}?{query}")
+    };
+
     outgoing
-        .set_path_with_query(Some(gateway_path))
+        .set_path_with_query(Some(&path_with_query))
         .map_err(|()| anyhow::anyhow!("Failed to set path"))?;
 
     // Transfer request body

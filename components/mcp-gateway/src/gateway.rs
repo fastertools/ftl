@@ -19,13 +19,63 @@ fn default_validate_arguments() -> bool {
     true
 }
 
+#[derive(Debug, Clone)]
+pub struct ToolScope {
+    pub component: Option<String>,
+    pub tool: Option<String>,
+}
+
+impl ToolScope {
+    /// Parse a URL path to extract component and tool scope
+    /// Examples:
+    /// - "/" or "/mcp" -> None (all tools)
+    /// - "/calc-tools" or "/calc-tools/mcp" -> Some(component: "calc-tools")
+    /// - "/calc-tools/add" or "/calc-tools/add/mcp" -> Some(component: "calc-tools", tool: "add")
+    fn from_path(path: &str) -> Option<Self> {
+        // Remove leading slash
+        let path = path.trim_start_matches('/');
+
+        // Remove trailing slash if present
+        let path = path.trim_end_matches('/');
+
+        // Empty path or just "mcp" means no scoping
+        if path.is_empty() || path == "mcp" {
+            return None;
+        }
+
+        // Split by slash to get parts
+        let parts: Vec<&str> = path.split('/').collect();
+
+        // Check if last part is "mcp" and should be ignored
+        let parts = if parts.last() == Some(&"mcp") {
+            parts.get(..parts.len().saturating_sub(1)).unwrap_or(&[])
+        } else {
+            &parts[..]
+        };
+
+        // Now match on the remaining parts
+        match parts {
+            [] | [_, _, _, ..] => None, // Empty or too many parts (invalid format)
+            [component] => Some(Self {
+                component: Some((*component).to_string()),
+                tool: None,
+            }),
+            [component, tool] => Some(Self {
+                component: Some((*component).to_string()),
+                tool: Some((*tool).to_string()),
+            }),
+        }
+    }
+}
+
 pub struct McpGateway {
     config: GatewayConfig,
+    scope: Option<ToolScope>,
 }
 
 impl McpGateway {
-    pub fn new(config: GatewayConfig) -> Self {
-        Self { config }
+    pub fn new(config: GatewayConfig, scope: Option<ToolScope>) -> Self {
+        Self { config, scope }
     }
 
     /// Convert `snake_case` to kebab-case for component names
@@ -199,9 +249,25 @@ impl McpGateway {
         };
 
         // Parse the comma-separated list of component names
-        let component_names: Vec<&str> = component_names_str.split(',').map(str::trim).collect();
+        let all_component_names: Vec<&str> =
+            component_names_str.split(',').map(str::trim).collect();
 
-        // Create futures for fetching metadata from all components in parallel
+        // Filter components based on scope
+        let component_names = if let Some(ref scope) = self.scope {
+            if let Some(ref component_filter) = scope.component {
+                // Only include the specified component if it exists
+                all_component_names
+                    .into_iter()
+                    .filter(|name| *name == component_filter)
+                    .collect()
+            } else {
+                all_component_names
+            }
+        } else {
+            all_component_names
+        };
+
+        // Create futures for fetching metadata from selected components in parallel
         let metadata_futures: Vec<_> = component_names
             .iter()
             .map(|component_name| async move {
@@ -217,6 +283,14 @@ impl McpGateway {
         let mut tools: Vec<ToolMetadata> = Vec::new();
         for (component_name, component_tools) in results {
             for mut tool in component_tools {
+                // Filter by specific tool if scope specifies one
+                if let Some(ref scope) = self.scope
+                    && let Some(ref tool_filter) = scope.tool
+                    && tool.name != *tool_filter
+                {
+                    continue; // Skip tools that don't match the filter
+                }
+
                 // Prefix the tool name with the component name using double underscore as delimiter
                 tool.name = format!("{}__{}", component_name, tool.name);
                 tools.push(tool);
@@ -277,42 +351,98 @@ impl McpGateway {
         }
     }
 
-    async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
-        let params: CallToolRequest = match request.params {
-            Some(p) => match serde_json::from_value(p) {
-                Ok(params) => params,
-                Err(e) => {
-                    return JsonRpcResponse::error(
-                        request.id,
-                        ErrorCode::INVALID_PARAMS.0,
-                        &format!("Invalid params: {e}"),
-                    );
-                }
-            },
-            None => {
-                return JsonRpcResponse::error(
-                    request.id,
+    /// Parse and validate the tool call parameters
+    fn parse_tool_params(
+        request_id: Option<serde_json::Value>,
+        params: Option<serde_json::Value>,
+    ) -> Result<CallToolRequest, JsonRpcResponse> {
+        match params {
+            Some(p) => serde_json::from_value(p).map_err(|e| {
+                JsonRpcResponse::error(
+                    request_id,
                     ErrorCode::INVALID_PARAMS.0,
-                    "Invalid params: missing required parameters",
-                );
+                    &format!("Invalid params: {e}"),
+                )
+            }),
+            None => Err(JsonRpcResponse::error(
+                request_id,
+                ErrorCode::INVALID_PARAMS.0,
+                "Invalid params: missing required parameters",
+            )),
+        }
+    }
+
+    /// Parse component and tool names from the prefixed format
+    fn parse_tool_name(
+        request_id: Option<serde_json::Value>,
+        tool_name: &str,
+    ) -> Result<(String, String), JsonRpcResponse> {
+        tool_name.split_once("__").map_or_else(
+            || {
+                Err(JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INVALID_PARAMS.0,
+                    &format!("Invalid tool name format '{tool_name}'. Expected format: 'component__toolname'"),
+                ))
+            },
+            |(component, tool)| Ok((component.to_string(), tool.to_string())),
+        )
+    }
+
+    /// Validate that the tool call is allowed within the current scope
+    fn validate_scope(
+        &self,
+        request_id: Option<serde_json::Value>,
+        component_name: &str,
+        tool_name: &str,
+        full_name: &str,
+    ) -> Result<(), JsonRpcResponse> {
+        if let Some(ref scope) = self.scope {
+            if let Some(ref component_filter) = scope.component
+                && component_name != component_filter
+            {
+                return Err(JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INVALID_PARAMS.0,
+                    &format!("Tool '{full_name}' is not accessible in the current scope"),
+                ));
             }
+            if let Some(ref tool_filter) = scope.tool
+                && tool_name != tool_filter
+            {
+                return Err(JsonRpcResponse::error(
+                    request_id,
+                    ErrorCode::INVALID_PARAMS.0,
+                    &format!("Tool '{full_name}' is not accessible in the current scope"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        // Parse and validate parameters
+        let params = match Self::parse_tool_params(request.id.clone(), request.params) {
+            Ok(p) => p,
+            Err(e) => return e,
         };
 
-        // Parse the component name and actual tool name from the prefixed name
-        let (component_name, actual_tool_name) = match params.name.split_once("__") {
-            Some((component, tool)) => (component.to_string(), tool.to_string()),
-            None => {
-                // If there's no double underscore delimiter, the tool name is invalid
-                return JsonRpcResponse::error(
-                    request.id,
-                    ErrorCode::INVALID_PARAMS.0,
-                    &format!(
-                        "Invalid tool name format '{}'. Expected format: 'component__toolname'",
-                        params.name
-                    ),
-                );
-            }
-        };
+        // Parse the component and tool names
+        let (component_name, actual_tool_name) =
+            match Self::parse_tool_name(request.id.clone(), &params.name) {
+                Ok(names) => names,
+                Err(e) => return e,
+            };
+
+        // Validate scope access
+        if let Err(e) = self.validate_scope(
+            request.id.clone(),
+            &component_name,
+            &actual_tool_name,
+            &params.name,
+        ) {
+            return e;
+        }
 
         // Validate arguments if validation is enabled
         let tool_arguments = params.arguments.unwrap_or_else(|| serde_json::json!({}));
@@ -396,6 +526,10 @@ impl McpGateway {
 }
 
 pub async fn handle_mcp_request(req: Request) -> Response {
+    // Extract the path to determine scoping
+    let path = req.path();
+    let scope = ToolScope::from_path(path);
+
     // Handle CORS preflight
     if *req.method() == Method::Options {
         return Response::builder()
@@ -467,7 +601,7 @@ pub async fn handle_mcp_request(req: Request) -> Response {
         validate_arguments,
     };
 
-    let gateway = McpGateway::new(config);
+    let gateway = McpGateway::new(config, scope);
 
     // Handle the request
     gateway.handle_request(request).await.map_or_else(
