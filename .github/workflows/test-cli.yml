@@ -19,7 +19,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           targets: wasm32-wasip1
-          cache-key: test-cli
+          cache-key: test-cli-v189
       
       - name: Install cargo-binstall
         uses: taiki-e/install-action@v2
@@ -78,7 +78,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           targets: wasm32-wasip1
-          cache-key: test-cli
+          cache-key: test-cli-v189
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -140,7 +140,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: test-cli
+          cache-key: test-cli-v189
       
       - name: Setup Node.js
         uses: actions/setup-node@v4

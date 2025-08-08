@@ -206,29 +206,20 @@ enum EngCommand {
         #[arg(long, value_name = "KEY=VALUE")]
         variable: Vec<String>,
 
-        /// Set access control mode (public, private, custom)
-        /// Overrides `FTL_ACCESS_CONTROL` env var and ftl.toml `auth.access_control`
+        /// Set access control mode (public, private)
+        /// Overrides `FTL_ACCESS_CONTROL` env var and ftl.toml `project.access_control`
         #[arg(
             long = "access-control",
-            value_name = "public|private|custom",
+            value_name = "public|private",
             help_heading = "Authentication"
         )]
         access_control: Option<String>,
 
-        /// Custom auth provider (authkit, auth0, oidc, static)
-        /// Overrides `FTL_AUTH_PROVIDER` env var and ftl.toml auth provider
-        #[arg(long, value_name = "PROVIDER", help_heading = "Authentication")]
-        auth_provider: Option<String>,
-
-        /// Custom auth issuer URL
-        /// Overrides `FTL_AUTH_ISSUER` env var and ftl.toml auth issuer
+        /// JWT issuer URL (triggers custom auth mode)
+        /// For complex OAuth configuration, use ftl.toml [oauth] section
+        /// Overrides `FTL_JWT_ISSUER` env var and ftl.toml oauth.issuer
         #[arg(long, value_name = "URL", help_heading = "Authentication")]
-        auth_issuer: Option<String>,
-
-        /// Custom auth audience
-        /// Overrides `FTL_AUTH_AUDIENCE` env var and ftl.toml auth audience
-        #[arg(long, value_name = "AUDIENCE", help_heading = "Authentication")]
-        auth_audience: Option<String>,
+        jwt_issuer: Option<String>,
 
         /// Run without making any changes (preview what would be deployed)
         #[arg(long)]
@@ -545,18 +536,14 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
         EngCommand::Deploy {
             variable,
             access_control,
-            auth_provider,
-            auth_issuer,
-            auth_audience,
+            jwt_issuer,
             dry_run,
             yes,
         } => {
             let deploy_args = ftl_commands::deploy::DeployArgs {
                 variables: variable,
                 access_control,
-                auth_provider,
-                auth_issuer,
-                auth_audience,
+                jwt_issuer,
                 dry_run,
                 yes,
             };

@@ -9,9 +9,9 @@
       "description": "Project metadata",
       "$ref": "#/$defs/ProjectConfig"
     },
-    "oidc": {
+    "oauth": {
       "description": "OpenID Connect authentication configuration (optional)",
-      "$ref": "#/$defs/OidcConfig"
+      "$ref": "#/$defs/OauthConfig"
     },
     "mcp": {
       "description": "MCP component configuration",
@@ -84,13 +84,13 @@
         }
       }
     },
-    "OidcConfig": {
+    "OauthConfig": {
       "description": "OpenID Connect authentication configuration",
       "type": "object",
       "required": ["issuer"],
       "properties": {
         "issuer": {
-          "description": "OIDC issuer URL",
+          "description": "OAuth issuer URL",
           "type": "string",
           "minLength": 1
         },

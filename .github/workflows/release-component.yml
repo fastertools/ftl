@@ -76,7 +76,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           targets: wasm32-wasip1
-          cache-key: release-component-${{ matrix.component }}
+          cache-key: release-component-${{ matrix.component }}-v189
       
       - name: Install cargo-component
         uses: taiki-e/install-action@v2

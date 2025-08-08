@@ -6,7 +6,7 @@ Faster tools for AI agents
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-compatible-purple.svg)](https://webassembly.org/)
-[![Rust](https://img.shields.io/badge/rust-1.86+-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.89+-orange.svg)](https://www.rust-lang.org)
 [![Discord](https://img.shields.io/discord/1397659435177869403?logo=discord&label=Discord&link=https%3A%2F%2Fdiscord.gg%2FByFw4eKEU7)](https://discord.gg/ByFw4eKEU7)
 
 [Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
@@ -212,7 +212,7 @@ Tools are automatically deployed across the global network edge. Tool calls are 
 
 The FTL [components](#architecture) handle MCP implementation, auth, tool call routing, and tool call argument validation.
 
-Bring your own JWT issuer or OIDC provider via simple configuration. Or use FTL's by default.
+Bring your own JWT issuer or OAuth provider via simple configuration. Or use FTL's by default.
 </details>
 
 

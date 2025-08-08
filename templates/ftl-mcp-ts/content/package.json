@@ -1,7 +1,7 @@
 {
   "name": "{{project-name | kebab_case}}",
   "version": "0.1.0",
-  "description": "MCP tool written in TypeScript",
+  "description": "MCP component authored in TypeScript",
   "main": "index.js",
   "scripts": {
     "build": "npm run typecheck && esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && mkdir -p dist && j2w -i build/bundle.js -o dist/{{project-name | kebab_case}}.wasm",

@@ -3,9 +3,9 @@ name = "{{project-name | snake_case}}"
 version = "0.1.0"
 authors = ["{{authors}}"]
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.89"
 license = "Apache-2.0"
-description = "MCP tool written in rust"
+description = "MCP component authored in Rust"
 
 [dependencies]
 ftl-sdk = { version = "0.2.10", features = ["macros"] }

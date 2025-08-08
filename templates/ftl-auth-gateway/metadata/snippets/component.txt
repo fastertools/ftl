@@ -21,11 +21,11 @@ auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-interna
 auth_trace_header = { default = "X-Trace-Id" }
 
 # Provider configuration (required when auth_enabled = "true")
-auth_provider_type = { default = "" }  # "authkit" or "oidc"
+auth_provider_type = { default = "" }  # "authkit" or "oauth"
 auth_provider_issuer = { default = "" }
 auth_provider_audience = { default = "" }
 
-# OIDC-specific settings (only required for auth_provider_type = "oidc")
+# OAuth-specific settings (only required for auth_provider_type = "oauth")
 auth_provider_name = { default = "" }
 auth_provider_jwks_uri = { default = "" }
 auth_provider_authorize_endpoint = { default = "" }

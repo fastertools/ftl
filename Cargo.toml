@@ -27,7 +27,7 @@ exclude = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.89"
 authors = ["FTL Contributors"]
 license = "Apache-2.0"
 repository = "https://github.com/fastertools/ftl-cli"

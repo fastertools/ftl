@@ -1,7 +1,7 @@
 # FTL CLI - Rust Formatting Configuration
 # Using stable rustfmt features only
 
-edition = "2021"
+edition = "2024"
 
 # Line width and wrapping
 max_width = 100

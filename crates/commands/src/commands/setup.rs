@@ -188,31 +188,30 @@ pub fn info_with_deps(deps: &Arc<SetupDependencies>) {
     deps.ui.print("");
 
     // Check templates
-    if let Ok(spin_path) = deps.spin_installer.get_spin_path() {
-        if let Ok(output) = deps
+    if let Ok(spin_path) = deps.spin_installer.get_spin_path()
+        && let Ok(output) = deps
             .command_executor
             .execute(spin_path.to_str().unwrap_or("spin"), &["templates", "list"])
-        {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            let ftl_templates: Vec<&str> = output_str
-                .lines()
-                .filter(|line| line.contains("ftl-mcp-"))
-                .collect();
+    {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let ftl_templates: Vec<&str> = output_str
+            .lines()
+            .filter(|line| line.contains("ftl-mcp-"))
+            .collect();
 
-            if ftl_templates.is_empty() {
-                deps.ui.print(&format!(
-                    "ftl-mcp Templates: {} Not installed",
-                    styled_text("✗", MessageStyle::Error)
-                ));
-                deps.ui.print("  Run 'ftl setup templates' to install");
-            } else {
-                deps.ui.print(&format!(
-                    "ftl-mcp Templates: {} Installed",
-                    styled_text("✓", MessageStyle::Success)
-                ));
-                for template in ftl_templates {
-                    deps.ui.print(&format!("  - {}", template.trim()));
-                }
+        if ftl_templates.is_empty() {
+            deps.ui.print(&format!(
+                "ftl-mcp Templates: {} Not installed",
+                styled_text("✗", MessageStyle::Error)
+            ));
+            deps.ui.print("  Run 'ftl setup templates' to install");
+        } else {
+            deps.ui.print(&format!(
+                "ftl-mcp Templates: {} Installed",
+                styled_text("✓", MessageStyle::Success)
+            ));
+            for template in ftl_templates {
+                deps.ui.print(&format!("  - {}", template.trim()));
             }
         }
     }

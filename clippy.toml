@@ -1,5 +1,5 @@
 # Clippy configuration for FTL CLI
-msrv = "1.86.0"
+msrv = "1.89.0"
 
 # Avoid breaking changes
 avoid-breaking-exported-api = true

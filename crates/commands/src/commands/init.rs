@@ -168,7 +168,7 @@ fn create_ftl_project(
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),

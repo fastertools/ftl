@@ -291,8 +291,8 @@ fn https_enforcement_accepts_https_prefix() {
 }
 
 #[spin_test]
-fn https_enforcement_oidc_urls() {
-    // Test that OIDC URLs also enforce HTTPS
+fn https_enforcement_oauth_urls() {
+    // Test that OAuth URLs also enforce HTTPS
     variables::set("mcp_jwt_issuer", "https://example.com");
     variables::set("mcp_jwt_jwks_uri", "http://example.com/jwks"); // HTTP should fail
     variables::set("mcp_oauth_authorize_endpoint", "example.com/auth");

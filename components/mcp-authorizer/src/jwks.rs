@@ -54,18 +54,17 @@ pub async fn fetch_jwks(jwks_uri: &str, store: &Store) -> Result<Jwks> {
     let cache_key = format!("jwks:{jwks_uri}");
 
     // Check cache first
-    if let Ok(Some(cached_data)) = store.get(&cache_key) {
-        if let Ok(cached_str) = String::from_utf8(cached_data) {
-            if let Ok(cached) = serde_json::from_str::<CachedJwks>(&cached_str) {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
+    if let Ok(Some(cached_data)) = store.get(&cache_key)
+        && let Ok(cached_str) = String::from_utf8(cached_data)
+        && let Ok(cached) = serde_json::from_str::<CachedJwks>(&cached_str)
+    {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
-                if now < cached.expires_at {
-                    return Ok(cached.jwks);
-                }
-            }
+        if now < cached.expires_at {
+            return Ok(cached.jwks);
         }
     }
 
@@ -120,10 +119,10 @@ pub fn find_key(jwks: &Jwks, kid: Option<&str>) -> Result<DecodingKey> {
             }
 
             // Check use if specified
-            if let Some(use_) = &key.use_ {
-                if use_ != "sig" {
-                    return false;
-                }
+            if let Some(use_) = &key.use_
+                && use_ != "sig"
+            {
+                return false;
             }
 
             true

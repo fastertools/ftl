@@ -170,19 +170,19 @@ pub fn parse_component_builds_from_content(content: &str) -> Result<Vec<Componen
     if let Some(components_table) = toml.get("component").and_then(|c| c.as_table()) {
         for (name, component) in components_table {
             // Check if this component has a build section
-            if let Some(build_section) = component.get("build").and_then(|b| b.as_table()) {
-                if let Some(command) = build_section.get("command").and_then(|c| c.as_str()) {
-                    let workdir = build_section
-                        .get("workdir")
-                        .and_then(|w| w.as_str())
-                        .map(std::string::ToString::to_string);
+            if let Some(build_section) = component.get("build").and_then(|b| b.as_table())
+                && let Some(command) = build_section.get("command").and_then(|c| c.as_str())
+            {
+                let workdir = build_section
+                    .get("workdir")
+                    .and_then(|w| w.as_str())
+                    .map(std::string::ToString::to_string);
 
-                    components.push(ComponentBuildInfo {
-                        name: name.clone(),
-                        build_command: Some(command.to_string()),
-                        workdir,
-                    });
-                }
+                components.push(ComponentBuildInfo {
+                    name: name.clone(),
+                    build_command: Some(command.to_string()),
+                    workdir,
+                });
             }
         }
     }
@@ -272,10 +272,10 @@ async fn build_components_parallel(
     // Wait for all tasks to complete
     let mut first_error = None;
     while let Some(result) = tasks.join_next().await {
-        if let Err(e) = result? {
-            if first_error.is_none() {
-                first_error = Some(e);
-            }
+        if let Err(e) = result?
+            && first_error.is_none()
+        {
+            first_error = Some(e);
         }
     }
 

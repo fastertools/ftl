@@ -192,52 +192,52 @@ impl MockFtlApiClientMock {
     }
 
     /// Sets up an expectation for the `create_app` method
-    pub fn expect_create_app(&mut self) -> CreateAppExpectation {
+    pub fn expect_create_app(&mut self) -> CreateAppExpectation<'_> {
         CreateAppExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `list_apps` method
-    pub fn expect_list_apps(&mut self) -> ListAppsExpectation {
+    pub fn expect_list_apps(&mut self) -> ListAppsExpectation<'_> {
         ListAppsExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `get_app` method
-    pub fn expect_get_app(&mut self) -> GetAppExpectation {
+    pub fn expect_get_app(&mut self) -> GetAppExpectation<'_> {
         GetAppExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `delete_app` method
-    pub fn expect_delete_app(&mut self) -> DeleteAppExpectation {
+    pub fn expect_delete_app(&mut self) -> DeleteAppExpectation<'_> {
         DeleteAppExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `create_deployment` method
-    pub fn expect_create_deployment(&mut self) -> CreateDeploymentExpectation {
+    pub fn expect_create_deployment(&mut self) -> CreateDeploymentExpectation<'_> {
         CreateDeploymentExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `update_components` method
-    pub fn expect_update_components(&mut self) -> UpdateComponentsExpectation {
+    pub fn expect_update_components(&mut self) -> UpdateComponentsExpectation<'_> {
         UpdateComponentsExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `list_app_components` method
-    pub fn expect_list_app_components(&mut self) -> ListAppComponentsExpectation {
+    pub fn expect_list_app_components(&mut self) -> ListAppComponentsExpectation<'_> {
         ListAppComponentsExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `create_ecr_token` method
-    pub fn expect_create_ecr_token(&mut self) -> CreateEcrTokenExpectation {
+    pub fn expect_create_ecr_token(&mut self) -> CreateEcrTokenExpectation<'_> {
         CreateEcrTokenExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `update_auth_config` method
-    pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation {
+    pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation<'_> {
         UpdateAuthConfigExpectation { mock: self }
     }
 
     /// Sets up an expectation for the `get_app_logs` method
-    pub fn expect_get_app_logs(&mut self) -> GetAppLogsExpectation {
+    pub fn expect_get_app_logs(&mut self) -> GetAppLogsExpectation<'_> {
         GetAppLogsExpectation { mock: self }
     }
 }
@@ -771,7 +771,7 @@ impl MockCommandExecutorMock {
     ///     .with(mockall::predicate::eq("docker"))
     ///     .returning(|_| Ok(()));
     /// ```
-    pub fn expect_check_command_exists(&mut self) -> CheckCommandExistsExpectation {
+    pub fn expect_check_command_exists(&mut self) -> CheckCommandExistsExpectation<'_> {
         CheckCommandExistsExpectation { mock: self }
     }
 
@@ -790,7 +790,7 @@ impl MockCommandExecutorMock {
     ///         stderr: vec![],
     ///     }));
     /// ```
-    pub fn expect_execute(&mut self) -> ExecuteExpectation {
+    pub fn expect_execute(&mut self) -> ExecuteExpectation<'_> {
         ExecuteExpectation {
             mock: self,
             matcher: None,
@@ -814,7 +814,7 @@ impl MockCommandExecutorMock {
     ///         stderr: vec![],
     ///     }));
     /// ```
-    pub fn expect_execute_with_stdin(&mut self) -> ExecuteWithStdinExpectation {
+    pub fn expect_execute_with_stdin(&mut self) -> ExecuteWithStdinExpectation<'_> {
         ExecuteWithStdinExpectation {
             mock: self,
             matcher: None,

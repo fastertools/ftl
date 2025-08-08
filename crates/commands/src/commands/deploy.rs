@@ -193,13 +193,102 @@ async fn execute_deploy_inner(
         })
         .collect();
 
-    // Parse variables from command line
-    let mut parsed_variables = parse_variables(&args.variables)?;
+    // Parse variables following precedence: CLI flags > env vars > ftl.toml
+    let mut parsed_variables = HashMap::new();
 
-    // If we have ftl.toml, extract variables and auth configuration
-    if deps.file_system.exists(Path::new("ftl.toml")) {
-        add_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
-        add_auth_variables_from_ftl(&deps.file_system, &mut parsed_variables)?;
+    // Step 1: Load from ftl.toml first (lowest priority)
+    // Note: We use the already-parsed ftl_config to avoid re-reading the file
+    add_variables_from_config(&ftl_config, &mut parsed_variables);
+    add_auth_variables_from_config(&ftl_config, &mut parsed_variables);
+
+    // Step 2: Override with environment variables (middle priority)
+    // Spin uses SPIN_VARIABLE_ prefix for runtime variables
+    for (key, value) in std::env::vars() {
+        if let Some(var_name) = key.strip_prefix("SPIN_VARIABLE_") {
+            parsed_variables.insert(var_name.to_string(), value);
+        }
+    }
+
+    // Also handle FTL_ACCESS_CONTROL env var which affects auth_enabled
+    if let Ok(access_control) = std::env::var("FTL_ACCESS_CONTROL") {
+        match access_control.as_str() {
+            "public" => {
+                parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
+            }
+            "private" | "custom" => {
+                parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
+
+                // Set provider type based on mode
+                if access_control == "private" {
+                    // Use FTL's AuthKit for private mode (unless overridden by SPIN_VARIABLE_)
+                    if !parsed_variables.contains_key("mcp_provider_type") {
+                        parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    }
+                    if !parsed_variables.contains_key("mcp_jwt_issuer") {
+                        parsed_variables.insert(
+                            "mcp_jwt_issuer".to_string(),
+                            "https://divine-lion-50-staging.authkit.app".to_string(),
+                        );
+                    }
+                }
+            }
+            _ => {} // Invalid values handled later
+        }
+    }
+
+    // Apply other FTL_ env vars for auth configuration
+    if let Ok(provider) = std::env::var("FTL_AUTH_PROVIDER") {
+        parsed_variables.insert("mcp_provider_type".to_string(), provider);
+    }
+    if let Ok(issuer) = std::env::var("FTL_JWT_ISSUER") {
+        parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer);
+    }
+    if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
+        parsed_variables.insert("mcp_jwt_audience".to_string(), audience);
+    }
+
+    // Step 3: Override with CLI variables (highest priority)
+    let cli_variables = parse_variables(&args.variables)?;
+    for (key, value) in cli_variables {
+        parsed_variables.insert(key, value);
+    }
+
+    // Step 4: Handle auth-related CLI flags which should also affect variables
+    // The --access-control flag should override auth_enabled and related variables
+    // IMPORTANT: If --auth-issuer is provided, treat it as custom auth regardless of access_control
+    if let Some(access_control) = &args.access_control {
+        match access_control.as_str() {
+            "public" => {
+                // Disable auth
+                parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
+            }
+            "private" => {
+                // Enable auth
+                parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
+
+                // If jwt_issuer is provided, treat as custom auth
+                if let Some(issuer) = &args.jwt_issuer {
+                    // Custom auth mode with custom issuer
+                    parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
+                } else if access_control == "private" {
+                    // For private mode without custom OAuth, use FTL's AuthKit
+                    // Check if we need to override issuer for tenant-scoped AuthKit
+                    if !parsed_variables.contains_key("mcp_jwt_issuer") {
+                        parsed_variables.insert(
+                            "mcp_jwt_issuer".to_string(),
+                            "https://divine-lion-50-staging.authkit.app".to_string(),
+                        );
+                    }
+                    if !parsed_variables.contains_key("mcp_provider_type") {
+                        parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
+                    }
+                }
+            }
+            _ => {
+                // Invalid value will be caught later in resolve_auth_config
+            }
+        }
     }
 
     // If this is a dry run, display summary and exit
@@ -567,12 +656,12 @@ fn display_dry_run_summary(
         deps.ui.print(&format!("  • {deploy_name} (v{version})"));
         let source_path = &component.source_path;
         deps.ui.print(&format!("    Source: {source_path}"));
-        if let Some(hosts) = &component.allowed_outbound_hosts {
-            if !hosts.is_empty() {
-                let hosts_str = hosts.join(", ");
-                deps.ui
-                    .print(&format!("    Allowed outbound hosts: {hosts_str}"));
-            }
+        if let Some(hosts) = &component.allowed_outbound_hosts
+            && !hosts.is_empty()
+        {
+            let hosts_str = hosts.join(", ");
+            deps.ui
+                .print(&format!("    Allowed outbound hosts: {hosts_str}"));
         }
     }
     deps.ui.print("");
@@ -653,16 +742,16 @@ async fn update_auth_config(
             // No additional config needed
         }
         "custom" => {
-            if auth_provider.is_none() || auth_issuer.is_none() {
-                return Err(anyhow!(
-                    "Custom auth mode requires --auth-provider and --auth-issuer"
-                ));
+            // Custom mode is only reached when we have OAuth config or --jwt-issuer
+            // The issuer should always be present at this point
+            if auth_issuer.is_none() {
+                return Err(anyhow!("Internal error: custom auth mode without issuer"));
             }
 
             custom_config = Some(types::UpdateAuthConfigRequestCustomConfig {
                 provider: auth_provider
-                    .unwrap()
-                    .clone()
+                    .cloned()
+                    .unwrap_or_else(|| "jwt".to_string())
                     .try_into()
                     .map_err(|_| anyhow!("Invalid provider name"))?,
                 issuer: auth_issuer
@@ -690,49 +779,40 @@ async fn update_auth_config(
     Ok(())
 }
 
-/// Add auth-related variables from ftl.toml to the variables map
-fn add_auth_variables_from_ftl(
-    file_system: &Arc<dyn FileSystem>,
+/// Add auth-related variables from parsed `FtlConfig` to the variables map
+fn add_auth_variables_from_config(
+    config: &crate::config::ftl_config::FtlConfig,
     variables: &mut HashMap<String, String>,
-) -> Result<()> {
-    use crate::config::ftl_config::FtlConfig;
-
-    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
-    let config = FtlConfig::parse(&content)?;
-
-    // Always add auth_enabled variable if not already provided via command line
-    if !variables.contains_key("auth_enabled") {
-        variables.insert(
-            "auth_enabled".to_string(),
-            config.is_auth_enabled().to_string(),
-        );
-    }
+) {
+    // Always add auth_enabled variable (will be overridden by env/CLI if present)
+    variables.insert(
+        "auth_enabled".to_string(),
+        config.is_auth_enabled().to_string(),
+    );
 
     // Only add other auth-related variables if auth is enabled
     if config.is_auth_enabled() {
         // Add provider type
-        if !variables.contains_key("mcp_provider_type") {
-            variables.insert(
-                "mcp_provider_type".to_string(),
-                config.auth_provider_type().to_string(),
-            );
-        }
+        variables.insert(
+            "mcp_provider_type".to_string(),
+            config.auth_provider_type().to_string(),
+        );
 
         // Add issuer
         let issuer = config.auth_issuer();
-        if !issuer.is_empty() && !variables.contains_key("mcp_jwt_issuer") {
+        if !issuer.is_empty() {
             variables.insert("mcp_jwt_issuer".to_string(), issuer.to_string());
         }
 
         // Add audience
         let audience = config.auth_audience();
-        if !audience.is_empty() && !variables.contains_key("mcp_jwt_audience") {
+        if !audience.is_empty() {
             variables.insert("mcp_jwt_audience".to_string(), audience.to_string());
         }
 
         // Add required scopes
         let required_scopes = config.auth_required_scopes();
-        if !required_scopes.is_empty() && !variables.contains_key("mcp_jwt_required_scopes") {
+        if !required_scopes.is_empty() {
             variables.insert(
                 "mcp_jwt_required_scopes".to_string(),
                 required_scopes.to_string(),
@@ -740,81 +820,66 @@ fn add_auth_variables_from_ftl(
         }
     }
 
-    // Add OIDC-specific variables if present and auth is enabled
-    if config.is_auth_enabled() {
-        if let Some(oidc) = &config.oidc {
-            if !oidc.jwks_uri.is_empty() && !variables.contains_key("mcp_jwt_jwks_uri") {
-                variables.insert("mcp_jwt_jwks_uri".to_string(), oidc.jwks_uri.clone());
-            }
+    // Add OAuth-specific variables if present and auth is enabled
+    if config.is_auth_enabled()
+        && let Some(oauth) = &config.oauth
+    {
+        if !oauth.jwks_uri.is_empty() {
+            variables.insert("mcp_jwt_jwks_uri".to_string(), oauth.jwks_uri.clone());
+        }
 
-            if !oidc.public_key.is_empty() && !variables.contains_key("mcp_jwt_public_key") {
-                variables.insert("mcp_jwt_public_key".to_string(), oidc.public_key.clone());
-            }
+        if !oauth.public_key.is_empty() {
+            variables.insert("mcp_jwt_public_key".to_string(), oauth.public_key.clone());
+        }
 
-            if !oidc.algorithm.is_empty() && !variables.contains_key("mcp_jwt_algorithm") {
-                variables.insert("mcp_jwt_algorithm".to_string(), oidc.algorithm.clone());
-            }
+        if !oauth.algorithm.is_empty() {
+            variables.insert("mcp_jwt_algorithm".to_string(), oauth.algorithm.clone());
+        }
 
-            if !oidc.authorize_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_authorize_endpoint")
-            {
-                variables.insert(
-                    "mcp_oauth_authorize_endpoint".to_string(),
-                    oidc.authorize_endpoint.clone(),
-                );
-            }
+        if !oauth.authorize_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_authorize_endpoint".to_string(),
+                oauth.authorize_endpoint.clone(),
+            );
+        }
 
-            if !oidc.token_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_token_endpoint")
-            {
-                variables.insert(
-                    "mcp_oauth_token_endpoint".to_string(),
-                    oidc.token_endpoint.clone(),
-                );
-            }
+        if !oauth.token_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_token_endpoint".to_string(),
+                oauth.token_endpoint.clone(),
+            );
+        }
 
-            if !oidc.userinfo_endpoint.is_empty()
-                && !variables.contains_key("mcp_oauth_userinfo_endpoint")
-            {
-                variables.insert(
-                    "mcp_oauth_userinfo_endpoint".to_string(),
-                    oidc.userinfo_endpoint.clone(),
-                );
-            }
+        if !oauth.userinfo_endpoint.is_empty() {
+            variables.insert(
+                "mcp_oauth_userinfo_endpoint".to_string(),
+                oauth.userinfo_endpoint.clone(),
+            );
         }
     }
-
-    Ok(())
 }
 
-/// Add general variables from ftl.toml to the variables map
-fn add_variables_from_ftl(
-    file_system: &Arc<dyn FileSystem>,
+/// Add general variables from parsed `FtlConfig` to the variables map
+fn add_variables_from_config(
+    config: &crate::config::ftl_config::FtlConfig,
     variables: &mut HashMap<String, String>,
-) -> Result<()> {
-    use crate::config::ftl_config::{ApplicationVariable, FtlConfig};
-
-    let content = file_system.read_to_string(Path::new("ftl.toml"))?;
-    let config = FtlConfig::parse(&content)?;
+) {
+    use crate::config::ftl_config::ApplicationVariable;
 
     // Add application-level variables that have default values
     // Required variables without defaults must be provided via CLI or env vars
     for (name, var) in &config.variables {
-        // Only add if not already provided via command line
-        if !variables.contains_key(name) {
-            match var {
-                ApplicationVariable::Default { default } => {
-                    variables.insert(name.clone(), default.clone());
-                }
-                ApplicationVariable::Required { .. } => {
-                    // Required variables must be provided at runtime
-                    // We don't add them here, they'll be handled by Spin
-                }
+        match var {
+            ApplicationVariable::Default { default } => {
+                // Always add defaults from ftl.toml (will be overridden by env/CLI if present)
+                variables.insert(name.clone(), default.clone());
+            }
+            ApplicationVariable::Required { .. } => {
+                // Required variables must be provided at runtime
+                // We don't add them here, they'll be handled by Spin
             }
         }
     }
-
-    Ok(())
 }
 
 /// Parse deployment configuration from spin.toml
@@ -956,11 +1021,10 @@ pub fn extract_component_version(
         if let Some(version_line) = go_mod_content
             .lines()
             .find(|line| line.contains("// Version:"))
+            && let Some(version_str) = version_line.split("// Version:").nth(1)
         {
-            if let Some(version_str) = version_line.split("// Version:").nth(1) {
-                let version = version_str.trim().trim_start_matches('v');
-                return Ok(version.to_string());
-            }
+            let version = version_str.trim().trim_start_matches('v');
+            return Ok(version.to_string());
         }
     }
 
@@ -1187,10 +1251,10 @@ async fn ensure_components_and_push(
     // Wait for all tasks to complete
     let mut first_error = None;
     while let Some(result) = tasks.join_next().await {
-        if let Err(e) = result? {
-            if first_error.is_none() {
-                first_error = Some(e);
-            }
+        if let Err(e) = result?
+            && first_error.is_none()
+        {
+            first_error = Some(e);
         }
     }
 
@@ -1315,12 +1379,8 @@ pub struct DeployArgs {
     pub variables: Vec<String>,
     /// Access control mode to set for the deployed app
     pub access_control: Option<String>,
-    /// Custom auth provider (authkit, auth0, oidc)
-    pub auth_provider: Option<String>,
-    /// Custom auth issuer URL
-    pub auth_issuer: Option<String>,
-    /// Custom auth audience
-    pub auth_audience: Option<String>,
+    /// JWT issuer URL
+    pub jwt_issuer: Option<String>,
     /// Run without making any changes (preview what would be deployed)
     pub dry_run: bool,
     /// Skip confirmation prompt
@@ -1352,8 +1412,8 @@ fn resolve_auth_config(
         if config.project.access_control == "public" {
             auth_mode = Some("public".to_string());
         } else if config.project.access_control == "private" {
-            // Check if we have custom OIDC config
-            if config.oidc.is_some() {
+            // Check if we have custom OAuth config
+            if config.oauth.is_some() {
                 auth_mode = Some("custom".to_string());
             } else {
                 auth_mode = Some("private".to_string());
@@ -1363,13 +1423,13 @@ fn resolve_auth_config(
         // Extract provider details only when auth is enabled
         if config.is_auth_enabled() {
             // Extract provider details based on configuration
-            if let Some(oidc) = &config.oidc {
-                auth_provider = Some("oidc".to_string());
-                auth_issuer = Some(oidc.issuer.clone());
-                auth_audience = if oidc.audience.is_empty() {
+            if let Some(oauth) = &config.oauth {
+                auth_provider = Some("oauth".to_string());
+                auth_issuer = Some(oauth.issuer.clone());
+                auth_audience = if oauth.audience.is_empty() {
                     None
                 } else {
-                    Some(oidc.audience.clone())
+                    Some(oauth.audience.clone())
                 };
             } else {
                 // Using FTL's built-in AuthKit
@@ -1387,7 +1447,7 @@ fn resolve_auth_config(
     if let Ok(provider) = std::env::var("FTL_AUTH_PROVIDER") {
         auth_provider = Some(provider);
     }
-    if let Ok(issuer) = std::env::var("FTL_AUTH_ISSUER") {
+    if let Ok(issuer) = std::env::var("FTL_JWT_ISSUER") {
         auth_issuer = Some(issuer);
     }
     if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
@@ -1395,17 +1455,20 @@ fn resolve_auth_config(
     }
 
     // Override with CLI flags (highest priority)
-    if let Some(mode) = &args.access_control {
-        auth_mode = Some(mode.clone());
-    }
-    if let Some(provider) = &args.auth_provider {
-        auth_provider = Some(provider.clone());
-    }
-    if let Some(issuer) = &args.auth_issuer {
+    // IMPORTANT: If --jwt-issuer is provided, treat as custom auth
+    if let Some(issuer) = &args.jwt_issuer {
+        // When jwt_issuer is explicitly provided, this is custom auth
+        auth_mode = Some("custom".to_string());
         auth_issuer = Some(issuer.clone());
+        // Always use jwt provider for custom auth
+        auth_provider = Some("jwt".to_string());
     }
-    if let Some(audience) = &args.auth_audience {
-        auth_audience = Some(audience.clone());
+
+    // Set access control mode if provided and no custom issuer override
+    if let Some(mode) = &args.access_control
+        && args.jwt_issuer.is_none()
+    {
+        auth_mode = Some(mode.clone());
     }
 
     // Return None if no auth mode is configured

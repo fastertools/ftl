@@ -75,14 +75,14 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 
     // Only add other auth variables if auth is enabled
     if ftl_config.is_auth_enabled() {
-        // Add tenant_id variable for private mode without OIDC (platform will provide the value)
-        if ftl_config.project.access_control == "private" && ftl_config.oidc.is_none() {
+        // Add tenant_id variable for private mode without OAuth (platform will provide the value)
+        if ftl_config.project.access_control == "private" && ftl_config.oauth.is_none() {
             variables.insert(
                 "mcp_tenant_id".to_string(),
                 SpinVariable::Required { required: true },
             );
         } else {
-            // For public mode or private with OIDC, tenant_id is empty
+            // For public mode or private with OAuth, tenant_id is empty
             variables.insert(
                 "mcp_tenant_id".to_string(),
                 SpinVariable::Default {
@@ -110,7 +110,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             },
         );
 
-        // JWT provider variables (both FTL AuthKit and custom OIDC use JWT)
+        // JWT provider variables (both FTL AuthKit and custom OAuth use JWT)
         variables.insert(
             "mcp_jwt_issuer".to_string(),
             SpinVariable::Default {
@@ -130,9 +130,9 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             },
         );
 
-        // JWKS URI - empty for FTL AuthKit (auto-derived), explicit for OIDC
-        let jwks_uri = if let Some(oidc) = &ftl_config.oidc {
-            oidc.jwks_uri.clone()
+        // JWKS URI - empty for FTL AuthKit (auto-derived), explicit for OAuth
+        let jwks_uri = if let Some(oauth) = &ftl_config.oauth {
+            oauth.jwks_uri.clone()
         } else {
             String::new()
         };
@@ -141,18 +141,18 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             SpinVariable::Default { default: jwks_uri },
         );
 
-        // Public key and algorithm (OIDC only)
-        if let Some(oidc) = &ftl_config.oidc {
+        // Public key and algorithm (OAuth only)
+        if let Some(oauth) = &ftl_config.oauth {
             variables.insert(
                 "mcp_jwt_public_key".to_string(),
                 SpinVariable::Default {
-                    default: oidc.public_key.clone(),
+                    default: oauth.public_key.clone(),
                 },
             );
             variables.insert(
                 "mcp_jwt_algorithm".to_string(),
                 SpinVariable::Default {
-                    default: oidc.algorithm.clone(),
+                    default: oauth.algorithm.clone(),
                 },
             );
         } else {
@@ -171,23 +171,23 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         }
 
         // OAuth discovery endpoints
-        if let Some(oidc) = &ftl_config.oidc {
+        if let Some(oauth) = &ftl_config.oauth {
             variables.insert(
                 "mcp_oauth_authorize_endpoint".to_string(),
                 SpinVariable::Default {
-                    default: oidc.authorize_endpoint.clone(),
+                    default: oauth.authorize_endpoint.clone(),
                 },
             );
             variables.insert(
                 "mcp_oauth_token_endpoint".to_string(),
                 SpinVariable::Default {
-                    default: oidc.token_endpoint.clone(),
+                    default: oauth.token_endpoint.clone(),
                 },
             );
             variables.insert(
                 "mcp_oauth_userinfo_endpoint".to_string(),
                 SpinVariable::Default {
-                    default: oidc.userinfo_endpoint.clone(),
+                    default: oauth.userinfo_endpoint.clone(),
                 },
             );
         } else {
@@ -549,13 +549,13 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
     // Validate auth configuration for local development
     if config.validate_local_auth
         && ftl_config.project.access_control == "private"
-        && ftl_config.oidc.is_none()
+        && ftl_config.oauth.is_none()
     {
         return Err(anyhow::anyhow!(
-            "Private access control requires OIDC configuration for local development.\n\
+            "Private access control requires OAuth configuration for local development.\n\
             \n\
             To fix this, either:\n\
-            1. Add an [oidc] section to your ftl.toml with your OIDC provider details\n\
+            1. Add an [oauth] section to your ftl.toml with your OAuth provider details\n\
             2. Set access_control = \"public\"\n"
         ));
     }
@@ -659,15 +659,15 @@ pub fn generate_temp_spin_toml(config: &GenerateSpinConfig) -> Result<Option<std
             }
 
             // Also make the wasm path absolute (only for local components)
-            if let Some(wasm_path) = &tool_config.wasm {
-                if !wasm_path.starts_with('/') {
-                    tool_config.wasm = Some(
-                        abs_project_path
-                            .join(wasm_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    );
-                }
+            if let Some(wasm_path) = &tool_config.wasm
+                && !wasm_path.starts_with('/')
+            {
+                tool_config.wasm = Some(
+                    abs_project_path
+                        .join(wasm_path)
+                        .to_string_lossy()
+                        .to_string(),
+                );
             }
         }
     }

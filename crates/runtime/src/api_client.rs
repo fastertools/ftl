@@ -13,6 +13,8 @@ use crate::config::{
 #[allow(clippy::nursery)]
 #[allow(unused_imports)]
 #[allow(missing_docs)]
+#[allow(unknown_lints)]
+#[allow(mismatched_lifetime_syntaxes)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/ftl_backend_client.rs"));
 }

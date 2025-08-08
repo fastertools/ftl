@@ -44,7 +44,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-          cache-key: ci-lint
+          cache-key: ci-lint-v189
           install-system-deps: 'true'
       
       - name: Check formatting (CLI)
@@ -74,7 +74,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-          cache-key: ci-lint-rust-sdk
+          cache-key: ci-lint-rust-sdk-v189
       
       - name: Check formatting (SDK)
         run: |
@@ -399,7 +399,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: llvm-tools-preview
-          cache-key: ci-test-sdk
+          cache-key: ci-test-sdk-v189
       
       - name: Setup test tools
         uses: ./.github/actions/setup-test-tools
@@ -423,7 +423,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: llvm-tools-preview
-          cache-key: ci-test-core
+          cache-key: ci-test-core-v189
           install-system-deps: 'true'
       
       - name: Setup test tools
@@ -447,7 +447,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: ci-security
+          cache-key: ci-security-v189
           install-system-deps: 'true'
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
@@ -464,9 +464,8 @@ jobs:
       - name: Setup Rust for WASM
         uses: ./.github/actions/setup-rust
         with:
-          toolchain: '1.86.0'
           targets: wasm32-wasip1
-          cache-key: ci-wasm
+          cache-key: ci-wasm-v189
           cache-targets: 'true'
       
       - name: Install cargo-component

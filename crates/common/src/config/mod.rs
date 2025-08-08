@@ -163,6 +163,7 @@ impl Config {
     }
 
     /// Get the path to the configuration file
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to PathBuf deref
     pub fn path(&self) -> &Path {
         &self.path
     }

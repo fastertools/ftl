@@ -256,7 +256,7 @@ pub fn openid_configuration(
             }
         }
         crate::config::Provider::Static(_) => {
-            // Static provider has no OIDC support
+            // Static provider has no OAuth support
             json!({
                 "error": "not_supported",
                 "error_description": "Static token provider does not support OpenID Connect"

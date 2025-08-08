@@ -30,6 +30,7 @@ impl ToolsManifest {
     }
 
     /// Get all tools
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to Vec deref
     pub fn get_tools(&self) -> &[Tool] {
         &self.tools
     }
@@ -69,7 +70,7 @@ impl ToolsManifest {
     }
 
     /// Get tools count
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.tools.len()
     }
 }

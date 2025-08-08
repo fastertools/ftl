@@ -15,10 +15,10 @@ pub struct FtlConfig {
     #[garde(dive)]
     pub project: ProjectConfig,
 
-    /// OIDC configuration (optional)
+    /// OAuth configuration (optional)
     #[serde(default)]
     #[garde(dive)]
-    pub oidc: Option<OidcConfig>,
+    pub oauth: Option<OauthConfig>,
 
     /// Tool definitions
     #[serde(default)]
@@ -89,10 +89,10 @@ pub struct ProjectConfig {
     pub default_registry: Option<String>,
 }
 
-/// OIDC-specific configuration
+/// OAuth-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-pub struct OidcConfig {
-    /// OIDC issuer URL
+pub struct OauthConfig {
+    /// OAuth issuer URL
     #[garde(length(min = 1))]
     pub issuer: String,
 
@@ -293,7 +293,7 @@ impl FtlConfig {
     /// Determine the auth provider type
     pub fn auth_provider_type(&self) -> &str {
         if self.is_auth_enabled() {
-            "jwt" // Always use JWT for both OIDC and built-in AuthKit
+            "jwt" // Always use JWT for both OAuth and built-in AuthKit
         } else {
             ""
         }
@@ -301,8 +301,8 @@ impl FtlConfig {
 
     /// Get the issuer URL
     pub fn auth_issuer(&self) -> &str {
-        if let Some(oidc) = &self.oidc {
-            &oidc.issuer
+        if let Some(oauth) = &self.oauth {
+            &oauth.issuer
         } else if self.is_auth_enabled() {
             // Use FTL's built-in AuthKit
             "https://divine-lion-50-staging.authkit.app"
@@ -312,18 +312,20 @@ impl FtlConfig {
     }
 
     /// Get the audience
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to String deref
     pub fn auth_audience(&self) -> &str {
-        if let Some(oidc) = &self.oidc {
-            &oidc.audience
+        if let Some(oauth) = &self.oauth {
+            &oauth.audience
         } else {
             ""
         }
     }
 
     /// Get required scopes
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to String deref
     pub fn auth_required_scopes(&self) -> &str {
-        if let Some(oidc) = &self.oidc {
-            &oidc.required_scopes
+        if let Some(oauth) = &self.oauth {
+            &oauth.required_scopes
         } else {
             ""
         }
@@ -468,7 +470,7 @@ name = "test-project"
     }
 
     #[test]
-    fn test_private_without_oidc() {
+    fn test_private_without_oauth() {
         let config = r#"
 [project]
 name = "test-project"
@@ -484,13 +486,13 @@ access_control = "private"
     }
 
     #[test]
-    fn test_private_with_oidc() {
+    fn test_private_with_oauth() {
         let config = r#"
 [project]
 name = "test-project"
 access_control = "private"
 
-[oidc]
+[oauth]
 issuer = "https://auth.example.com"
 audience = "my-api"
 "#;

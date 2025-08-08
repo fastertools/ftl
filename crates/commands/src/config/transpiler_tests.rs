@@ -24,7 +24,7 @@ fn test_transpile_minimal_config() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -194,7 +194,7 @@ fn test_transpile_with_tools() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -263,7 +263,7 @@ fn test_transpile_with_variables() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -296,7 +296,7 @@ fn test_transpile_with_auth() {
             access_control: "private".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -314,7 +314,7 @@ fn test_transpile_with_auth() {
     );
     assert!(result.contains("mcp_jwt_audience = { default = \"\" }"));
 
-    // For private mode without OIDC, tenant_id should be required
+    // For private mode without OAuth, tenant_id should be required
     assert!(result.contains("mcp_tenant_id = { required = true }"));
 
     // Validate and check auth variables
@@ -334,17 +334,17 @@ fn test_transpile_with_auth() {
 }
 
 #[test]
-fn test_transpile_with_oidc_auth() {
+fn test_transpile_with_oauth_auth() {
     let config = FtlConfig {
         project: ProjectConfig {
-            name: "oidc-project".to_string(),
+            name: "oauth-project".to_string(),
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
             access_control: "private".to_string(),
             default_registry: None,
         },
-        oidc: Some(OidcConfig {
+        oauth: Some(OauthConfig {
             issuer: "https://auth.example.com".to_string(),
             audience: "api".to_string(),
             jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
@@ -362,14 +362,14 @@ fn test_transpile_with_oidc_auth() {
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    // Check OIDC configuration
+    // Check OAuth configuration
     assert!(result.contains("auth_enabled = { default = \"true\" }"));
     assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
     assert!(result.contains(
         "mcp_jwt_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
     ));
 
-    // For private mode with OIDC, tenant_id should be empty (not required)
+    // For private mode with OAuth, tenant_id should be empty (not required)
     assert!(result.contains("mcp_tenant_id = { default = \"\" }"));
 
     // Validate the generated TOML
@@ -397,7 +397,7 @@ fn test_transpile_with_public_access() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -433,7 +433,7 @@ fn test_transpile_with_custom_gateway_uris() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig {
             gateway: "ghcr.io/myorg/custom-gateway:2.0.0".to_string(),
@@ -523,7 +523,7 @@ fn test_transpile_with_application_variables() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: app_vars,
@@ -644,7 +644,7 @@ fn test_transpile_complete_example() {
             access_control: "private".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig {
             gateway: "ghcr.io/example/gateway:3.0.0".to_string(),
@@ -670,7 +670,7 @@ fn test_transpile_complete_example() {
     );
     assert_eq!(spin_config.application.authors.len(), 2);
 
-    // Check all components exist - private mode without OIDC has auth components
+    // Check all components exist - private mode without OAuth has auth components
     assert!(spin_config.component.contains_key("mcp"));
     assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
     assert!(spin_config.component.contains_key("database"));
@@ -773,7 +773,7 @@ fn test_transpile_with_build_profiles() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -844,7 +844,7 @@ fn test_transpile_with_special_characters() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: app_vars,
@@ -879,7 +879,7 @@ fn test_transpile_empty_collections() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(), // No tools
         mcp: McpConfig::default(),
         variables: HashMap::new(), // No variables
@@ -975,7 +975,7 @@ fn test_http_trigger_generation() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1014,7 +1014,7 @@ fn test_auth_disabled_omits_authorizer() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1075,7 +1075,7 @@ fn test_auth_enabled_includes_authorizer() {
             access_control: "private".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1166,7 +1166,7 @@ fn test_auth_disabled_with_tools() {
             access_control: "public".to_string(),
             default_registry: None,
         },
-        oidc: None,
+        oauth: None,
         tools,
         mcp: McpConfig::default(),
         variables: HashMap::new(),

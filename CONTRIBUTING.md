@@ -40,7 +40,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Rust 1.86 or later (with edition 2024 support)
+- Rust 1.89 or later
 - Spin CLI (for testing WebAssembly components)
 - wasm32-wasip1 target: `rustup target add wasm32-wasip1`
 
