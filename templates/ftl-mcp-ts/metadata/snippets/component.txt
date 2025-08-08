@@ -9,6 +9,6 @@ allowed_outbound_hosts = []
 command = "npm install && npm run build"
 watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
-# IMPORTANT: After adding this component, update the tool_components variable
+# IMPORTANT: After adding this component, update the component_names variable
 # in the [variables] section at the top of spin.toml to include "{{project-name | kebab_case}}"
-# Example: tool_components = { default = "existing-tool,{{project-name | kebab_case}}" }
+# Example: component_names = { default = "existing-tool,{{project-name | kebab_case}}" }

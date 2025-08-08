@@ -11,7 +11,7 @@ use crate::{ResponseData, test_helpers::*};
 #[spin_test]
 fn test_tool_routing_snake_to_kebab_case() {
     // Setup with a tool component that has underscores
-    variables::set("tool_components", "echo_tool,math_calculator");
+    variables::set("component_names", "echo_tool,math_calculator");
     variables::set("validate_arguments", "false");
     
     // The gateway will convert echo_tool to echo-tool when making requests
@@ -149,7 +149,7 @@ fn test_tool_not_found() {
 
 #[spin_test]
 fn test_component_failure_handling() {
-    variables::set("tool_components", "broken_tool");
+    variables::set("component_names", "broken_tool");
     variables::set("validate_arguments", "false");
     
     // Mock a component that returns 500 error
@@ -187,7 +187,7 @@ fn test_component_failure_handling() {
 #[spin_test]
 fn test_parallel_tool_discovery() {
     // Test that multiple components are queried in parallel
-    variables::set("tool_components", "tool1,tool2,tool3");
+    variables::set("component_names", "tool1,tool2,tool3");
     variables::set("validate_arguments", "false");
     
     // Mock three different tool components

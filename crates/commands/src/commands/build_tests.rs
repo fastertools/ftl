@@ -140,11 +140,11 @@ async fn test_build_single_component_success() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#,
     );
@@ -213,11 +213,11 @@ async fn test_build_with_release_flag() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#,
     );
@@ -278,11 +278,11 @@ async fn test_build_with_custom_path() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.frontend]
+[component.frontend]
 path = "frontend"
 wasm = "frontend/dist/frontend.wasm"
 
-[tools.frontend.build]
+[component.frontend.build]
 command = "npm run build"
 "#,
     );
@@ -350,18 +350,18 @@ async fn test_build_multiple_components() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 
-[tools.frontend]
+[component.frontend]
 path = "frontend"
 wasm = "frontend/dist/frontend.wasm"
 
-[tools.frontend.build]
+[component.frontend.build]
 command = "npm run build"
 "#,
     );
@@ -422,11 +422,11 @@ async fn test_build_failure() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#,
     );
@@ -534,11 +534,11 @@ async fn test_build_with_project_path() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.backend]
+[component.backend]
 path = "backend"
 wasm = "backend/target/wasm32-wasi/release/backend.wasm"
 
-[tools.backend.build]
+[component.backend.build]
 command = "cargo build --target wasm32-wasi"
 "#
             .to_string())

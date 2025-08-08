@@ -169,7 +169,7 @@ fn create_ftl_project(
             default_registry: None,
         },
         oauth: None,
-        tools: HashMap::new(),
+        component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
     };

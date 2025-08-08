@@ -61,7 +61,7 @@ impl ResponseData {
 #[spin_test]
 fn basic_ping_test() {
     // Setup test configuration
-    variables::set("tool_components", "echo");
+    variables::set("component_names", "echo");
     variables::set("validate_arguments", "true");
     
     // Create JSON-RPC ping request

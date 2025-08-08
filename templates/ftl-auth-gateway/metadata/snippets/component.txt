@@ -72,5 +72,5 @@ component = "ftl-mcp-gateway"
 source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.ftl-mcp-gateway.variables]
-tool_components = "{% raw %}{{ tool_components }}{% endraw %}"
+component_names = "{% raw %}{{ component_names }}{% endraw %}"
 validate_arguments = "true"

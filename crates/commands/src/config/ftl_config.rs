@@ -20,10 +20,10 @@ pub struct FtlConfig {
     #[garde(dive)]
     pub oauth: Option<OauthConfig>,
 
-    /// Tool definitions
-    #[serde(default)]
-    #[garde(custom(validate_tools))]
-    pub tools: HashMap<String, ToolConfig>,
+    /// Component definitions
+    #[serde(default, rename = "component")]
+    #[garde(custom(validate_components))]
+    pub component: HashMap<String, ComponentConfig>,
 
     /// MCP component configuration
     #[serde(default)]
@@ -137,24 +137,24 @@ pub struct OauthConfig {
     pub userinfo_endpoint: String,
 }
 
-/// Deployment configuration for a tool
+/// Deployment configuration for a component
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct DeployConfig {
     /// Build profile to use for deployment (e.g., "release", "production")
     #[garde(length(min = 1))]
     pub profile: String,
 
-    /// Optional custom name suffix for the deployed tool
+    /// Optional custom name suffix for the deployed component
     /// The full name will be {project-name}-{name}
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[garde(skip)]
     pub name: Option<String>,
 }
 
-/// Tool configuration
+/// Component configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolConfig {
-    /// Path to tool directory relative to project root
+pub struct ComponentConfig {
+    /// Path to component directory relative to project root
     /// Required for local components, ignored for registry components
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -185,16 +185,16 @@ pub struct ToolConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deploy: Option<DeployConfig>,
 
-    /// Allowed outbound hosts for the tool
+    /// Allowed outbound hosts for the component
     #[serde(default)]
     pub allowed_outbound_hosts: Vec<String>,
 
-    /// Variables to pass to the tool at runtime
+    /// Variables to pass to the component at runtime
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub variables: HashMap<String, String>,
 }
 
-/// Build profiles for a tool
+/// Build profiles for a component
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BuildProfiles {
     /// Build profiles mapped by name
@@ -280,9 +280,9 @@ impl FtlConfig {
         toml::to_string_pretty(self).context("Failed to serialize FTL configuration")
     }
 
-    /// Get the list of tool component names
-    pub fn tool_components(&self) -> Vec<String> {
-        self.tools.keys().cloned().collect()
+    /// Get the list of component names
+    pub fn component_names(&self) -> Vec<String> {
+        self.component.keys().cloned().collect()
     }
 
     /// Determine if authentication is enabled
@@ -332,13 +332,15 @@ impl FtlConfig {
     }
 }
 
-impl ToolConfig {
-    /// Get the path to the tool directory
-    pub fn get_path(&self, tool_name: &str) -> String {
-        self.path.clone().unwrap_or_else(|| tool_name.to_string())
+impl ComponentConfig {
+    /// Get the path to the component directory
+    pub fn get_path(&self, component_name: &str) -> String {
+        self.path
+            .clone()
+            .unwrap_or_else(|| component_name.to_string())
     }
 
-    /// Validate the tool configuration
+    /// Validate the component configuration
     pub fn validate(&self) -> Result<(), garde::Report> {
         let mut report = garde::Report::new();
 
@@ -347,14 +349,16 @@ impl ToolConfig {
             (None, None) => {
                 report.append(
                     garde::Path::empty(),
-                    garde::Error::new("Tool must specify either 'wasm' (for local components) or 'repo' (for registry components)")
+                    garde::Error::new(
+                        "Component must specify either 'wasm' (for local) or 'repo' (for registry)",
+                    ),
                 );
                 return Err(report);
             }
             (Some(_), Some(_)) => {
                 report.append(
                     garde::Path::empty(),
-                    garde::Error::new("Tool cannot specify both 'wasm' and 'repo'. Use 'wasm' for local components or 'repo' for registry components")
+                    garde::Error::new("Component cannot specify both 'wasm' and 'repo'. Use 'wasm' for local or 'repo' for registry")
                 );
                 return Err(report);
             }
@@ -423,19 +427,19 @@ impl Default for McpConfig {
 
 // Validation functions
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn validate_tools(tools: &HashMap<String, ToolConfig>, _: &()) -> garde::Result {
-    for (name, config) in tools {
+fn validate_components(component: &HashMap<String, ComponentConfig>, _: &()) -> garde::Result {
+    for (name, config) in component {
         config
             .validate()
-            .map_err(|e| garde::Error::new(format!("Tool '{name}': {e}")))?;
+            .map_err(|e| garde::Error::new(format!("Component '{name}': {e}")))?;
 
-        // Ensure tool name follows naming conventions
+        // Ensure component name follows naming conventions
         if !name
             .chars()
             .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         {
             return Err(garde::Error::new(format!(
-                "Tool name '{name}' contains invalid characters. Use only alphanumeric, dash, or underscore."
+                "Component name '{name}' contains invalid characters. Use only alphanumeric, dash, or underscore."
             )));
         }
     }
@@ -522,7 +526,7 @@ access_control = "custom"
     }
 
     #[test]
-    fn test_mixed_local_and_registry_tools() {
+    fn test_mixed_local_and_registry_components() {
         let config = r#"
 [project]
 name = "py-tools"
@@ -531,19 +535,19 @@ description = "FTL MCP server for hosting MCP tools"
 access_control = "private"
 default_registry = "ghcr.io/fastertools"
 
-[tools.example-py]
+[component.example-py]
 path = "example-py"
 wasm = "example-py/app.wasm"
 allowed_outbound_hosts = []
 
-[tools.example-py.build]
+[component.example-py.build]
 command = "make build"
 watch = [
     "src/**/*.py",
     "pyproject.toml",
 ]
 
-[tools.example-rs]
+[component.example-rs]
 repo = "ghcr.io/fastertools/example-rs:latest"
 
 [mcp]
@@ -555,30 +559,30 @@ validate_arguments = false
         assert_eq!(ftl_config.project.name, "py-tools");
         assert_eq!(ftl_config.project.access_control, "private");
 
-        // Check local tool
-        let py_tool = &ftl_config.tools["example-py"];
-        assert_eq!(py_tool.wasm, Some("example-py/app.wasm".to_string()));
-        assert!(py_tool.repo.is_none());
-        assert!(py_tool.build.is_some());
+        // Check local component
+        let py_component = &ftl_config.component["example-py"];
+        assert_eq!(py_component.wasm, Some("example-py/app.wasm".to_string()));
+        assert!(py_component.repo.is_none());
+        assert!(py_component.build.is_some());
 
-        // Check registry tool
-        let rs_tool = &ftl_config.tools["example-rs"];
-        assert!(rs_tool.wasm.is_none());
+        // Check registry component
+        let rs_component = &ftl_config.component["example-rs"];
+        assert!(rs_component.wasm.is_none());
         assert_eq!(
-            rs_tool.repo,
+            rs_component.repo,
             Some("ghcr.io/fastertools/example-rs:latest".to_string())
         );
-        assert!(rs_tool.build.is_none());
+        assert!(rs_component.build.is_none());
     }
 
     #[test]
-    fn test_tool_validation_errors() {
+    fn test_component_validation_errors() {
         // Test missing both wasm and repo
         let config = r#"
 [project]
 name = "test"
 
-[tools.broken]
+[component.broken]
 path = "broken"
 "#;
         let result = FtlConfig::parse(config);
@@ -594,7 +598,7 @@ path = "broken"
 [project]
 name = "test"
 
-[tools.broken]
+[component.broken]
 wasm = "broken/app.wasm"
 repo = "ghcr.io/org/broken:latest"
 "#;
@@ -612,7 +616,7 @@ repo = "ghcr.io/org/broken:latest"
 [project]
 name = "test"
 
-[tools.broken]
+[component.broken]
 wasm = "broken/app.wasm"
 "#;
         let result = FtlConfig::parse(config);
@@ -629,10 +633,10 @@ wasm = "broken/app.wasm"
 [project]
 name = "test"
 
-[tools.broken]
+[component.broken]
 repo = "ghcr.io/org/broken:latest"
 
-[tools.broken.build]
+[component.broken.build]
 command = "make build"
 "#;
         let result = FtlConfig::parse(config);

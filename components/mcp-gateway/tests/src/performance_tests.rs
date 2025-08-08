@@ -9,7 +9,7 @@ use crate::{ResponseData, test_helpers::*};
 
 #[spin_test]
 fn test_empty_components_list_performance() {
-    variables::set("tool_components", "");
+    variables::set("component_names", "");
     variables::set("validate_arguments", "true");
     
     let request_json = create_json_rpc_request("tools/list", None, Some(serde_json::json!(1)));
@@ -33,7 +33,7 @@ fn test_many_components_configuration() {
         .collect::<Vec<_>>()
         .join(",");
     
-    variables::set("tool_components", &many_components);
+    variables::set("component_names", &many_components);
     variables::set("validate_arguments", "false");
     
     // Mock all the components with empty tool lists

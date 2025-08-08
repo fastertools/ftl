@@ -77,10 +77,10 @@ api_token = { required = true }
 
 ### Using Variables in Tools
 
-Tools access variables through their component configuration:
+Components access variables through their component configuration:
 
 ```toml
-[tools.variables-demo]
+[component.variables-demo]
 variables = { 
     api_token = "{{ api_token }}", 
     api_url = "{{ api_url }}", 

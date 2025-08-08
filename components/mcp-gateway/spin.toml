@@ -7,8 +7,8 @@ authors = ["FTL Contributors"]
 description = "MCP gateway for FTL MCP components"
 
 [variables]
-# Tool components configuration
-tool_components = { default = "example-tool-component" }
+# Components configuration
+component_names = { default = "example-component" }
 validate_arguments = { default = "true" }
 
 [[trigger.http]]
@@ -26,7 +26,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 
 [component.mcp-gateway.variables]
 validate_arguments = "{{ validate_arguments }}"
-tool_components = "{{ tool_components }}"
+component_names = "{{ component_names }}"
 
 # Test configuration
 [component.mcp-gateway.tool.spin-test]

@@ -143,9 +143,12 @@ async fn execute_deploy_inner(
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
     // Determine which build profile to use for deployment
-    // For now, use release mode if any tool has deploy.profile = "release" or no profile specified
-    let use_release = ftl_config.tools.values().any(|tool| {
-        tool.deploy.as_ref().is_none_or(|d| d.profile == "release") // Default to release if no deploy config
+    // For now, use release mode if any component has deploy.profile = "release" or no profile specified
+    let use_release = ftl_config.component.values().any(|component| {
+        component
+            .deploy
+            .as_ref()
+            .is_none_or(|d| d.profile == "release") // Default to release if no deploy config
     });
 
     // Build the project first
@@ -182,12 +185,13 @@ async fn execute_deploy_inner(
         return Err(anyhow!("No user components found in spin.toml"));
     }
 
-    // Create a mapping of tool names to their deploy names
+    // Create a mapping of component names to their deploy names
     let deploy_names: HashMap<String, String> = ftl_config
-        .tools
+        .component
         .iter()
-        .filter_map(|(name, tool)| {
-            tool.deploy
+        .filter_map(|(name, component)| {
+            component
+                .deploy
                 .as_ref()
                 .and_then(|d| d.name.as_ref())
                 .map(|deploy_name| (name.clone(), deploy_name.clone()))

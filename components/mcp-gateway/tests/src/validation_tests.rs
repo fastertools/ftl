@@ -6,7 +6,7 @@ use crate::{ResponseData, test_helpers::*};
 
 #[spin_test]
 fn test_argument_validation_enabled() {
-    variables::set("tool_components", "strict_tool");
+    variables::set("component_names", "strict_tool");
     variables::set("validate_arguments", "true");
     
     // Mock tool with strict schema
@@ -120,7 +120,7 @@ fn test_argument_validation_enabled() {
 
 #[spin_test]
 fn test_argument_validation_disabled() {
-    variables::set("tool_components", "lenient_tool");
+    variables::set("component_names", "lenient_tool");
     variables::set("validate_arguments", "false");
     
     // Mock tool with schema
@@ -200,7 +200,7 @@ fn test_argument_validation_disabled() {
 
 #[spin_test]
 fn test_missing_arguments_defaults_to_empty_object() {
-    variables::set("tool_components", "optional_tool");
+    variables::set("component_names", "optional_tool");
     variables::set("validate_arguments", "true");
     
     // Mock tool that accepts optional arguments

@@ -165,13 +165,13 @@ impl ComponentResolver {
                     }
                 }
 
-                // Add user tool components if requested
+                // Add user components if requested
                 if *include_user {
-                    for (tool_name, tool_config) in &ftl_config.tools {
-                        if let Some(repo_ref) = &tool_config.repo {
+                    for (component_name, component_config) in &ftl_config.component {
+                        if let Some(repo_ref) = &component_config.repo {
                             // This is a registry component
                             components.push(ComponentToResolve {
-                                name: tool_name.clone(),
+                                name: component_name.clone(),
                                 source: repo_ref.clone(),
                                 is_mcp: false,
                             });
@@ -183,11 +183,11 @@ impl ComponentResolver {
             ComponentResolutionStrategy::Deploy { push_user_only } => {
                 if *push_user_only {
                     // Only resolve user registry components (not MCP, not local)
-                    for (tool_name, tool_config) in &ftl_config.tools {
-                        if let Some(repo_ref) = &tool_config.repo {
+                    for (component_name, component_config) in &ftl_config.component {
+                        if let Some(repo_ref) = &component_config.repo {
                             // This is a registry component that needs to be pushed
                             components.push(ComponentToResolve {
-                                name: tool_name.clone(),
+                                name: component_name.clone(),
                                 source: repo_ref.clone(),
                                 is_mcp: false,
                             });

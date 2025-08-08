@@ -180,11 +180,11 @@ fn setup_project_file_mocks_with_content(
 name = "test-project"
 version = "0.1.0"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#
             .to_string()
@@ -257,9 +257,9 @@ async fn test_deploy_authentication_expired() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.test-tool]
+[component.test-tool]
 wasm = "test.wasm"
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#;
     setup_comprehensive_ftl_mocks(&mut fixture, ftl_content);
@@ -858,11 +858,11 @@ fn setup_basic_mocks(fixture: &mut TestFixture) {
 name = "test-project"
 version = "0.1.0"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#
             .to_string())
@@ -1392,12 +1392,12 @@ access_control = "private"
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
-[tools.api]
+[component.api]
 path = "api"
 wasm = "api/target/wasm32-wasip1/release/api.wasm"
 allowed_outbound_hosts = ["https://*.amazonaws.com"]
 
-[tools.api.build]
+[component.api.build]
 command = "cargo build --release --target wasm32-wasip1"
 "#
     .to_string();
@@ -1649,12 +1649,12 @@ access_control = "private"
 issuer = "https://test.authkit.app"
 audience = "my-api"
 
-[tools.api]
+[component.api]
 path = "api"
 wasm = "api/target/wasm32-wasip1/release/api.wasm"
 allowed_outbound_hosts = ["https://*.amazonaws.com"]
 
-[tools.api.build]
+[component.api.build]
 command = "cargo build --release --target wasm32-wasip1"
 "#
     .to_string();
@@ -2202,11 +2202,11 @@ async fn test_deploy_dry_run() {
 name = "test-project"
 version = "0.1.0"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#
             .to_string())
@@ -2333,11 +2333,11 @@ async fn test_deploy_dry_run_no_variables() {
 name = "test-project"
 version = "0.1.0"
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#
             .to_string())
@@ -2548,15 +2548,15 @@ async fn test_deploy_with_deploy_name_override() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.my-component]
+[component.my-component]
 path = "my-component"
 wasm = "my-component/target/wasm32-wasip1/release/my_component.wasm"
 
-[tools.my-component.deploy]
+[component.my-component.deploy]
 name = "custom-deployed-name"
 profile = "release"
 
-[tools.my-component.build]
+[component.my-component.build]
 command = "cargo build --release"
 "#;
 
@@ -2650,14 +2650,14 @@ async fn test_deploy_build_profile_debug() {
 name = "test-app"
 version = "0.1.0"
 
-[tools.debug-component]
+[component.debug-component]
 path = "debug-component"
 wasm = "debug-component/target/wasm32-wasip1/debug/debug_component.wasm"
 
-[tools.debug-component.deploy]
+[component.debug-component.deploy]
 profile = "debug"
 
-[tools.debug-component.build]
+[component.debug-component.build]
 command = "cargo build"
 "#;
 
@@ -2718,11 +2718,11 @@ api_key = { required = true }
 database_url = { required = true }
 optional_var = { default = "default-value" }
 
-[tools.test-tool]
+[component.test-tool]
 path = "test"
 wasm = "test/test-tool.wasm"
 
-[tools.test-tool.build]
+[component.test-tool.build]
 command = "echo 'Building test tool'"
 "#;
 
