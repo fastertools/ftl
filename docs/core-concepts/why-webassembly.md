@@ -18,7 +18,7 @@ The real challenge is a combination of three complex problems:
 
 Existing solutions force a choice: you can have one, maybe two of these, but not all three. You could build a single-language server, wrestle with complex and fragile Foreign Function Interfaces (FFIs), or spin up a fleet of slow, heavy containers for each tool.
 
-This is the problem fastertools solves: We provide zero-to-OAuth-authenticated MCP tooling in less than five minutes. WebAssembly is the key that makes this possible.
+These are the problems fastertools solves: We provide developers a platform to go from zero-to-OAuth-authenticated MCP tooling at the edge in less than five minutes. WebAssembly is the key that makes this possible.
 
 
 ## How WebAssembly Solves the MCP Challenge
@@ -101,3 +101,12 @@ Our P95 of 131ms **globally** isn't just an improvement; it's a fundamental chan
 
 Results like these are possible because we've eliminated the traditional layers of overhead. There is no container to boot, no OS to virtualize, and no language runtime to initialize. The combination of instant WASM cold starts and reduced network travel time from the edge results in consistently fast global performance that is simply not achievable with other architectures.
 
+## Where Do We Go From Here? Just About Anywhere
+
+The performance numbers and architectural benefits we've outlined here aren't just an improvement—they're evidence of a fundamental shift. This journey has shown us that we need to take a step back and rethink how we approach building software, not just for AI, but in general.
+
+We believe the convergence of WebAssembly, the Component Model, and ubiquitous edge computing marks the start of something new. The ability to compose secure, polyglot components at the edge with near-zero latency opens up possibilities far beyond the initial AI use case that led us here.
+
+While the incredible progress in AI is what created the need for this architecture, we believe the underlying revolution in WASM and WASI is equally profound. We are passionate about building on these open standards and exploring what this new paradigm makes possible.
+
+We don't have all the answers, but we are convinced we're asking the right questions. If this vision resonates with you, join us. The future is composable, and we're just getting started.
