@@ -21,7 +21,6 @@ First, let's create a new FTL project:
 
 ```bash
 ftl init my-first-project
-cd my-first-project
 ```
 
 This creates a new directory with the basic FTL project structure:
@@ -29,7 +28,6 @@ This creates a new directory with the basic FTL project structure:
 ```
 my-first-project/
 ├── ftl.toml          # Project configuration
-├── spin.toml         # Spin framework configuration
 └── README.md         # Getting started guide
 ```
 
@@ -37,9 +35,27 @@ Let's look at what was created:
 
 ```bash
 cat ftl.toml
+
+[project]
+name = "my-first-project"
+version = "0.1.0"
+description = "FTL MCP server for hosting MCP tools"
+authors = []
+access_control = "public"
+
+[tools]
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:0.0.XX"
+authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.XX"
+validate_arguments = false
 ```
 
 The `ftl.toml` file defines your project metadata and which tools it contains (initially empty).
+
+`access_control = "public"` - By default your tools will be accessible publicly.
+
+`validate_arguments = false` - Our MCP gateway can do tool input validation for you if you want. You can also handle this yourself if desired.
 
 ## Step 2: Add Your First Tool
 
@@ -50,24 +66,22 @@ ftl add hello-world --language rust
 ```
 
 This command:
-- Creates a new tool component in the `components/hello-world/` directory
+- Creates a new tool in the `hello-world/` directory
 - Updates `ftl.toml` to include the new tool
 - Generates boilerplate code for a Rust-based MCP tool
-
-Let's examine what was created:
-
-```bash
-tree components/hello-world/
-```
 
 You should see:
 
 ```
-components/hello-world/
-├── Cargo.toml        # Rust package configuration
-├── src/
-│   └── lib.rs        # Your tool implementation
-└── README.md         # Tool-specific documentation
+.
+├── ftl.toml
+├── hello-world    # The tool we just created
+│   ├── Cargo.toml # Provides necessary dependencies, basic linting rules, etc
+│   ├── Makefile   # Standardized build commands
+│   ├── README.md  # Some rust specific guidance on using our SDK 
+│   └── src
+│       └── lib.rs # Scaffolded out Rust code for your new tool
+└── README.md
 ```
 
 ## Step 3: Implement Your Tool
@@ -77,21 +91,25 @@ Open `components/hello-world/src/lib.rs` in your text editor. You'll see generat
 Let's modify it to create a simple greeting tool:
 
 ```rust
-use ftl_sdk::prelude::*;
+use ftl_sdk::{tools, text, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
 
-#[tool]
-pub fn say_hello(name: Option<String>) -> ToolResponse {
-    let name = name.unwrap_or_else(|| "World".to_string());
-    let message = format!("Hello, {}! Welcome to FTL.", name);
-    
-    ToolResponse::ok(message)
+#[derive(Deserialize, JsonSchema)]
+struct SayHelloInput {
+    message: String,
 }
+
+tools! {
+    fn say_hello(input: SayHelloInput) -> ToolResponse {
+        text!("Hello {}!", input.message)
+    }
+}   
 ```
 
 This creates an MCP tool that:
-- Takes an optional `name` parameter
-- Returns a greeting message
-- Uses "World" as the default if no name is provided
+- Takes a `message` parameter
+- Returns a Hello with the message passed to the tool call
 
 ## Step 4: Build Your Project
 
@@ -99,12 +117,11 @@ Now let's build the project to compile our tool to WebAssembly:
 
 ```bash
 ftl build
-```
+→ Building 1 component in parallel
 
-This command:
-- Compiles each tool to a WebAssembly component
-- Generates MCP tool schemas automatically
-- Updates the Spin configuration with component information
+  [hello-world] ✓ Built in 9.3s
+✓ All components built successfully!
+```
 
 You should see output indicating successful compilation.
 
@@ -119,74 +136,42 @@ ftl up
 This command:
 - Starts the FTL development server
 - Hosts your MCP server locally
-- Provides logging and debugging information
 
 You should see output similar to:
 
 ```
-✅ FTL server started successfully
-🌐 MCP server available at: http://localhost:3000
-📋 Available tools: hello-world/say_hello
+→ Starting server...
+
+🌐 Server will start at http://127.0.0.1:3000
+⏹ Press Ctrl+C to stop
+
+Loading Wasm components is taking a few seconds...
+
+Logging component stdio to "/private/tmp/my-first-project/.ftl/logs/"
+
+Serving http://127.0.0.1:3000
+Available Routes:
+  mcp: http://127.0.0.1:3000 (wildcard)
 ```
 
 ## Step 6: Test Your Tool
 
-Now let's test your tool! You have several options:
+Your tool is now ready for testing! You can add it to your client of choice.
 
-### Option A: Using curl
+### Using Claude Desktop
 
-```bash
-curl -X POST http://localhost:3000/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "hello-world/say_hello",
-    "arguments": {
-      "name": "Developer"
-    }
-  }'
-```
+`claude mcp add -t http hello-world http://127.0.0.1:3000`
 
-### Option B: Using Claude Desktop
+Restart Claude Desktop and you should see your tool available to test!
 
-1. Add this server to your Claude Desktop configuration:
-   ```json
-   {
-     "mcpServers": {
-       "my-first-project": {
-         "command": "curl",
-         "args": ["-X", "GET", "http://localhost:3000/tools/list"]
-       }
-     }
-   }
-   ```
+## Step 7: Experiment!
 
-2. Restart Claude Desktop and you should see your tool available
+Now that you've got the basics you can start developing!
 
-### Option C: Using the MCP Inspector
-
-Visit `http://localhost:3000` in your browser to use the built-in MCP inspector.
-
-## Step 7: Experiment
-
-Try modifying your tool:
-
-1. **Add more parameters:**
-   ```rust
-   #[tool]
-   pub fn say_hello(name: Option<String>, greeting: Option<String>) -> ToolResponse {
-       let name = name.unwrap_or_else(|| "World".to_string());
-       let greeting = greeting.unwrap_or_else(|| "Hello".to_string());
-       let message = format!("{}, {}! Welcome to FTL.", greeting, name);
-       
-       ToolResponse::ok(message)
-   }
-   ```
-
-2. **Rebuild and test:**
-   ```bash
-   ftl build
-   # The server will automatically reload
-   ```
+Try:
+- Adding a second tool 
+- Adding additional parameters to your say_hello tool
+- Create another component with tools in a different language!
 
 ## What You've Learned
 
@@ -203,7 +188,6 @@ Congratulations! You've just:
 
 - **Tools are WebAssembly components:** Your Rust code compiles to WASM for security and performance
 - **Automatic schema generation:** FTL generates MCP schemas from your tool signatures
-- **Hot reload:** Changes rebuild automatically during development
 - **Language agnostic:** The same patterns work across all supported languages
 
 ## Next Steps
