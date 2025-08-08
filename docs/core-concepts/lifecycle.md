@@ -1,291 +1,328 @@
 # Project Lifecycle
 
-Understanding what happens behind FTL's commands helps you debug issues, optimize your workflow, and extend FTL's capabilities. This guide explains the complete project lifecycle from initialization to deployment.
+Understanding FTL's dynamic configuration system is essential for debugging, optimizing workflows, and extending capabilities. This guide explains the complete project lifecycle with a focus on how FTL's transpilation engine converts your simple `ftl.toml` configuration into complete Spin applications.
 
 ## Overview
 
-FTL's project lifecycle follows a clear progression:
+One of fastertools's key features is **dynamic configuration transpilation**. While you work with a simple `ftl.toml` file, fastertools automatically generates complex `spin.toml` configurations on-demand for each operation:
 
 ```
-ftl init → ftl add → ftl build → ftl up → ftl deploy
-   │         │         │          │         │
-   ▼         ▼         ▼          ▼         ▼
-Project   Tools    WASM       Local    Production
-Setup     Added   Built      Server   Deployment
+User writes ftl.toml → FTL transpiles → Temporary spin.toml → Spin executes
+       ↓                    ↓                  ↓              ↓
+   Simple config      Dynamic generation   Runtime config   WASM execution
 ```
 
-## `ftl init`: Project Initialization
+**Key Concepts:**
+- **ftl.toml** - Your project configuration:  persistent, version-controlled(or at least it SHOULD be!)
+- **spin.toml** - Runtime configuration (temporary, auto-generated) 
+- **Transpilation** - Dynamic conversion that happens during every command
 
-### What It Does
-Creates a new FTL project with the foundational configuration and directory structure.
+## Core Architecture: Configuration Transpilation
 
-### Behind the Scenes
+### The fastertools Configuration Model
 
-1. **Directory Creation**:
+fastertools uses a **two-layer configuration architecture**:
+
+1. **User Layer (ftl.toml)** - Simple, declarative configuration
+2. **Runtime Layer (spin.toml)** - Complex, executable configuration
+
+```toml
+# ftl.toml - What you write
+[project]
+name = "my-app"
+access_control = "private"
+
+[tools.calculator]
+path = "components/calculator"
+```
+
+Gets transpiled into:
+
+```toml
+# Generated spin.toml - What Spin executes
+spin_manifest_version = "2"
+name = "my-app"
+
+[variables]
+tool_components = { default = "calculator" }
+auth_enabled = { default = "true" }
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+mcp_tenant_id = { required = true }
+# ... 15+ more auth variables
+
+[[component]]
+id = "mcp"
+source = { url = "ghcr.io/fastertools/mcp-authorizer:0.0.13" }
+
+[[component]] 
+id = "ftl-mcp-gateway"
+source = { url = "ghcr.io/fastertools/mcp-gateway:0.0.15" }
+
+[[component]]
+id = "calculator"
+source = "components/calculator/target/wasm32-wasip1/release/calculator.wasm"
+
+[[trigger.http]]
+route = "/..."
+component = "mcp"
+```
+
+### Transpilation Process
+
+Every FTL command performs these steps:
+
+1. **Read ftl.toml** - Parse user configuration
+2. **Generate Variables** - Inject system variables based on configuration
+3. **Resolve Components** - Add gateway, authorizer, and tool components  
+4. **Create Triggers** - Set up HTTP routing based on authentication
+5. **Write Temporary spin.toml** - Save to temp directory
+6. **Execute Spin** - Run command with generated configuration
+7. **Cleanup** - Remove temporary files
+
+### Variable Injection System
+
+FTL automatically injects system variables based on your configuration:
+
+**From Simple Access Control:**
+```toml
+# ftl.toml
+access_control = "private"
+```
+
+**To Complex Auth Variables:**
+```toml
+# Generated variables
+auth_enabled = { default = "true" }
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+mcp_tenant_id = { required = true }
+mcp_trace_header = { default = "x-trace-id" }
+mcp_provider_type = { default = "ftl_authkit" }
+mcp_jwt_issuer = { default = "https://divine-lion-50-staging.authkit.app" }
+mcp_jwt_audience = { default = "ftl-mcp-server" }
+mcp_jwt_required_scopes = { default = "" }
+# ... plus OAuth endpoints, JWKS URIs, etc.
+```
+
+## Command Lifecycle
+
+### `ftl init`: Project Foundation
+
+**What It Does:**
+Creates a new FTL project with foundational configuration.
+
+**Transpilation Role:**
+None - Only creates the initial `ftl.toml` file.
+
+**Behind the Scenes:**
+
+1. **Directory Creation:**
    ```bash
-   mkdir my-project
-   cd my-project
+   mkdir my-project && cd my-project
    ```
 
-2. **Configuration Generation**:
-   Creates `ftl.toml` with project metadata:
+2. **Template Download:**
+   - Downloads `ftl-mcp-server` Spin template if not cached
+   - Processes template variables like `{{project-name}}`
+
+3. **ftl.toml Generation:**
    ```toml
    [project]
    name = "my-project"
-   access_control = "public"  # or "private" with --private flag
+   access_control = "public"  # or "private" with --private
    
    [mcp]
    gateway = "ghcr.io/fastertools/mcp-gateway:latest"
    authorizer = "ghcr.io/fastertools/mcp-authorizer:latest"
-   validate_arguments = true
    ```
 
-3. **Template Processing**:
-   - Downloads the `ftl-mcp-server` Spin template if not cached
-   - Processes template variables like `{{project-name}}`
-   - Creates initial directory structure and README
-
-4. **Spin Configuration**:
-   Generates initial `spin.toml` with base configuration:
-   ```toml
-   spin_manifest_version = "2"
-   name = "my-project"
-   
-   [variables]
-   tool_components = { default = "" }  # Empty until tools added
-   
-   [[component]]
-   id = "mcp-gateway"
-   source = { url = "ghcr.io/fastertools/mcp-gateway:latest" }
-   ```
-
-### File System Result
+**File System Result:**
 ```
 my-project/
-├── ftl.toml          # FTL project configuration
-├── spin.toml         # Spin application configuration
-├── components/       # Directory for tool components (empty)
+├── ftl.toml          # FTL project configuration (persistent)
+├── components/       # Directory for tool components (empty initially)
 └── README.md         # Getting started guide
 ```
 
-### Command Variants
-- `ftl init my-project`: Public access (no authentication)
-- `ftl init my-project --private`: Private access (JWT authentication enabled)
-- `ftl init my-project --template custom`: Use custom project template
+**Note:** No `spin.toml` is created - this is generated dynamically later.
 
-## `ftl add`: Tool Addition
+### `ftl add`: Tool Integration
 
-### What It Does
-Adds a new tool component to your project in a specific programming language.
+**What It Does:**
+Adds a new tool component in a specific programming language.
 
-### Behind the Scenes
+**Transpilation Role:**
+Generates temporary `spin.toml` for Spin template operations.
 
-1. **Template Resolution**:
+**Behind the Scenes:**
+
+1. **Transpilation for Template Operations:**
+   ```rust
+   let temp_spin_toml = generate_temp_spin_toml(&GenerateSpinConfig {
+       file_system: &deps.file_system,
+       project_path: &working_path,
+       download_components: false,  // Not needed for templates
+       validate_local_auth: false,  // Not needed for templates
+   })?;
+   ```
+
+2. **Template Resolution:**
    ```bash
-   # Resolves language to specific template
-   --language rust    → ftl-mcp-rust
-   --language python  → ftl-mcp-python
-   --language go      → ftl-mcp-go
-   --language typescript → ftl-mcp-ts
+   --language rust → ftl-mcp-rust template
+   --language python → ftl-mcp-python template  
+   --language go → ftl-mcp-go template
    ```
 
-2. **Template Download**:
-   - Checks local cache: `~/.cache/spin/templates/`
-   - Downloads from registry if not cached or outdated
-   - Verifies template integrity
+3. **Component Generation:**
+   Uses Spin templates with temporary spin.toml to generate tool structure
 
-3. **Component Generation**:
-   ```bash
-   # Creates component directory
-   mkdir components/my-tool
-   cd components/my-tool
-   
-   # Processes template with variables
-   {{tool-name}} → my-tool
-   {{component-name}} → my_tool (snake_case)
-   ```
-
-4. **Language-Specific Setup**:
-
-   **Rust**:
-   ```toml
-   # Cargo.toml
-   [package]
-   name = "my-tool"
-   
-   [dependencies]
-   ftl-sdk = "0.1.0"
-   serde = { version = "1.0", features = ["derive"] }
-   
-   [lib]
-   crate-type = ["cdylib"]
-   
-   [[bin]]
-   name = "my-tool"
-   path = "src/main.rs"
-   ```
-
-   **Python**:
-   ```toml
-   # pyproject.toml
-   [project]
-   name = "my-tool"
-   dependencies = ["ftl-sdk"]
-   
-   [build-system]
-   requires = ["componentize-py"]
-   ```
-
-5. **Configuration Updates**:
-   Updates `ftl.toml`:
+4. **ftl.toml Update:**
    ```toml
    [tools.my-tool]
    path = "components/my-tool"
    allowed_outbound_hosts = []
    ```
 
-   Updates `spin.toml` via transpilation:
+5. **Cleanup:**
+   Temporary `spin.toml` is automatically removed
+
+**File System Changes:**
+```
+my-project/
+├── ftl.toml          # Updated with new tool config
+├── components/
+│   └── my-tool/      # New tool component directory
+│       ├── Cargo.toml (or pyproject.toml, go.mod)
+│       ├── src/
+│       └── README.md
+└── README.md
+```
+
+### `ftl build`: Component Compilation
+
+**What It Does:**
+Compiles all tool components to WebAssembly and prepares the complete application.
+
+**Transpilation Role:**  
+Generates temporary `spin.toml` to discover components and their build configurations.
+
+**Behind the Scenes:**
+
+1. **Dynamic Transpilation:**
+   ```rust
+   let temp_spin_toml = generate_temp_spin_toml(&GenerateSpinConfig {
+       file_system: &deps.file_system,
+       project_path: &working_path,
+       download_components: true,   // Download registry components
+       validate_local_auth: true,   // Validate auth for build
+   })?;
+   ```
+
+2. **Component Discovery:**
+   Parses generated `spin.toml` to find components with build configurations:
    ```toml
-   [variables]
-   tool_components = { default = "my-tool" }  # Updated list
-   
    [[component]]
-   id = "my-tool"
-   source = "components/my-tool/target/wasm32-wasip1/release/my-tool.wasm"
+   id = "my-rust-tool"
+   source = "components/my-rust-tool/target/wasm32-wasip1/release/my-rust-tool.wasm"
+   [component.build]
+   command = "cargo build --target wasm32-wasip1 --release"
+   workdir = "components/my-rust-tool"
    ```
 
-### Generated Component Structure
+3. **Parallel Building:**
+   Executes build commands for all local components simultaneously
 
-**Rust**:
-```
-components/my-tool/
-├── Cargo.toml        # Rust package configuration
-├── src/
-│   ├── lib.rs        # Tool implementation with ftl-sdk
-│   └── main.rs       # WASM binary entry point
-├── README.md         # Tool documentation
-└── Makefile          # Build automation
-```
+4. **External Component Resolution:**
+   Downloads registry components (gateway, authorizer) if not cached
 
-**Python**:
-```
-components/my-tool/
-├── pyproject.toml    # Python package configuration
-├── src/
-│   └── __init__.py   # Tool implementation
-├── README.md         # Tool documentation
-└── Makefile          # Build automation with componentize-py
-```
-
-## `ftl build`: Compilation to WebAssembly
-
-### What It Does
-Compiles all tool components to WebAssembly modules and prepares the complete application.
-
-### Behind the Scenes
-
-1. **Configuration Transpilation**:
-   - Reads `ftl.toml` configuration
-   - Generates up-to-date `spin.toml` with current tools
-   - Resolves component dependencies and versions
-
-2. **Parallel Component Building**:
-   ```bash
-   # For each tool component in parallel
-   for component in tools:
-       execute_build_command(component)
-   ```
-
-3. **Language-Specific Build Process**:
-
-   **Rust**:
-   ```bash
-   cd components/my-rust-tool
-   cargo build --target wasm32-wasip1 --release
-   # Produces: target/wasm32-wasip1/release/my-rust-tool.wasm
-   ```
-
-   **Python**:
-   ```bash
-   cd components/my-python-tool
-   componentize-py componentize guest -o my-python-tool.wasm
-   # Produces: my-python-tool.wasm
-   ```
-
-   **Go**:
-   ```bash
-   cd components/my-go-tool
-   tinygo build -o my-go-tool.wasm -target wasip1 .
-   # Produces: my-go-tool.wasm
-   ```
-
-4. **Schema Generation**:
+5. **Schema Generation:**
    - Rust: Automatic via `schemars` derive macros
-   - Python: Via type hints and `pydantic`
+   - Python: Via type hints and `pydantic` 
    - Go: Via struct tags and reflection
-   - Generates JSON Schema files for MCP tool descriptions
 
-5. **Component Validation**:
-   - Verifies WASM modules are valid
-   - Checks Component Model compatibility
-   - Validates generated schemas
+6. **Validation:**
+   - Verifies WASM modules are valid Component Model format
+   - Validates generated JSON schemas for MCP tool descriptions
 
-6. **External Component Resolution**:
-   Downloads external components if needed:
-   ```bash
-   # Downloads mcp-gateway and mcp-authorizer if not cached
-   crane pull ghcr.io/fastertools/mcp-gateway:latest
-   crane pull ghcr.io/fastertools/mcp-authorizer:latest
-   ```
+**Temporary File Lifecycle:**
+```
+/tmp/ftl-XXXXXX/
+└── spin.toml         # Generated, used for discovery, then deleted
+```
 
-### Build Output
+**Build Output:**
 ```
 my-project/
 ├── components/
 │   └── my-tool/
-│       ├── target/wasm32-wasip1/release/my-tool.wasm  # WASM binary
+│       ├── target/wasm32-wasip1/release/my-tool.wasm  # Compiled WASM
 │       └── my-tool.schema.json                       # Generated schema
-├── spin.toml         # Updated with component paths
-└── .spin/            # Spin cache directory
-    └── components/   # Cached external components
+└── .spin/
+    └── registry/     # Cached external components
 ```
 
-### Build Performance Optimizations
-- **Parallel Compilation**: All components build simultaneously
-- **Incremental Builds**: Only recompiles changed components
-- **Component Caching**: External components cached locally
-- **Schema Caching**: Regenerated only when tool interfaces change
+### `ftl up`: Local Development Server
 
-## `ftl up`: Local Development Server
-
-### What It Does
+**What It Does:**
 Starts a local Spin server running your complete MCP application.
 
-### Behind the Scenes
+**Transpilation Role:**
+Generates temporary `spin.toml` with full configuration for local development.
 
-1. **Pre-flight Checks**:
-   - Verifies `spin.toml` exists and is valid
-   - Checks all WASM components are built and accessible
-   - Validates component compatibility
+**Behind the Scenes:**
 
-2. **Spin Server Initialization**:
+1. **Pre-Build Check:**
+   Automatically runs `ftl build` if components need compilation
+
+2. **Development Transpilation:**
+   ```rust
+   let temp_spin_toml = generate_temp_spin_toml(&GenerateSpinConfig {
+       file_system: &deps.file_system,
+       project_path: &working_path,  
+       download_components: true,   // Ensure all components available
+       validate_local_auth: true,   // Validate auth config
+   })?;
+   ```
+
+3. **Authentication Configuration Expansion:**
+   
+   **Simple Configuration:**
+   ```toml
+   # ftl.toml
+   access_control = "private"
+   ```
+
+   **Generates Complex Auth Setup:**
+   ```toml
+   # Temporary spin.toml
+   [variables]
+   auth_enabled = { default = "true" }
+   mcp_tenant_id = { required = true }
+   mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+   # ... many more auth variables
+
+   [[component]]
+   id = "mcp"  # Authorizer component
+   source = { url = "ghcr.io/fastertools/mcp-authorizer:0.0.13" }
+   
+   [[component]]  
+   id = "ftl-mcp-gateway"  # Gateway component
+   source = { url = "ghcr.io/fastertools/mcp-gateway:0.0.15" }
+
+   [[trigger.http]]
+   route = "/..."
+   component = "mcp"  # All requests go through authorizer first
+   
+   [[trigger.http]]
+   route = { private = true }  
+   component = "ftl-mcp-gateway"  # Private internal route
+   ```
+
+4. **Spin Server Launch:**
    ```bash
-   # Internal command executed
-   spin up --listen 127.0.0.1:3000
+   spin up --file /tmp/ftl-XXXXXX/spin.toml --listen 127.0.0.1:3000
    ```
 
-3. **Component Loading**:
-   ```
-   Loading Components:
-   ├── mcp-gateway (public endpoint)
-   ├── mcp-authorizer (if auth enabled)
-   └── Tool Components:
-       ├── my-rust-tool.wasm
-       ├── my-python-tool.wasm
-       └── my-go-tool.wasm
-   ```
-
-4. **Runtime Architecture Setup**:
+5. **Runtime Architecture:**
    ```
    ┌─────────────────────────────────────┐
    │         Spin Runtime                │
@@ -295,194 +332,322 @@ Starts a local Spin server running your complete MCP application.
    │  ├─ /tools/call                     │
    │  └─ /ping                           │
    ├─────────────────────────────────────┤
-   │ Internal Network                    │
-   │  ├─ mcp-gateway.spin.internal       │
-   │  ├─ mcp-authorizer.spin.internal    │
-   │  └─ my-tool.spin.internal           │
+   │ Component Network                   │
+   │  ├─ mcp (authorizer)                │
+   │  ├─ ftl-mcp-gateway                 │
+   │  └─ tool components                 │
    └─────────────────────────────────────┘
    ```
 
-5. **Service Registration**:
-   - Each component registers its internal endpoints
-   - Gateway component discovers available tools
-   - Health checks establish component readiness
+6. **Development Features:**
+   - File watching for auto-reload
+   - Live component logging
+   - Detailed error reporting
 
-6. **Development Features**:
-   - **Auto-reload**: File changes trigger automatic rebuilds
-   - **Live Logging**: Component stdout/stderr in real-time
-   - **Error Reporting**: Detailed error messages with stack traces
-
-### Server Output
+**Server Output:**
 ```bash
-✅ FTL server started successfully
+✅ FTL server started successfully  
 🌐 MCP server available at: http://localhost:3000
 📋 Available tools:
-   - my-rust-tool/analyze_text
-   - my-python-tool/process_data
-   - my-go-tool/calculate_metrics
+   - calculator/add_numbers
+   - calculator/subtract_numbers  
 🔄 Watching for changes...
 ```
 
-### Runtime Behavior
-- **Hot Reload**: Changes to tool code trigger automatic rebuilds
-- **Concurrent Requests**: Multiple tool calls handled simultaneously  
-- **Error Isolation**: Tool failures don't crash the server
-- **Resource Management**: Memory and CPU usage monitoring
+### `ftl deploy`: Production Deployment
 
-## `ftl deploy`: Production Deployment
-
-### What It Does
+**What It Does:**
 Deploys your FTL application to production infrastructure.
 
-### Behind the Scenes
+**Transpilation Role:**
+Generates production-optimized temporary `spin.toml` for deployment.
 
-1. **Build Verification**:
-   ```bash
-   # Ensures latest build
-   ftl build --release
-   
-   # Validates all components
-   validate_deployment_readiness()
+**Behind the Scenes:**
+
+1. **Production Transpilation:**
+   ```rust
+   let temp_spin_toml = generate_temp_spin_toml(&GenerateSpinConfig {
+       file_system: &deps.file_system,
+       project_path: &working_path,
+       download_components: true,   // Ensure production components
+       validate_local_auth: false,  // Production auth validation
+   })?;
    ```
 
-2. **Bundle Preparation**:
+2. **Build Verification:**
+   ```bash
+   ftl build --release  # Ensures optimized WASM builds
+   ```
+
+3. **Production Configuration:**
+   Generates spin.toml with production settings:
+   - Pinned component versions instead of `:latest`
+   - Production auth endpoints
+   - Optimized resource limits
+   - Monitoring and logging configuration
+
+4. **Bundle Preparation:**
    - Creates deployment artifact with all components
-   - Includes configuration and dependencies
-   - Optimizes WASM modules for production
+   - Includes optimized WASM modules  
+   - Packages configuration and dependencies
 
-3. **Infrastructure Provisioning** (FTL Engine):
-   - Creates managed infrastructure resources
-   - Sets up load balancing and auto-scaling
-   - Configures monitoring and logging
+5. **Infrastructure Provisioning:**
+   - Managed infrastructure resources
+   - Load balancing and auto-scaling
+   - SSL/TLS certificate management
 
-4. **Component Deployment**:
+6. **Service Activation:**
    ```
    Upload Pipeline:
-   ├── Application Bundle (spin.toml + components)
-   ├── Environment Configuration
-   ├── SSL/TLS Certificates
-   └── Health Check Endpoints
+   ├── Application Bundle (generated spin.toml + components)
+   ├── Environment Configuration  
+   ├── Health Check Endpoints
+   └── Monitoring Setup
    ```
 
-5. **Service Activation**:
-   - Deploys to staging environment first
-   - Runs health checks and integration tests
-   - Promotes to production with zero-downtime cutover
+## File System Reality
 
-6. **DNS Configuration**:
-   ```
-   Production Endpoints:
-   ├── https://my-project.ftlengine.dev  # Auto-generated
-   ├── https://custom-domain.com        # Custom domain (optional)
-   └── Health: https://my-project.ftlengine.dev/_health
-   ```
+### What Actually Exists
 
-## Configuration Evolution
-
-Throughout the lifecycle, configurations evolve:
-
-### Initial State (after `ftl init`)
-```toml
-[project]
-name = "my-project"
-
-[mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:latest"
-
-# No tools yet
+**Persistent Files (version controlled):**
+```
+my-project/
+├── ftl.toml          # Your configuration
+├── components/       # Tool source code
+│   └── my-tool/
+│       ├── src/
+│       ├── Cargo.toml
+│       └── README.md
+├── README.md
+└── .gitignore
 ```
 
-### After Adding Tools
-```toml
-[project]
-name = "my-project"
-
-[mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:latest"
-
-[tools.text-analyzer]
-path = "components/text-analyzer"
-
-[tools.data-processor]  
-path = "components/data-processor"
-allowed_outbound_hosts = ["https://api.openai.com"]
+**Generated Files (temporary):**
+```
+/tmp/ftl-XXXXXX/      # Created during command execution
+├── spin.toml         # Generated configuration
+└── components/       # Downloaded registry components (cached)
 ```
 
-### Production Configuration
+**Build Artifacts (generated, can be cached):**
+```  
+my-project/
+├── components/
+│   └── my-tool/
+│       └── target/wasm32-wasip1/release/
+│           ├── my-tool.wasm        # Compiled WASM
+│           └── my-tool.schema.json # Generated schema
+└── .spin/
+    └── registry/     # External component cache
+```
+
+### What Never Exists
+
+- **Static spin.toml in project directory** - Always generated dynamically
+- **Persistent Spin configuration** - Recreated for each command
+- **Manual component management** - All handled by transpilation
+
+## Authentication & Variable Expansion
+
+### Simple to Complex Transformation
+
+FTL's transpilation engine dramatically expands simple authentication configuration:
+
+**Your Configuration:**
 ```toml
-[project]
-name = "my-project"
+[project]  
 access_control = "private"
+```
 
-[mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:0.1.0"  # Pinned version
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.1.0"
-validate_arguments = true
+**Generated System Variables:**
+```toml
+[variables]
+# Core auth state
+auth_enabled = { default = "true" }
+
+# Gateway communication  
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+mcp_trace_header = { default = "x-trace-id" }
+
+# Provider configuration
+mcp_provider_type = { default = "ftl_authkit" }
+mcp_tenant_id = { required = true }  # Platform provides this
+
+# JWT validation
+mcp_jwt_issuer = { default = "https://divine-lion-50-staging.authkit.app" }
+mcp_jwt_audience = { default = "ftl-mcp-server" }
+mcp_jwt_required_scopes = { default = "" }
+mcp_jwt_jwks_uri = { default = "" }  # Auto-derived for FTL AuthKit
+mcp_jwt_public_key = { default = "" }
+mcp_jwt_algorithm = { default = "" }
+
+# OAuth endpoints (empty for FTL AuthKit)
+mcp_oauth_authorize_endpoint = { default = "" }  
+mcp_oauth_token_endpoint = { default = "" }
+mcp_oauth_userinfo_endpoint = { default = "" }
+
+# Legacy support (deprecated)
+mcp_static_tokens = { default = "" }
+```
+
+### OIDC Configuration Expansion
+
+**Your OIDC Configuration:**
+```toml
+[project]
+access_control = "private"
 
 [oidc]
 issuer = "https://auth.company.com"
-audience = "my-project-api"
-
-[tools.text-analyzer]
-path = "components/text-analyzer"
-environment_variables = { "MODEL_VERSION" = "v2" }
-
-[tools.data-processor]
-path = "components/data-processor"
-allowed_outbound_hosts = ["https://api.openai.com"]
+audience = "my-api"
+jwks_uri = "https://auth.company.com/.well-known/jwks.json"
 ```
 
-## Debugging the Lifecycle
+**Generated Variables (30+ variables):**
+```toml
+[variables]
+# Provider type changes
+mcp_provider_type = { default = "oidc" }
 
-### Common Issues and Solutions
+# OIDC-specific values
+mcp_jwt_issuer = { default = "https://auth.company.com" }
+mcp_jwt_audience = { default = "my-api" }
+mcp_jwt_jwks_uri = { default = "https://auth.company.com/.well-known/jwks.json" }
 
-**Build Failures**:
+# Plus all the auth_enabled, gateway, and tenant variables...
+```
+
+## Debugging & Troubleshooting
+
+### Understanding Transpilation Issues
+
+**Common Problems:**
+
+1. **Invalid ftl.toml Syntax:**
+   ```bash
+   Error: Failed to parse ftl.toml
+   → Check TOML syntax with a validator
+   ```
+
+2. **Missing Component Build:**
+   ```bash
+   Error: Component WASM file not found
+   → Run 'ftl build' to compile components
+   ```
+
+3. **Auth Configuration Conflicts:**
+   ```bash
+   Error: Both access_control="public" and [oidc] specified
+   → Private access required for OIDC
+   ```
+
+### Inspecting Generated Configuration
+
+**Export Generated spin.toml:**
 ```bash
-# Check component-specific build logs
+ftl build --export spin --export-out debug-spin.toml
+```
+
+This creates a permanent copy of the generated configuration for inspection.
+
+**Verbose Transpilation:**
+```bash
 ftl build --verbose
-
-# Test individual component builds
-cd components/my-tool && make build
 ```
 
-**Runtime Errors**:
-```bash  
-# Detailed logging during development
-ftl up --log-level debug
+Shows detailed transpilation process and variable injection.
 
-# Component-specific logs
-spin logs --component my-tool
-```
+### Component Build Debugging
 
-**Deployment Issues**:
+**Individual Component Build:**
 ```bash
-# Validate deployment readiness
-ftl build --validate
-
-# Check deployment status
-ftl eng status my-project
+cd components/my-tool
+make build  # or cargo build, etc.
 ```
 
-## Performance Considerations
+**Component Discovery:**
+```bash
+ftl build --verbose  # Shows detailed build information
+```
 
-### Build Optimization
-- **Dependency Caching**: Reuse compiled dependencies
-- **Incremental Compilation**: Only rebuild changed components
-- **Parallel Processing**: Utilize multiple CPU cores
-- **Size Optimization**: Strip debug symbols in release builds
+### Runtime Debugging
 
-### Runtime Optimization
-- **Component Startup**: WASM modules start in ~1-5ms
-- **Memory Usage**: Linear memory model with precise control
-- **Network Efficiency**: Internal component communication via shared memory
-- **Auto-scaling**: Production deployments scale based on load
+**Development Logging:**
+```bash
+ftl up --log-level debug
+```
+
+**Component-Specific Logs:**
+```bash
+spin logs --component my-tool  # During ftl up
+```
+
+## Advanced Topics
+
+### Custom Authentication Providers
+
+FTL supports complex authentication scenarios through transpilation:
+
+```toml
+[project]
+access_control = "private"
+
+[oidc]
+issuer = "https://custom-auth.company.com"
+audience = "api://my-service"
+authorize_endpoint = "https://custom-auth.company.com/oauth2/authorize"
+token_endpoint = "https://custom-auth.company.com/oauth2/token"
+userinfo_endpoint = "https://custom-auth.company.com/oauth2/userinfo"
+jwks_uri = "https://custom-auth.company.com/.well-known/jwks.json"
+public_key = "-----BEGIN PUBLIC KEY-----\n..."
+algorithm = "RS256"
+required_scopes = "read write admin"
+```
+
+This generates 20+ authentication variables in the runtime configuration.
+
+### Multi-Environment Configuration
+
+Use different `ftl.toml` files for different environments:
+
+```bash
+# Development
+ftl up --config ftl.dev.toml
+
+# Staging  
+ftl deploy --config ftl.staging.toml
+
+# Production
+ftl deploy --config ftl.prod.toml
+```
+
+Each generates appropriate runtime configuration for that environment.
+
+### Performance Optimization
+
+**Build Performance:**
+- **Component Caching:** Registry components cached in `~/.cache/spin/`
+- **Incremental Builds:** Only changed components recompiled
+- **Parallel Compilation:** All components built simultaneously
+
+**Runtime Performance:**
+- **WASM Startup:** Components start in ~1-5ms
+- **Memory Efficiency:** Linear memory model with precise control
+- **Internal Communication:** Components communicate via shared memory
 
 ## Next Steps
 
-Now that you understand the complete lifecycle:
-- **Apply Your Knowledge**: Try the [Getting Started Tutorials](../getting-started/)
-- **Solve Specific Problems**: Check [How-to Guides](../guides/)
-- **Reference APIs**: Browse [SDK Reference](../sdk-reference/)
-- **Advanced Patterns**: Explore [Examples](../../examples/)
+Understanding FTL's dynamic transpilation system helps you:
 
-Understanding the lifecycle helps you work more effectively with FTL, debug issues faster, and optimize your development workflow.
+- **Debug Configuration Issues** - Know where problems originate
+- **Optimize Build Performance** - Understand caching and incremental builds  
+- **Design Complex Auth** - Leverage variable injection for custom providers
+- **Extend FTL** - Build on the transpilation architecture
+
+**Continue Learning:**
+- **[Getting Started Tutorials](../getting-started/)** - Apply your knowledge
+- **[ftl.toml Reference](../ftl-schema/ftl-toml-reference.md)** - Complete configuration options
+- **[SDK Reference](../sdk-reference/)** - Build tool components
+- **[Examples](../../examples/)** - Real-world configuration patterns
+
+The transpilation system is FTL's core innovation - it allows simple, maintainable configuration while providing the full power of Spin's component architecture.

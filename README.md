@@ -1,6 +1,6 @@
 <div align="center">
 
-# `ftl`
+# `ftl` by fastertools 
 
 Faster tools for AI agents
 
@@ -15,7 +15,7 @@ Faster tools for AI agents
 
 </div>
 
-FTL (Faster Tools) is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
+FTL is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
 
 We believe the future of AI tooling shouldn't be locked into proprietary ecosystems. FTL is our commitment to that vision, built entirely on:
 

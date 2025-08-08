@@ -1,12 +1,28 @@
-# The Component Model
+# The Component Model: FTL's Foundation for Polyglot Development
 
-The WebAssembly Component Model is the secret sauce that makes FTL's polyglot capabilities possible. It's like creating universal adapters for different electronic plugs - a Go "plug" can fit into a Rust "socket" seamlessly.
+The WebAssembly Component Model is the architectural foundation that enables FTL's seamless polyglot capabilities. Think of it as creating a universal standard for software components - like USB ports that work with any device, the Component Model ensures that a Go component can work alongside Rust, Python, and TypeScript components without friction.
+
+## The Universal Interoperability Problem
+
+Building applications that span multiple programming languages has traditionally been a complex, error-prone endeavor. Each language has its own runtime, memory model, and calling conventions, making integration a constant source of bugs and maintenance overhead.
+
+FTL solves this through the WebAssembly Component Model - a standardized way to build composable, language-agnostic software components. By leveraging this standard through the Fermyon Spin framework, FTL transforms the "polyglot problem" from a technical challenge into a superpower.
+
+## What You'll Learn
+
+- **The Problem**: Why traditional language interop is painful and fragile
+- **The Solution**: How the Component Model creates universal compatibility 
+- **FTL's Approach**: How we deliver Component Model benefits through practical abstractions
+- **Real Examples**: Actual multi-language development workflows with FTL
+- **The Benefits**: What this means for your development productivity and application architecture
 
 ## The Language Interoperability Problem
 
-Traditionally, making different programming languages work together has been painful:
+Building software that combines multiple programming languages has always been challenging. Each language excels in different domains - Rust for performance, Python for data science, Go for concurrency, JavaScript for web interfaces - but getting them to work together cleanly is notoriously difficult.
 
 ### The Old Way: Foreign Function Interfaces (FFI)
+
+Traditional language interop relies on Foreign Function Interfaces, which require manual bridging between incompatible systems:
 
 ```c
 // C library
@@ -14,404 +30,435 @@ int add(int a, int b) { return a + b; }
 ```
 
 ```rust
-// Rust calling C
+// Rust calling C - requires unsafe code
 extern "C" {
     fn add(a: i32, b: i32) -> i32;
 }
 
 unsafe {
-    let result = add(5, 3); // Requires unsafe code
+    let result = add(5, 3); // One wrong type = crash
 }
 ```
 
 ```python  
-# Python calling C
+# Python calling C - platform-specific
 import ctypes
-lib = ctypes.CDLL('./libmath.so')  # Platform-specific
+lib = ctypes.CDLL('./libmath.so')  # Different on Windows/Mac
 lib.add.argtypes = (ctypes.c_int, ctypes.c_int)
 lib.add.restype = ctypes.c_int
-result = lib.add(5, 3)
+result = lib.add(5, 3)  # Manual type marshaling
 ```
 
-**Problems with FFI:**
-- ❌ **Platform-specific**: Different approaches for each OS
-- ❌ **Unsafe**: Easy to cause crashes with type mismatches  
-- ❌ **Complex**: Manual memory management and marshaling
-- ❌ **Fragile**: ABI compatibility issues across versions
-- ❌ **Limited Types**: Only simple types work reliably
+### Why FFI Falls Short
+
+**❌ Platform Dependencies**: Different approaches for Linux, macOS, Windows  
+**❌ Safety Issues**: Easy to crash with type mismatches or memory errors  
+**❌ Complex Marshaling**: Manual conversion between language type systems  
+**❌ ABI Fragility**: Binary compatibility breaks across compiler versions  
+**❌ Limited Types**: Only primitive types work reliably across boundaries  
+**❌ Maintenance Burden**: Each language pair needs custom integration code
+
+### The Real-World Impact
+
+This complexity means teams often resort to:
+- **Language Silos**: Entire applications locked into single languages
+- **HTTP APIs**: Network overhead just to combine local components
+- **Data Serialization**: JSON/XML marshaling for simple function calls
+- **Deployment Complexity**: Multiple runtimes, package managers, and dependency chains
+
+The result? Choosing the "best language for the job" becomes impractical because integration costs outweigh language benefits.
 
 ## The Component Model Solution
 
-The WebAssembly Component Model defines a **standard interface layer** that all languages can use:
+The WebAssembly Component Model fundamentally changes how languages work together by creating a **universal interface standard**. Instead of each language pair needing custom integration code, all languages compile to components that speak the same protocol.
 
-### Universal Interface Definition
+### Key Principles
 
-Instead of language-specific bindings, you define interfaces in **WIT (WebAssembly Interface Types)**:
+**Universal Interfaces**: Components define their capabilities using [WebAssembly Interface Types (WIT)](https://component-model.bytecodealliance.org/design/wit.html) - a language-agnostic interface definition language.
 
-```wit
-// math.wit - Universal interface definition
-package example:math@1.0.0
+**Type Safety**: The Component Model provides compile-time type checking across language boundaries, eliminating entire classes of integration bugs.
 
-interface operations {
-  add: func(a: s32, b: s32) -> s32
-  multiply: func(numbers: list<f64>) -> f64
-  
-  record point {
-    x: f64,
-    y: f64,
-  }
-  
-  calculate-distance: func(p1: point, p2: point) -> f64
-}
+**True Portability**: Components run consistently across platforms without platform-specific binding code.
 
-world math-tools {
-  export operations
-}
+**Near-Native Performance**: WebAssembly execution is close to native speed, without the overhead of JSON serialization or network calls.
+
+**Sandboxed Security**: Each component runs in an isolated environment with explicit capability permissions.
+
+### How It Works (High Level)
+
+It can be worth reading about how [WIT syntax](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md) and the [Canonical ABI](https://component-model.bytecodealliance.org/design/canonical-abi.html) are foundational pieces in how the component model works, but the key insight is this:
+
+```mermaid
+graph TD
+    A[Rust Tool<br/>Your Business Logic] --> D[Standard Component<br/>Interface Layer]
+    B[Python Tool<br/>Your Business Logic] --> D
+    C[Go Tool<br/>Your Business Logic] --> D
+    
+    D --> E[Universal Type System]
+    D --> F[Memory Management]
+    D --> G[Security Isolation]
+    D --> H[Interface Versioning]
 ```
 
-### Language Implementations
+Each language compiles to WebAssembly with standardized interfaces. The Component Model handles all the complexity of:
+- Type marshaling between languages
+- Memory management across component boundaries  
+- Interface versioning and compatibility
+- Security isolation and capability control
 
-Now each language implements this interface naturally:
+### Current State (2024-2025)
 
+The Component Model ecosystem is rapidly maturing:
+- **WASI 0.2.0**: Released January 2024 with stable component interfaces
+- **WASI 0.3**: Expected H1 2025 with native async support
+- **Runtime Support**: Wasmtime has full support, other runtimes catching up
+- **Tooling**: Growing ecosystem of language bindings and development tools
+
+For the latest technical details, see the official [Component Model documentation](https://component-model.bytecodealliance.org/).
+
+## How FTL Delivers Component Model Benefits
+
+FTL doesn't ask you to learn WIT interfaces or configure WebAssembly components directly. Instead, we leverage the [Fermyon Spin framework](https://www.fermyon.com/spin) to give you all the Component Model benefits through familiar development workflows.
+
+### The FTL Approach: Abstraction Without Complexity
+
+Rather than exposing the full complexity of the Component Model, FTL provides a streamlined developer experience:
+
+**Simple Configuration**: Write `ftl.toml` instead of complex Spin manifests  
+**Language-Specific SDKs**: Use familiar patterns in each language  
+**Unified Build System**: `ftl build` handles all languages in parallel  
+**Single Deployment**: One command deploys your entire polyglot application  
+
+### Spin Framework Integration
+
+Fermyon Spin is a developer framework that makes the Component Model practical for real applications. Spin provides:
+
+- **HTTP Components**: Each tool becomes an HTTP service with WASM runtime
+- **Multi-language Support**: Built-in compilation for Rust, Python, Go, JavaScript/TypeScript
+- **Component Isolation**: Each language component runs in its own secure sandbox
+- **Unified Runtime**: Single server hosting multiple language components
+
+FTL builds on Spin by adding:
+- **Configuration Transpilation**: `ftl.toml` → `spin.toml` automatic conversion
+- **Parallel Builds**: Simultaneous compilation of all language components  
+- **Template System**: Language-specific project templates
+- **MCP Protocol Integration**: Standardized tool communication
+
+### Real Architecture: HTTP-Based Microservices
+
+Here's how FTL actually implements polyglot interoperability:
+
+```mermaid
+graph TB
+    subgraph "Single Spin Application"
+        GW[MCP Gateway<br/>HTTP Router]
+        RS[Rust Tool<br/>HTTP Service]
+        PY[Python Tool<br/>HTTP Service] 
+        GO[Go Tool<br/>HTTP Service]
+        TS[TypeScript Tool<br/>HTTP Service]
+        
+        GW --> RS
+        GW --> PY  
+        GW --> GO
+        GW --> TS
+    end
+    
+    subgraph "Component Model Benefits"
+        CM1[Type Safety]
+        CM2[Memory Isolation] 
+        CM3[Security Sandboxing]
+        CM4[Cross-Platform]
+    end
+    
+    RS -.-> CM1
+    PY -.-> CM2
+    GO -.-> CM3  
+    TS -.-> CM4
+```
+
+Each language compiles to WebAssembly and runs as an isolated HTTP service within a single Spin application. Communication happens via HTTP/MCP protocol, giving you Component Model benefits (isolation, security, portability) without direct component-to-component calling complexity.
+
+### Local Component Chaining: HTTP Without Network Overhead
+
+A key advantage of Spin's architecture is **local chaining** - when components communicate within the same Spin application, HTTP calls are handled entirely in memory without network overhead:
+
+**Zero Network Latency**: Component-to-component calls never leave the WASM runtime  
+**HTTP Protocol Benefits**: Standard REST/JSON interfaces for easy debugging and testing  
+**Memory Speed**: In-process communication at native memory speeds  
+**Service Mesh Without Complexity**: Get microservices benefits without network infrastructure  
+
+This means you can architect your tools as separate services (great for development, testing, and modularity) while maintaining the performance characteristics of a monolithic application. The HTTP interface makes each component independently testable and debuggable, while Spin's runtime ensures zero network overhead between them.
+
+## Real Example: Building Polyglot Tools with FTL
+
+Let's see how this works in practice by building a text analysis pipeline with multiple languages, each chosen for its strengths.
+
+### Project Setup
+
+```bash
+# Initialize a new FTL project
+ftl init text-analysis
+cd text-analysis
+
+# Add tools in different languages
+ftl add text-extractor --language rust        # Rust for performance
+ftl add sentiment --language python           # Python for ML libraries  
+ftl add summarizer --language go              # Go for concurrency
+ftl add formatter --language typescript       # TypeScript for JSON processing
+```
+
+### Configuration: ftl.toml
+
+FTL's configuration abstracts away Spin's complexity:
+
+```toml
+[project]
+name = "text-analysis"
+access_control = "public"
+
+[mcp]
+gateway = "ghcr.io/fastertools/mcp-gateway:latest"
+
+# Each tool specifies its language and build process
+[tools.text-extractor]
+path = "text-extractor"
+wasm = "text-extractor/target/wasm32-wasip1/release/text_extractor.wasm"
+[tools.text-extractor.build]
+command = "cargo build --target wasm32-wasip1 --release"
+
+[tools.sentiment]  
+path = "sentiment"
+wasm = "sentiment/dist/app.wasm"
+[tools.sentiment.build]
+command = "componentize-py -w spin-http componentize app -o dist/app.wasm"
+
+[tools.summarizer]
+path = "summarizer" 
+wasm = "summarizer/dist/summarizer.wasm"
+[tools.summarizer.build]
+command = "tinygo build -target=wasip1 -o dist/summarizer.wasm main.go"
+
+[tools.formatter]
+path = "formatter"
+wasm = "formatter/dist/formatter.wasm" 
+[tools.formatter.build]
+command = "npm run build"
+```
+
+### Language-Specific Implementations
+
+**Rust Tool** (text-extractor/src/lib.rs):
 ```rust
-// Rust implementation
-use example::math::operations::*;
+use ftl_sdk::{tools, ToolResponse};
+use serde::{Deserialize, Serialize};
 
-struct MathToolsImpl;
+#[derive(Deserialize)]
+struct ExtractInput {
+    document: String,
+    extract_type: String,
+}
 
-impl Guest for MathToolsImpl {
-    fn add(a: i32, b: i32) -> i32 {
-        a + b
-    }
-    
-    fn multiply(numbers: Vec<f64>) -> f64 {
-        numbers.iter().product()
-    }
-    
-    fn calculate_distance(p1: Point, p2: Point) -> f64 {
-        ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt()
+#[derive(Serialize)]
+struct ExtractResult {
+    content: Vec<String>,
+    metadata: serde_json::Value,
+}
+
+tools! {
+    /// Extract structured data from documents using high-performance parsing
+    fn extract_text(input: ExtractInput) -> ToolResponse {
+        // Fast regex processing in Rust
+        let content = match input.extract_type.as_str() {
+            "emails" => extract_emails(&input.document),
+            "urls" => extract_urls(&input.document),
+            "phone" => extract_phones(&input.document),
+            _ => vec![]
+        };
+        
+        ToolResponse::json(ExtractResult {
+            content,
+            metadata: serde_json::json!({"processed_at": chrono::Utc::now()})
+        })
     }
 }
 ```
 
+**Python Tool** (sentiment/app.py):
 ```python
-# Python implementation
-from example.math import operations
+from ftl_sdk import FTL
+from transformers import pipeline
+import numpy as np
 
-class MathTools:
-    def add(self, a: int, b: int) -> int:
-        return a + b
+# Leverage Python's ML ecosystem
+sentiment_pipeline = pipeline("sentiment-analysis")
+
+ftl = FTL()
+
+@ftl.tool(name="analyze_sentiment")
+def analyze_sentiment(text: str) -> dict:
+    """Analyze sentiment using state-of-the-art ML models."""
+    result = sentiment_pipeline(text)[0]
     
-    def multiply(self, numbers: list[float]) -> float:
-        result = 1.0
-        for num in numbers:
-            result *= num
-        return result
-    
-    def calculate_distance(self, p1: operations.Point, p2: operations.Point) -> float:
-        import math
-        return math.sqrt((p2.x - p1.x)**2 + (p2.y - p1.y)**2)
+    return {
+        "sentiment": result["label"],
+        "confidence": float(result["score"]),
+        "model": "distilbert-base-uncased-finetuned-sst-2-english"
+    }
+
+IncomingHandler = ftl.create_handler()
 ```
 
+**Go Tool** (summarizer/main.go):
 ```go
-// Go implementation  
 package main
 
 import (
-    "math"
-    "example.com/math/gen"
+    "context"
+    "strings"
+    "sync"
+    
+    ftl "github.com/fastertools/ftl-cli/sdk/go"
 )
 
-type MathToolsImpl struct{}
-
-func (m *MathToolsImpl) Add(a, b int32) int32 {
-    return a + b
-}
-
-func (m *MathToolsImpl) Multiply(numbers []float64) float64 {
-    result := 1.0
-    for _, num := range numbers {
-        result *= num
-    }
-    return result
-}
-
-func (m *MathToolsImpl) CalculateDistance(p1, p2 gen.Point) float64 {
-    dx := p2.X - p1.X
-    dy := p2.Y - p1.Y
-    return math.Sqrt(dx*dx + dy*dy)
-}
-```
-
-## How It Works: The Magic Beneath
-
-### 1. Canonical ABI
-
-The Component Model defines a **Canonical ABI** (Application Binary Interface) that standardizes:
-
-```
-High-Level Type    →    Canonical ABI    →    WASM Core Types
-─────────────────────────────────────────────────────────────
-string            →     (ptr, len)       →    (i32, i32)  
-list<f64>         →     (ptr, len)       →    (i32, i32)
-record { x, y }   →     (x, y)           →    (f64, f64)
-result<T, E>      →     (tag, value)     →    (i32, ...)
-```
-
-### 2. Interface Adapters
-
-Each component gets automatically generated adapters:
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Rust Tool     │    │   Python Tool   │    │    Go Tool      │
-│                 │    │                 │    │                 │
-│  ┌───────────┐  │    │  ┌───────────┐  │    │  ┌───────────┐  │
-│  │   Your    │  │    │  │   Your    │  │    │  │   Your    │  │
-│  │   Code    │  │    │  │   Code    │  │    │  │   Code    │  │
-│  └───────────┘  │    │  └───────────┘  │    │  └───────────┘  │
-│         │        │    │         │       │    │         │       │
-│  ┌───────────┐  │    │  ┌───────────┐  │    │  ┌───────────┐  │
-│  │ Generated │  │    │  │ Generated │  │    │  │ Generated │  │
-│  │  Adapter  │  │    │  │  Adapter  │  │    │  │  Adapter  │  │
-│  └───────────┘  │    │  └───────────┘  │    │  └───────────┘  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-                 ┌─────────────────────────────┐
-                 │   Canonical ABI Interface  │
-                 └─────────────────────────────┘
-```
-
-### 3. Type Safety Across Languages
-
-The Component Model provides **strong type safety**:
-
-```wit
-// If the interface says:
-process-user: func(user: user-record) -> result<string, error>
-
-record user-record {
-  id: u32,
-  name: string,
-  email: string,
-}
-
-variant error {
-  invalid-email(string),
-  user-not-found,
-  database-error(string),
-}
-```
-
-Then **every language** gets the same strong typing:
-
-```rust
-// Rust gets proper Result types
-fn process_user(user: UserRecord) -> Result<String, Error> { ... }
-```
-
-```python
-# Python gets dataclasses and proper error handling  
-def process_user(user: UserRecord) -> Result[str, Error]: ...
-```
-
-```go
-// Go gets proper struct types and error returns
-func ProcessUser(user UserRecord) (string, error) { ... }
-```
-
-## Real-World Example: FTL Tools
-
-Let's see how this works in practice with FTL tools:
-
-### 1. Tool Interface Definition
-
-FTL automatically generates component interfaces from your tool signatures:
-
-```rust
-// Your Rust tool
-#[tool]
-pub fn analyze_text(content: String, options: AnalysisOptions) -> AnalysisResult {
-    // Your implementation
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct AnalysisOptions {
-    pub sentiment: bool,
-    pub keywords: bool,
-    pub language: Option<String>,
-}
-```
-
-This automatically becomes:
-
-```wit
-// Generated WIT interface
-interface text-analysis {
-  record analysis-options {
-    sentiment: bool,
-    keywords: bool,  
-    language: option<string>,
-  }
-  
-  record analysis-result {
-    sentiment-score: option<f64>,
-    keywords: list<string>,
-    detected-language: option<string>,
-  }
-  
-  analyze-text: func(content: string, options: analysis-options) -> analysis-result
-}
-```
-
-### 2. Cross-Language Composition
-
-Now a Python tool can call your Rust tool seamlessly:
-
-```python
-# Python tool calling Rust tool
-from ftl_sdk import tool, call_tool
-
-@tool  
-def summarize_with_analysis(document: str) -> dict:
-    # Call the Rust text analysis tool
-    analysis = call_tool("text-analyzer/analyze_text", {
-        "content": document,
-        "options": {
-            "sentiment": True,
-            "keywords": True,
-            "language": None
-        }
+func init() {
+    ftl.CreateTools(map[string]ftl.ToolDefinition{
+        "summarize_concurrent": {
+            Description: "High-performance concurrent text summarization",
+            Handler: func(input map[string]interface{}) ftl.ToolResponse {
+                text, _ := input["text"].(string)
+                chunks := strings.Split(text, "\n\n")
+                
+                // Leverage Go's concurrency
+                var wg sync.WaitGroup
+                summaries := make([]string, len(chunks))
+                
+                for i, chunk := range chunks {
+                    wg.Add(1)
+                    go func(idx int, content string) {
+                        defer wg.Done()
+                        summaries[idx] = summarizeChunk(content)
+                    }(i, chunk)
+                }
+                
+                wg.Wait()
+                
+                return ftl.ToolResponse{
+                    Content: []ftl.ToolContent{{
+                        Type: "text",
+                        Text: strings.Join(summaries, " "),
+                    }},
+                }
+            },
+        },
     })
-    
-    # Use the results in Python
-    if analysis.sentiment_score and analysis.sentiment_score > 0.5:
-        tone = "positive"
-    else:
-        tone = "negative" 
-        
-    return {
-        "summary": generate_summary(document),  # Python logic
-        "tone": tone,
-        "keywords": analysis.keywords,
-        "language": analysis.detected_language
+}
+```
+
+**TypeScript Tool** (formatter/src/index.ts):
+```typescript
+import { tools, ToolResponse } from 'ftl-sdk'
+
+interface FormatterInput {
+  data: Record<string, any>
+  format: 'markdown' | 'html' | 'json'
+}
+
+tools({
+  formatResults: {
+    description: 'Format analysis results with rich output options',
+    handler: async (input: FormatterInput): Promise<ToolResponse> => {
+      const { data, format } = input
+      
+      let formatted: string
+      
+      switch (format) {
+        case 'markdown':
+          formatted = generateMarkdown(data)
+          break
+        case 'html': 
+          formatted = generateHTML(data)
+          break
+        case 'json':
+          formatted = JSON.stringify(data, null, 2)
+          break
+      }
+      
+      return ToolResponse.text(formatted)
     }
+  }
+})
 ```
 
-### 3. Type Safety Guarantees
+### Build and Deploy
 
-The Component Model ensures:
-
-- ✅ **Compile-time checks**: Wrong types are caught at build time
-- ✅ **Runtime safety**: No buffer overflows or memory corruption  
-- ✅ **Interface versioning**: Breaking changes are detected
-- ✅ **Automatic marshaling**: No manual serialization needed
-
-## Benefits in Action
-
-### Traditional Multi-Language Setup
 ```bash
-# Install multiple runtimes
-brew install python rust go node
-pip install requests numpy pandas
-cargo install serde tokio
-npm install axios lodash
-go mod download
+# Build all languages in parallel
+ftl build
 
-# Coordinate between languages
-curl http://rust-service:8080/api/analyze \
-  -d @data.json | \
-python process.py | \
-node format.js | \
-go run summary.go
+# Run locally - single server, all languages
+ftl up
+
+# (Optionally) Deploy to production
+ftl eng deploy
 ```
 
-### FTL Component Model Approach
-```bash
-# Single runtime, multiple languages
-ftl add text-analyzer --language rust    # Rust for performance
-ftl add data-processor --language python # Python for data science  
-ftl add formatter --language node        # Node for JSON processing
-ftl add summarizer --language go         # Go for concurrency
+### What Just Happened
 
-ftl build  # All components work together
-ftl up     # Single server, all languages
-```
+1. **Component Model Benefits**: Each language compiles to isolated, secure WASM components
+2. **Type Safety**: Tools communicate via well-defined JSON schemas  
+3. **Performance**: Local chaining means zero network overhead between tools
+4. **Modularity**: Each tool can be developed, tested, and deployed independently
+5. **Language Optimization**: Each language handles what it does best
 
-## Advanced Component Model Features
+The entire multi-language application runs as a single Spin server, with FTL abstracting away the complexity of WebAssembly component configuration, build orchestration, and HTTP routing.
 
-### Resource Management
-```wit
-// Shared resources across components
-resource database-connection {
-  constructor(url: string) -> result<database-connection, error>
-  query: func(sql: string) -> result<list<record>, error>
-  close: func()
-}
-```
+## The Benefits in Practice
 
-### Stream Processing
-```wit
-// Streaming interfaces for large data
-interface stream-processor {
-  process-stream: func(input: stream<bytes>) -> stream<result<string, error>>
-}
-```
+By leveraging the WebAssembly Component Model through Spin, FTL delivers transformative benefits for polyglot development:
 
-### Async Operations
-```wit
-// Future/Promise-like async operations
-interface async-operations {
-  fetch-data: func(url: string) -> future<result<bytes, http-error>>  
-}
-```
+### Development Productivity
 
-## Component Model vs Alternatives
+**Language Choice Freedom**: Pick the best language for each task without integration overhead  
+**Familiar Workflows**: Each language uses its natural patterns and tooling  
+**Unified Build System**: Single `ftl build` command handles all languages in parallel  
+**Fast Iteration**: Local chaining enables instant testing of multi-language workflows  
 
-| Approach | Type Safety | Performance | Complexity | Universality |
-|----------|-------------|-------------|------------|--------------|
-| FFI | ❌ Manual | ✅ Native | ❌ High | ❌ Platform-specific |
-| HTTP APIs | ❌ Runtime only | ❌ Network overhead | ✅ Simple | ✅ Universal |
-| Shared Libraries | ❌ ABI fragile | ✅ Native | ❌ High | ❌ Platform-specific |
-| Component Model | ✅ Compile-time | ✅ Near-native | ✅ Generated | ✅ Universal |
+### Application Architecture
 
-## The Future of Composition
+**Microservices Without Complexity**: Get service isolation without network infrastructure  
+**Type Safety Across Languages**: JSON schemas ensure compatibility at compile time  
+**Security by Default**: Each component runs in an isolated sandbox with explicit permissions  
+**True Portability**: Same application runs identically on any platform supporting WASM  
 
-The Component Model enables new patterns:
+### Operational Excellence  
 
-### Capability-Based Security
-```wit
-// Components request only needed capabilities
-world secure-tool {
-  import network: network-interface
-  import filesystem: readonly-filesystem  // Read-only access
-  export tool: tool-interface
-}
-```
+**Single Runtime**: One server process hosts your entire polyglot application  
+**Consistent Deployment**: Same deployment process regardless of language mix  
+**Memory Efficiency**: Shared runtime with isolated component memory spaces  
+**Performance Optimization**: Near-native execution with zero network overhead between components
 
-### Dynamic Composition
-```bash
-# Runtime composition without recompilation
-ftl compose \
-  --pipeline text-analyzer,sentiment-scorer,report-generator \
-  --input document.txt \
-  --output report.json
-```
+### Compared to Traditional Approaches
 
-### Component Registries
-```bash
-# Discover and use community components
-ftl component search text-processing
-ftl component install @community/advanced-nlp:1.2.0
-ftl add my-tool --use @community/advanced-nlp
-```
+| Approach | Integration Complexity | Performance | Security | Deployment |
+|----------|------------------------|-------------|----------|------------|
+| **Microservices** | High (networking, discovery) | Network overhead | Complex (service mesh) | Multiple services |
+| **Monorepos** | High (build coordination) | Good | Shared process | Complex polyglot builds |
+| **FTL + Component Model** | Low (automatic) | Near-native | Isolated components | Single application |
 
-## Learning More
+## What's Next
 
-- **Architecture**: See how components fit into FTL's overall design in [FTL Architecture](./architecture.md)
-- **Implementation**: Learn the development workflow in [Project Lifecycle](./lifecycle.md)
-- **Practice**: Try the polyglot tutorial in [Composing Polyglot Servers](../getting-started/polyglot-composition.md)
+Now that you understand how FTL leverages the Component Model to make polyglot development practical, explore these areas:
 
-The WebAssembly Component Model transforms language interoperability from a painful integration problem into a seamless composition opportunity. It's the foundation that makes FTL's "write each tool in the best language for the job" philosophy practical and powerful.
+**Architecture Deep Dive**: Learn how components fit into FTL's overall system design → [FTL Architecture](./architecture.md)
+
+**Development Workflow**: Understand the complete project lifecycle from init to production → [Project Lifecycle](./lifecycle.md)  
+
+**Hands-On Tutorial**: Build your first multi-language application → [Getting Started Guide](../getting-started/)
+
+**Component Model Details**: Dive deeper into the technical foundations → [WebAssembly Component Model Documentation](https://component-model.bytecodealliance.org/)
+
+**Spin Framework**: Explore the runtime that makes it all possible → [Fermyon Spin Documentation](https://www.fermyon.com/spin)
+
+---
+
+The WebAssembly Component Model represents a fundamental shift in how we think about language interoperability. FTL makes this shift practical by abstracting the complexity while preserving all the benefits. The result: you can finally choose the best language for each job without paying the integration tax.
