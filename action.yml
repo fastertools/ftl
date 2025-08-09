@@ -177,6 +177,18 @@ runs:
         ~/.local/bin/spin --version
         echo "✅ Spin installed successfully"
 
+    - name: Debug cache paths
+      shell: bash
+      run: |
+        echo "🔍 Checking cache paths..."
+        echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+        echo "~/.local/bin contents:"
+        ls -la ~/.local/bin/ || echo "~/.local/bin does not exist"
+        echo "~/.cargo/bin contents:"
+        ls -la ~/.cargo/bin/ || echo "~/.cargo/bin does not exist"
+        echo "Current wkg location:"
+        which wkg || echo "wkg not found in PATH"
+
     - name: Install wkg
       if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
       shell: bash
@@ -232,6 +244,20 @@ runs:
         # Verify installation
         ~/.local/bin/wkg --version
         echo "✅ wkg installed successfully"
+
+    - name: Debug wkg installation location
+      shell: bash  
+      run: |
+        echo "🔍 wkg installation verification:"
+        echo "which wkg: $(which wkg || echo 'not found')"
+        echo "~/.cargo/bin/wkg exists: $(test -f ~/.cargo/bin/wkg && echo 'YES' || echo 'NO')"
+        echo "~/.local/bin/wkg exists: $(test -f ~/.local/bin/wkg && echo 'YES' || echo 'NO')"
+        if [ -f ~/.cargo/bin/wkg ]; then
+          echo "~/.cargo/bin/wkg version: $(~/.cargo/bin/wkg --version)"
+        fi
+        if [ -f ~/.local/bin/wkg ]; then
+          echo "~/.local/bin/wkg version: $(~/.local/bin/wkg --version)"
+        fi
 
     - name: Verify FTL CLI installation
       id: verify
