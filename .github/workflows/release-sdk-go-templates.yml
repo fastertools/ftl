@@ -124,11 +124,11 @@ jobs:
             
             # Create temporary directory for validation
             template_dir=$(dirname "$template_file")
-            template_name=$(basename "$template_dir")
+            template_name=$(basename "$(dirname "$template_dir")")
             temp_dir=$(mktemp -d)
             
             # Copy template content to temp directory
-            cp -r "$template_dir/content/"* "$temp_dir/"
+            cp -r "$template_dir/"* "$temp_dir/"
             
             # Resolve template variables with test values
             find "$temp_dir" -type f \( -name "*.mod" -o -name "*.go" -o -name "*.toml" \) | while read -r file; do
@@ -151,8 +151,8 @@ jobs:
                     echo "Successfully verified go.sum for template $template_name"
                     
                     # Copy the generated go.sum back to template (if it doesn't exist or is different)
-                    if [ ! -f "$template_dir/content/go.sum" ] || ! diff -q go.sum "$template_dir/content/go.sum" > /dev/null 2>&1; then
-                      cp go.sum "$template_dir/content/go.sum"
+                    if [ ! -f "$template_dir/go.sum" ] || ! diff -q go.sum "$template_dir/go.sum" > /dev/null 2>&1; then
+                      cp go.sum "$template_dir/go.sum"
                       echo "Updated go.sum for template $template_name"
                     fi
                   else
