@@ -135,9 +135,8 @@ jobs:
             VERSION="${{ steps.version.outputs.version }}"
             git commit -m "chore: validate and update Go templates for SDK v$VERSION
 
-- Run go mod tidy to update go.sum files
-- Verify module checksums with go mod verify  
-- Templates now ready for Go SDK v$VERSION
+Run go mod tidy to update go.sum files and verify module checksums.
+Templates are now ready for Go SDK v$VERSION.
 
 This commit completes the template validation process started by
 the release-sdk-go.yml workflow. TinyGo compatibility is tested
