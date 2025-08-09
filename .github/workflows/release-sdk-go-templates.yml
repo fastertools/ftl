@@ -124,11 +124,12 @@ jobs:
             
             # Create temporary directory for validation
             template_dir=$(dirname "$template_file")
-            template_name=$(basename "$template_dir")
+            template_name=$(basename "$(dirname "$template_dir")")
+            template_abs_dir="$(pwd)/$template_dir"
             temp_dir=$(mktemp -d)
             
             # Copy template content to temp directory
-            cp -r "$template_dir/content/"* "$temp_dir/"
+            cp -r "$template_dir/"* "$temp_dir/"
             
             # Resolve template variables with test values
             find "$temp_dir" -type f \( -name "*.mod" -o -name "*.go" -o -name "*.toml" \) | while read -r file; do
@@ -151,8 +152,8 @@ jobs:
                     echo "Successfully verified go.sum for template $template_name"
                     
                     # Copy the generated go.sum back to template (if it doesn't exist or is different)
-                    if [ ! -f "$template_dir/content/go.sum" ] || ! diff -q go.sum "$template_dir/content/go.sum" > /dev/null 2>&1; then
-                      cp go.sum "$template_dir/content/go.sum"
+                    if [ ! -f "$template_abs_dir/go.sum" ] || ! diff -q go.sum "$template_abs_dir/go.sum" > /dev/null 2>&1; then
+                      cp go.sum "$template_abs_dir/go.sum"
                       echo "Updated go.sum for template $template_name"
                     fi
                   else
@@ -209,28 +210,17 @@ jobs:
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         
-        # Get PR number
-        if [ -n "${{ inputs.pr_number }}" ]; then
-          PR_NUMBER="${{ inputs.pr_number }}"
-        else
-          PR_NUMBER=$(gh pr list --head ${{ github.head_ref }} --json number -q '.[0].number')
-        fi
+        COMMENT_BODY=$(cat <<EOF
+        ## Go Template Update Complete
+
+        Templates have been updated to use Go SDK v${VERSION}.
+
+        - Templates updated to new SDK version
+        - Examples updated to new SDK version  
+        - Ready for CI validation
+
+        Templates are ready for merge!
+        EOF
+        )
         
-        if [ -n "$PR_NUMBER" ]; then
-          COMMENT_BODY=$(cat <<EOF
-          ## Go Template Update Complete
-
-          Templates have been updated to use Go SDK v${VERSION}.
-
-          - Templates updated to new SDK version
-          - Examples updated to new SDK version  
-          - Ready for CI validation
-
-          Templates are ready for merge!
-          EOF
-          )
-          
-          gh pr comment $PR_NUMBER --body "$COMMENT_BODY"
-        else
-          echo "Could not find PR number to comment on"
-        fi
+        gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
