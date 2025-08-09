@@ -85,12 +85,13 @@ jobs:
         
         echo "Running go mod tidy and validation on templates..."
         
-        find templates -name "go.mod" -type f | while read -r file; do
+        # Use process substitution to avoid subshell variable scope issues
+        while IFS= read -r -d '' file; do
           if grep -q "github.com/fastertools/ftl-cli/sdk/go v$VERSION" "$file"; then
             echo "Processing template: $file"
             
             dir=$(dirname "$file")
-            cd "$dir"
+            pushd "$dir" > /dev/null
             
             # Run go mod tidy to update go.sum
             if go mod tidy; then
@@ -102,56 +103,54 @@ jobs:
                   echo "SUCCESS: go.sum verification passed for $dir"
                 else
                   echo "ERROR: go.sum verification failed for $dir"
-                  cd -
+                  popd > /dev/null
                   exit 1
                 fi
               fi
             else
               echo "ERROR: go mod tidy failed for $dir"
-              cd -
+              popd > /dev/null
               exit 1
             fi
             
-            cd -
+            popd > /dev/null
             CHANGES_MADE=true
           fi
-        done
+        done < <(find templates -name "go.mod" -type f -print0)
         
         # Set flag for commit step
         echo "CHANGES_MADE=$CHANGES_MADE" >> $GITHUB_ENV
 
     # Note: TinyGo compatibility testing moved to CI workflow for faster feedback
 
+    - name: Setup Git
+      uses: ./.github/actions/setup-git
+      with:
+        token: ${{ secrets.PAT || github.token }}
+
     - name: Commit template updates
       run: |
-        if [ "$CHANGES_MADE" = "true" ]; then
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          git add -A
-          
-          if ! git diff --staged --quiet; then
-            VERSION="${{ steps.version.outputs.version }}"
-            git commit -m "chore: validate and update Go templates for SDK v$VERSION
-
-- Run go mod tidy to update go.sum files
-- Verify module checksums with go mod verify  
-- Templates now ready for Go SDK v$VERSION
-
-This commit completes the template validation process started by
-the release-sdk-go.yml workflow. TinyGo compatibility is tested
-separately in the CI workflow."
-            
-            git push
-            echo "SUCCESS: Template validation changes committed and pushed"
-          else
-            echo "No changes to commit"
-          fi
-        else
-          echo "No templates were processed"
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
         fi
+        
+        VERSION="${{ steps.version.outputs.version }}"
+        git commit -m "chore: validate and update Go templates for SDK v$VERSION" \
+          -m "Run go mod tidy to update go.sum files and verify module checksums." \
+          -m "Templates are now ready for Go SDK v$VERSION." \
+          -m "" \
+          -m "This commit completes the template validation process started by" \
+          -m "the release-sdk-go.yml workflow. TinyGo compatibility is tested" \
+          -m "separately in the CI workflow."
+        
+        git push
+        echo "Template validation changes committed and pushed"
 
     - name: Add PR comment
+      env:
+        GH_TOKEN: ${{ secrets.PAT || github.token }}
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         
@@ -163,19 +162,15 @@ separately in the CI workflow."
         fi
         
         if [ -n "$PR_NUMBER" ]; then
-          gh pr comment $PR_NUMBER --body "## SUCCESS: Go Template Validation Complete
+          gh pr comment $PR_NUMBER --body "## Go Template Validation Complete
 
 SDK v$VERSION is now available in the Go module proxy and all templates have been validated:
 
-- [x] Go module proxy availability confirmed
-- [x] \`go mod tidy\` completed for all templates  
-- [x] \`go mod verify\` passed for all go.sum files
-
-> **Note**: TinyGo compatibility testing runs automatically in the CI workflow
+- Go module proxy availability confirmed
+- \`go mod tidy\` completed for all templates  
+- \`go mod verify\` passed for all go.sum files
 
 Templates are ready for merge!"
         else
-          echo "WARNING: Could not find PR number to comment on"
+          echo "Could not find PR number to comment on"
         fi
-      env:
-        GH_TOKEN: ${{ secrets.PAT || github.token }}
