@@ -28,7 +28,6 @@ jobs:
           version: 'latest'
           install-dependencies: 'true'
           cache-dependencies: 'true'
-          working-directory: './test-project'
 
       - name: Verify FTL CLI installation
         run: |
