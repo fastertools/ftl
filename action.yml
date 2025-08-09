@@ -97,11 +97,6 @@ runs:
         OS=$(uname -s)
         ARCH=$(uname -m)
         
-        # Force x86_64 for Linux in act environment 
-        if [ "$OS" = "Linux" ] && [ -n "$ACT" ]; then
-          ARCH="x86_64"
-        fi
-        
         case "$OS" in
           Linux)
             PLATFORM="x86_64-unknown-linux-gnu" ;;
@@ -200,16 +195,11 @@ runs:
           exit 0
         fi
         
-        # Fallback to binary download - handle act emulation
+        # Fallback to binary download
         WKG_VERSION="0.11.0"
         
         OS=$(uname -s)
         ARCH=$(uname -m)
-        
-        # Force x86_64 for Linux in act environment
-        if [ "$OS" = "Linux" ] && [ -n "$ACT" ]; then
-          ARCH="x86_64"
-        fi
         
         case "$OS" in
           Linux)
