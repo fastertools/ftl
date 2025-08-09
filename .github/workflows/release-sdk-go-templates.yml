@@ -125,6 +125,7 @@ jobs:
             # Create temporary directory for validation
             template_dir=$(dirname "$template_file")
             template_name=$(basename "$(dirname "$template_dir")")
+            template_abs_dir="$(pwd)/$template_dir"
             temp_dir=$(mktemp -d)
             
             # Copy template content to temp directory
@@ -151,8 +152,8 @@ jobs:
                     echo "Successfully verified go.sum for template $template_name"
                     
                     # Copy the generated go.sum back to template (if it doesn't exist or is different)
-                    if [ ! -f "$template_dir/go.sum" ] || ! diff -q go.sum "$template_dir/go.sum" > /dev/null 2>&1; then
-                      cp go.sum "$template_dir/go.sum"
+                    if [ ! -f "$template_abs_dir/go.sum" ] || ! diff -q go.sum "$template_abs_dir/go.sum" > /dev/null 2>&1; then
+                      cp go.sum "$template_abs_dir/go.sum"
                       echo "Updated go.sum for template $template_name"
                     fi
                   else
