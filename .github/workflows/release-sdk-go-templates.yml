@@ -82,22 +82,46 @@ jobs:
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         
-        echo "Updating Go SDK version in templates to v$VERSION..."
+        echo "Updating Go SDK version to v$VERSION..."
         
-        # Update Go templates - just update version numbers, don't run go mod tidy
+        # Update Go templates - just update version numbers (these contain template variables)
         find templates -name "go.mod" -type f | while read -r file; do
           if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
-            # Update the require statement
             sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
-            echo "Updated Go SDK version to v$VERSION in: $file"
+            echo "Updated template version in: $file"
           fi
         done
         
-        # Also update examples if needed  
-        find examples -name "go.mod" -type f | while read -r file; do
-          if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
-            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
-            echo "Updated Go SDK version to v$VERSION in: $file"
+        # Update actual Go projects and run go mod tidy
+        for dir in examples/demo/echo-go examples/demo/multi-tools-go examples/demo/weather-go sdk/go; do
+          if [ -f "$dir/go.mod" ] && grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$dir/go.mod"; then
+            echo "Processing Go project: $dir"
+            
+            # Update version
+            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$dir/go.mod"
+            echo "Updated version in: $dir/go.mod"
+            
+            # Run go mod tidy to update go.sum
+            pushd "$dir" > /dev/null
+            if go mod tidy; then
+              echo "Successfully ran go mod tidy in: $dir"
+              
+              # Verify go.sum if it exists
+              if [ -f go.sum ]; then
+                if go mod verify; then
+                  echo "Successfully verified go.sum in: $dir"
+                else
+                  echo "ERROR: go mod verify failed in: $dir"
+                  popd > /dev/null
+                  exit 1
+                fi
+              fi
+            else
+              echo "ERROR: go mod tidy failed in: $dir"
+              popd > /dev/null
+              exit 1
+            fi
+            popd > /dev/null
           fi
         done
 
