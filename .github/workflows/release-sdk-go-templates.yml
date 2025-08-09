@@ -208,35 +208,19 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.PAT || github.token }}
       run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          
-          PR_BODY=$(cat <<EOF
-          ## 📦 Update Templates to ftl-sdk v${VERSION}
-          
-          This PR updates project templates and examples to use the newly published ftl-sdk version.
-          
-          ### Changes
-          - Updated Go project templates to use ftl-sdk v${VERSION}
-          - Updated example projects to use ftl-sdk v${VERSION}
-          
-          ### Context
-          This is an automated PR created after successfully publishing ftl-sdk v${VERSION} to the Go proxy.
-          
-          ### Checklist
-          - [x] SDK v${VERSION} is available on the proxy
-          - [x] Templates updated to new version
-          - [x] Examples updated to new version
-          - [ ] CI tests pass with new version
-          
-          ---
-          *🤖 This PR was automatically created by the release workflow*
-          EOF
-          )
-          
-          gh pr create \
-            --title "chore: update templates to ftl-sdk v${VERSION}" \
-            --body "$PR_BODY" \
-            --base main \
-            --head "$UPDATE_BRANCH" \
-            --label "automated" \
-            --label "dependencies"
+        VERSION="${{ steps.version.outputs.version }}"
+        
+        COMMENT_BODY=$(cat <<EOF
+        ## Go Template Update Complete
+
+        Templates have been updated to use Go SDK v${VERSION}.
+
+        - Templates updated to new SDK version
+        - Examples updated to new SDK version  
+        - Ready for CI validation
+
+        Templates are ready for merge!
+        EOF
+        )
+        
+        gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
