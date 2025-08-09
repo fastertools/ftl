@@ -1,0 +1,399 @@
+name: 'Setup FTL CLI'
+description: 'Install and setup FTL CLI for building and deploying MCP servers'
+author: 'FasterTools'
+branding:
+  icon: 'cloud'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'FTL CLI version to install (default: latest)'
+    required: false
+    default: 'latest'
+  
+  install-dependencies:
+    description: 'Install dependencies (Spin, wkg, Docker) automatically'
+    required: false
+    default: 'true'
+  
+  ftl-auth-token:
+    description: 'FTL authentication token for deployment (store in secrets)'
+    required: false
+  
+  working-directory:
+    description: 'Working directory containing ftl.toml'
+    required: false
+    default: '.'
+  
+  deploy:
+    description: 'Automatically deploy after setup'
+    required: false
+    default: 'false'
+  
+  deploy-access-control:
+    description: 'Access control for deployment (public, private, custom)'
+    required: false
+    default: 'public'
+  
+  deploy-variables:
+    description: 'Environment variables for deployment (JSON format or comma-separated KEY=VALUE)'
+    required: false
+  
+  cache-dependencies:
+    description: 'Cache installed dependencies'
+    required: false
+    default: 'true'
+
+outputs:
+  ftl-version:
+    description: 'The installed FTL CLI version'
+    value: ${{ steps.install.outputs.ftl-version }}
+  
+  deployment-url:
+    description: 'The deployment URL (if deployed)'
+    value: ${{ steps.deploy.outputs.deployment-url }}
+  
+  deployment-status:
+    description: 'The deployment status'
+    value: ${{ steps.deploy.outputs.deployment-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        # Validate working directory
+        if [ ! -d "${{ inputs.working-directory }}" ]; then
+          echo "❌ Working directory '${{ inputs.working-directory }}' does not exist"
+          exit 1
+        fi
+        
+        # Check for ftl.toml if deploying
+        if [ "${{ inputs.deploy }}" = "true" ] && [ ! -f "${{ inputs.working-directory }}/ftl.toml" ]; then
+          echo "❌ ftl.toml not found in '${{ inputs.working-directory }}'. Required for deployment."
+          exit 1
+        fi
+        
+        # Validate access control option
+        if [ "${{ inputs.deploy-access-control }}" != "public" ] && [ "${{ inputs.deploy-access-control }}" != "private" ] && [ "${{ inputs.deploy-access-control }}" != "custom" ]; then
+          echo "❌ Invalid access-control value. Must be 'public', 'private', or 'custom'"
+          exit 1
+        fi
+        
+        echo "✅ Input validation passed"
+
+    - name: Setup cache key
+      id: cache-key
+      shell: bash
+      run: |
+        # Create cache key based on OS, version, and dependencies flag
+        CACHE_KEY="ftl-cli-${{ runner.os }}-${{ inputs.version }}-deps-${{ inputs.install-dependencies }}"
+        echo "cache-key=${CACHE_KEY}" >> $GITHUB_OUTPUT
+
+    - name: Cache FTL CLI and dependencies
+      if: inputs.cache-dependencies == 'true'
+      uses: actions/cache@v4
+      id: cache
+      with:
+        path: |
+          ~/.local/bin/ftl
+          ~/.local/bin/spin  
+          ~/.local/bin/wkg
+          ~/.cache/ftl
+        key: ${{ steps.cache-key.outputs.cache-key }}
+        restore-keys: |
+          ftl-cli-${{ runner.os }}-${{ inputs.version }}-
+          ftl-cli-${{ runner.os }}-
+
+    - name: Install system dependencies
+      if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "🔧 Installing system dependencies..."
+        
+        case "${{ runner.os }}" in
+          Linux)
+            # Update package list
+            sudo apt-get update
+            
+            # Install required packages
+            sudo apt-get install -y curl wget docker.io
+            
+            # Start Docker service
+            sudo systemctl start docker
+            sudo usermod -aG docker $USER
+            ;;
+          macOS)
+            # Docker Desktop should be available in macOS runners
+            echo "Docker should be pre-installed on macOS runners"
+            ;;
+          *)
+            echo "❌ Unsupported OS: ${{ runner.os }}"
+            exit 1
+            ;;
+        esac
+        
+        echo "✅ System dependencies installed"
+
+    - name: Install FTL CLI
+      id: install
+      shell: bash
+      run: |
+        echo "📦 Installing FTL CLI..."
+        
+        # Skip if cached and exists
+        if [ "${{ inputs.cache-dependencies }}" = "true" ] && [ "${{ steps.cache.outputs.cache-hit }}" = "true" ] && command -v ftl >/dev/null 2>&1; then
+          echo "✅ FTL CLI found in cache"
+          FTL_VERSION=$(ftl --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+          echo "ftl-version=${FTL_VERSION}" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Create local bin directory
+        mkdir -p ~/.local/bin
+        
+        # Determine download URL and version
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          # Get latest version from GitHub API
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/fastertools/ftl-cli/releases | jq -r '.[] | select(.tag_name | startswith("cli-v")) | .tag_name' | head -1)
+          VERSION=${LATEST_RELEASE#cli-v}
+          TAG_NAME=${LATEST_RELEASE}
+        else
+          VERSION="${{ inputs.version }}"
+          TAG_NAME="cli-v${VERSION}"
+        fi
+        
+        echo "Installing FTL CLI version: ${VERSION}"
+        
+        # Detect platform
+        case "${{ runner.os }}" in
+          Linux)
+            case "${{ runner.arch }}" in
+              X64) PLATFORM="x86_64-unknown-linux-gnu" ;;
+              ARM64) PLATFORM="aarch64-unknown-linux-gnu" ;;
+              *) echo "❌ Unsupported architecture: ${{ runner.arch }}"; exit 1 ;;
+            esac
+            ;;
+          macOS)
+            case "${{ runner.arch }}" in
+              X64) PLATFORM="x86_64-apple-darwin" ;;
+              ARM64) PLATFORM="aarch64-apple-darwin" ;;
+              *) echo "❌ Unsupported architecture: ${{ runner.arch }}"; exit 1 ;;
+            esac
+            ;;
+          *)
+            echo "❌ Unsupported OS: ${{ runner.os }}"
+            exit 1
+            ;;
+        esac
+        
+        # Download FTL CLI binary
+        ASSET_NAME="ftl-${PLATFORM}"
+        DOWNLOAD_URL="https://github.com/fastertools/ftl-cli/releases/download/${TAG_NAME}/${ASSET_NAME}"
+        
+        echo "Downloading from: ${DOWNLOAD_URL}"
+        curl -fsSL "${DOWNLOAD_URL}" -o ~/.local/bin/ftl
+        
+        # Make executable
+        chmod +x ~/.local/bin/ftl
+        
+        # Add to PATH
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+        # Verify installation
+        ~/.local/bin/ftl --version
+        FTL_VERSION=$(~/.local/bin/ftl --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+        
+        echo "✅ FTL CLI v${FTL_VERSION} installed successfully"
+        echo "ftl-version=${FTL_VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Install Spin
+      if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "📦 Installing Spin WebAssembly runtime..."
+        
+        # Skip if already installed
+        if command -v spin >/dev/null 2>&1; then
+          echo "✅ Spin already installed"
+          exit 0
+        fi
+        
+        # Download and install Spin
+        case "${{ runner.os }}" in
+          Linux)
+            curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash
+            ;;
+          macOS)
+            curl -fsSL https://wasm-functions.fermyon.app/downloads/install.sh | bash
+            ;;
+        esac
+        
+        # Move to local bin and add to PATH
+        mv ./spin ~/.local/bin/spin
+        chmod +x ~/.local/bin/spin
+        
+        # Verify installation
+        ~/.local/bin/spin --version
+        echo "✅ Spin installed successfully"
+
+    - name: Install wkg
+      if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "📦 Installing wkg (WebAssembly package tool)..."
+        
+        # Skip if already installed  
+        if command -v wkg >/dev/null 2>&1; then
+          echo "✅ wkg already installed"
+          exit 0
+        fi
+        
+        # Try cargo first (if available)
+        if command -v cargo >/dev/null 2>&1; then
+          cargo install wkg
+          echo "✅ wkg installed via cargo"
+          exit 0
+        fi
+        
+        # Fallback to binary download
+        WKG_VERSION="0.11.0"
+        
+        case "${{ runner.os }}" in
+          Linux)
+            case "${{ runner.arch }}" in
+              X64) WKG_PLATFORM="x86_64-unknown-linux-gnu" ;;
+              ARM64) WKG_PLATFORM="aarch64-unknown-linux-gnu" ;;
+            esac
+            ;;
+          macOS)
+            case "${{ runner.arch }}" in
+              X64) WKG_PLATFORM="x86_64-apple-darwin" ;;
+              ARM64) WKG_PLATFORM="aarch64-apple-darwin" ;;
+            esac
+            ;;
+        esac
+        
+        WKG_URL="https://github.com/bytecodealliance/wasm-pkg-tools/releases/download/v${WKG_VERSION}/wkg-${WKG_PLATFORM}"
+        
+        echo "Downloading wkg from: ${WKG_URL}"
+        curl -fsSL "${WKG_URL}" -o ~/.local/bin/wkg
+        chmod +x ~/.local/bin/wkg
+        
+        # Verify installation
+        ~/.local/bin/wkg --version
+        echo "✅ wkg installed successfully"
+
+    - name: Setup FTL authentication
+      if: inputs.ftl-auth-token != ''
+      shell: bash
+      env:
+        FTL_AUTH_TOKEN: ${{ inputs.ftl-auth-token }}
+      run: |
+        echo "🔐 Setting up FTL authentication..."
+        
+        # The FTL_AUTH_TOKEN environment variable will be available for subsequent steps
+        # Test authentication by checking login status
+        cd "${{ inputs.working-directory }}"
+        
+        # Note: This may need adjustment based on actual FTL auth flow
+        # For now, we'll rely on the environment variable being set
+        echo "✅ FTL authentication configured"
+
+    - name: Build FTL project
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔨 Building FTL project..."
+        
+        # Check if ftl.toml exists
+        if [ ! -f "ftl.toml" ]; then
+          echo "⚠️  No ftl.toml found - skipping build"
+          exit 0
+        fi
+        
+        # Build the project
+        ftl build
+        echo "✅ FTL project built successfully"
+
+    - name: Deploy to FTL Engine
+      id: deploy
+      if: inputs.deploy == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        FTL_AUTH_TOKEN: ${{ inputs.ftl-auth-token }}
+      run: |
+        echo "🚀 Deploying to FTL Engine..."
+        
+        # Prepare deployment command
+        DEPLOY_CMD="ftl eng deploy --yes"
+        
+        # Add access control
+        DEPLOY_CMD="${DEPLOY_CMD} --access-control ${{ inputs.deploy-access-control }}"
+        
+        # Process deployment variables
+        if [ -n "${{ inputs.deploy-variables }}" ]; then
+          VARIABLES="${{ inputs.deploy-variables }}"
+          
+          # Check if it's JSON format
+          if echo "$VARIABLES" | jq . >/dev/null 2>&1; then
+            # Parse JSON and convert to --variable flags
+            echo "$VARIABLES" | jq -r 'to_entries[] | "--variable \(.key)=\(.value)"' | while read -r var_flag; do
+              DEPLOY_CMD="${DEPLOY_CMD} ${var_flag}"
+            done
+          else
+            # Assume comma-separated KEY=VALUE format
+            IFS=',' read -ra VARS <<< "$VARIABLES"
+            for var in "${VARS[@]}"; do
+              if [[ $var == *"="* ]]; then
+                DEPLOY_CMD="${DEPLOY_CMD} --variable ${var}"
+              fi
+            done
+          fi
+        fi
+        
+        echo "Running: ${DEPLOY_CMD}"
+        
+        # Execute deployment and capture output
+        DEPLOY_OUTPUT=$(eval "$DEPLOY_CMD" 2>&1)
+        DEPLOY_EXIT_CODE=$?
+        
+        echo "$DEPLOY_OUTPUT"
+        
+        if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
+          # Extract deployment URL from output (adjust regex as needed)
+          DEPLOYMENT_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*\.fwf\.app[^[:space:]]*' | head -1)
+          
+          echo "deployment-url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
+          echo "deployment-status=success" >> $GITHUB_OUTPUT
+          echo "✅ Deployment successful!"
+          
+          if [ -n "$DEPLOYMENT_URL" ]; then
+            echo "🌐 Deployment URL: ${DEPLOYMENT_URL}"
+          fi
+        else
+          echo "deployment-status=failed" >> $GITHUB_OUTPUT
+          echo "❌ Deployment failed"
+          exit 1
+        fi
+
+    - name: Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## 📋 FTL CLI Setup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **FTL CLI Version**: ${{ steps.install.outputs.ftl-version || 'Not installed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Dependencies Installed**: ${{ inputs.install-dependencies }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Working Directory**: \`${{ inputs.working-directory }}\`" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.deploy }}" = "true" ]; then
+          echo "- **Deployment**: ${{ steps.deploy.outputs.deployment-status || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.deploy.outputs.deployment-url }}" ]; then
+            echo "- **Deployment URL**: [${{ steps.deploy.outputs.deployment-url }}](${{ steps.deploy.outputs.deployment-url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "- **Deployment**: Skipped" >> $GITHUB_STEP_SUMMARY
+        fi

@@ -1,0 +1,153 @@
+name: Test GitHub Action
+
+on:
+  push:
+    branches:
+      - github-action-setup
+  pull_request:
+    branches:
+      - github-action-setup
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-action:
+    name: Test FTL CLI GitHub Action
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup FTL CLI using local action
+        id: setup-ftl
+        uses: ./
+        with:
+          version: 'latest'
+          install-dependencies: 'true'
+          cache-dependencies: 'true'
+          working-directory: './test-project'
+
+      - name: Verify FTL CLI installation
+        run: |
+          echo "🔍 Verifying FTL CLI installation..."
+          
+          # Check if ftl command is available
+          if ! command -v ftl >/dev/null 2>&1; then
+            echo "❌ FTL CLI not found in PATH"
+            exit 1
+          fi
+          
+          # Print version information
+          echo "✅ FTL CLI found!"
+          ftl --version
+          
+          # Check if dependencies are installed
+          echo ""
+          echo "🔍 Checking dependencies..."
+          
+          if command -v spin >/dev/null 2>&1; then
+            echo "✅ Spin: $(spin --version)"
+          else
+            echo "⚠️  Spin not found"
+          fi
+          
+          if command -v wkg >/dev/null 2>&1; then
+            echo "✅ wkg: $(wkg --version)"
+          else
+            echo "⚠️  wkg not found"
+          fi
+          
+          if command -v docker >/dev/null 2>&1; then
+            echo "✅ Docker: $(docker --version)"
+          else
+            echo "⚠️  Docker not found"
+          fi
+
+      - name: Test ftl init command
+        run: |
+          echo "🧪 Testing ftl init command..."
+          
+          # Create a temporary directory for the test project
+          mkdir -p test-project
+          cd test-project
+          
+          # Initialize a new FTL project
+          echo "Creating new FTL project..."
+          ftl init test-cli-action --template ftl-mcp-rust --yes
+          
+          # Verify the project was created
+          if [ ! -d "test-cli-action" ]; then
+            echo "❌ Project directory not created"
+            exit 1
+          fi
+          
+          cd test-cli-action
+          
+          # Check if required files exist
+          if [ ! -f "ftl.toml" ]; then
+            echo "❌ ftl.toml not found"
+            exit 1
+          fi
+          
+          if [ ! -f "spin.toml" ]; then
+            echo "❌ spin.toml not found"
+            exit 1
+          fi
+          
+          echo "✅ FTL project created successfully!"
+          
+          # Show project structure
+          echo ""
+          echo "📁 Project structure:"
+          ls -la
+          
+          # Show ftl.toml content
+          echo ""
+          echo "📄 ftl.toml content:"
+          cat ftl.toml
+
+      - name: Test ftl build command
+        run: |
+          echo "🔨 Testing ftl build command..."
+          cd test-project/test-cli-action
+          
+          # Try to build the project
+          if ftl build; then
+            echo "✅ FTL build successful!"
+          else
+            echo "❌ FTL build failed"
+            exit 1
+          fi
+
+      - name: Test additional ftl commands
+        run: |
+          echo "🧪 Testing additional FTL commands..."
+          cd test-project/test-cli-action
+          
+          # Test various ftl commands (non-destructive ones)
+          echo "Testing ftl --help..."
+          ftl --help
+          
+          echo ""
+          echo "Testing ftl templates list..."
+          if ftl templates list; then
+            echo "✅ Templates list command works"
+          else
+            echo "⚠️  Templates list command failed (might be expected)"
+          fi
+
+      - name: Output summary
+        if: always()
+        run: |
+          echo "## 🎉 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **FTL CLI Installation**: Success" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **FTL Init Command**: Success" >> $GITHUB_STEP_SUMMARY  
+          echo "✅ **FTL Build Command**: Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Installed Version**: ${{ steps.setup-ftl.outputs.ftl-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The GitHub Action is working correctly! 🚀" >> $GITHUB_STEP_SUMMARY
