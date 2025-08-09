@@ -59,8 +59,8 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "🔢 Version: $VERSION"
-          echo "🎯 Trigger: ${{ github.event_name }}"
+          echo "Version: $VERSION"
+          echo "Trigger: ${{ github.event_name }}"
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
@@ -174,10 +174,10 @@ jobs:
     - name: Report module information
       run: |
         echo ""
-        echo "📦 Go module users can import with:"
+        echo "Go module users can import with:"
         echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}"
         echo ""
-        echo "🏷️  Created tags:"
+        echo "Created tags:"
         echo "  - sdk-go-v${{ needs.verify-tag.outputs.version }} (release tracking)"
         echo "  - sdk/go/v${{ needs.verify-tag.outputs.version }} (Go module resolution)"
         echo ""
@@ -243,7 +243,7 @@ jobs:
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
           PR_BODY=$(cat <<EOF
-          ## 📦 Update Templates to Go SDK v${VERSION}
+          ## Update Templates to Go SDK v${VERSION}
           
           This PR updates project templates to use the newly published Go SDK version.
           
@@ -266,7 +266,7 @@ jobs:
           - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-go-v${VERSION})
           
           ---
-          *🤖 This PR was automatically created by the release workflow*
+          *This PR was automatically created by the release workflow*
           EOF
           )
           

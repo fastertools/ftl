@@ -70,7 +70,7 @@ jobs:
         if [[ "$BRANCH_NAME" =~ update-templates-sdk-go-v(.+)$ ]]; then
           VERSION="${BASH_REMATCH[1]}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "🔢 SDK Version: $VERSION"
+          echo "SDK Version: $VERSION"
         else
           echo "ERROR: Cannot extract version from branch name: $BRANCH_NAME"
           exit 1
@@ -83,11 +83,11 @@ jobs:
         VERSION="${{ steps.version.outputs.version }}"
         CHANGES_MADE=false
         
-        echo "🔧 Running go mod tidy and validation on templates..."
+        echo "Running go mod tidy and validation on templates..."
         
         find templates -name "go.mod" -type f | while read -r file; do
           if grep -q "github.com/fastertools/ftl-cli/sdk/go v$VERSION" "$file"; then
-            echo "📁 Processing template: $file"
+            echo "Processing template: $file"
             
             dir=$(dirname "$file")
             cd "$dir"
@@ -136,19 +136,19 @@ jobs:
 
 - Run go mod tidy to update go.sum files
 - Verify module checksums with go mod verify  
-- Test TinyGo compatibility
 - Templates now ready for Go SDK v$VERSION
 
 This commit completes the template validation process started by
-the release-sdk-go.yml workflow."
+the release-sdk-go.yml workflow. TinyGo compatibility is tested
+separately in the CI workflow."
             
             git push
             echo "SUCCESS: Template validation changes committed and pushed"
           else
-            echo "ℹ️ No changes to commit"
+            echo "No changes to commit"
           fi
         else
-          echo "ℹ️ No templates were processed"
+          echo "No templates were processed"
         fi
 
     - name: Add PR comment
@@ -170,9 +170,10 @@ SDK v$VERSION is now available in the Go module proxy and all templates have bee
 - [x] Go module proxy availability confirmed
 - [x] \`go mod tidy\` completed for all templates  
 - [x] \`go mod verify\` passed for all go.sum files
-- [x] TinyGo compatibility verified
 
-Templates are ready for merge! 🚀"
+> **Note**: TinyGo compatibility testing runs automatically in the CI workflow
+
+Templates are ready for merge!"
         else
           echo "WARNING: Could not find PR number to comment on"
         fi
