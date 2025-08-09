@@ -203,6 +203,78 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck -tags test ./...
 
+  tinygo-validation:
+    name: TinyGo Compilation Validation
+    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      - name: Set up TinyGo
+        uses: acifani/setup-tinygo@v2
+        with:
+          tinygo-version: '0.38.0'
+      
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-1.23-tinygo-${{ hashFiles('sdk/go/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-1.23-tinygo-
+            ${{ runner.os }}-go-1.23-
+      
+      - name: Validate Go SDK compiles with TinyGo
+        working-directory: sdk/go
+        run: |
+          echo "Testing Go SDK compilation with TinyGo..."
+          tinygo test -target=wasip1 -c .
+      
+      - name: Create and test minimal project
+        run: |
+          echo "Creating minimal test project..."
+          mkdir -p /tmp/tinygo-test
+          cd /tmp/tinygo-test
+          
+          # Create go.mod
+          cat > go.mod << 'EOF'
+          module tinygo-test-project
+          
+          go 1.23
+          
+          require github.com/fastertools/ftl-cli/sdk/go v0.0.0
+          
+          replace github.com/fastertools/ftl-cli/sdk/go => ${{ github.workspace }}/sdk/go
+          EOF
+          
+          # Create test file
+          cat > main_test.go << 'EOF'
+          package main
+          
+          import (
+              "testing"
+              "github.com/fastertools/ftl-cli/sdk/go"
+          )
+          
+          func TestCreateTextResponse(t *testing.T) {
+              response := ftl.CreateTextResponse("test")
+              if response.Content == nil {
+                  t.Fatal("response.Content should not be nil")
+              }
+              if *response.Content != "test" {
+                  t.Errorf("expected 'test', got %s", *response.Content)
+              }
+          }
+          EOF
+          
+          echo "Testing minimal project with TinyGo..."
+          tinygo test -target=wasip1 -c .
+
   test-python-sdk:
     name: Test Python SDK
     if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'

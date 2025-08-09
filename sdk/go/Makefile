@@ -1,4 +1,4 @@
-.PHONY: help test test-cov fmt lint clean build-examples tidy dev-deps quality verify-tinygo
+.PHONY: help test test-cov fmt lint clean build-examples tidy dev-deps quality
 
 help:
 	@echo "Available commands:"
@@ -11,7 +11,6 @@ help:
 	@echo "  build-examples Build example applications"
 	@echo "  tidy          Run go mod tidy"
 	@echo "  quality       Run all quality checks"
-	@echo "  verify-tinygo Verify TinyGo compatibility"
 
 # Run tests
 test:
@@ -58,14 +57,3 @@ dev-deps:
 # Run all quality checks
 quality: fmt lint test
 	@echo "All quality checks passed!"
-
-# Verify TinyGo compatibility
-verify-tinygo:
-	@echo "Verifying TinyGo compatibility..."
-	@which tinygo > /dev/null || (echo "TinyGo not found. Please install from https://tinygo.org" && exit 1)
-	@echo "Creating temporary test file..."
-	@echo 'package main\nimport _ "github.com/fastertools/ftl-cli/sdk/go"\nfunc main() {}' > /tmp/tinygo_test.go
-	@cd /tmp && go mod init test 2>/dev/null || true
-	@cd /tmp && go get github.com/fastertools/ftl-cli/sdk/go@latest 2>/dev/null || true
-	@tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o /tmp/test.wasm /tmp/tinygo_test.go && rm /tmp/test.wasm /tmp/tinygo_test.go
-	@echo "TinyGo compatibility verified!"

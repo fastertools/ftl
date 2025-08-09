@@ -51,7 +51,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
             if [[ ! "$TAG" =~ ^sdk-go-v ]]; then
-              echo "❌ Manual tag must start with 'sdk-go-v'"
+              echo "ERROR: Manual tag must start with 'sdk-go-v'"
               exit 1
             fi
             VERSION="${TAG#sdk-go-v}"
@@ -59,8 +59,8 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "🔢 Version: $VERSION"
-          echo "🎯 Trigger: ${{ github.event_name }}"
+          echo "Version: $VERSION"
+          echo "Trigger: ${{ github.event_name }}"
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
@@ -73,10 +73,10 @@ jobs:
           VERSION="${{ steps.parse.outputs.version }}"
           README_VERSION=$(grep "^Version: " README.md | cut -d' ' -f2)
           if [ "$README_VERSION" != "$VERSION" ]; then
-            echo "❌ Tag version ($VERSION) does not match README.md version ($README_VERSION)"
+            echo "ERROR: Tag version ($VERSION) does not match README.md version ($README_VERSION)"
             exit 1
           fi
-          echo "✅ Version matches README.md"
+          echo "SUCCESS: Version matches README.md"
 
   validate-and-test:
     name: Validate and Test
@@ -94,7 +94,7 @@ jobs:
     - name: Validate version format
       run: |
         if ! [[ "${{ needs.verify-tag.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-          echo "❌ Invalid version format. Please use semantic versioning (e.g., 1.0.0 or 1.0.0-beta1)"
+          echo "ERROR: Invalid version format. Please use semantic versioning (e.g., 1.0.0 or 1.0.0-beta1)"
           exit 1
         fi
 
@@ -119,35 +119,18 @@ jobs:
         
         # Skip version comparison if this is the first release
         if [ "$current" = "0.1.0" ] && [ -z "$(git tag -l 'sdk-go-v*')" ]; then
-          echo "✅ First release - no version comparison needed"
+          echo "SUCCESS: First release - no version comparison needed"
         else
           # Simple version comparison (works for most cases)
           if [ "$(printf '%s\n' "$new" "$current" | sort -V | head -n1)" = "$new" ] && [ "$new" != "$current" ]; then
-            echo "❌ New version ($new) must be higher than current version ($current)"
+            echo "ERROR: New version ($new) must be higher than current version ($current)"
             exit 1
           fi
-          echo "✅ Version $new is newer than $current"
+          echo "SUCCESS: Version $new is newer than $current"
         fi
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.23'
-
-    - name: Install TinyGo
-      run: |
-        wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
-        sudo dpkg -i tinygo_0.31.2_amd64.deb
-
-    - name: Run tests
-      working-directory: sdk/go
-      run: |
-        go mod download
-        go test -v -tags test ./...
-
-    - name: Verify TinyGo compatibility
-      working-directory: sdk/go
-      run: make verify-tinygo
+    # Note: Go SDK tests (including TinyGo compatibility) are handled by CI workflow
+    # This release workflow focuses on publishing and template updates
 
   release:
     name: Create Release
@@ -191,14 +174,14 @@ jobs:
     - name: Report module information
       run: |
         echo ""
-        echo "📦 Go module users can import with:"
+        echo "Go module users can import with:"
         echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}"
         echo ""
-        echo "🏷️  Created tags:"
+        echo "Created tags:"
         echo "  - sdk-go-v${{ needs.verify-tag.outputs.version }} (release tracking)"
         echo "  - sdk/go/v${{ needs.verify-tag.outputs.version }} (Go module resolution)"
         echo ""
-        echo "⚠️  Module may take a few minutes to appear in the Go module proxy"
+        echo "WARNING: Module may take a few minutes to appear in the Go module proxy"
 
   update-templates:
     name: Update Templates PR
@@ -231,7 +214,7 @@ jobs:
             if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
               # Update the require statement
               sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
-              echo "✅ Updated $file"
+              echo "SUCCESS: Updated $file"
               
               # Note: go mod tidy and validation are handled by release-sdk-go-templates.yml
               # to avoid Go module proxy timing dependencies
@@ -260,7 +243,7 @@ jobs:
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
           PR_BODY=$(cat <<EOF
-          ## 📦 Update Templates to Go SDK v${VERSION}
+          ## Update Templates to Go SDK v${VERSION}
           
           This PR updates project templates to use the newly published Go SDK version.
           
@@ -283,7 +266,7 @@ jobs:
           - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-go-v${VERSION})
           
           ---
-          *🤖 This PR was automatically created by the release workflow*
+          *This PR was automatically created by the release workflow*
           EOF
           )
           
