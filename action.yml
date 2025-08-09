@@ -45,6 +45,7 @@ runs:
         path: |
           ~/.local/bin/ftl
           ~/.local/bin/spin  
+          ~/.cargo/bin/wkg
           ~/.local/bin/wkg
           ~/.cache/ftl
         key: ${{ steps.cache-key.outputs.cache-key }}
