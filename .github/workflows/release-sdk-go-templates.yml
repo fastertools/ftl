@@ -85,12 +85,13 @@ jobs:
         
         echo "Running go mod tidy and validation on templates..."
         
-        find templates -name "go.mod" -type f | while read -r file; do
+        # Use process substitution to avoid subshell variable scope issues
+        while IFS= read -r -d '' file; do
           if grep -q "github.com/fastertools/ftl-cli/sdk/go v$VERSION" "$file"; then
             echo "Processing template: $file"
             
             dir=$(dirname "$file")
-            cd "$dir"
+            pushd "$dir" > /dev/null
             
             # Run go mod tidy to update go.sum
             if go mod tidy; then
@@ -102,20 +103,20 @@ jobs:
                   echo "SUCCESS: go.sum verification passed for $dir"
                 else
                   echo "ERROR: go.sum verification failed for $dir"
-                  cd -
+                  popd > /dev/null
                   exit 1
                 fi
               fi
             else
               echo "ERROR: go mod tidy failed for $dir"
-              cd -
+              popd > /dev/null
               exit 1
             fi
             
-            cd -
+            popd > /dev/null
             CHANGES_MADE=true
           fi
-        done
+        done < <(find templates -name "go.mod" -type f -print0)
         
         # Set flag for commit step
         echo "CHANGES_MADE=$CHANGES_MADE" >> $GITHUB_ENV
