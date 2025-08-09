@@ -78,21 +78,13 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.PAT || github.token }}
 
-    - name: Update template versions
+    - name: Update template versions and validate
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         
-        echo "Updating Go SDK version to v$VERSION..."
+        echo "Updating Go SDK version to v$VERSION and validating templates..."
         
-        # Update Go templates - just update version numbers (these contain template variables)
-        find templates -name "go.mod" -type f | while read -r file; do
-          if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
-            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
-            echo "Updated template version in: $file"
-          fi
-        done
-        
-        # Update actual Go projects and run go mod tidy
+        # Update actual Go projects first
         for dir in examples/demo/echo-go examples/demo/multi-tools-go examples/demo/weather-go sdk/go; do
           if [ -f "$dir/go.mod" ] && grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$dir/go.mod"; then
             echo "Processing Go project: $dir"
@@ -122,6 +114,69 @@ jobs:
               exit 1
             fi
             popd > /dev/null
+          fi
+        done
+        
+        # Process Go templates by creating temporary test projects
+        find templates -name "go.mod" -type f | while read -r template_file; do
+          if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$template_file"; then
+            echo "Processing template: $template_file"
+            
+            # Create temporary directory for validation
+            template_dir=$(dirname "$template_file")
+            template_name=$(basename "$template_dir")
+            temp_dir=$(mktemp -d)
+            
+            # Copy template content to temp directory
+            cp -r "$template_dir/content/"* "$temp_dir/"
+            
+            # Resolve template variables with test values
+            find "$temp_dir" -type f -name "*.mod" -o -name "*.go" -o -name "*.toml" | while read -r file; do
+              sed -i 's/{{project-name | kebab_case}}/test-project/g' "$file"
+              sed -i 's/{{project-name}}/test-project/g' "$file"
+            done
+            
+            # Update SDK version in the resolved template
+            if [ -f "$temp_dir/go.mod" ]; then
+              sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$temp_dir/go.mod"
+              
+              # Run go mod tidy to validate and generate go.sum
+              pushd "$temp_dir" > /dev/null
+              if go mod tidy; then
+                echo "Successfully validated template $template_name with SDK v$VERSION"
+                
+                # Verify go.sum
+                if [ -f go.sum ]; then
+                  if go mod verify; then
+                    echo "Successfully verified go.sum for template $template_name"
+                    
+                    # Copy the generated go.sum back to template (if it doesn't exist or is different)
+                    if [ ! -f "$template_dir/content/go.sum" ] || ! diff -q go.sum "$template_dir/content/go.sum" > /dev/null 2>&1; then
+                      cp go.sum "$template_dir/content/go.sum"
+                      echo "Updated go.sum for template $template_name"
+                    fi
+                  else
+                    echo "ERROR: go mod verify failed for template $template_name"
+                    popd > /dev/null
+                    rm -rf "$temp_dir"
+                    exit 1
+                  fi
+                fi
+              else
+                echo "ERROR: go mod tidy failed for template $template_name - SDK v$VERSION may not be available in Go module proxy yet"
+                popd > /dev/null
+                rm -rf "$temp_dir"
+                exit 1
+              fi
+              popd > /dev/null
+            fi
+            
+            # Update the original template's go.mod version
+            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$template_file"
+            echo "Updated SDK version in template: $template_file"
+            
+            # Clean up
+            rm -rf "$temp_dir"
           fi
         done
 
