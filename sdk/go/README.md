@@ -6,7 +6,7 @@ A lightweight SDK for building MCP (Model Context Protocol) tools with Go using 
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/fastertools/ftl-cli/sdk/go.svg)](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fastertools/ftl-cli/sdk/go)](https://goreportcard.com/report/github.com/fastertools/ftl-cli/sdk/go)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/fastertools/ftl-cli?filter=sdk/go/*)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/fastertools/ftl-cli)
 
 ## Installation
 

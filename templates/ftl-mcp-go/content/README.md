@@ -51,13 +51,14 @@ An FTL MCP tool written in Go.
 ### Available Commands
 
 ```bash
-make help         # Show all available commands
-make fmt          # Format code with gofmt
-make lint         # Run linting with golangci-lint
+make build        # Build WebAssembly module
+make clean        # Clean build artifacts
 make test         # Run tests
 make test-cov     # Run tests with coverage report
-make clean        # Clean build artifacts
-make build        # Build WebAssembly module
+make fmt          # Format code with gofmt
+make lint         # Run linting with golangci-lint
+make dev          # Run format, lint, and test (full development check)
+make help         # Show all available commands (optional setup guidance)
 ```
 
 ### Adding New Tools
@@ -178,31 +179,66 @@ When using TinyGo, be aware of these limitations:
 4. **Memory Usage**: Be mindful of memory constraints in WASI
 5. **Documentation**: Document all tools and parameters clearly
 
-## Deployment
+## Running Your Tool
 
-After building with `make build` or `ftl build`, deploy to FTL Engine:
+After building, start the local development server:
 
 ```bash
-ftl eng deploy
+ftl up
 ```
+
+Your MCP server will be available at `http://localhost:3000/` and can be used with any MCP-compatible client.
 
 ## Troubleshooting
 
-### Build Errors
+**Build fails with "tinygo not found":**
+```bash
+# Install TinyGo
+go install tinygo.org/x/tinygo@latest
+# Or follow official installation: https://tinygo.org/getting-started/install/
+tinygo version
+```
 
-If you encounter build errors:
+**Build fails with Go version error:**
+```bash
+# Check Go version (must be 1.23+)
+go version
+# Update Go if necessary
+```
 
-1. Ensure TinyGo is installed: `tinygo version`
-2. Check Go version: `go version` (must be 1.23+)
-3. Run `go mod tidy` to fix dependencies
-4. Check for TinyGo-incompatible packages
+**Dependency issues:**
+```bash
+# Clean and rebuild dependencies
+go mod tidy
+go mod download
+make clean
+make build
+```
 
-### Runtime Errors
+**TinyGo compilation errors:**
+- Check if your dependencies are TinyGo-compatible
+- Avoid packages that use CGO or unsupported features
+- Use `tinygo build -target=wasip1` to test compilation directly
 
-1. Check Spin logs: `ftl logs`
-2. Validate your input schemas match handler expectations
-3. Ensure all required fields are handled
+**Runtime errors in WASM:**
+- No goroutines available (scheduler disabled)
+- Limited reflection support - avoid reflect package
+- Memory leaks possible (-gc=leaking) - be mindful of allocations
+- Some standard library packages not available
 
-## License
+**Input validation errors:**
+```go
+// Always validate and type-assert inputs
+value, ok := input["key"].(string)
+if !ok {
+    return ftl.Error("key must be a string")
+}
+```
 
-Apache License 2.0
+**Testing failures:**
+```bash
+# Run tests with verbose output
+make test
+# Run with coverage
+make test-cov
+```

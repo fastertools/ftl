@@ -495,8 +495,7 @@ main() {
         
         echo ""
         info "Note: To develop MCP tools, you'll need language-specific dependencies:"
-        echo "  • For Rust tools: Install Rust and run 'rustup target add wasm32-wasip1'"
-        echo "  • For TypeScript/JavaScript tools: Install Node.js and npm"
+        echo "  • Visit our docs for details: https://github.com/fastertools/ftl-cli/blob/main/README.md#prerequisites"
         
         # Remind about Docker if not installed
         if ! command_exists "docker"; then

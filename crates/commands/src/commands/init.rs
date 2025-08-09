@@ -186,37 +186,54 @@ FTL MCP server for hosting MCP tools.
 
 ## Getting Started
 
-Add tools to your project:
+### Scaffold a new tool:
 ```bash
 ftl add my-tool --language rust
 ```
 
-Start the development server:
+## Running the server
+
+### Basic
+
 ```bash
-ftl up
+ftl build && ftl up
 ```
 
-The server will be available at http://localhost:3000/mcp
+### Hot Reloading with `watch`
 
-## Adding Tools
+```bash
+ftl up --watch
 
-You can add tools in two ways:
+→ Starting development server with auto-rebuild...
 
-1. **Custom tools**: Write your own MCP tools
-   ```bash
-   ftl add my-tool --language rust
-   ```
+👀 Watching for file changes
 
-2. **Pre-built tools**: Use tools from the registry
-   ```bash
-   ftl tools add calculator
-   ```
+Serving http://127.0.0.1:3000
+Available Routes:
+  mcp: http://127.0.0.1:3000 (wildcard)
+```
 
-## Deployment
+## Deployment Options
+
+### Export spin.toml
+
+```bash
+ftl build --export-out ./spin.toml --export spin
+```
+
+This allows you to run the application with `spin` or deploy to any platform that supports it.
+
+### FTL Engine
+
+#### Login to FTL Engine
+
+```bash
+ftl eng login
+```
 
 Deploy your MCP server:
 ```bash
-ftl deploy
+ftl eng deploy
 ```
 
 For more information, visit the [FTL documentation](https://docs.fastertools.com).

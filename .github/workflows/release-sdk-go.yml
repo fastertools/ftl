@@ -195,6 +195,11 @@ jobs:
           git checkout -b "$BRANCH"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
       - name: Update template versions
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"

@@ -1,6 +1,6 @@
 <div align="center">
 
-# `ftl`
+# `ftl` by fastertools 
 
 Faster tools for AI agents
 
@@ -15,7 +15,7 @@ Faster tools for AI agents
 
 </div>
 
-FTL (Faster Tools) is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
+FTL is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
 
 We believe the future of AI tooling shouldn't be locked into proprietary ecosystems. FTL is our commitment to that vision, built entirely on:
 
@@ -60,11 +60,11 @@ wget -qO- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh 
 
 ### Create a new project and scaafold a tool
 ```bash
-ftl init hal9000
+ftl init fast-project 
 
-cd hal9000
+cd fast 
 
-ftl add open-pod-bay --language rust
+ftl add fast-tool --language rust
 ```
 
 ### Run the Local Development Server
@@ -86,7 +86,7 @@ Example mcp.json config
 ```json
 {
   "mcpServers": {
-    "hal9000": {
+    "fasttools": {
       "url": "http://127.0.0.1:3000",
       "transport": "http"
     }
@@ -96,7 +96,7 @@ Example mcp.json config
 
 #### Add To Claude Code
 ```bash
-claude mcp add -t http faster-tools http://127.0.0.1:3000
+claude mcp add -t http fasttools http://127.0.0.1:3000
 ```
 
 ## Ready to Deploy? 
@@ -168,7 +168,7 @@ graph TB
     MCPGateway -.->|"In-memory call"| Custom
 ```
 
-### Fast Anywhere is the World
+### Fast Anywhere in the World
 <div align="center">
 <em>Example: A Python text processing tool called from 5 continents</em>
 

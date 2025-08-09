@@ -4,7 +4,7 @@ Python SDK for building Model Context Protocol (MCP) tools that compile to WebAs
 
 [![PyPI Version](https://img.shields.io/pypi/v/ftl-sdk.svg)](https://pypi.org/project/ftl-sdk/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/ftl-sdk.svg)](https://pypi.org/project/ftl-sdk/)
-[![License](https://img.shields.io/pypi/l/ftl-sdk.svg)](https://github.com/fastertools/ftl-cli/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/fastertools/ftl-cli.svg)](https://github.com/fastertools/ftl-cli/blob/main/LICENSE)
 [![GitHub Actions](https://github.com/fastertools/ftl-cli/workflows/Test%20Python%20SDK/badge.svg)](https://github.com/fastertools/ftl-cli/actions)
 
 ## Installation
@@ -139,6 +139,29 @@ ToolResponse.error("Something went wrong")
 ToolResponse.with_structured("Operation complete", {"result": 42})
 ```
 
+### `ToolResult` Class
+
+For advanced response handling, you can use the `ToolResult` class:
+
+```python
+from ftl_sdk import ToolResult, ToolContent
+
+# Create custom response with multiple content items
+result = ToolResult(
+    content=[
+        ToolContent.text("Processing complete"),
+        ToolContent.text("Results:", {"priority": 0.8})
+    ],
+    structured_content={"status": "success", "count": 5}
+)
+
+# Error result
+error_result = ToolResult.error("Operation failed: invalid input")
+
+# Text result (shorthand)
+text_result = ToolResult.text("Simple text response")
+```
+
 ### `ToolContent` Helper Methods
 
 ```python
@@ -268,74 +291,6 @@ Handler = ftl.create_handler()
 
 The FTL framework automatically catches exceptions and returns them as error responses.
 
-## Development
-
-### Setting Up Development Environment
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/fastertools/ftl-cli.git
-   cd ftl-cli/sdk/python
-   ```
-
-2. **Create virtual environment**:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install development dependencies**:
-   ```bash
-   make install-dev
-   # or manually:
-   pip install -e ".[dev]"
-   pip install componentize-py
-   ```
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run tests with coverage
-make test-cov
-
-# Run specific test
-pytest tests/test_ftl_sdk.py::test_tool_response_text
-```
-
-### Code Quality
-
-```bash
-# Format code
-make format
-
-# Run linting
-make lint
-
-# Type checking
-make type-check
-
-# Run all quality checks
-make quality
-```
-
-### Available Make Commands
-
-```bash
-make help         # Show all available commands
-make install      # Install SDK
-make install-dev  # Install with dev dependencies
-make format       # Format code with black
-make lint         # Run linting with ruff
-make type-check   # Run type checking with mypy
-make test         # Run tests
-make test-cov     # Run tests with coverage
-make clean        # Clean build artifacts
-make build        # Build distribution packages
-make publish      # Publish to PyPI
-```
 
 ## Building to WebAssembly
 
@@ -360,54 +315,81 @@ Tools must be compiled to WebAssembly to run on Spin:
 
 ### Type Hints
 
-Always use type hints for better code clarity and IDE support:
+Always use type hints for better code clarity and automatic schema generation:
 
 ```python
-from typing import Dict, Any
-from ftl_sdk import ToolResponse
+from ftl_sdk import FTL
 
-def my_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
-    message: str = input_data.get("message", "")
-    return ToolResponse.text(f"Received: {message}")
+ftl = FTL()
+
+@ftl.tool
+def my_handler(message: str) -> str:
+    """Handle a message with automatic type validation."""
+    return f"Received: {message}"
 ```
 
 ### Error Handling
 
-Handle errors gracefully and return informative error messages:
+The FTL framework automatically catches exceptions and converts them to error responses. Use type hints for automatic validation:
 
 ```python
-def safe_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
-    try:
-        # Validate required fields
-        if "required_field" not in input_data:
-            return ToolResponse.error("Missing required field: required_field")
-        
-        # Process input
-        result = process_data(input_data["required_field"])
-        return ToolResponse.text(f"Success: {result}")
-        
-    except ValueError as e:
-        return ToolResponse.error(f"Invalid value: {e}")
-    except Exception as e:
-        return ToolResponse.error(f"Unexpected error: {e}")
+from ftl_sdk import FTL
+
+ftl = FTL()
+
+@ftl.tool
+def safe_handler(required_field: str, optional_value: int = 10) -> dict:
+    """Process data with automatic validation and error handling."""
+    # Type validation is automatic - required_field is guaranteed to be a string
+    # Framework automatically catches and converts exceptions to error responses
+    
+    if not required_field.strip():
+        raise ValueError("required_field cannot be empty")
+    
+    # Process the validated input
+    result = len(required_field) * optional_value
+    
+    return {
+        "processed": required_field.upper(),
+        "result": result,
+        "status": "success"
+    }
 ```
 
 ### Testing Your Tools
 
-Write comprehensive tests for your tools:
+Write comprehensive tests for your decorated tools:
 
 ```python
 import pytest
-from your_module import your_handler
+from ftl_sdk import FTL
 
-def test_handler_success():
-    result = your_handler({"message": "test"})
-    assert result["content"][0]["text"] == "Expected output"
+# Your tool module
+ftl = FTL()
 
-def test_handler_missing_field():
-    result = your_handler({})
-    assert result.get("isError") is True
-    assert "Missing required field" in result["content"][0]["text"]
+@ftl.tool
+def echo_message(message: str) -> str:
+    """Echo back the input message."""
+    if not message:
+        raise ValueError("Message cannot be empty")
+    return f"Echo: {message}"
+
+# Test the tool function directly
+def test_echo_success():
+    result = echo_message("test")
+    assert result == "Echo: test"
+
+def test_echo_validation():
+    with pytest.raises(ValueError, match="Message cannot be empty"):
+        echo_message("")
+
+# Test the HTTP handler integration
+def test_handler_integration():
+    handler = ftl.create_handler()
+    # Test metadata endpoint
+    metadata = handler.get_tools_metadata()
+    assert len(metadata) == 1
+    assert metadata[0]["name"] == "echo_message"
 ```
 
 ## Important Notes
@@ -451,37 +433,65 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install development dependencies
+make install-dev
+# or manually:
 pip install -e ".[dev]"
-pip install tox
+pip install componentize-py tox
 ```
 
 ### Running Tests
 
 ```bash
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-cov
+
 # Run tests for all Python versions
 tox
 
 # Run tests for specific Python version
 tox -e py311
 
-# Run linting and type checking
-tox -e lint,type
-
-# Run tests with coverage
-tox -e py311 -- --cov-report=html
+# Run specific test
+pytest tests/test_ftl_sdk.py::test_tool_response_text
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-black src tests
+make format
 
-# Run linter
-ruff check src tests
+# Run linting
+make lint
 
 # Type checking
+make type-check
+
+# Run all quality checks
+make quality
+
+# Or run individual tools:
+black src tests
+ruff check src tests
 mypy src
+```
+
+### Available Make Commands
+
+```bash
+make help         # Show all available commands
+make install      # Install SDK
+make install-dev  # Install with dev dependencies
+make format       # Format code with black
+make lint         # Run linting with ruff
+make type-check   # Run type checking with mypy
+make test         # Run tests
+make test-cov     # Run tests with coverage
+make clean        # Clean build artifacts
+make publish      # Publish to PyPI
 ```
 
 ## Changelog
