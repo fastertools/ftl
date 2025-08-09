@@ -40,7 +40,7 @@ jobs:
   cli-tests:
     name: Run CLI Tests
     needs: changes
-    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.core-crates == 'true'
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.core-crates == 'true' || needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/test-cli.yml
   
   # The single required status check
@@ -79,9 +79,9 @@ jobs:
             echo "⏭️  CI: skipped (no relevant changes)"
           fi
           
-          # Check CLI tests status (when CLI or core-crates change)
+          # Check CLI tests status (when CLI, core-crates, or CI workflows change)
           CLI_TESTS_SHOULD_RUN=false
-          if [ "${{ needs.changes.outputs.cli }}" == "true" ] || [ "${{ needs.changes.outputs.core-crates }}" == "true" ]; then
+          if [ "${{ needs.changes.outputs.cli }}" == "true" ] || [ "${{ needs.changes.outputs.core-crates }}" == "true" ] || [ "${{ needs.changes.outputs.ci }}" == "true" ]; then
             CLI_TESTS_SHOULD_RUN=true
           fi
           
@@ -92,7 +92,7 @@ jobs:
               echo "❌ CLI Tests: ${{ needs.cli-tests.result }}"
             fi
           else
-            echo "⏭️  CLI Tests: skipped (no CLI or core crate changes)"
+            echo "⏭️  CLI Tests: skipped (no CLI, core crate, or CI workflow changes)"
           fi
           
           # Overall status - only fail if a job that should have run failed
