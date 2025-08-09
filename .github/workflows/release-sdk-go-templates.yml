@@ -131,7 +131,7 @@ jobs:
             cp -r "$template_dir/content/"* "$temp_dir/"
             
             # Resolve template variables with test values
-            find "$temp_dir" -type f -name "*.mod" -o -name "*.go" -o -name "*.toml" | while read -r file; do
+            find "$temp_dir" -type f \( -name "*.mod" -o -name "*.go" -o -name "*.toml" \) | while read -r file; do
               sed -i 's/{{project-name | kebab_case}}/test-project/g' "$file"
               sed -i 's/{{project-name}}/test-project/g' "$file"
             done
