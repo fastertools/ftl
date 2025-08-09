@@ -166,9 +166,9 @@ jobs:
 
 SDK v$VERSION is now available in the Go module proxy and all templates have been validated:
 
-- Go module proxy availability confirmed
-- \`go mod tidy\` completed for all templates  
-- \`go mod verify\` passed for all go.sum files
+* Go module proxy availability confirmed
+* \`go mod tidy\` completed for all templates  
+* \`go mod verify\` passed for all go.sum files
 
 Templates are ready for merge!"
         else
