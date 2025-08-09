@@ -202,6 +202,49 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck -tags test ./...
+      
+      - name: Install TinyGo
+        run: |
+          wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
+          sudo dpkg -i tinygo_0.31.2_amd64.deb
+
+      - name: Test TinyGo SDK Import Compatibility  
+        working-directory: sdk/go
+        run: |
+          echo "🧪 Testing TinyGo SDK import compatibility..."
+          printf 'package main\nimport _ "github.com/fastertools/ftl-cli/sdk/go"\nfunc main() {}' > /tmp/tinygo_test.go
+          cd /tmp && go mod init test >/dev/null 2>&1 || true
+          cd /tmp && go mod edit -replace github.com/fastertools/ftl-cli/sdk/go=${GITHUB_WORKSPACE}/sdk/go
+          cd /tmp && tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -tags=test -o test.wasm tinygo_test.go
+          rm -f /tmp/test.wasm /tmp/tinygo_test.go /tmp/go.mod /tmp/go.sum
+          echo "✅ TinyGo SDK import compatibility verified"
+
+      - name: Test TinyGo Template Compatibility
+        run: |
+          echo "🧪 Testing TinyGo template build compatibility..."
+          TEMPLATE_DIR=$(find templates -name "go.mod" -type f | grep 'ftl-mcp-go' | head -1 | xargs dirname)
+          if [ -n "$TEMPLATE_DIR" ]; then
+            # Create a test copy to avoid modifying the template
+            cp -r "$TEMPLATE_DIR" /tmp/tinygo_template_test
+            cd /tmp/tinygo_template_test
+            
+            # Fix template variables
+            sed -i 's/{{project-name | kebab_case}}/test-project/g' go.mod
+            
+            # Use local SDK
+            go mod edit -replace github.com/fastertools/ftl-cli/sdk/go=${GITHUB_WORKSPACE}/sdk/go
+            
+            # Test TinyGo build
+            if tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o test.wasm main.go; then
+              echo "✅ TinyGo template build compatibility verified"
+              rm -f test.wasm
+            else
+              echo "❌ TinyGo template build failed"
+              exit 1
+            fi
+          else
+            echo "⚠️ No Go templates found for TinyGo testing"
+          fi
 
   test-python-sdk:
     name: Test Python SDK

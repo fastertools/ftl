@@ -129,25 +129,8 @@ jobs:
           echo "✅ Version $new is newer than $current"
         fi
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.23'
-
-    - name: Install TinyGo
-      run: |
-        wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
-        sudo dpkg -i tinygo_0.31.2_amd64.deb
-
-    - name: Run tests
-      working-directory: sdk/go
-      run: |
-        go mod download
-        go test -v -tags test ./...
-
-    - name: Verify TinyGo compatibility
-      working-directory: sdk/go
-      run: make verify-tinygo
+    # Note: Go SDK tests (including TinyGo compatibility) are handled by CI workflow
+    # This release workflow focuses on publishing and template updates
 
   release:
     name: Create Release
