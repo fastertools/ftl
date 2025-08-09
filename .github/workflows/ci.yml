@@ -190,7 +190,7 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out -tags test ./...
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./sdk/go/coverage.out
           flags: go-sdk
@@ -308,7 +308,7 @@ jobs:
         run: tox
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./sdk/python/coverage.xml
           flags: python-sdk
