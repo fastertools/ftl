@@ -78,48 +78,28 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.PAT || github.token }}
 
-    - name: Update and validate templates
+    - name: Update template versions
       run: |
         VERSION="${{ steps.version.outputs.version }}"
-        CHANGES_MADE=false
         
-        echo "Running go mod tidy and validation on templates..."
+        echo "Updating Go SDK version in templates to v$VERSION..."
         
-        # Use process substitution to avoid subshell variable scope issues
-        while IFS= read -r -d '' file; do
-          if grep -q "github.com/fastertools/ftl-cli/sdk/go v$VERSION" "$file"; then
-            echo "Processing template: $file"
-            
-            dir=$(dirname "$file")
-            pushd "$dir" > /dev/null
-            
-            # Run go mod tidy to update go.sum
-            if go mod tidy; then
-              echo "SUCCESS: go mod tidy completed for $dir"
-              
-              # Verify go.sum is correct
-              if [ -f go.sum ]; then
-                if go mod verify; then
-                  echo "SUCCESS: go.sum verification passed for $dir"
-                else
-                  echo "ERROR: go.sum verification failed for $dir"
-                  popd > /dev/null
-                  exit 1
-                fi
-              fi
-            else
-              echo "ERROR: go mod tidy failed for $dir"
-              popd > /dev/null
-              exit 1
-            fi
-            
-            popd > /dev/null
-            CHANGES_MADE=true
+        # Update Go templates - just update version numbers, don't run go mod tidy
+        find templates -name "go.mod" -type f | while read -r file; do
+          if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
+            # Update the require statement
+            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
+            echo "Updated Go SDK version to v$VERSION in: $file"
           fi
-        done < <(find templates -name "go.mod" -type f -print0)
+        done
         
-        # Set flag for commit step
-        echo "CHANGES_MADE=$CHANGES_MADE" >> $GITHUB_ENV
+        # Also update examples if needed  
+        find examples -name "go.mod" -type f | while read -r file; do
+          if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
+            sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
+            echo "Updated Go SDK version to v$VERSION in: $file"
+          fi
+        done
 
     # Note: TinyGo compatibility testing moved to CI workflow for faster feedback
 
@@ -137,16 +117,12 @@ jobs:
         fi
         
         VERSION="${{ steps.version.outputs.version }}"
-        git commit -m "chore: validate and update Go templates for SDK v$VERSION" \
-          -m "Run go mod tidy to update go.sum files and verify module checksums." \
-          -m "Templates are now ready for Go SDK v$VERSION." \
-          -m "" \
-          -m "This commit completes the template validation process started by" \
-          -m "the release-sdk-go.yml workflow. TinyGo compatibility is tested" \
-          -m "separately in the CI workflow."
+        git commit -m "chore: update templates to use Go SDK v$VERSION" \
+          -m "Updates project templates and examples to use the newly published SDK version." \
+          -m "This is an automated update following the release of Go SDK v$VERSION."
         
         git push
-        echo "Template validation changes committed and pushed"
+        echo "Template update changes committed and pushed"
 
     - name: Add PR comment
       env:
@@ -163,13 +139,13 @@ jobs:
         
         if [ -n "$PR_NUMBER" ]; then
           COMMENT_BODY=$(cat <<EOF
-          ## Go Template Validation Complete
+          ## Go Template Update Complete
 
-          SDK v${VERSION} is now available in the Go module proxy and all templates have been validated.
+          Templates have been updated to use Go SDK v${VERSION}.
 
-          - Go module proxy availability confirmed  
-          - \`go mod tidy\` completed for all templates  
-          - \`go mod verify\` passed for all go.sum files
+          - Templates updated to new SDK version
+          - Examples updated to new SDK version  
+          - Ready for CI validation
 
           Templates are ready for merge!
           EOF
