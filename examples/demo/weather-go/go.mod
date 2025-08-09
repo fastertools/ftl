@@ -1,11 +1,14 @@
 module github.com/fastertools/ftl-cli/examples/demo/weather-go
 
-go 1.21
+go 1.23
 
-require github.com/fastertools/ftl-cli/sdk/go v0.0.0
+toolchain go1.23.11
+
+require github.com/fastertools/ftl-cli/sdk/go v0.1.1
 
 replace github.com/fastertools/ftl-cli/sdk/go => ../../../sdk/go
 
-require github.com/fermyon/spin/sdk/go/v2 v2.2.0 // indirect
-
-require github.com/julienschmidt/httprouter v1.3.0 // indirect
+require (
+	github.com/julienschmidt/httprouter v1.3.0 // indirect
+	github.com/spinframework/spin-go-sdk v0.0.0-20250411015808-ee0bd1e7d170 // indirect
+)
