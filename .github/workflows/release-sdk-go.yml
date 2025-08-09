@@ -64,8 +64,6 @@ jobs:
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
-        with:
-          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       
       - name: Verify version matches README
         working-directory: sdk/go
