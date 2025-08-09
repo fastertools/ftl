@@ -47,6 +47,9 @@ runs:
           ~/.local/bin/spin  
           ~/.cargo/bin/wkg
           ~/.local/bin/wkg
+          ~/.cargo/registry
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
           ~/.cache/ftl
         key: ${{ steps.cache-key.outputs.cache-key }}
         restore-keys: |
@@ -180,14 +183,42 @@ runs:
     - name: Debug cache paths
       shell: bash
       run: |
-        echo "🔍 Checking cache paths..."
+        echo "🔍 Comprehensive cache debugging..."
         echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-        echo "~/.local/bin contents:"
-        ls -la ~/.local/bin/ || echo "~/.local/bin does not exist"
-        echo "~/.cargo/bin contents:"
-        ls -la ~/.cargo/bin/ || echo "~/.cargo/bin does not exist"
-        echo "Current wkg location:"
-        which wkg || echo "wkg not found in PATH"
+        
+        echo "=== ~/.local/bin ==="
+        if [ -d ~/.local/bin ]; then
+          ls -la ~/.local/bin/
+          echo "Size: $(du -sh ~/.local/bin/ 2>/dev/null || echo 'unknown')"
+        else
+          echo "~/.local/bin does not exist"
+        fi
+        
+        echo "=== ~/.cargo/bin ==="
+        if [ -d ~/.cargo/bin ]; then
+          ls -la ~/.cargo/bin/
+          echo "Size: $(du -sh ~/.cargo/bin/ 2>/dev/null || echo 'unknown')"
+        else
+          echo "~/.cargo/bin does not exist"
+        fi
+        
+        echo "=== ~/.cargo/registry ==="
+        if [ -d ~/.cargo/registry ]; then
+          echo "Registry exists - Size: $(du -sh ~/.cargo/registry/ 2>/dev/null || echo 'unknown')"
+          echo "Registry contents (top level):"
+          ls -la ~/.cargo/registry/ | head -10
+        else
+          echo "~/.cargo/registry does not exist"
+        fi
+        
+        echo "=== Cargo metadata files ==="
+        ls -la ~/.cargo/.crates* 2>/dev/null || echo "No .crates files found"
+        
+        echo "=== Current tool locations ==="
+        echo "ftl: $(which ftl || echo 'not found')"
+        echo "spin: $(which spin || echo 'not found')"
+        echo "wkg: $(which wkg || echo 'not found')"
+        echo "cargo: $(which cargo || echo 'not found')"
 
     - name: Install wkg
       if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
