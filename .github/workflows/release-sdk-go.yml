@@ -1,9 +1,34 @@
+# Release Go SDK
+#
+# WORKFLOW PURPOSE:
+# This workflow handles the core Go SDK release process when a new version tag is pushed.
+# It creates GitHub releases and prepares template update PRs, but does NOT perform 
+# Go module proxy-dependent operations (those are handled by release-sdk-go-templates.yml).
+#
+# FLOW:
+# 1. Tag validation and version parsing
+# 2. Run tests with build tags to exclude Spin SDK  
+# 3. Create GitHub release with dual tagging strategy:
+#    - sdk-go-v{version} (release tracking)
+#    - sdk/go/v{version} (Go module resolution)
+# 4. Create template update PR with text-only changes (no go mod tidy)
+#
+# FAILURE HANDLING:
+# - Manual workflow dispatch available for retries
+# - Template validation handled separately to avoid proxy timing issues
+#
 name: Release Go SDK
 
 on:
   push:
     tags:
       - 'sdk-go-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Go SDK tag to release (e.g., sdk-go-v1.2.3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -23,12 +48,24 @@ jobs:
       - name: Parse tag
         id: parse
         run: |
-          VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            if [[ ! "$TAG" =~ ^sdk-go-v ]]; then
+              echo "❌ Manual tag must start with 'sdk-go-v'"
+              exit 1
+            fi
+            VERSION="${TAG#sdk-go-v}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "🔢 Version: $VERSION"
+          echo "🎯 Trigger: ${{ github.event_name }}"
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
+        with:
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       
       - name: Verify version matches README
         working-directory: sdk/go
@@ -106,7 +143,7 @@ jobs:
       working-directory: sdk/go
       run: |
         go mod download
-        go test -v ./...
+        go test -v -tags test ./...
 
     - name: Verify TinyGo compatibility
       working-directory: sdk/go
@@ -151,20 +188,8 @@ jobs:
           - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }})
           - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/go)
 
-    - name: Verify module availability
+    - name: Report module information
       run: |
-        echo "Waiting for Go module proxy to update..."
-        sleep 30
-        
-        # Try to fetch the module
-        cd /tmp
-        go mod init test
-        if go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}; then
-          echo "✅ Module is available at version v${{ needs.verify-tag.outputs.version }}"
-        else
-          echo "⚠️  Module may take a few minutes to appear in the proxy"
-        fi
-        
         echo ""
         echo "📦 Go module users can import with:"
         echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}"
@@ -172,6 +197,8 @@ jobs:
         echo "🏷️  Created tags:"
         echo "  - sdk-go-v${{ needs.verify-tag.outputs.version }} (release tracking)"
         echo "  - sdk/go/v${{ needs.verify-tag.outputs.version }} (Go module resolution)"
+        echo ""
+        echo "⚠️  Module may take a few minutes to appear in the Go module proxy"
 
   update-templates:
     name: Update Templates PR
@@ -195,27 +222,19 @@ jobs:
           git checkout -b "$BRANCH"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      
       - name: Update template versions
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          # Update Go templates
+          # Update Go templates (text-only changes, no go mod operations)
           find templates -name "go.mod" -type f | while read -r file; do
             if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
               # Update the require statement
               sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
               echo "✅ Updated $file"
               
-              # Run go mod tidy for the template
-              dir=$(dirname "$file")
-              cd "$dir"
-              go mod tidy
-              cd -
+              # Note: go mod tidy and validation are handled by release-sdk-go-templates.yml
+              # to avoid Go module proxy timing dependencies
             fi
           done
       
@@ -255,8 +274,8 @@ jobs:
           ### Checklist
           - [x] SDK v${VERSION} tag has been created
           - [x] Go module subdirectory tag created for proper versioning
-          - [x] Templates updated to new version
-          - [x] \`go mod tidy\` run for all templates
+          - [x] Templates updated to new version (text changes only)
+          - [ ] Go module validation (triggered by release-sdk-go-templates.yml)
           - [ ] CI tests pass with new version
           
           ### Links

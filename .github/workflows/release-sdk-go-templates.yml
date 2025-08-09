@@ -1,0 +1,204 @@
+# Release Go SDK Templates Validation
+#
+# WORKFLOW PURPOSE:
+# This workflow handles Go module proxy-dependent validation for Go SDK template updates.
+# It runs separately from the main release workflow to avoid timing issues with the Go module proxy.
+#
+# FLOW:
+# 1. Triggered by template update PRs created by release-sdk-go.yml
+# 2. Run go mod tidy on all updated templates (fails fast if proxy not ready)
+# 3. Validate go.sum files with go mod verify
+# 4. Test TinyGo compatibility
+# 5. Push any changes back to the PR branch
+#
+# TIMING:
+# - Fails immediately if Go module proxy doesn't have the new version yet
+# - Can be rerun manually (via workflow dispatch) until proxy is ready
+# - No action minutes wasted waiting - just retry when convenient
+# - Separates proxy-dependent operations from immediate release process
+#
+name: Release Go SDK Templates Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'templates/**/go.mod'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to validate (optional, auto-detects from branch)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-templates:
+    name: Validate Go Templates
+    runs-on: ubuntu-latest
+    # Only run on template update branches or manual dispatch
+    if: contains(github.head_ref, 'update-templates-sdk-go-v') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout PR branch
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT || github.token }}
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Install TinyGo
+      run: |
+        wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
+        sudo dpkg -i tinygo_0.31.2_amd64.deb
+
+    - name: Extract SDK version from branch name
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.pr_number }}" ]; then
+          # Get branch name from PR number
+          BRANCH_NAME=$(gh pr view ${{ inputs.pr_number }} --json headRefName -q .headRefName)
+        else
+          BRANCH_NAME="${{ github.head_ref }}"
+        fi
+        
+        if [[ "$BRANCH_NAME" =~ update-templates-sdk-go-v(.+)$ ]]; then
+          VERSION="${BASH_REMATCH[1]}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🔢 SDK Version: $VERSION"
+        else
+          echo "❌ Cannot extract version from branch name: $BRANCH_NAME"
+          exit 1
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.PAT || github.token }}
+
+    - name: Update and validate templates
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        CHANGES_MADE=false
+        
+        echo "🔧 Running go mod tidy and validation on templates..."
+        
+        find templates -name "go.mod" -type f | while read -r file; do
+          if grep -q "github.com/fastertools/ftl-cli/sdk/go v$VERSION" "$file"; then
+            echo "📁 Processing template: $file"
+            
+            dir=$(dirname "$file")
+            cd "$dir"
+            
+            # Run go mod tidy to update go.sum
+            if go mod tidy; then
+              echo "✅ go mod tidy completed for $dir"
+              
+              # Verify go.sum is correct
+              if [ -f go.sum ]; then
+                if go mod verify; then
+                  echo "✅ go.sum verification passed for $dir"
+                else
+                  echo "❌ go.sum verification failed for $dir"
+                  cd -
+                  exit 1
+                fi
+              fi
+            else
+              echo "❌ go mod tidy failed for $dir"
+              cd -
+              exit 1
+            fi
+            
+            cd -
+            CHANGES_MADE=true
+          fi
+        done
+        
+        # Set flag for commit step
+        echo "CHANGES_MADE=$CHANGES_MADE" >> $GITHUB_ENV
+
+    - name: Test TinyGo compatibility
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        echo "🧪 Testing TinyGo compatibility with SDK v$VERSION..."
+        
+        # Find a template to test with
+        TEMPLATE_DIR=$(find templates -name "go.mod" -type f | grep 'ftl-mcp-go' | head -1 | xargs dirname)
+        
+        if [ -n "$TEMPLATE_DIR" ]; then
+          cd "$TEMPLATE_DIR"
+          echo "Testing TinyGo build in $TEMPLATE_DIR..."
+          
+          if make verify-tinygo 2>/dev/null || tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o test.wasm main.go; then
+            echo "✅ TinyGo compatibility verified"
+            rm -f test.wasm
+          else
+            echo "❌ TinyGo compatibility test failed"
+            exit 1
+          fi
+        else
+          echo "⚠️ No Go templates found for TinyGo testing"
+        fi
+
+    - name: Commit template updates
+      run: |
+        if [ "$CHANGES_MADE" = "true" ]; then
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add -A
+          
+          if ! git diff --staged --quiet; then
+            VERSION="${{ steps.version.outputs.version }}"
+            git commit -m "chore: validate and update Go templates for SDK v$VERSION
+
+- Run go mod tidy to update go.sum files
+- Verify module checksums with go mod verify  
+- Test TinyGo compatibility
+- Templates now ready for Go SDK v$VERSION
+
+This commit completes the template validation process started by
+the release-sdk-go.yml workflow."
+            
+            git push
+            echo "✅ Template validation changes committed and pushed"
+          else
+            echo "ℹ️ No changes to commit"
+          fi
+        else
+          echo "ℹ️ No templates were processed"
+        fi
+
+    - name: Add PR comment
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        
+        # Get PR number
+        if [ -n "${{ inputs.pr_number }}" ]; then
+          PR_NUMBER="${{ inputs.pr_number }}"
+        else
+          PR_NUMBER=$(gh pr list --head ${{ github.head_ref }} --json number -q '.[0].number')
+        fi
+        
+        if [ -n "$PR_NUMBER" ]; then
+          gh pr comment $PR_NUMBER --body "## ✅ Go Template Validation Complete
+
+SDK v$VERSION is now available in the Go module proxy and all templates have been validated:
+
+- [x] Go module proxy availability confirmed
+- [x] \`go mod tidy\` completed for all templates  
+- [x] \`go mod verify\` passed for all go.sum files
+- [x] TinyGo compatibility verified
+
+Templates are ready for merge! 🚀"
+        else
+          echo "⚠️ Could not find PR number to comment on"
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.PAT || github.token }}
