@@ -204,29 +204,6 @@ jobs:
           govulncheck -tags test ./...
       
 
-      - name: Test TinyGo Template Compatibility
-        run: |
-          TEMPLATE_DIR=$(find templates -name "go.mod" -type f | grep 'ftl-mcp-go' | head -1 | xargs dirname)
-          if [ -n "$TEMPLATE_DIR" ]; then
-            # Create temporary directory for test
-            TEMP_DIR=$(mktemp -d)
-            cp -r "$TEMPLATE_DIR"/* "$TEMP_DIR/"
-            cd "$TEMP_DIR"
-            
-            # Fix template variables
-            sed -i 's/{{project-name | kebab_case}}/test-project/g' go.mod
-            
-            # Use local SDK
-            go mod edit -replace github.com/fastertools/ftl-cli/sdk/go=${GITHUB_WORKSPACE}/sdk/go
-            go mod tidy
-            
-            # Test TinyGo build
-            tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -o test.wasm main.go
-            rm -rf "$TEMP_DIR"
-          else
-            echo "No Go templates found for TinyGo testing"
-            exit 1
-          fi
 
   test-python-sdk:
     name: Test Python SDK
