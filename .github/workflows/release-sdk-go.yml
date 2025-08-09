@@ -1,3 +1,22 @@
+# Release Go SDK
+#
+# WORKFLOW PURPOSE:
+# This workflow handles the core Go SDK release process when a new version tag is pushed.
+# It creates GitHub releases and prepares template update PRs, but does NOT perform 
+# Go module proxy-dependent operations (those are handled by release-sdk-go-templates.yml).
+#
+# FLOW:
+# 1. Tag validation and version parsing
+# 2. Run tests with build tags to exclude Spin SDK  
+# 3. Create GitHub release with dual tagging strategy:
+#    - sdk-go-v{version} (release tracking)
+#    - sdk/go/v{version} (Go module resolution)
+# 4. Create template update PR with text-only changes (no go mod tidy)
+#
+# FAILURE HANDLING:
+# - Manual workflow dispatch available for retries
+# - Template validation handled separately to avoid proxy timing issues
+#
 name: Release Go SDK
 
 on:
@@ -203,37 +222,19 @@ jobs:
           git checkout -b "$BRANCH"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
       
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      
       - name: Update template versions
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          # Update Go templates
+          # Update Go templates (text-only changes, no go mod operations)
           find templates -name "go.mod" -type f | while read -r file; do
             if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
               # Update the require statement
               sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
               echo "✅ Updated $file"
               
-              # Run go mod tidy for the template
-              dir=$(dirname "$file")
-              cd "$dir"
-              go mod tidy
-              
-              # Verify go.sum was updated correctly
-              if [ -f go.sum ]; then
-                if go mod verify; then
-                  echo "✅ go.sum verification passed for $dir"
-                else
-                  echo "❌ go.sum verification failed for $dir"
-                  exit 1
-                fi
-              fi
-              cd -
+              # Note: go mod tidy and validation are handled by release-sdk-go-templates.yml
+              # to avoid Go module proxy timing dependencies
             fi
           done
       
@@ -273,8 +274,8 @@ jobs:
           ### Checklist
           - [x] SDK v${VERSION} tag has been created
           - [x] Go module subdirectory tag created for proper versioning
-          - [x] Templates updated to new version
-          - [x] \`go mod tidy\` run for all templates
+          - [x] Templates updated to new version (text changes only)
+          - [ ] Go module validation (triggered by release-sdk-go-templates.yml)
           - [ ] CI tests pass with new version
           
           ### Links
