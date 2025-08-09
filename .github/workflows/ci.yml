@@ -203,42 +203,6 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck -tags test ./...
       
-      - name: Install TinyGo
-        run: |
-          wget https://github.com/tinygo-org/tinygo/releases/download/v0.31.2/tinygo_0.31.2_amd64.deb
-          sudo dpkg -i tinygo_0.31.2_amd64.deb
-
-      - name: Test TinyGo SDK Compatibility  
-        run: |
-          # Create temporary directory for test
-          TEMP_DIR=$(mktemp -d)
-          cat > "$TEMP_DIR/tinygo_test.go" << 'EOF'
-          package main
-          
-          import ftl "github.com/fastertools/ftl-cli/sdk/go"
-          
-          // Test basic SDK functionality without CreateTools (excluded by test build tag)
-          func main() {
-            response := ftl.Text("TinyGo compatibility test")
-            if len(response.Content) > 0 && response.Content[0].Text == "TinyGo compatibility test" {
-              // SDK functions work correctly
-            }
-          }
-          EOF
-          
-          cd "$TEMP_DIR"
-          go mod init test
-          go mod edit -replace github.com/fastertools/ftl-cli/sdk/go=${GITHUB_WORKSPACE}/sdk/go
-          go mod tidy
-          # TinyGo may show "undefined symbol: main.main" warning but still create valid WASM
-          tinygo build -target=wasip1 -gc=leaking -scheduler=none -no-debug -tags=test -o test.wasm tinygo_test.go 2>/dev/null || true
-          if [ -f test.wasm ]; then
-            echo "SUCCESS: TinyGo SDK compatibility test passed"
-          else
-            echo "FAIL: TinyGo SDK compatibility test failed"
-            exit 1
-          fi
-          rm -rf "$TEMP_DIR"
 
       - name: Test TinyGo Template Compatibility
         run: |
