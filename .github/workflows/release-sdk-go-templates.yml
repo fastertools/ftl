@@ -72,7 +72,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "🔢 SDK Version: $VERSION"
         else
-          echo "❌ Cannot extract version from branch name: $BRANCH_NAME"
+          echo "ERROR: Cannot extract version from branch name: $BRANCH_NAME"
           exit 1
         fi
       env:
@@ -94,20 +94,20 @@ jobs:
             
             # Run go mod tidy to update go.sum
             if go mod tidy; then
-              echo "✅ go mod tidy completed for $dir"
+              echo "SUCCESS: go mod tidy completed for $dir"
               
               # Verify go.sum is correct
               if [ -f go.sum ]; then
                 if go mod verify; then
-                  echo "✅ go.sum verification passed for $dir"
+                  echo "SUCCESS: go.sum verification passed for $dir"
                 else
-                  echo "❌ go.sum verification failed for $dir"
+                  echo "ERROR: go.sum verification failed for $dir"
                   cd -
                   exit 1
                 fi
               fi
             else
-              echo "❌ go mod tidy failed for $dir"
+              echo "ERROR: go mod tidy failed for $dir"
               cd -
               exit 1
             fi
@@ -143,7 +143,7 @@ This commit completes the template validation process started by
 the release-sdk-go.yml workflow."
             
             git push
-            echo "✅ Template validation changes committed and pushed"
+            echo "SUCCESS: Template validation changes committed and pushed"
           else
             echo "ℹ️ No changes to commit"
           fi
@@ -163,7 +163,7 @@ the release-sdk-go.yml workflow."
         fi
         
         if [ -n "$PR_NUMBER" ]; then
-          gh pr comment $PR_NUMBER --body "## ✅ Go Template Validation Complete
+          gh pr comment $PR_NUMBER --body "## SUCCESS: Go Template Validation Complete
 
 SDK v$VERSION is now available in the Go module proxy and all templates have been validated:
 
@@ -174,7 +174,7 @@ SDK v$VERSION is now available in the Go module proxy and all templates have bee
 
 Templates are ready for merge! 🚀"
         else
-          echo "⚠️ Could not find PR number to comment on"
+          echo "WARNING: Could not find PR number to comment on"
         fi
       env:
         GH_TOKEN: ${{ secrets.PAT || github.token }}
