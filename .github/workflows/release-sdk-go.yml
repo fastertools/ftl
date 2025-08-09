@@ -122,7 +122,7 @@ jobs:
           echo "SUCCESS: First release - no version comparison needed"
         else
           # Simple version comparison (works for most cases)
-          if [ "$(printf '%s\n' "$new" "$current" | sort -V | head -n1)" = "$new" ] && [ "$new" != "$current" ]; then
+          if [ "$(printf '%s\n' "$new" "$current" | sort -V | tail -n1)" != "$new" ]; then
             echo "ERROR: New version ($new) must be higher than current version ($current)"
             exit 1
           fi
@@ -152,8 +152,13 @@ jobs:
       run: |
         # Create Go module subdirectory tag for proper Go module versioning
         go_module_tag="sdk/go/v${{ needs.verify-tag.outputs.version }}"
-        git tag -a "$go_module_tag" -m "Release Go SDK v${{ needs.verify-tag.outputs.version }}"
-        git push origin "$go_module_tag"
+        if git tag -l "$go_module_tag" | grep -q "$go_module_tag"; then
+          echo "Tag $go_module_tag already exists, skipping creation"
+        else
+          git tag -a "$go_module_tag" -m "Release Go SDK v${{ needs.verify-tag.outputs.version }}"
+          git push origin "$go_module_tag"
+          echo "Created and pushed tag $go_module_tag"
+        fi
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
