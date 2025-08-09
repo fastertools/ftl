@@ -143,6 +143,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Setup Git
+      uses: ./.github/actions/setup-git
+      with:
+        token: ${{ secrets.PAT || github.token }}
+
     - name: Create Go module subdirectory tag
       run: |
         # Create Go module subdirectory tag for proper Go module versioning
