@@ -52,35 +52,9 @@ runs:
           ftl-cli-${{ runner.os }}-${{ inputs.version }}-
           ftl-cli-${{ runner.os }}-
 
-    - name: Install system dependencies
+    - name: Set up Docker Buildx
       if: inputs.install-dependencies == 'true' && steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        echo "🔧 Installing system dependencies..."
-        
-        case "${{ runner.os }}" in
-          Linux)
-            # Update package list
-            sudo apt-get update
-            
-            # Install required packages
-            sudo apt-get install -y curl wget docker.io
-            
-            # Start Docker service
-            sudo systemctl start docker
-            sudo usermod -aG docker $USER
-            ;;
-          macOS)
-            # Docker Desktop should be available in macOS runners
-            echo "Docker should be pre-installed on macOS runners"
-            ;;
-          *)
-            echo "❌ Unsupported OS: ${{ runner.os }}"
-            exit 1
-            ;;
-        esac
-        
-        echo "✅ System dependencies installed"
+      uses: docker/setup-buildx-action@v3
 
     - name: Install FTL CLI
       id: install
@@ -94,13 +68,22 @@ runs:
           exit 0
         fi
         
+        
         # Create local bin directory
         mkdir -p ~/.local/bin
         
         # Determine download URL and version
         if [ "${{ inputs.version }}" = "latest" ]; then
-          # Get latest version from GitHub API
+          # Get latest version from GitHub API (check if jq is available first)
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "❌ jq is required but not installed"
+            exit 1
+          fi
           LATEST_RELEASE=$(curl -s https://api.github.com/repos/fastertools/ftl-cli/releases | jq -r '.[] | select(.tag_name | startswith("cli-v")) | .tag_name' | head -1)
+          if [ -z "$LATEST_RELEASE" ]; then
+            echo "❌ Failed to get latest release"
+            exit 1
+          fi
           VERSION=${LATEST_RELEASE#cli-v}
           TAG_NAME=${LATEST_RELEASE}
         else
@@ -111,23 +94,26 @@ runs:
         echo "Installing FTL CLI version: ${VERSION}"
         
         # Detect platform
-        case "${{ runner.os }}" in
+        OS=$(uname -s)
+        ARCH=$(uname -m)
+        
+        # Force x86_64 for Linux in act environment 
+        if [ "$OS" = "Linux" ] && [ -n "$ACT" ]; then
+          ARCH="x86_64"
+        fi
+        
+        case "$OS" in
           Linux)
-            case "${{ runner.arch }}" in
-              X64) PLATFORM="x86_64-unknown-linux-gnu" ;;
-              ARM64) PLATFORM="aarch64-unknown-linux-gnu" ;;
-              *) echo "❌ Unsupported architecture: ${{ runner.arch }}"; exit 1 ;;
-            esac
-            ;;
-          macOS)
-            case "${{ runner.arch }}" in
-              X64) PLATFORM="x86_64-apple-darwin" ;;
-              ARM64) PLATFORM="aarch64-apple-darwin" ;;
-              *) echo "❌ Unsupported architecture: ${{ runner.arch }}"; exit 1 ;;
+            PLATFORM="x86_64-unknown-linux-gnu" ;;
+          Darwin)
+            case "$ARCH" in
+              x86_64|amd64) PLATFORM="x86_64-apple-darwin" ;;
+              aarch64|arm64) PLATFORM="aarch64-apple-darwin" ;;
+              *) echo "❌ Unsupported macOS architecture: $ARCH"; exit 1 ;;
             esac
             ;;
           *)
-            echo "❌ Unsupported OS: ${{ runner.os }}"
+            echo "❌ Unsupported OS: $OS"
             exit 1
             ;;
         esac
@@ -137,13 +123,30 @@ runs:
         DOWNLOAD_URL="https://github.com/fastertools/ftl-cli/releases/download/${TAG_NAME}/${ASSET_NAME}"
         
         echo "Downloading from: ${DOWNLOAD_URL}"
+        echo "Asset name: ${ASSET_NAME}"
+        echo "Platform: ${PLATFORM}"
+        echo "Version: ${VERSION}"
+        echo "Tag name: ${TAG_NAME}"
+        
+        # Test if URL exists first
+        if ! curl -fsSL --head "${DOWNLOAD_URL}" >/dev/null 2>&1; then
+          echo "❌ Asset not found at URL: ${DOWNLOAD_URL}"
+          echo "Available assets for ${TAG_NAME}:"
+          curl -s "https://api.github.com/repos/fastertools/ftl-cli/releases/tags/${TAG_NAME}" | jq -r '.assets[].name' || echo "Could not list assets"
+          exit 1
+        fi
+        
         curl -fsSL "${DOWNLOAD_URL}" -o ~/.local/bin/ftl
         
         # Make executable
         chmod +x ~/.local/bin/ftl
         
-        # Add to PATH
+        # Add to PATH for GitHub Actions and export for current session
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.local/bin:$PATH"
+        
+        # Also add to GITHUB_ENV for persistence across steps
+        echo "PATH=$HOME/.local/bin:$PATH" >> $GITHUB_ENV
         
         echo "✅ FTL CLI installed"
 
@@ -159,12 +162,13 @@ runs:
           exit 0
         fi
         
-        # Download and install Spin
-        case "${{ runner.os }}" in
+        # Download and install Spin - use consistent system detection
+        OS=$(uname -s)
+        case "$OS" in
           Linux)
             curl -fsSL https://developer.fermyon.com/downloads/fwf_install.sh | bash
             ;;
-          macOS)
+          Darwin)
             curl -fsSL https://wasm-functions.fermyon.app/downloads/install.sh | bash
             ;;
         esac
@@ -196,21 +200,35 @@ runs:
           exit 0
         fi
         
-        # Fallback to binary download
+        # Fallback to binary download - handle act emulation
         WKG_VERSION="0.11.0"
         
-        case "${{ runner.os }}" in
+        OS=$(uname -s)
+        ARCH=$(uname -m)
+        
+        # Force x86_64 for Linux in act environment
+        if [ "$OS" = "Linux" ] && [ -n "$ACT" ]; then
+          ARCH="x86_64"
+        fi
+        
+        case "$OS" in
           Linux)
-            case "${{ runner.arch }}" in
-              X64) WKG_PLATFORM="x86_64-unknown-linux-gnu" ;;
-              ARM64) WKG_PLATFORM="aarch64-unknown-linux-gnu" ;;
+            case "$ARCH" in
+              x86_64|amd64) WKG_PLATFORM="x86_64-unknown-linux-gnu" ;;
+              aarch64|arm64) WKG_PLATFORM="aarch64-unknown-linux-gnu" ;;
+              *) echo "❌ Unsupported architecture: $ARCH"; exit 1 ;;
             esac
             ;;
-          macOS)
-            case "${{ runner.arch }}" in
-              X64) WKG_PLATFORM="x86_64-apple-darwin" ;;
-              ARM64) WKG_PLATFORM="aarch64-apple-darwin" ;;
+          Darwin)
+            case "$ARCH" in
+              x86_64|amd64) WKG_PLATFORM="x86_64-apple-darwin" ;;
+              aarch64|arm64) WKG_PLATFORM="aarch64-apple-darwin" ;;
+              *) echo "❌ Unsupported architecture: $ARCH"; exit 1 ;;
             esac
+            ;;
+          *)
+            echo "❌ Unsupported OS: $OS"
+            exit 1
             ;;
         esac
         
@@ -262,6 +280,7 @@ runs:
         
         if command -v docker >/dev/null 2>&1; then
           echo "✅ Docker: $(docker --version)"
+          echo "✅ Docker Buildx: $(docker buildx version)"
         else
           echo "⚠️  Docker not installed"
         fi
