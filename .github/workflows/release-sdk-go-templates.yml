@@ -162,15 +162,20 @@ jobs:
         fi
         
         if [ -n "$PR_NUMBER" ]; then
-          gh pr comment $PR_NUMBER --body "## Go Template Validation Complete
+          COMMENT_BODY=$(cat <<EOF
+          ## Go Template Validation Complete
 
-SDK v$VERSION is now available in the Go module proxy and all templates have been validated:
+          SDK v${VERSION} is now available in the Go module proxy and all templates have been validated.
 
-* Go module proxy availability confirmed
-* \`go mod tidy\` completed for all templates  
-* \`go mod verify\` passed for all go.sum files
+          - Go module proxy availability confirmed  
+          - \`go mod tidy\` completed for all templates  
+          - \`go mod verify\` passed for all go.sum files
 
-Templates are ready for merge!"
+          Templates are ready for merge!
+          EOF
+          )
+          
+          gh pr comment $PR_NUMBER --body "$COMMENT_BODY"
         else
           echo "Could not find PR number to comment on"
         fi
