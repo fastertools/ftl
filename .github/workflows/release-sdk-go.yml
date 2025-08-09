@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'sdk-go-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Go SDK tag to release (e.g., sdk-go-v1.2.3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -23,12 +29,24 @@ jobs:
       - name: Parse tag
         id: parse
         run: |
-          VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            if [[ ! "$TAG" =~ ^sdk-go-v ]]; then
+              echo "❌ Manual tag must start with 'sdk-go-v'"
+              exit 1
+            fi
+            VERSION="${TAG#sdk-go-v}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/sdk-go-v}"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "🔢 Version: $VERSION"
+          echo "🎯 Trigger: ${{ github.event_name }}"
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
+        with:
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       
       - name: Verify version matches README
         working-directory: sdk/go
@@ -106,7 +124,7 @@ jobs:
       working-directory: sdk/go
       run: |
         go mod download
-        go test -v ./...
+        go test -v -tags test ./...
 
     - name: Verify TinyGo compatibility
       working-directory: sdk/go
@@ -151,20 +169,8 @@ jobs:
           - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }})
           - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/go)
 
-    - name: Verify module availability
+    - name: Report module information
       run: |
-        echo "Waiting for Go module proxy to update..."
-        sleep 30
-        
-        # Try to fetch the module
-        cd /tmp
-        go mod init test
-        if go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}; then
-          echo "✅ Module is available at version v${{ needs.verify-tag.outputs.version }}"
-        else
-          echo "⚠️  Module may take a few minutes to appear in the proxy"
-        fi
-        
         echo ""
         echo "📦 Go module users can import with:"
         echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}"
@@ -172,6 +178,8 @@ jobs:
         echo "🏷️  Created tags:"
         echo "  - sdk-go-v${{ needs.verify-tag.outputs.version }} (release tracking)"
         echo "  - sdk/go/v${{ needs.verify-tag.outputs.version }} (Go module resolution)"
+        echo ""
+        echo "⚠️  Module may take a few minutes to appear in the Go module proxy"
 
   update-templates:
     name: Update Templates PR
@@ -215,6 +223,16 @@ jobs:
               dir=$(dirname "$file")
               cd "$dir"
               go mod tidy
+              
+              # Verify go.sum was updated correctly
+              if [ -f go.sum ]; then
+                if go mod verify; then
+                  echo "✅ go.sum verification passed for $dir"
+                else
+                  echo "❌ go.sum verification failed for $dir"
+                  exit 1
+                fi
+              fi
               cd -
             fi
           done
