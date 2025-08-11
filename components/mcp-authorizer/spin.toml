@@ -10,10 +10,10 @@ description = "Authentication gateway for FTL MCP servers"
 # Core settings
 mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
 mcp_trace_header = { default = "x-trace-id" }
-mcp_provider_type = { default = "jwt" }
+mcp_provider_type = { default = "" }  # Empty = no auth provider configured
 
 # JWT provider settings
-mcp_jwt_issuer = { default = "https://test.authkit.app" }
+mcp_jwt_issuer = { default = "" }
 mcp_jwt_audience = { default = "" }
 mcp_jwt_jwks_uri = { default = "" }
 mcp_jwt_public_key = { default = "" }
@@ -25,11 +25,15 @@ mcp_oauth_authorize_endpoint = { default = "" }
 mcp_oauth_token_endpoint = { default = "" }
 mcp_oauth_userinfo_endpoint = { default = "" }
 
-# Static provider settings
+# Static provider settings (for development/testing)
 mcp_static_tokens = { default = "" }
 
-# Tenant restriction (for private mode)
-mcp_tenant_id = { default = "" }
+# Authorization rules (applied after authentication)
+mcp_auth_allowed_subjects = { default = "" }
+mcp_auth_allowed_issuers = { default = "" }
+mcp_auth_required_claims = { default = "" }
+mcp_auth_required_scopes = { default = "" }
+mcp_auth_forward_claims = { default = "" }
 
 [[trigger.http]]
 route = "/..."
@@ -65,8 +69,12 @@ mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 # Static provider settings
 mcp_static_tokens = "{{ mcp_static_tokens }}"
 
-# Tenant restriction (for private mode)
-mcp_tenant_id = "{{ mcp_tenant_id }}"
+# Authorization rules
+mcp_auth_allowed_subjects = "{{ mcp_auth_allowed_subjects }}"
+mcp_auth_allowed_issuers = "{{ mcp_auth_allowed_issuers }}"
+mcp_auth_required_claims = "{{ mcp_auth_required_claims }}"
+mcp_auth_required_scopes = "{{ mcp_auth_required_scopes }}"
+mcp_auth_forward_claims = "{{ mcp_auth_forward_claims }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]

@@ -21,7 +21,6 @@ fn test_transpile_minimal_config() {
             version: "0.1.0".to_string(),
             description: "Test project".to_string(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -53,57 +52,6 @@ fn test_transpile_minimal_config() {
     assert_eq!(spin_config.application.name, "test-project");
     assert_eq!(spin_config.application.version, "0.1.0");
     assert_eq!(spin_config.application.description, "Test project");
-}
-
-#[test]
-#[ignore = "generate_temp_spin_toml was removed - test needs rewrite for new architecture"]
-fn test_generate_temp_spin_toml_absolute_paths() {
-    use crate::test_helpers::MockFileSystemMock;
-    use ftl_runtime::deps::FileSystem;
-    use std::sync::Arc;
-
-    // Use a real temporary directory for the test
-    let temp_dir = tempfile::tempdir().unwrap();
-    let project_path = temp_dir.path();
-    let ftl_path = project_path.join("ftl.toml");
-
-    let mut fs_mock = MockFileSystemMock::new();
-
-    // Mock ftl.toml exists
-    let ftl_path_clone = ftl_path.clone();
-    fs_mock
-        .expect_exists()
-        .withf(move |path| *path == ftl_path_clone)
-        .returning(|_| true);
-
-    // Mock reading ftl.toml with relative paths
-    let ftl_content = r#"
-[project]
-name = "test-project"
-version = "0.1.0"
-access_control = "public"
-
-[mcp]
-gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
-authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
-
-[component.my-component]
-path = "my-component"
-wasm = "my-component/target/wasm32-wasip1/release/my_component.wasm"
-
-[component.my-component.build]
-command = "cargo build --release --target wasm32-wasip1"
-"#;
-
-    fs_mock
-        .expect_read_to_string()
-        .withf(move |path| *path == ftl_path)
-        .returning(move |_| Ok(ftl_content.to_string()));
-
-    let _fs: Arc<dyn FileSystem> = Arc::new(fs_mock);
-
-    // Skip test - generate_temp_spin_toml has been removed
-    // TODO: Rewrite test using create_spin_toml_with_resolved_paths
 }
 
 #[test]
@@ -152,7 +100,6 @@ fn test_transpile_with_components() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec!["Test Author <test@example.com>".to_string()],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -221,7 +168,6 @@ fn test_transpile_with_variables() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -254,7 +200,6 @@ fn test_transpile_with_auth() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "private".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -265,32 +210,34 @@ fn test_transpile_with_auth() {
 
     let result = transpile_ftl_to_spin(&config).unwrap();
 
-    // Check auth configuration
-    assert!(result.contains("auth_enabled = { default = \"true\" }"));
-    assert!(result.contains("mcp_provider_type = { default = \"jwt\" }"));
-    assert!(
-        result.contains(
-            "mcp_jwt_issuer = { default = \"https://divine-lion-50-staging.authkit.app\" }"
-        )
-    );
-    assert!(result.contains("mcp_jwt_audience = { default = \"\" }"));
+    // Check auth configuration - oauth is None so auth should be disabled
+    assert!(result.contains("auth_enabled = { default = \"false\" }"));
 
-    // For private mode without OAuth, tenant_id should be required
-    assert!(result.contains("mcp_tenant_id = { required = true }"));
+    // Authentication should be disabled (no oauth)
+    // Note: mcp_auth_enabled is no longer used - provider config determines auth
+
+    // Authorization rule variables should be present but empty
+    assert!(result.contains("mcp_auth_allowed_subjects = { default = \"\" }"));
+    assert!(result.contains("mcp_auth_required_claims = { default = \"\" }"));
 
     // Validate and check auth variables
     let spin_config = validate_spin_toml(&result).unwrap();
     assert!(matches!(
         &spin_config.variables["auth_enabled"],
-        SpinVariable::Default { default } if default == "true"
+        SpinVariable::Default { default } if default == "false"
+    ));
+    // Check that provider variables are empty (auth disabled)
+    assert!(matches!(
+        &spin_config.variables["mcp_jwt_issuer"],
+        SpinVariable::Default { default } if default.is_empty()
     ));
     assert!(matches!(
-        &spin_config.variables["mcp_provider_type"],
-        SpinVariable::Default { default } if default == "jwt"
+        &spin_config.variables["mcp_auth_allowed_subjects"],
+        SpinVariable::Default { default } if default.is_empty()
     ));
     assert!(matches!(
-        &spin_config.variables["mcp_tenant_id"],
-        SpinVariable::Required { required: true }
+        &spin_config.variables["mcp_auth_required_claims"],
+        SpinVariable::Default { default } if default.is_empty()
     ));
 }
 
@@ -302,7 +249,6 @@ fn test_transpile_with_oauth_auth() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "private".to_string(),
             default_registry: None,
         },
         oauth: Some(OauthConfig {
@@ -315,6 +261,7 @@ fn test_transpile_with_oauth_auth() {
             authorize_endpoint: "https://auth.example.com/authorize".to_string(),
             token_endpoint: "https://auth.example.com/token".to_string(),
             userinfo_endpoint: "https://auth.example.com/userinfo".to_string(),
+            allowed_subjects: vec![],
         }),
         component: HashMap::new(),
         mcp: McpConfig::default(),
@@ -330,8 +277,9 @@ fn test_transpile_with_oauth_auth() {
         "mcp_jwt_jwks_uri = { default = \"https://auth.example.com/.well-known/jwks.json\" }"
     ));
 
-    // For private mode with OAuth, tenant_id should be empty (not required)
-    assert!(result.contains("mcp_tenant_id = { default = \"\" }"));
+    // For authentication enabled, provider should be configured
+    assert!(result.contains("mcp_jwt_issuer = { default = \"https://auth.example.com\" }"));
+    assert!(result.contains("mcp_auth_allowed_subjects = { default = \"\" }"));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -339,9 +287,60 @@ fn test_transpile_with_oauth_auth() {
         &spin_config.variables["mcp_provider_type"],
         SpinVariable::Default { default } if default == "jwt"
     ));
+    // Check that provider variables are set (auth enabled)
     assert!(matches!(
-        &spin_config.variables["mcp_tenant_id"],
+        &spin_config.variables["mcp_jwt_issuer"],
+        SpinVariable::Default { default } if default == "https://auth.example.com"
+    ));
+    assert!(matches!(
+        &spin_config.variables["mcp_auth_allowed_subjects"],
         SpinVariable::Default { default } if default.is_empty()
+    ));
+}
+
+#[test]
+fn test_transpile_with_allowed_subjects() {
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "restricted-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: "api".to_string(),
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![
+                "alice@example.com".to_string(),
+                "bob@example.com".to_string(),
+                "service-account-123".to_string(),
+            ],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Check that allowed_subjects is properly converted to comma-separated string
+    assert!(result.contains(
+        "mcp_auth_allowed_subjects = { default = \"alice@example.com,bob@example.com,service-account-123\" }"
+    ));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["mcp_auth_allowed_subjects"],
+        SpinVariable::Default { default } if default == "alice@example.com,bob@example.com,service-account-123"
     ));
 }
 
@@ -355,7 +354,6 @@ fn test_transpile_with_public_access() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -391,7 +389,6 @@ fn test_transpile_with_custom_gateway_uris() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -481,7 +478,6 @@ fn test_transpile_with_application_variables() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -602,7 +598,6 @@ fn test_transpile_complete_example() {
                 "John Doe <john@example.com>".to_string(),
                 "Jane Smith <jane@example.com>".to_string(),
             ],
-            access_control: "private".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -633,7 +628,7 @@ fn test_transpile_complete_example() {
 
     // Check all components exist - private mode without OAuth has auth components
     assert!(spin_config.component.contains_key("mcp"));
-    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(spin_config.component.contains_key("mcp"));
     assert!(spin_config.component.contains_key("database"));
     assert!(spin_config.component.contains_key("api-client"));
 
@@ -667,14 +662,10 @@ fn test_transpile_complete_example() {
         SpinVariable::Default { default } if default == "info"
     ));
 
-    // Check auth is properly configured
+    // Check auth is disabled (no oauth configured)
     assert!(matches!(
         &spin_config.variables["auth_enabled"],
-        SpinVariable::Default { default } if default == "true"
-    ));
-    assert!(matches!(
-        &spin_config.variables["mcp_provider_type"],
-        SpinVariable::Default { default } if default == "jwt"
+        SpinVariable::Default { default } if default == "false"
     ));
 }
 
@@ -731,7 +722,6 @@ fn test_transpile_with_build_profiles() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -802,7 +792,6 @@ fn test_transpile_with_special_characters() {
             version: "0.1.0".to_string(),
             description: "Testing \"special\" characters & symbols".to_string(),
             authors: vec!["Author <test@example.com> (Company & Co.)".to_string()],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -837,7 +826,6 @@ fn test_transpile_empty_collections() {
             version: "0.1.0".to_string(),
             description: String::new(), // Empty description
             authors: vec![],            // Empty authors
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -936,7 +924,6 @@ fn test_http_trigger_generation() {
             version: "0.1.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -975,7 +962,6 @@ fn test_auth_disabled_omits_authorizer() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,
@@ -999,13 +985,15 @@ fn test_auth_disabled_omits_authorizer() {
     assert!(!result.contains("/.well-known/oauth-protected-resource"));
     assert!(!result.contains("/.well-known/oauth-authorization-server"));
 
-    // Check that auth variables are NOT included (except auth_enabled)
-    assert!(!result.contains("mcp_provider_type"));
-    assert!(!result.contains("mcp_jwt_issuer"));
-    assert!(!result.contains("mcp_jwt_audience"));
-    assert!(!result.contains("mcp_jwt_jwks_uri"));
-    assert!(!result.contains("mcp_gateway_url"));
-    assert!(!result.contains("mcp_trace_header"));
+    // Check that auth variables are set to empty (auth disabled)
+    assert!(result.contains("mcp_provider_type = { default = \"\" }"));
+    assert!(result.contains("mcp_jwt_issuer = { default = \"\" }"));
+    assert!(result.contains("mcp_jwt_audience = { default = \"\" }"));
+    assert!(result.contains("mcp_jwt_jwks_uri = { default = \"\" }"));
+    // Gateway URL should be "none" when auth is disabled
+    assert!(result.contains("mcp_gateway_url = { default = \"none\" }"));
+    // Trace header is always set
+    assert!(result.contains("mcp_trace_header = { default = \"x-trace-id\" }"));
 
     // Check that wildcard route points directly to gateway (named "mcp")
     assert!(result.contains("route = \"/...\""));
@@ -1029,17 +1017,27 @@ fn test_auth_disabled_omits_authorizer() {
 
 #[test]
 fn test_auth_enabled_includes_authorizer() {
-    // Test that when auth is enabled (private access), all auth components are included
+    // Test that when auth is enabled (oauth configured), all auth components are included
     let config = FtlConfig {
         project: ProjectConfig {
             name: "auth-project".to_string(),
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "private".to_string(),
             default_registry: None,
         },
-        oauth: None,
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            jwks_uri: String::new(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            allowed_subjects: vec![],
+        }),
         component: HashMap::new(),
         mcp: McpConfig::default(),
         variables: HashMap::new(),
@@ -1089,13 +1087,77 @@ fn test_auth_enabled_includes_authorizer() {
     assert!(spin_config.component.contains_key("mcp"));
 
     // Verify that gateway component exists
-    assert!(spin_config.component.contains_key("ftl-mcp-gateway"));
+    assert!(spin_config.component.contains_key("mcp"));
 
     // Verify auth_enabled is true
     assert!(matches!(
         &spin_config.variables["auth_enabled"],
         SpinVariable::Default { default } if default == "true"
     ));
+}
+
+#[test]
+fn test_validate_local_auth() {
+    // Test that only public and custom modes are allowed locally
+
+    // Public mode should work
+    let public_config = FtlConfig {
+        project: ProjectConfig {
+            name: "test".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+        },
+        oauth: None,
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+    assert!(super::validate_local_auth(&public_config).is_ok());
+
+    // Custom mode with OAuth should work
+    let custom_with_oauth = FtlConfig {
+        project: ProjectConfig {
+            name: "test".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://example.com".to_string(),
+            audience: String::new(),
+            jwks_uri: "https://example.com/jwks".to_string(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+    assert!(super::validate_local_auth(&custom_with_oauth).is_ok());
+
+    // Any config without OAuth should also pass validation
+    let no_oauth_config = FtlConfig {
+        project: ProjectConfig {
+            name: "test".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+        },
+        oauth: None,
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+    assert!(super::validate_local_auth(&no_oauth_config).is_ok());
 }
 
 #[test]
@@ -1127,7 +1189,6 @@ fn test_auth_disabled_with_components() {
             version: "1.0.0".to_string(),
             description: String::new(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,

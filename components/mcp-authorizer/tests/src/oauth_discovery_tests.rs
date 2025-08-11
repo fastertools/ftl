@@ -11,7 +11,7 @@ use crate::{test_helpers, ResponseData};
 #[spin_test]
 fn test_oauth_protected_resource_metadata() {
     // Set up provider configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
     
@@ -54,7 +54,7 @@ fn test_oauth_protected_resource_metadata() {
 #[spin_test]
 fn test_oauth_authorization_server_metadata() {
     // Set up provider configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
     
@@ -114,6 +114,7 @@ fn test_discovery_endpoints_no_auth_required() {
 #[spin_test]
 fn test_discovery_authkit_provider() {
     variables::set("mcp_jwt_issuer", "https://example.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request
@@ -129,6 +130,7 @@ fn test_discovery_authkit_provider() {
 fn test_discovery_oauth_provider() {
     variables::set("mcp_jwt_issuer", "https://auth.example.com");
     variables::set("mcp_jwt_jwks_uri", "https://auth.example.com/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_oauth_authorize_endpoint", "https://auth.example.com/authorize");
     variables::set("mcp_oauth_token_endpoint", "https://auth.example.com/token");
     
@@ -144,6 +146,9 @@ fn test_discovery_oauth_provider() {
 // Test that WWW-Authenticate header includes resource metadata URL
 #[spin_test]
 fn test_www_authenticate_resource_metadata() {
+    // Setup default test configuration
+    crate::test_setup::setup_default_test_config();
+    
     let headers = http::types::Headers::new();
     headers.append("host", b"api.example.com").unwrap();
     
@@ -169,7 +174,7 @@ fn test_www_authenticate_resource_metadata() {
 #[spin_test]
 fn test_discovery_without_host() {
     // Set up provider configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
     
@@ -187,7 +192,7 @@ fn test_discovery_without_host() {
 #[spin_test]
 fn test_discovery_with_forwarded_host() {
     // Set up provider configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
     
@@ -207,7 +212,7 @@ fn test_discovery_with_forwarded_host() {
 #[spin_test]
 fn test_discovery_cors_headers() {
     // Set up minimal configuration for component to initialize
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_trace_header", "x-trace-id");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");

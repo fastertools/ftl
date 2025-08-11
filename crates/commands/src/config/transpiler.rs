@@ -67,9 +67,49 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         },
     );
 
-    // Only add other auth variables if auth is enabled
+    // Add core MCP variables (always needed)
+    add_core_mcp_variables(&mut variables, ftl_config);
+
+    // Add authorization rules variables (always needed for platform integration)
+    add_ownership_variables(&mut variables, ftl_config);
+
+    // Only add auth provider variables if auth is enabled
+    // When auth is disabled, we don't set provider variables so the authorizer
+    // knows no provider is configured
     if ftl_config.is_auth_enabled() {
-        add_auth_variables(&mut variables, ftl_config);
+        add_jwt_variables(&mut variables, ftl_config);
+        add_oauth_variables(&mut variables, ftl_config);
+
+        // Static provider variables (legacy, but still needed)
+        variables.insert(
+            "mcp_static_tokens".to_string(),
+            SpinVariable::Default {
+                default: String::new(),
+            },
+        );
+    } else {
+        // Explicitly set empty provider variables when auth is disabled
+        // This ensures the authorizer knows no provider is configured
+        for var in &[
+            "mcp_jwt_issuer",
+            "mcp_jwt_audience",
+            "mcp_jwt_jwks_uri",
+            "mcp_jwt_public_key",
+            "mcp_jwt_algorithm",
+            "mcp_jwt_required_scopes",
+            "mcp_oauth_authorize_endpoint",
+            "mcp_oauth_token_endpoint",
+            "mcp_oauth_userinfo_endpoint",
+            "mcp_static_tokens",
+            "mcp_provider_type",
+        ] {
+            variables.insert(
+                (*var).to_string(),
+                SpinVariable::Default {
+                    default: String::new(),
+                },
+            );
+        }
     }
 
     spin_config.variables = variables;
@@ -173,16 +213,11 @@ pub fn create_spin_toml_with_resolved_paths<S: std::hash::BuildHasher>(
 }
 
 /// Validate auth configuration for local development
-pub fn validate_local_auth(ftl_config: &FtlConfig) -> Result<()> {
-    if ftl_config.project.access_control == "private" && ftl_config.oauth.is_none() {
-        return Err(anyhow::anyhow!(
-            "Private access control requires OAuth configuration for local development.\n\
-            \n\
-            To fix this, either:\n\
-            1. Add an [oauth] section to your ftl.toml with your OAuth provider details\n\
-            2. Set access_control = \"public\"\n"
-        ));
-    }
+pub const fn validate_local_auth(_ftl_config: &FtlConfig) -> Result<()> {
+    // Local development only supports:
+    // - No [oauth] block = public access
+    // - With [oauth] block = custom OAuth
+    // Private and org modes are only available via ftl eng deploy
     Ok(())
 }
 
@@ -209,42 +244,68 @@ fn make_path_absolute(path: &mut String, base: &Path) {
     }
 }
 
-fn add_auth_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
-    add_tenant_variable(variables, ftl_config);
-    add_core_mcp_variables(variables, ftl_config);
-    add_jwt_variables(variables, ftl_config);
-    add_oauth_variables(variables, ftl_config);
+fn add_ownership_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
+    // Authorization rules will be populated by the platform during deployment
+    // based on the deployment configuration (org-scoped, user-scoped, etc.)
+    // Note: mcp_auth_enabled is no longer used - the authorizer determines auth
+    // based on whether a provider is configured
 
-    // Static provider variables (legacy)
+    // Get allowed_subjects from OAuth config if present
+    let allowed_subjects = ftl_config
+        .oauth
+        .as_ref()
+        .map(|oauth| oauth.allowed_subjects.join(","))
+        .unwrap_or_default();
+
     variables.insert(
-        "mcp_static_tokens".to_string(),
+        "mcp_auth_allowed_subjects".to_string(),
+        SpinVariable::Default {
+            default: allowed_subjects,
+        },
+    );
+
+    variables.insert(
+        "mcp_auth_required_claims".to_string(),
+        SpinVariable::Default {
+            default: String::new(),
+        },
+    );
+
+    variables.insert(
+        "mcp_auth_required_scopes".to_string(),
+        SpinVariable::Default {
+            default: String::new(),
+        },
+    );
+
+    variables.insert(
+        "mcp_auth_allowed_issuers".to_string(),
+        SpinVariable::Default {
+            default: String::new(),
+        },
+    );
+
+    variables.insert(
+        "mcp_auth_forward_claims".to_string(),
         SpinVariable::Default {
             default: String::new(),
         },
     );
 }
 
-fn add_tenant_variable(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
-    if ftl_config.project.access_control == "private" && ftl_config.oauth.is_none() {
-        variables.insert(
-            "mcp_tenant_id".to_string(),
-            SpinVariable::Required { required: true },
-        );
-    } else {
-        variables.insert(
-            "mcp_tenant_id".to_string(),
-            SpinVariable::Default {
-                default: String::new(),
-            },
-        );
-    }
-}
-
 fn add_core_mcp_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
+    // Gateway URL only needed when auth is enabled (points to the actual gateway)
+    // When auth is disabled, the gateway is accessed directly
+    let gateway_url = if ftl_config.is_auth_enabled() {
+        "http://ftl-mcp-gateway.spin.internal".to_string()
+    } else {
+        // No separate authorizer, so no forwarding needed
+        "none".to_string()
+    };
     variables.insert(
         "mcp_gateway_url".to_string(),
         SpinVariable::Default {
-            default: "http://ftl-mcp-gateway.spin.internal".to_string(),
+            default: gateway_url,
         },
     );
     variables.insert(
@@ -390,7 +451,7 @@ fn parse_component_source(source: &str, _default_registry: Option<&str>) -> Comp
 
 fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> SpinComponentConfig {
     let uri = if registry_uri.is_empty() {
-        "ghcr.io/fastertools/mcp-authorizer:0.0.13"
+        "ghcr.io/fastertools/mcp-authorizer:0.0.14"
     } else {
         registry_uri
     };
@@ -405,6 +466,8 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> S
     let mut variables = HashMap::new();
 
     // MCP authorizer variables use template syntax
+    // Note: mcp_auth_enabled is no longer used - the authorizer determines auth
+    // based on whether a provider is configured
     for var in &[
         "mcp_gateway_url",
         "mcp_trace_header",
@@ -419,7 +482,11 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> S
         "mcp_oauth_token_endpoint",
         "mcp_oauth_userinfo_endpoint",
         "mcp_static_tokens",
-        "mcp_tenant_id",
+        "mcp_auth_allowed_subjects",
+        "mcp_auth_required_claims",
+        "mcp_auth_required_scopes",
+        "mcp_auth_allowed_issuers",
+        "mcp_auth_forward_claims",
     ] {
         variables.insert((*var).to_string(), format!("{{{{ {var} }}}}"));
     }

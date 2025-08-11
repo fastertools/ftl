@@ -9,3 +9,7 @@ mcp_trace_header = "x-trace-id"
 mcp_jwt_issuer = "https://test.authkit.app"
 mcp_jwt_audience = "test-audience"
 # JWKS URI will be auto-derived for AuthKit domains
+
+# Ownership settings - not defined here, set per test
+# mcp_org_id = "set_per_test"
+# mcp_user_id = "set_per_test"

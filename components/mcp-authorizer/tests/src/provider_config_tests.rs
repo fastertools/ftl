@@ -73,6 +73,7 @@ fn test_https_enforcement_all_urls() {
 fn test_bare_domain_https_prefix() {
     // Test that bare domains get https:// prefix
     variables::set("mcp_jwt_issuer", "tenant.authkit.app"); // No https://
+    variables::set("mcp_jwt_audience", "test-api");
     
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request
@@ -84,18 +85,21 @@ fn test_bare_domain_https_prefix() {
     assert_eq!(response.status(), 200);
 }
 
-// Test invalid provider type
+// Test no provider configured
 #[spin_test]
 fn test_invalid_provider_type() {
-    // Clear issuer to trigger error
+    // Clear all provider configuration
     variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_static_tokens", "");
     
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
     
-    // Should return 500 for invalid configuration
-    assert_eq!(response.status(), 500);
+    // Should return 401 when no provider is configured
+    assert_eq!(response.status(), 401);
 }
 
 // Test missing required JWT key source
@@ -112,7 +116,7 @@ fn test_missing_jwt_key_source() {
     assert_eq!(response.status(), 500);
 }
 
-// Test audience validation optional
+// Test audience validation required
 #[spin_test]
 fn test_audience_optional() {
     variables::set("mcp_jwt_issuer", "https://tenant.authkit.app");
@@ -124,8 +128,8 @@ fn test_audience_optional() {
         .unwrap();
     let response = spin_test_sdk::perform_request(request);
     
-    // Should work without audience
-    assert_eq!(response.status(), 200);
+    // Should fail without audience (required for security)
+    assert_eq!(response.status(), 500);
 }
 
 // Test multiple providers (future enhancement)
@@ -133,6 +137,7 @@ fn test_audience_optional() {
 fn test_single_provider_only() {
     // Currently only single provider is supported
     variables::set("mcp_jwt_issuer", "https://tenant.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     
     // Verify we can configure one provider
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -147,6 +152,9 @@ fn test_single_provider_only() {
 // Test trace header configuration
 #[spin_test]
 fn test_custom_trace_header() {
+    // Setup default test configuration
+    crate::test_setup::setup_default_test_config();
+    // Override trace header
     variables::set("mcp_trace_header", "X-Custom-Trace");
     
     let headers = http::types::Headers::new();
@@ -163,7 +171,7 @@ fn test_custom_trace_header() {
 // Test gateway URL configuration with authenticated request
 #[spin_test]
 fn test_gateway_url_config() {
-    variables::set("mcp_gateway_url", "http://custom-gateway.spin.internal/api");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
     
@@ -280,7 +288,7 @@ fn test_provider_cannot_have_both_key_and_jwks() {
 #[spin_test]
 fn test_no_issuer_validation() {
     // Configure provider without issuer
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", ""); // Empty issuer
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");
@@ -352,7 +360,7 @@ fn test_multiple_expected_audiences() {
 #[spin_test]
 fn test_algorithm_configuration() {
     // Test that provider can be configured with specific algorithms
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
     variables::set("mcp_jwt_audience", "test-audience");

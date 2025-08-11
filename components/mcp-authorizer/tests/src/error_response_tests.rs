@@ -10,6 +10,14 @@ use crate::ResponseData;
 // Test error response format for missing token
 #[spin_test]
 fn test_missing_token_error_format() {
+    // Clear all provider configuration
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_static_tokens", "");
+    variables::set("mcp_gateway_url", "none");
+    
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
@@ -41,6 +49,18 @@ fn test_missing_token_error_format() {
 // Test error response for invalid token
 #[spin_test]
 fn test_invalid_token_error_format() {
+    // Clear ALL provider configuration first
+    variables::set("mcp_provider_type", "static");  // Explicitly set to static
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_oauth_authorize_endpoint", "");
+    variables::set("mcp_oauth_token_endpoint", "");
+    // Configure a simple static token provider to test invalid token errors
+    variables::set("mcp_static_tokens", "valid-token:user1:client1:read,write");
+    variables::set("mcp_gateway_url", "none");
+    
     let headers = http::types::Headers::new();
     headers.append("authorization", b"Bearer invalid.token.here").unwrap();
     
@@ -66,6 +86,14 @@ fn test_invalid_token_error_format() {
 // Test error response includes resource metadata URL when host is present
 #[spin_test]
 fn test_error_includes_resource_metadata_url() {
+    // Clear all provider configuration
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_static_tokens", "");
+    variables::set("mcp_gateway_url", "none");
+    
     let headers = http::types::Headers::new();
     headers.append("host", b"api.example.com").unwrap();
     
@@ -91,6 +119,14 @@ fn test_error_includes_resource_metadata_url() {
 // Test error response without host header
 #[spin_test]
 fn test_error_without_host() {
+    // Clear all provider configuration
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_static_tokens", "");
+    variables::set("mcp_gateway_url", "none");
+    
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
@@ -114,6 +150,14 @@ fn test_error_without_host() {
 // Test JSON error response content type
 #[spin_test]
 fn test_error_json_content_type() {
+    // Clear all provider configuration
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_static_tokens", "");
+    variables::set("mcp_gateway_url", "none");
+    
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
@@ -131,24 +175,38 @@ fn test_error_json_content_type() {
     assert!(content_type.unwrap().contains("application/json"));
 }
 
-// Test internal server error format
+// Test no provider configured error format
 #[spin_test]
 fn test_internal_error_format() {
-    // Configure without required issuer to trigger internal error
-    // Clear the issuer to trigger error
+    // Clear all provider configuration
     variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_static_tokens", "");
     
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
     
-    // Should return 500 for configuration error
-    assert_eq!(response.status(), 500);
+    // Should return 401 when no provider is configured
+    assert_eq!(response.status(), 401);
 }
 
 // Test malformed authorization header
 #[spin_test]
 fn test_malformed_auth_header() {
+    // Clear ALL provider configuration first
+    variables::set("mcp_provider_type", "static");  // Explicitly set to static
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_oauth_authorize_endpoint", "");
+    variables::set("mcp_oauth_token_endpoint", "");
+    // Configure a simple static token provider to test malformed auth headers
+    variables::set("mcp_static_tokens", "valid-token:user1:client1:read,write");
+    variables::set("mcp_gateway_url", "none");
+    
     let test_cases = vec![
         "NotBearer token",
         "Bearer",  // Missing token
@@ -171,6 +229,14 @@ fn test_malformed_auth_header() {
 // Test trace ID propagation in error responses
 #[spin_test]
 fn test_error_trace_id_propagation() {
+    // Clear all provider configuration
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_static_tokens", "");
+    variables::set("mcp_gateway_url", "none");
+    
     let headers = http::types::Headers::new();
     headers.append("x-trace-id", b"error-trace-123").unwrap();
     
@@ -193,6 +259,18 @@ fn test_error_trace_id_propagation() {
 // Test various invalid bearer tokens
 #[spin_test]
 fn test_various_invalid_tokens() {
+    // Clear ALL provider configuration first
+    variables::set("mcp_provider_type", "static");  // Explicitly set to static
+    variables::set("mcp_jwt_issuer", "");
+    variables::set("mcp_jwt_jwks_uri", "");
+    variables::set("mcp_jwt_public_key", "");
+    variables::set("mcp_jwt_audience", "");
+    variables::set("mcp_oauth_authorize_endpoint", "");
+    variables::set("mcp_oauth_token_endpoint", "");
+    // Configure a simple static token provider to test invalid token errors
+    variables::set("mcp_static_tokens", "valid-token:user1:client1:read,write");
+    variables::set("mcp_gateway_url", "none");
+    
     let invalid_tokens = vec![
         "not.a.jwt",
         "too.many.parts.here.invalid",

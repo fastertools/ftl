@@ -129,7 +129,7 @@ fn build_forwarding_headers(
         headers.append(&name.to_string(), &value.as_bytes().to_vec())?;
     }
 
-    // Add authentication context headers
+    // Add standard authentication context headers
     headers.append(
         &"x-auth-client-id".to_string(),
         &auth_context.client_id.as_bytes().to_vec(),
@@ -150,9 +150,22 @@ fn build_forwarding_headers(
         )?;
     }
 
-    // Add organization ID if present
-    if let Some(org_id) = &auth_context.org_id {
-        headers.append(&"x-auth-org-id".to_string(), &org_id.as_bytes().to_vec())?;
+    // Forward configured claims as headers
+    if let Some(authorization) = &config.authorization
+        && let Some(forward_claims) = &authorization.forward_claims
+    {
+        for (claim_name, header_name) in forward_claims {
+            if let Some(claim_value) = auth_context.additional_claims.get(claim_name) {
+                // Convert claim value to string
+                let value_str = match claim_value {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    _ => claim_value.to_string(),
+                };
+                headers.append(header_name, &value_str.as_bytes().to_vec())?;
+            }
+        }
     }
 
     // Forward the original authorization header

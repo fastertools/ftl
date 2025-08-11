@@ -4,6 +4,7 @@
 //! allowing for easy mocking and testing.
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
@@ -110,14 +111,7 @@ pub trait FtlApiClient: Send + Sync {
     ) -> Result<types::UpdateComponentsResponse>;
 
     /// Create ECR token
-    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse>;
-
-    /// Update authentication configuration for an app
-    async fn update_auth_config(
-        &self,
-        app_id: &str,
-        request: &types::UpdateAuthConfigRequest,
-    ) -> Result<types::AuthConfigResponse>;
+    async fn create_ecr_token(&self, app_id: &str) -> Result<types::CreateEcrTokenResponse>;
 
     /// Get application logs
     async fn get_app_logs(
@@ -126,6 +120,9 @@ pub trait FtlApiClient: Send + Sync {
         since: Option<&str>,
         tail: Option<&str>,
     ) -> Result<types::GetAppLogsResponse>;
+
+    /// Get user organizations
+    async fn get_user_orgs(&self) -> Result<types::GetUserOrgsResponse>;
 }
 
 /// Time/clock operations
@@ -227,6 +224,13 @@ pub enum MessageStyle {
 pub trait AsyncRuntime: Send + Sync {
     /// Sleep for a duration
     async fn sleep(&self, duration: Duration);
+}
+
+/// Factory for creating API clients
+#[async_trait]
+pub trait ApiClientFactory: Send + Sync {
+    /// Create a new API client with authentication
+    async fn create_api_client(&self) -> Result<Box<dyn FtlApiClient>>;
 }
 
 // Production implementations
@@ -484,40 +488,26 @@ impl FtlApiClient for RealFtlApiClient {
             .map_err(|e| anyhow::anyhow!("Failed to list components: {}", e))
     }
 
-    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
+    async fn create_ecr_token(&self, app_id: &str) -> Result<types::CreateEcrTokenResponse> {
         let auth = self
             .auth_token
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        let request = types::CreateEcrTokenRequest {
+            app_id: app_id
+                .parse()
+                .map_err(|e| anyhow::anyhow!("Invalid app ID format: {}", e))?,
+        };
 
         self.client
             .create_ecr_token()
-            .authorization(format!("Bearer {auth}"))
-            .send()
-            .await
-            .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to create ECR token: {}", e))
-    }
-
-    async fn update_auth_config(
-        &self,
-        app_id: &str,
-        request: &types::UpdateAuthConfigRequest,
-    ) -> Result<types::AuthConfigResponse> {
-        let auth = self
-            .auth_token
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
-
-        self.client
-            .update_auth_config()
-            .app_id(app_id)
             .authorization(format!("Bearer {auth}"))
             .body(request)
             .send()
             .await
             .map(progenitor_client::ResponseValue::into_inner)
-            .map_err(|e| anyhow::anyhow!("Failed to update auth config: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to create ECR token: {}", e))
     }
 
     async fn get_app_logs(
@@ -550,6 +540,21 @@ impl FtlApiClient for RealFtlApiClient {
             .await
             .map(progenitor_client::ResponseValue::into_inner)
             .map_err(|e| anyhow::anyhow!("Failed to get app logs: {}", e))
+    }
+
+    async fn get_user_orgs(&self) -> Result<types::GetUserOrgsResponse> {
+        let auth = self
+            .auth_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No authentication token available"))?;
+
+        self.client
+            .get_user_orgs()
+            .authorization(format!("Bearer {auth}"))
+            .send()
+            .await
+            .map(progenitor_client::ResponseValue::into_inner)
+            .map_err(|e| anyhow::anyhow!("Failed to get user organizations: {}", e))
     }
 }
 
@@ -591,12 +596,11 @@ impl CredentialsProvider for RealCredentialsProvider {
             let credentials: StoredCredentials = serde_json::from_str(&json)
                 .map_err(|e| anyhow::anyhow!("Failed to parse stored credentials: {}", e))?;
 
-            // Check if token is expired or about to expire (within 30 seconds)
+            // Check if token is expired
             if let Some(expires_at) = credentials.expires_at {
                 let now = Utc::now();
-                let buffer = chrono::Duration::seconds(30);
 
-                if expires_at < now + buffer {
+                if expires_at < now {
                     // Token is expired or about to expire, try to refresh
                     if let Some(refresh_token) = credentials.refresh_token.clone() {
                         match self
@@ -652,7 +656,7 @@ impl RealCredentialsProvider {
 
         let client = reqwest::Client::new();
         let token_url = format!("https://{authkit_domain}/oauth2/token");
-        let client_id = "client_01K06E1DRP26N8A3T9CGMB1YSP"; // FTL OAuth client ID
+        let client_id = "client_01K2ADMPRAFT9X83PFVJBQ6T49"; // FTL OAuth client ID
 
         let response = client
             .post(&token_url)
@@ -706,6 +710,35 @@ pub struct RealAsyncRuntime;
 impl AsyncRuntime for RealAsyncRuntime {
     async fn sleep(&self, duration: Duration) {
         tokio::time::sleep(duration).await;
+    }
+}
+
+/// Real API client factory implementation
+pub struct RealApiClientFactory {
+    /// Credentials provider for authentication
+    pub credentials_provider: Arc<dyn CredentialsProvider>,
+}
+
+impl RealApiClientFactory {
+    /// Create a new API client factory
+    pub fn new(credentials_provider: Arc<dyn CredentialsProvider>) -> Self {
+        Self {
+            credentials_provider,
+        }
+    }
+}
+
+#[async_trait]
+impl ApiClientFactory for RealApiClientFactory {
+    async fn create_api_client(&self) -> Result<Box<dyn FtlApiClient>> {
+        let credentials = self
+            .credentials_provider
+            .get_or_refresh_credentials()
+            .await?;
+        Ok(Box::new(RealFtlApiClient::new_with_auth(
+            ApiClient::new(crate::config::DEFAULT_API_BASE_URL),
+            credentials.access_token,
+        )))
     }
 }
 

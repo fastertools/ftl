@@ -71,9 +71,9 @@
           "default": []
         },
         "access_control": {
-          "description": "Access control mode: 'public' (no auth) or 'private' (auth required)",
+          "description": "Access control mode: 'public' (no auth), 'private' (user-level auth), 'org' (organization-wide auth), or 'custom' (custom OAuth)",
           "type": "string",
-          "enum": ["public", "private"],
+          "enum": ["public", "private", "org", "custom"],
           "default": "public"
         },
         "default_registry": {

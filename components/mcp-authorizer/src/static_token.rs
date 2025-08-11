@@ -40,11 +40,35 @@ pub fn verify(token: &str, provider: &StaticProvider) -> Result<TokenInfo> {
         }
     }
 
+    // Build complete claims map
+    let mut claims = std::collections::HashMap::new();
+    claims.insert(
+        "sub".to_string(),
+        serde_json::Value::String(token_info.sub.clone()),
+    );
+    claims.insert(
+        "client_id".to_string(),
+        serde_json::Value::String(token_info.client_id.clone()),
+    );
+    claims.insert(
+        "iss".to_string(),
+        serde_json::Value::String("static".to_string()),
+    );
+    claims.insert(
+        "scope".to_string(),
+        serde_json::Value::String(token_info.scopes.join(" ")),
+    );
+
+    // Add all additional claims
+    for (key, value) in &token_info.additional_claims {
+        claims.insert(key.clone(), value.clone());
+    }
+
     Ok(TokenInfo {
         client_id: token_info.client_id.clone(),
         sub: token_info.sub.clone(),
         iss: "static".to_string(), // Static provider has no issuer
         scopes: token_info.scopes.clone(),
-        org_id: token_info.org_id.clone(),
+        claims,
     })
 }

@@ -15,7 +15,7 @@
   },
   "servers": [
     {
-      "url": "https://raj3cibkjk.execute-api.us-west-2.amazonaws.com",
+      "url": "https://vnwyancgjj.execute-api.us-west-2.amazonaws.com",
       "description": "Production API"
     }
   ],
@@ -32,6 +32,10 @@
     {
       "name": "Registry",
       "description": "Multi-tenant ECR repository and credentials management"
+    },
+    {
+      "name": "User",
+      "description": "User and organization management endpoints"
     }
   ],
   "externalDocs": {
@@ -458,8 +462,71 @@
       "post": {
         "operationId": "createEcrToken",
         "summary": "Create ECR authorization token",
-        "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories in the authenticated tenant namespace",
+        "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories under the specified app namespace",
         "tags": ["Registry"],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "schema": {
+              "description": "Bearer token for authentication",
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "Bearer token for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEcrTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ECR token created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEcrTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/user/orgs": {
+      "get": {
+        "operationId": "getUserOrgs",
+        "summary": "Get user organizations",
+        "description": "Retrieves a list of organizations the authenticated user belongs to",
+        "tags": ["User"],
         "parameters": [
           {
             "in": "header",
@@ -475,11 +542,11 @@
         ],
         "responses": {
           "200": {
-            "description": "ECR token created successfully",
+            "description": "Organizations retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateEcrTokenResponse"
+                  "$ref": "#/components/schemas/GetUserOrgsResponse"
                 }
               }
             }
@@ -797,102 +864,6 @@
           }
         }
       }
-    },
-    "/v1/apps/{appId}/auth-config": {
-      "put": {
-        "operationId": "updateAuthConfig",
-        "summary": "Update authentication configuration",
-        "description": "Updates the authentication configuration for an application. This determines who can access the MCP endpoint and how authentication is performed.",
-        "tags": ["Apps"],
-        "parameters": [
-          {
-            "in": "header",
-            "name": "Authorization",
-            "schema": {
-              "description": "Bearer token for authentication",
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "description": "Bearer token for authentication"
-          },
-          {
-            "in": "path",
-            "name": "appId",
-            "schema": {
-              "description": "Application ID (UUID)",
-              "example": "123e4567-e89b-12d3-a456-426614174000",
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
-            },
-            "required": true,
-            "description": "Application ID (UUID)"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAuthConfigRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Authentication configuration updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthConfigResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request - validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "App not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -906,6 +877,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 63
+          },
+          "accessControl": {
+            "description": "Access control mode for the application",
+            "default": "private",
+            "type": "string",
+            "enum": ["public", "private", "org", "custom"]
           }
         },
         "required": ["appName"]
@@ -950,9 +927,95 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "accessControl": {
+            "description": "Access control mode for the application",
+            "type": "string",
+            "enum": ["public", "private", "org", "custom"]
+          },
+          "customAuthConfig": {
+            "description": "Custom auth configuration with all MCP auth variables (required when accessControl is \"custom\")",
+            "type": "object",
+            "properties": {
+              "provider": {
+                "description": "Auth provider type: jwt, oauth, static, etc.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "issuer": {
+                "description": "Token issuer URL",
+                "type": "string",
+                "minLength": 1
+              },
+              "audience": {
+                "description": "Expected audience for tokens",
+                "type": "string",
+                "minLength": 1
+              },
+              "jwksUri": {
+                "type": "string"
+              },
+              "publicKey": {
+                "type": "string"
+              },
+              "algorithm": {
+                "type": "string"
+              },
+              "requiredScopes": {
+                "type": "string"
+              },
+              "authorizeEndpoint": {
+                "type": "string"
+              },
+              "tokenEndpoint": {
+                "type": "string"
+              },
+              "userinfoEndpoint": {
+                "type": "string"
+              },
+              "allowedSubjects": {
+                "type": "string"
+              },
+              "allowedIssuers": {
+                "type": "string"
+              },
+              "requiredClaims": {
+                "type": "string"
+              },
+              "authRequiredScopes": {
+                "type": "string"
+              },
+              "forwardClaims": {
+                "type": "string"
+              }
+            },
+            "required": ["provider", "issuer", "audience"]
+          },
+          "subs": {
+            "description": "List of authorized user emails for org access control (will be resolved to user IDs)",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
           }
         },
         "required": ["components"]
+      },
+      "CreateEcrTokenRequest": {
+        "description": "Request body for creating ECR token",
+        "type": "object",
+        "properties": {
+          "appId": {
+            "description": "Application ID to create ECR token for",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          }
+        },
+        "required": ["appId"]
       },
       "UpdateComponentsRequest": {
         "description": "Request body for updating components",
@@ -979,38 +1042,6 @@
           }
         },
         "required": ["components"]
-      },
-      "UpdateAuthConfigRequest": {
-        "description": "Request body for updating authentication configuration",
-        "type": "object",
-        "properties": {
-          "accessControl": {
-            "type": "string",
-            "enum": ["public", "private", "custom"]
-          },
-          "customConfig": {
-            "type": "object",
-            "properties": {
-              "provider": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 50
-              },
-              "issuer": {
-                "type": "string",
-                "minLength": 1
-              },
-              "audience": {
-                "type": "string"
-              },
-              "jwksUri": {
-                "type": "string"
-              }
-            },
-            "required": ["provider", "issuer"]
-          }
-        },
-        "required": ["accessControl"]
       },
       "ListAppsResponse": {
         "description": "List of applications with pagination",
@@ -1198,6 +1229,33 @@
         "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
         "additionalProperties": false
       },
+      "GetUserOrgsResponse": {
+        "description": "List of user organizations",
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "description": "List of organizations the user belongs to",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Organization ID from WorkOS",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Organization name",
+                  "type": "string"
+                }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["organizations"],
+        "additionalProperties": false
+      },
       "ListComponentsResponse": {
         "description": "List of components for an app",
         "type": "object",
@@ -1322,53 +1380,6 @@
           }
         },
         "required": ["appId", "logs", "metadata"],
-        "additionalProperties": false
-      },
-      "AuthConfigResponse": {
-        "description": "Response for successful auth config update",
-        "type": "object",
-        "properties": {
-          "appId": {
-            "type": "string"
-          },
-          "authConfig": {
-            "type": "object",
-            "properties": {
-              "accessControl": {
-                "type": "string",
-                "enum": ["public", "private", "custom"]
-              },
-              "customConfig": {
-                "type": "object",
-                "properties": {
-                  "provider": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 50
-                  },
-                  "issuer": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "audience": {
-                    "type": "string"
-                  },
-                  "jwksUri": {
-                    "type": "string"
-                  }
-                },
-                "required": ["provider", "issuer"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["accessControl"],
-            "additionalProperties": false
-          },
-          "updatedAt": {
-            "type": "number"
-          }
-        },
-        "required": ["appId", "authConfig", "updatedAt"],
         "additionalProperties": false
       }
     },

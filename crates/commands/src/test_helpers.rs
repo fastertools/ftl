@@ -148,6 +148,31 @@ mock! {
     }
 }
 
+// Mock implementation of the ApiClientFactory trait for testing API client creation.
+//
+// This mock allows you to control API client creation in tests.
+//
+// # Example
+//
+// ```rust
+// use ftl_commands::test_helpers::{MockApiClientFactoryMock, MockFtlApiClientMock};
+//
+// let mut mock_factory = MockApiClientFactoryMock::new();
+// let mock_client = MockFtlApiClientMock::new();
+//
+// mock_factory.expect_create_api_client()
+//     .times(1)
+//     .returning(move || Ok(Box::new(mock_client.clone())));
+// ```
+mock! {
+    pub ApiClientFactoryMock {}
+
+    #[async_trait]
+    impl ApiClientFactory for ApiClientFactoryMock {
+        async fn create_api_client(&self) -> Result<Box<dyn FtlApiClient>>;
+    }
+}
+
 // Mock implementation of the SpinInstaller trait for testing Spin installation.
 //
 // This mock allows you to simulate Spin CLI installation without actually downloading
@@ -340,12 +365,7 @@ type UpdateComponentsFn = Box<
         + Sync,
 >;
 type ListComponentsFn = Box<dyn Fn(&str) -> Result<types::ListComponentsResponse> + Send + Sync>;
-type CreateEcrTokenFn = Box<dyn Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
-type UpdateAuthConfigFn = Box<
-    dyn Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
-        + Send
-        + Sync,
->;
+type CreateEcrTokenFn = Box<dyn Fn(&str) -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
 type GetAppLogsFn = Box<
     dyn Fn(&str, Option<&str>, Option<&str>) -> Result<types::GetAppLogsResponse> + Send + Sync,
 >;
@@ -363,8 +383,23 @@ pub struct MockFtlApiClientMock {
     update_components: Arc<Mutex<Option<UpdateComponentsFn>>>,
     list_app_components: Arc<Mutex<Option<ListComponentsFn>>>,
     create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
-    update_auth_config: Arc<Mutex<Option<UpdateAuthConfigFn>>>,
     get_app_logs: Arc<Mutex<Option<GetAppLogsFn>>>,
+}
+
+impl Clone for MockFtlApiClientMock {
+    fn clone(&self) -> Self {
+        Self {
+            create_app: Arc::clone(&self.create_app),
+            list_apps: Arc::clone(&self.list_apps),
+            get_app: Arc::clone(&self.get_app),
+            delete_app: Arc::clone(&self.delete_app),
+            create_deployment: Arc::clone(&self.create_deployment),
+            update_components: Arc::clone(&self.update_components),
+            list_app_components: Arc::clone(&self.list_app_components),
+            create_ecr_token: Arc::clone(&self.create_ecr_token),
+            get_app_logs: Arc::clone(&self.get_app_logs),
+        }
+    }
 }
 
 impl Default for MockFtlApiClientMock {
@@ -385,7 +420,6 @@ impl MockFtlApiClientMock {
             update_components: Arc::new(Mutex::new(None)),
             list_app_components: Arc::new(Mutex::new(None)),
             create_ecr_token: Arc::new(Mutex::new(None)),
-            update_auth_config: Arc::new(Mutex::new(None)),
             get_app_logs: Arc::new(Mutex::new(None)),
         }
     }
@@ -428,11 +462,6 @@ impl MockFtlApiClientMock {
     /// Set up expectation for `create_ecr_token` method
     pub fn expect_create_ecr_token(&mut self) -> CreateEcrTokenExpectation<'_> {
         CreateEcrTokenExpectation { mock: self }
-    }
-
-    /// Set up expectation for `update_auth_config` method
-    pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation<'_> {
-        UpdateAuthConfigExpectation { mock: self }
     }
 
     /// Set up expectation for `get_app_logs` method
@@ -624,34 +653,19 @@ impl<'a> CreateEcrTokenExpectation<'a> {
     /// Set the function to call when this expectation is matched
     pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
+        F: Fn(&str) -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
     {
         *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(f));
         self.mock
     }
-}
 
-/// Expectation builder for `update_auth_config` method
-pub struct UpdateAuthConfigExpectation<'a> {
-    mock: &'a mut MockFtlApiClientMock,
-}
-
-impl<'a> UpdateAuthConfigExpectation<'a> {
-    /// Specifies how many times this expectation should be called (currently unused)
-    #[must_use]
-    pub fn times(self, _n: usize) -> Self {
-        self
-    }
-
-    /// Set the function to call when this expectation is matched
-    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    /// Set the function to call when this expectation is matched (legacy - ignores `app_id`)
+    pub fn returning_const<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
-            + Send
-            + Sync
-            + 'static,
+        F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
     {
-        *self.mock.update_auth_config.lock().unwrap() = Some(Box::new(f));
+        let wrapper = move |_app_id: &str| f();
+        *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(wrapper));
         self.mock
     }
 }
@@ -755,23 +769,11 @@ impl FtlApiClient for MockFtlApiClientMock {
         }
     }
 
-    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
+    async fn create_ecr_token(&self, app_id: &str) -> Result<types::CreateEcrTokenResponse> {
         if let Some(ref f) = *self.create_ecr_token.lock().unwrap() {
-            f()
+            f(app_id)
         } else {
             Err(anyhow!("create_ecr_token not mocked"))
-        }
-    }
-
-    async fn update_auth_config(
-        &self,
-        app_id: &str,
-        request: &types::UpdateAuthConfigRequest,
-    ) -> Result<types::AuthConfigResponse> {
-        if let Some(ref f) = *self.update_auth_config.lock().unwrap() {
-            f(app_id, request)
-        } else {
-            Err(anyhow!("update_auth_config not mocked"))
         }
     }
 
@@ -786,6 +788,13 @@ impl FtlApiClient for MockFtlApiClientMock {
         } else {
             Err(anyhow!("get_app_logs not mocked"))
         }
+    }
+
+    async fn get_user_orgs(&self) -> Result<types::GetUserOrgsResponse> {
+        // Return empty organizations list by default for tests
+        Ok(types::GetUserOrgsResponse {
+            organizations: vec![],
+        })
     }
 }
 
@@ -1135,28 +1144,5 @@ pub fn test_ecr_credentials() -> types::CreateEcrTokenResponse {
         proxy_endpoint: "https://123456789012.dkr.ecr.us-east-1.amazonaws.com".to_string(),
         expires_at: (chrono::Utc::now() + chrono::Duration::hours(12)).to_rfc3339(),
         region: "us-east-1".to_string(),
-    }
-}
-
-/// Creates a test auth config response for use in tests.
-///
-/// This function returns a valid `AuthConfigResponse` with test values.
-///
-/// # Example
-///
-/// ```ignore
-/// use ftl_commands::test_helpers::test_auth_config_response;
-///
-/// let auth_response = test_auth_config_response();
-/// assert!(matches!(auth_response.auth_config.access_control, types::AuthConfigResponseAuthConfigAccessControl::Public));
-/// ```
-pub fn test_auth_config_response() -> types::AuthConfigResponse {
-    types::AuthConfigResponse {
-        app_id: "app-12345".to_string(),
-        auth_config: types::AuthConfigResponseAuthConfig {
-            access_control: types::AuthConfigResponseAuthConfigAccessControl::Public,
-            custom_config: None,
-        },
-        updated_at: 1_234_567_890.0,
     }
 }

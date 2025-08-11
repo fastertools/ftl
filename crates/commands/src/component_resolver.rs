@@ -119,9 +119,12 @@ impl ComponentResolver {
                 .context("Failed to create temporary directory")?,
         );
 
+        // Get default registry from config
+        let default_registry = ftl_config.project.default_registry.clone();
+
         // Resolve components in parallel with progress
         let resolved = self
-            .resolve_parallel_with_progress(components, temp_dir.clone())
+            .resolve_parallel_with_progress(components, temp_dir.clone(), default_registry)
             .await?;
 
         Ok(ResolvedComponents {
@@ -209,6 +212,7 @@ impl ComponentResolver {
         &self,
         components: Vec<ComponentToResolve>,
         temp_dir: Arc<TempDir>,
+        default_registry: Option<String>,
     ) -> Result<HashMap<String, PathBuf>> {
         if components.is_empty() {
             return Ok(HashMap::new());
@@ -242,11 +246,17 @@ impl ComponentResolver {
             let resolved_components = Arc::clone(&resolved_components);
             let error_flag = Arc::clone(&error_flag);
             let semaphore = Arc::clone(&semaphore);
-            let default_registry = None; // TODO: Get from ftl_config if needed
+            let default_registry = default_registry.clone();
 
             tasks.spawn(async move {
                 // Acquire permit to limit concurrency
-                let _permit = semaphore.acquire().await.unwrap();
+                let Ok(_permit) = semaphore.acquire().await else {
+                    // Semaphore was closed, likely due to shutdown
+                    pb.finish_with_message("Component resolution interrupted".to_string());
+                    return Err(anyhow::anyhow!(
+                        "Semaphore closed during component resolution"
+                    ));
+                };
 
                 // Check if another task has already failed
                 if error_flag.lock().await.is_some() {
@@ -257,8 +267,10 @@ impl ComponentResolver {
                 let start = Instant::now();
 
                 // Resolve the registry URL
-                let resolved_url =
-                    crate::registry::resolve_registry_url(&component.source, default_registry);
+                let resolved_url = crate::registry::resolve_registry_url(
+                    &component.source,
+                    default_registry.as_deref(),
+                );
 
                 // Determine output path
                 let wasm_filename = format!("{}.wasm", component.name);
@@ -312,7 +324,11 @@ impl ComponentResolver {
             return Err(e);
         }
 
-        let mappings = Arc::try_unwrap(resolved_components).unwrap().into_inner();
+        let mappings = Arc::try_unwrap(resolved_components)
+            .map_err(|_| {
+                anyhow::anyhow!("Failed to unwrap resolved components - Arc still has references")
+            })?
+            .into_inner();
 
         self.ui.print("");
         self.ui.print_styled(

@@ -19,11 +19,12 @@ mod static_provider_tests;
 mod jwt_test_utils_tests;
 mod test_token_utils;
 mod optional_issuer_tests;
-mod authkit_integration_tests;
-mod tenant_validation_tests;
+mod authkit_integration_tests;  
 mod test_helpers;
 mod simple_test;
 mod test_setup;
+mod test_config_loading;
+mod test_audience_required;
 
 // Response data helper to extract all needed information
 pub struct ResponseData {
@@ -260,6 +261,7 @@ fn https_enforcement_rejects_http() {
 fn https_enforcement_accepts_bare_domain() {
     // Test that bare domains work (https:// is added automatically)
     variables::set("mcp_jwt_issuer", "example.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly
@@ -277,6 +279,7 @@ fn https_enforcement_accepts_bare_domain() {
 fn https_enforcement_accepts_https_prefix() {
     // Test that explicit https:// URLs work
     variables::set("mcp_jwt_issuer", "https://example.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly

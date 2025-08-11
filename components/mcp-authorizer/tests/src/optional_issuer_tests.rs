@@ -20,8 +20,9 @@ fn test_optional_issuer_validation_when_configured() {
     // Configure JWT provider WITH issuer
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://expected.issuer.com");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Test 1: Correct issuer should work
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -80,8 +81,9 @@ fn test_optional_issuer_empty_string() {
     // Configure JWT provider with empty issuer string
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "");  // Empty string = no validation
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -126,8 +128,9 @@ fn test_optional_issuer_string_support() {
     // Configure JWT provider with non-URL string issuer
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "my-service");  // Non-URL issuer
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());

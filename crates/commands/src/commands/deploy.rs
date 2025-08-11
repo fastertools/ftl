@@ -12,8 +12,8 @@ use tokio::task::JoinSet;
 use crate::component_resolver::{ComponentResolutionStrategy, ComponentResolver};
 use ftl_runtime::api_client::types;
 use ftl_runtime::deps::{
-    AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem, FtlApiClient,
-    MessageStyle, UserInterface,
+    ApiClientFactory, AsyncRuntime, Clock, CommandExecutor, CredentialsProvider, FileSystem,
+    FtlApiClient, MessageStyle, UserInterface,
 };
 
 /// Build executor trait for running builds
@@ -50,12 +50,12 @@ pub struct DeployDependencies {
     pub file_system: Arc<dyn FileSystem>,
     /// Command execution operations
     pub command_executor: Arc<dyn CommandExecutor>,
-    /// API client for FTL service
-    pub api_client: Arc<dyn FtlApiClient>,
+    /// Provider for authentication credentials (used to create fresh API clients)
+    pub credentials_provider: Arc<dyn CredentialsProvider>,
+    /// Factory for creating API clients
+    pub api_client_factory: Arc<dyn ApiClientFactory>,
     /// Clock for time operations
     pub clock: Arc<dyn Clock>,
-    /// Provider for authentication credentials
-    pub credentials_provider: Arc<dyn CredentialsProvider>,
     /// User interface for output
     pub ui: Arc<dyn UserInterface>,
     /// Build executor for running builds
@@ -267,8 +267,8 @@ async fn execute_deploy_inner(
                 // Disable auth
                 parsed_variables.insert("auth_enabled".to_string(), "false".to_string());
             }
-            "private" => {
-                // Enable auth
+            "private" | "org" => {
+                // Enable auth for both private and org modes
                 parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
 
                 // If jwt_issuer is provided, treat as custom auth
@@ -276,8 +276,8 @@ async fn execute_deploy_inner(
                     // Custom auth mode with custom issuer
                     parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
                     parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
-                } else if access_control == "private" {
-                    // For private mode without custom OAuth, use FTL's AuthKit
+                } else {
+                    // For private/org mode without custom OAuth, use FTL's AuthKit
                     // Check if we need to override issuer for tenant-scoped AuthKit
                     if !parsed_variables.contains_key("mcp_jwt_issuer") {
                         parsed_variables.insert(
@@ -289,6 +289,22 @@ async fn execute_deploy_inner(
                         parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
                     }
                 }
+            }
+            "custom" => {
+                // Custom auth mode requires OAuth configuration
+                parsed_variables.insert("auth_enabled".to_string(), "true".to_string());
+
+                // jwt_issuer must be provided either via CLI or ftl.toml
+                if args.jwt_issuer.is_none() && !parsed_variables.contains_key("mcp_jwt_issuer") {
+                    return Err(anyhow!(
+                        "Custom auth mode requires OAuth configuration. Either provide --jwt-issuer or configure [oauth] in ftl.toml"
+                    ));
+                }
+
+                if let Some(issuer) = &args.jwt_issuer {
+                    parsed_variables.insert("mcp_jwt_issuer".to_string(), issuer.clone());
+                }
+                parsed_variables.insert("mcp_provider_type".to_string(), "jwt".to_string());
             }
             _ => {
                 // Invalid value will be caught later in resolve_auth_config
@@ -312,6 +328,9 @@ async fn execute_deploy_inner(
         return Ok(());
     }
 
+    // Resolve auth configuration early to display in confirmation
+    let auth_config = resolve_auth_config(&deps.file_system, &args)?;
+
     // Check if engine exists and show confirmation before proceeding
     if !args.yes && !args.dry_run {
         spinner.finish_and_clear();
@@ -321,8 +340,10 @@ async fn execute_deploy_inner(
         check_spinner.set_message("Checking engine status...");
         check_spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
-        let existing_apps = deps
-            .api_client
+        // Create API client with fresh credentials
+        let api_client_check = deps.api_client_factory.create_api_client().await?;
+
+        let existing_apps = api_client_check
             .list_apps(None, None, Some(&config.app_name))
             .await
             .map_err(|e| anyhow!("Failed to check existing apps: {}", e))?;
@@ -339,6 +360,54 @@ async fn execute_deploy_inner(
         deps.ui.print(&format!("Components: {component_count}"));
         let profile = if use_release { "release" } else { "debug" };
         deps.ui.print(&format!("Build Profile: {profile}"));
+
+        // Display access control configuration
+        if let Some((mode, _, _, _)) = &auth_config {
+            deps.ui.print(&format!("Access Control: {mode}"));
+
+            // Show org info if using org access control
+            if mode == "org" {
+                // First check if user has a saved org preference
+                let saved_org = crate::config::UserConfig::load()
+                    .ok()
+                    .and_then(|c| c.selected_org);
+
+                if let Some(org_selection) = saved_org {
+                    deps.ui.print(&format!(
+                        "  Organization: {} ({})",
+                        org_selection.name, org_selection.id
+                    ));
+                } else {
+                    // No saved preference, fetch user's organizations to display which one will be used
+                    // Create API client with fresh credentials
+                    let org_api_client = deps.api_client_factory.create_api_client().await?;
+
+                    match org_api_client.get_user_orgs().await {
+                        Ok(orgs_response) => {
+                            if orgs_response.organizations.is_empty() {
+                                deps.ui.print("  Organization: No organizations found");
+                                deps.ui.print_styled(
+                                    "  ⚠ You must be a member of an organization to use org access control",
+                                    MessageStyle::Warning,
+                                );
+                            } else {
+                                // Display the first org (which the backend will use by default)
+                                let org = &orgs_response.organizations[0];
+                                deps.ui
+                                    .print(&format!("  Organization: {} ({})", org.name, org.id));
+                            }
+                        }
+                        Err(_) => {
+                            // Don't fail deployment just because we couldn't fetch org info for display
+                            deps.ui
+                                .print("  Organization: (will use your org membership)");
+                        }
+                    }
+                }
+            }
+        } else {
+            deps.ui.print("Access Control: public (default)");
+        }
 
         if existing_apps.apps.is_empty() {
             deps.ui.print("");
@@ -382,22 +451,13 @@ async fn execute_deploy_inner(
     let spinner = deps.ui.create_spinner();
     spinner.enable_steady_tick(deps.clock.duration_from_millis(100));
 
-    // Get ECR credentials
-    spinner.set_message("Getting registry credentials...");
-    let ecr_creds = deps
-        .api_client
-        .create_ecr_token()
-        .await
-        .map_err(|e| anyhow!("Failed to get ECR token: {}", e))?;
-
-    // Docker login to ECR
-    spinner.set_message("Logging into registry...");
-    docker_login(&deps.command_executor, &ecr_creds).await?;
-
-    // Get or create the app first
+    // Get or create the app first (we need the app_id for ECR token)
     spinner.set_message("Checking if engine exists...");
-    let existing_apps = deps
-        .api_client
+
+    // Create API client with fresh credentials
+    let api_client = deps.api_client_factory.create_api_client().await?;
+
+    let existing_apps = api_client
         .list_apps(None, None, Some(&config.app_name))
         .await
         .map_err(|e| anyhow!("Failed to check existing apps: {}", e))?;
@@ -405,16 +465,34 @@ async fn execute_deploy_inner(
     let app_id = if existing_apps.apps.is_empty() {
         // Engine doesn't exist, create it first
         spinner.set_message("Creating engine...");
+
+        // Determine access control from CLI flag or infer from oauth presence
+        let access_control_mode = if let Some(mode) = &args.access_control {
+            mode.as_str()
+        } else if ftl_config.oauth.is_some() {
+            "custom"
+        } else {
+            "public"
+        };
+
+        // Map access control to API enum
+        let access_control = match access_control_mode {
+            "private" => types::CreateAppRequestAccessControl::Private,
+            "org" => types::CreateAppRequestAccessControl::Org,
+            "custom" => types::CreateAppRequestAccessControl::Custom,
+            _ => types::CreateAppRequestAccessControl::Public, // Default to public for "public" and any other value
+        };
+
         let create_app_request = types::CreateAppRequest {
             app_name: config
                 .app_name
                 .as_str()
                 .try_into()
                 .map_err(|e| anyhow!("Invalid app name: {}", e))?,
+            access_control,
         };
 
-        let create_response = deps
-            .api_client
+        let create_response = api_client
             .create_app(&create_app_request)
             .await
             .map_err(|e| anyhow!("Failed to create engine: {}", e))?;
@@ -425,6 +503,17 @@ async fn execute_deploy_inner(
         existing_apps.apps[0].app_id
     };
 
+    // Get ECR credentials now that we have the app_id
+    spinner.set_message("Getting registry credentials...");
+    let ecr_creds = api_client
+        .create_ecr_token(&app_id.to_string())
+        .await
+        .map_err(|e| anyhow!("Failed to get ECR token: {}", e))?;
+
+    // Docker login to ECR
+    spinner.set_message("Logging into registry...");
+    docker_login(&deps.command_executor, &ecr_creds).await?;
+
     // Ensure components exist and push to ECR
     spinner.finish_and_clear();
     let deployed_components = ensure_components_and_push(
@@ -432,34 +521,9 @@ async fn execute_deploy_inner(
         &config.components,
         deploy_names.clone(),
         deps.clone(),
+        api_client.as_ref(),
     )
     .await?;
-
-    // Update auth configuration BEFORE deployment
-    // This follows the hierarchy: CLI flags > env vars > ftl.toml
-    let auth_config = resolve_auth_config(&deps.file_system, &args)?;
-    if let Some((mode, provider, issuer, audience)) = auth_config {
-        deps.ui.print("");
-        deps.ui.print_styled(
-            "→ Configuring MCP authorization settings...",
-            MessageStyle::Cyan,
-        );
-
-        update_auth_config(
-            deps.clone(),
-            &app_id.to_string(),
-            &mode,
-            provider.as_ref(),
-            issuer.as_ref(),
-            audience.as_ref(),
-        )
-        .await?;
-
-        deps.ui.print_styled(
-            &format!("✓ MCP authorization set to: {mode}"),
-            MessageStyle::Warning,
-        );
-    }
 
     // Deploy to FTL
     deps.ui.print("");
@@ -519,12 +583,17 @@ async fn execute_deploy_inner(
         }
     };
 
+    // Create API client with fresh credentials for deployment
+    let api_client = deps.api_client_factory.create_api_client().await?;
+
     let deployment = deploy_to_ftl_with_progress(
         deps.clone(),
         app_id.to_string(),
         deployed_components,
         parsed_variables,
+        auth_config,
         spinner,
+        api_client.as_ref(),
     )
     .await?;
 
@@ -713,74 +782,6 @@ fn display_dry_run_summary(
     deps.ui.print("");
     deps.ui
         .print("To perform the actual deployment, run the command without --dry-run");
-}
-
-/// Update authorization configuration for a deployed app
-async fn update_auth_config(
-    deps: Arc<DeployDependencies>,
-    app_id: &str,
-    access_control_mode: &str,
-    auth_provider: Option<&String>,
-    auth_issuer: Option<&String>,
-    auth_audience: Option<&String>,
-) -> Result<()> {
-    use types::UpdateAuthConfigRequestAccessControl;
-
-    let access_control = match access_control_mode {
-        "public" => UpdateAuthConfigRequestAccessControl::Public,
-        "private" => UpdateAuthConfigRequestAccessControl::Private,
-        "custom" => UpdateAuthConfigRequestAccessControl::Custom,
-        _ => {
-            return Err(anyhow!(
-                "Invalid access control mode: {}. Must be one of: public, private, custom",
-                access_control_mode
-            ));
-        }
-    };
-
-    let mut custom_config = None;
-
-    // Handle different access control modes
-    match access_control_mode {
-        "public" | "private" => {
-            // No additional config needed
-        }
-        "custom" => {
-            // Custom mode is only reached when we have OAuth config or --jwt-issuer
-            // The issuer should always be present at this point
-            if auth_issuer.is_none() {
-                return Err(anyhow!("Internal error: custom auth mode without issuer"));
-            }
-
-            custom_config = Some(types::UpdateAuthConfigRequestCustomConfig {
-                provider: auth_provider
-                    .cloned()
-                    .unwrap_or_else(|| "jwt".to_string())
-                    .try_into()
-                    .map_err(|_| anyhow!("Invalid provider name"))?,
-                issuer: auth_issuer
-                    .unwrap()
-                    .clone()
-                    .try_into()
-                    .map_err(|_| anyhow!("Invalid issuer URL"))?,
-                audience: auth_audience.cloned(),
-                jwks_uri: None,
-            });
-        }
-        _ => unreachable!(), // Already handled above
-    }
-
-    let request = types::UpdateAuthConfigRequest {
-        access_control,
-        custom_config,
-    };
-
-    deps.api_client
-        .update_auth_config(app_id, &request)
-        .await
-        .map_err(|e| anyhow!("Failed to update auth config: {}", e))?;
-
-    Ok(())
 }
 
 /// Add auth-related variables from parsed `FtlConfig` to the variables map
@@ -1077,6 +1078,7 @@ async fn ensure_components_and_push(
     components: &[ComponentInfo],
     deploy_names: HashMap<String, String>,
     deps: Arc<DeployDependencies>,
+    api_client: &dyn FtlApiClient,
 ) -> Result<Vec<types::CreateDeploymentRequestComponentsItem>> {
     // Check if wkg is available before starting
     deps.command_executor
@@ -1112,8 +1114,7 @@ async fn ensure_components_and_push(
     };
 
     // Update all components in one atomic operation
-    let update_response = deps
-        .api_client
+    let update_response = api_client
         .update_components(app_id, &update_request)
         .await
         .map_err(|e| anyhow!("Failed to update components: {}", e))?;
@@ -1183,7 +1184,10 @@ async fn ensure_components_and_push(
 
         tasks.spawn(async move {
             // Acquire permit to limit concurrency
-            let _permit = semaphore.acquire().await.unwrap();
+            let _permit = semaphore
+                .acquire()
+                .await
+                .map_err(|e| anyhow!("Failed to acquire semaphore permit: {}", e))?;
 
             // Check if another task has already failed
             if error_flag.lock().await.is_some() {
@@ -1267,7 +1271,9 @@ async fn ensure_components_and_push(
         return Err(e);
     }
 
-    let components = Arc::try_unwrap(deployed_components).unwrap().into_inner();
+    let components = Arc::try_unwrap(deployed_components)
+        .map_err(|_| anyhow!("Failed to unwrap deployed components Arc"))?
+        .into_inner();
 
     deps.ui.print("");
     deps.ui.print_styled(
@@ -1292,7 +1298,10 @@ async fn poll_app_deployment_status_with_progress(
             return Err(anyhow!("Engine deployment timeout after 5 minutes"));
         }
 
-        let app = match deps.api_client.get_app(app_id).await {
+        // Create a fresh API client with potentially refreshed credentials
+        let api_client = deps.api_client_factory.create_api_client().await?;
+
+        let app = match api_client.get_app(app_id).await {
             Ok(app) => app,
             Err(e) => {
                 spinner.finish_and_clear();
@@ -1346,19 +1355,70 @@ async fn deploy_to_ftl_with_progress(
     app_id: String,
     components: Vec<types::CreateDeploymentRequestComponentsItem>,
     variables: HashMap<String, String>,
+    auth_config: Option<ResolvedAuthConfig>,
     spinner: Box<dyn ftl_runtime::deps::ProgressIndicator>,
+    api_client: &dyn FtlApiClient,
 ) -> Result<types::App> {
     // Create the deployment
     spinner.set_message("Creating engine deployment...");
 
-    // Use new API format with components
+    // Build access control and custom auth config if provided
+    let (access_control, custom_auth_config) =
+        if let Some((mode, provider, issuer, audience)) = auth_config {
+            let access_control = match mode.as_str() {
+                "public" => Some(types::CreateDeploymentRequestAccessControl::Public),
+                "private" => Some(types::CreateDeploymentRequestAccessControl::Private),
+                "org" => Some(types::CreateDeploymentRequestAccessControl::Org),
+                "custom" => Some(types::CreateDeploymentRequestAccessControl::Custom),
+                _ => None,
+            };
+
+            let custom_auth_config = if mode == "custom" {
+                Some(types::CreateDeploymentRequestCustomAuthConfig {
+                    provider: provider
+                        .unwrap_or_else(|| "jwt".to_string())
+                        .try_into()
+                        .map_err(|_| anyhow!("Invalid provider name"))?,
+                    issuer: issuer
+                        .ok_or_else(|| anyhow!("Issuer is required for custom auth"))?
+                        .try_into()
+                        .map_err(|_| anyhow!("Invalid issuer"))?,
+                    audience: audience
+                        .ok_or_else(|| anyhow!("Audience is required for custom auth"))?
+                        .try_into()
+                        .map_err(|_| anyhow!("Invalid audience"))?,
+                    jwks_uri: None,
+                    public_key: None,
+                    algorithm: None,
+                    required_scopes: None,
+                    authorize_endpoint: None,
+                    token_endpoint: None,
+                    userinfo_endpoint: None,
+                    allowed_subjects: None,
+                    allowed_issuers: None,
+                    required_claims: None,
+                    auth_required_scopes: None,
+                    forward_claims: None,
+                })
+            } else {
+                None
+            };
+
+            (access_control, custom_auth_config)
+        } else {
+            (None, None)
+        };
+
+    // Use new API format with components and optional auth config
     let deployment_request = types::CreateDeploymentRequest {
         components,
         variables,
+        access_control,
+        custom_auth_config,
+        subs: vec![], // Email list for org mode - not supported via CLI yet
     };
 
-    let deployment_response = deps
-        .api_client
+    let deployment_response = api_client
         .create_deployment(&app_id.to_string(), &deployment_request)
         .await
         .map_err(|e| {
@@ -1385,6 +1445,8 @@ pub struct DeployArgs {
     pub access_control: Option<String>,
     /// JWT issuer URL
     pub jwt_issuer: Option<String>,
+    /// JWT audience
+    pub jwt_audience: Option<String>,
     /// Run without making any changes (preview what would be deployed)
     pub dry_run: bool,
     /// Skip confirmation prompt
@@ -1412,16 +1474,11 @@ fn resolve_auth_config(
         let content = file_system.read_to_string(Path::new("ftl.toml"))?;
         let config = FtlConfig::parse(&content)?;
 
-        // Determine auth mode based on configuration
-        if config.project.access_control == "public" {
+        // Determine auth mode based on oauth presence (will be overridden by CLI flags)
+        if config.oauth.is_some() {
+            auth_mode = Some("custom".to_string());
+        } else {
             auth_mode = Some("public".to_string());
-        } else if config.project.access_control == "private" {
-            // Check if we have custom OAuth config
-            if config.oauth.is_some() {
-                auth_mode = Some("custom".to_string());
-            } else {
-                auth_mode = Some("private".to_string());
-            }
         }
 
         // Extract provider details only when auth is enabled
@@ -1454,7 +1511,7 @@ fn resolve_auth_config(
     if let Ok(issuer) = std::env::var("FTL_JWT_ISSUER") {
         auth_issuer = Some(issuer);
     }
-    if let Ok(audience) = std::env::var("FTL_AUTH_AUDIENCE") {
+    if let Ok(audience) = std::env::var("FTL_JWT_AUDIENCE") {
         auth_audience = Some(audience);
     }
 
@@ -1468,6 +1525,11 @@ fn resolve_auth_config(
         auth_provider = Some("jwt".to_string());
     }
 
+    // Override audience if provided via CLI
+    if let Some(audience) = &args.jwt_audience {
+        auth_audience = Some(audience.clone());
+    }
+
     // Set access control mode if provided and no custom issuer override
     if let Some(mode) = &args.access_control
         && args.jwt_issuer.is_none()
@@ -1477,7 +1539,18 @@ fn resolve_auth_config(
 
     // Return None if no auth mode is configured
     match auth_mode {
-        Some(mode) => Ok(Some((mode, auth_provider, auth_issuer, auth_audience))),
+        Some(mode) => {
+            // Validate the access control mode
+            match mode.as_str() {
+                "public" | "private" | "org" | "custom" => {
+                    Ok(Some((mode, auth_provider, auth_issuer, auth_audience)))
+                }
+                _ => Err(anyhow!(
+                    "Invalid access control mode: '{}'. Must be one of: public, private, org, custom",
+                    mode
+                )),
+            }
+        }
         None => Ok(None),
     }
 }
@@ -1505,24 +1578,20 @@ impl BuildExecutor for BuildExecutorImpl {
 pub async fn execute(args: DeployArgs) -> Result<()> {
     use ftl_common::RealUserInterface;
     use ftl_runtime::deps::{
-        RealAsyncRuntime, RealClock, RealCommandExecutor, RealCredentialsProvider, RealFileSystem,
-        RealFtlApiClient,
+        RealApiClientFactory, RealAsyncRuntime, RealClock, RealCommandExecutor,
+        RealCredentialsProvider, RealFileSystem,
     };
 
-    // Get credentials first to create authenticated API client
-    let credentials_provider = Arc::new(RealCredentialsProvider);
-    let credentials = credentials_provider.get_or_refresh_credentials().await?;
-
     let ui = Arc::new(RealUserInterface);
+    let credentials_provider = Arc::new(RealCredentialsProvider);
+    let api_client_factory = Arc::new(RealApiClientFactory::new(credentials_provider.clone()));
+
     let deps = Arc::new(DeployDependencies {
         file_system: Arc::new(RealFileSystem),
         command_executor: Arc::new(RealCommandExecutor),
-        api_client: Arc::new(RealFtlApiClient::new_with_auth(
-            ftl_runtime::api_client::Client::new(ftl_runtime::config::DEFAULT_API_BASE_URL),
-            credentials.access_token.clone(),
-        )),
-        clock: Arc::new(RealClock),
         credentials_provider,
+        api_client_factory,
+        clock: Arc::new(RealClock),
         ui: ui.clone(),
         build_executor: Arc::new(BuildExecutorImpl),
         async_runtime: Arc::new(RealAsyncRuntime),

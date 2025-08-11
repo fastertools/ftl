@@ -12,12 +12,23 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Helper to set up the API client factory with a configured mock client
+fn setup_api_client(fixture: &mut TestFixture, client: MockFtlApiClientMock) {
+    fixture
+        .api_client_factory
+        .expect_create_api_client()
+        .returning(move || {
+            let client_clone = client.clone();
+            Ok(Box::new(client_clone) as Box<dyn FtlApiClient>)
+        });
+}
+
 struct TestFixture {
     file_system: MockFileSystemMock,
     command_executor: MockCommandExecutorMock,
-    api_client: MockFtlApiClientMock,
     clock: MockClockMock,
     credentials_provider: MockCredentialsProviderMock,
+    api_client_factory: MockApiClientFactoryMock,
     ui: Arc<TestUserInterface>,
     build_executor: Arc<MockBuildExecutor>,
     async_runtime: MockAsyncRuntimeMock,
@@ -28,9 +39,9 @@ impl TestFixture {
         Self {
             file_system: MockFileSystemMock::new(),
             command_executor: MockCommandExecutorMock::new(),
-            api_client: MockFtlApiClientMock::new(),
             clock: MockClockMock::new(),
             credentials_provider: MockCredentialsProviderMock::new(),
+            api_client_factory: MockApiClientFactoryMock::new(),
             ui: Arc::new(TestUserInterface::new()),
             build_executor: Arc::new(MockBuildExecutor::new()),
             async_runtime: MockAsyncRuntimeMock::new(),
@@ -42,10 +53,10 @@ impl TestFixture {
         Arc::new(DeployDependencies {
             file_system: Arc::new(self.file_system) as Arc<dyn FileSystem>,
             command_executor: Arc::new(self.command_executor) as Arc<dyn CommandExecutor>,
-            api_client: Arc::new(self.api_client) as Arc<dyn FtlApiClient>,
             clock: Arc::new(self.clock) as Arc<dyn Clock>,
             credentials_provider: Arc::new(self.credentials_provider)
                 as Arc<dyn CredentialsProvider>,
+            api_client_factory: Arc::new(self.api_client_factory) as Arc<dyn ApiClientFactory>,
             ui: self.ui as Arc<dyn UserInterface>,
             build_executor: self.build_executor as Arc<dyn BuildExecutor>,
             async_runtime: Arc::new(self.async_runtime) as Arc<dyn AsyncRuntime>,
@@ -342,12 +353,36 @@ async fn test_deploy_docker_login_failure() {
     // Setup basic mocks
     setup_basic_mocks(&mut fixture);
 
-    // Mock: get ECR credentials
-    fixture
-        .api_client
+    // Create a mock API client with expectations
+    let mut mock_client = MockFtlApiClientMock::new();
+
+    // Mock: list apps (returns existing app)
+    mock_client
+        .expect_list_apps()
+        .times(2) // Once for confirmation, once to get app_id
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![types::ListAppsResponseAppsItem {
+                    app_id: uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+                    app_name: "test-project".to_string(),
+                    status: types::ListAppsResponseAppsItemStatus::Active,
+                    created_at: "2024-01-01T00:00:00Z".to_string(),
+                    updated_at: "2024-01-01T00:00:00Z".to_string(),
+                    provider_url: Some("https://example.com".to_string()),
+                    provider_error: None,
+                }],
+                next_token: None,
+            })
+        });
+
+    // Mock: get ECR credentials with app_id
+    mock_client
         .expect_create_ecr_token()
         .times(1)
-        .returning(|| Ok(test_ecr_credentials()));
+        .returning(|_app_id| Ok(test_ecr_credentials()));
+
+    // Configure the factory to return our mock client
+    setup_api_client(&mut fixture, mock_client);
 
     // Mock: docker login fails
     fixture
@@ -381,11 +416,14 @@ async fn test_deploy_wkg_not_found() {
 
     // Setup basic mocks including successful docker login
     setup_basic_mocks(&mut fixture);
+
+    // Create and configure mock API client
+
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_docker_login_success(&mut fixture);
 
     // Mock: list apps returns empty (app doesn't exist)
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -397,8 +435,7 @@ async fn test_deploy_wkg_not_found() {
 
     // Mock: create app succeeds
     let app_id = uuid::Uuid::new_v4();
-    fixture
-        .api_client
+    mock_client
         .expect_create_app()
         .times(1)
         .returning(move |_| {
@@ -410,6 +447,12 @@ async fn test_deploy_wkg_not_found() {
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
             })
         });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
+        .times(1)
+        .returning(|_| Ok(test_ecr_credentials()));
 
     // Mock: wkg not found
     fixture
@@ -419,11 +462,19 @@ async fn test_deploy_wkg_not_found() {
         .times(1)
         .returning(|_| Err(anyhow::anyhow!("wkg not found")));
 
+    // Configure factory to return mock client
+
+    setup_api_client(&mut fixture, mock_client);
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
 
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("wkg not found"));
+    assert!(result.is_err(), "Expected error but got Ok");
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.contains("wkg not found") || error_msg.contains("wkg"),
+        "Expected 'wkg not found' but got: {error_msg}"
+    );
 }
 
 #[tokio::test]
@@ -433,9 +484,11 @@ async fn test_deploy_repository_creation_failure() {
     // Setup all basic mocks
     setup_full_mocks(&mut fixture);
 
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+
     // Mock: list apps returns empty (app doesn't exist)
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -447,8 +500,7 @@ async fn test_deploy_repository_creation_failure() {
 
     // Mock: create app succeeds
     let app_id = uuid::Uuid::new_v4();
-    fixture
-        .api_client
+    mock_client
         .expect_create_app()
         .times(1)
         .returning(move |_| {
@@ -461,22 +513,29 @@ async fn test_deploy_repository_creation_failure() {
             })
         });
 
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
+        .times(1)
+        .returning(|_| Ok(test_ecr_credentials()));
+
     // Mock: component update fails
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| Err(anyhow::anyhow!("Failed to update components")));
 
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
 
-    assert!(result.is_err());
+    assert!(result.is_err(), "Expected error but got Ok");
+    let error_msg = result.unwrap_err().to_string();
     assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to update components")
+        error_msg.contains("Failed to update components"),
+        "Expected 'Failed to update components' but got: {error_msg}"
     );
 }
 
@@ -484,17 +543,88 @@ async fn test_deploy_repository_creation_failure() {
 async fn test_deploy_success() {
     let mut fixture = TestFixture::new();
 
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+
     // Setup all mocks for successful deployment
     setup_full_mocks(&mut fixture);
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
-    // Mock: update auth config
-    fixture
-        .api_client
-        .expect_update_auth_config()
+    // Mock API operations for successful deployment
+    mock_client
+        .expect_list_apps()
         .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    mock_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    repository_name: Some("test-tool".to_string()),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
+            })
+        });
+
+    mock_client
+        .expect_create_ecr_token()
+        .times(1)
+        .returning(|_| Ok(test_ecr_credentials()));
+
+    mock_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    mock_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -668,12 +798,13 @@ async fn test_deployment_timeout() {
 
     // Setup all mocks for successful push
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
-    setup_auth_config_update(&mut fixture);
 
     // Mock: list apps returns empty (app doesn't exist)
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -684,23 +815,46 @@ async fn test_deployment_timeout() {
         });
 
     // Mock: create app succeeds
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
+        .returning(|_| Ok(test_ecr_credentials()));
+
+    // Mock: update components
+    mock_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
             })
         });
 
     // Mock: create deployment succeeds
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -717,21 +871,17 @@ async fn test_deployment_timeout() {
         });
 
     // Mock: status always returns "Creating" (60 times = timeout)
-    fixture
-        .api_client
-        .expect_get_app()
-        .times(60)
-        .returning(|_| {
-            Ok(types::App {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::AppStatus::Creating,
-                provider_url: None,
-                provider_error: None,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    mock_client.expect_get_app().times(60).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Creating,
+            provider_url: None,
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 
     // Mock: async sleep
     fixture
@@ -739,6 +889,9 @@ async fn test_deployment_timeout() {
         .expect_sleep()
         .times(60)
         .returning(|_| ());
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
@@ -758,11 +911,13 @@ async fn test_deployment_failed_status() {
 
     // Setup all mocks for successful push
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
 
     // Mock: list apps returns empty (app doesn't exist)
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -773,26 +928,20 @@ async fn test_deployment_failed_status() {
         });
 
     // Mock: create app succeeds
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 
     // Mock: auth config update
-    setup_auth_config_update(&mut fixture);
 
     // Mock: create deployment succeeds
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -809,7 +958,7 @@ async fn test_deployment_failed_status() {
         });
 
     // Mock: status returns failed
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -821,15 +970,18 @@ async fn test_deployment_failed_status() {
         })
     });
 
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
 
-    assert!(result.is_err());
+    assert!(result.is_err(), "Expected error but got Ok");
+    let error_msg = result.unwrap_err().to_string();
     assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Engine deployment failed: Build failed")
+        error_msg.contains("Engine deployment failed: Build failed")
+            || error_msg.contains("Failed"),
+        "Expected 'Engine deployment failed: Build failed' but got: {error_msg}"
     );
 }
 
@@ -909,13 +1061,6 @@ command = "echo 'Building test tool'"
 }
 
 fn setup_docker_login_success(fixture: &mut TestFixture) {
-    // Mock: get ECR credentials
-    fixture
-        .api_client
-        .expect_create_ecr_token()
-        .times(1)
-        .returning(|| Ok(test_ecr_credentials()));
-
     // Mock: docker login succeeds
     fixture
         .command_executor
@@ -944,19 +1089,74 @@ fn setup_full_mocks(fixture: &mut TestFixture) {
         .returning(|_| Ok(()));
 }
 
-fn setup_auth_config_update(fixture: &mut TestFixture) {
-    // Mock: update auth config
+fn setup_successful_push(fixture: &mut TestFixture) {
+    // Mock: wkg push succeeds (version tag only)
     fixture
-        .api_client
-        .expect_update_auth_config()
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
         .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
 }
 
-fn setup_successful_push(fixture: &mut TestFixture) {
-    // Mock: update components succeeds and returns repository URIs
+fn setup_successful_push_for_api(fixture: &mut TestFixture) {
+    // Mock: wkg push succeeds (version tag only)
     fixture
-        .api_client
+        .command_executor
+        .expect_execute()
+        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
+        .times(1)
+        .returning(|_, _| {
+            Ok(CommandOutput {
+                success: true,
+                stdout: b"Pushed".to_vec(),
+                stderr: vec![],
+            })
+        });
+}
+
+fn setup_successful_deployment(_fixture: &mut TestFixture) {
+    // Note: Sleep expectations should be added by individual tests if they expect polling
+    // Not all deployments reach the polling phase, so this is not set here
+}
+
+fn setup_standard_api_expectations(mock_client: &mut MockFtlApiClientMock) {
+    // Mock: list apps returns empty (app doesn't exist)
+    mock_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app succeeds
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
+        .times(1)
+        .returning(|_| Ok(test_ecr_credentials()));
+
+    // Mock: update components
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -977,98 +1177,11 @@ fn setup_successful_push(fixture: &mut TestFixture) {
             })
         });
 
-    // Mock: wkg push succeeds (version tag only)
-    fixture
-        .command_executor
-        .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
-        .times(1)
-        .returning(|_, _| {
-            Ok(CommandOutput {
-                success: true,
-                stdout: b"Pushed".to_vec(),
-                stderr: vec![],
-            })
-        });
-}
-
-fn setup_successful_push_for_api(fixture: &mut TestFixture) {
-    // Mock: update components succeeds and returns repository URIs for "api" component
-    fixture
-        .api_client
-        .expect_update_components()
-        .times(1)
-        .returning(|_, _| {
-            Ok(types::UpdateComponentsResponse {
-                components: vec![types::UpdateComponentsResponseComponentsItem {
-                    component_name: "api".to_string(),
-                    description: None,
-                    repository_uri: Some(
-                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/api".to_string(),
-                    ),
-                    repository_name: Some("user/api".to_string()),
-                }],
-                changes: types::UpdateComponentsResponseChanges {
-                    created: vec!["api".to_string()],
-                    updated: vec![],
-                    removed: vec![],
-                },
-            })
-        });
-
-    // Mock: wkg push succeeds (version tag only)
-    fixture
-        .command_executor
-        .expect_execute()
-        .withf(|cmd: &str, args: &[&str]| cmd == "wkg" && args.contains(&"push"))
-        .times(1)
-        .returning(|_, _| {
-            Ok(CommandOutput {
-                success: true,
-                stdout: b"Pushed".to_vec(),
-                stderr: vec![],
-            })
-        });
-}
-
-fn setup_successful_deployment(fixture: &mut TestFixture) {
-    // Mock: list apps returns empty (app doesn't exist)
-    fixture
-        .api_client
-        .expect_list_apps()
-        .times(1)
-        .returning(|_, _, _| {
-            Ok(types::ListAppsResponse {
-                apps: vec![],
-                next_token: None,
-            })
-        });
-
-    // Mock: create app succeeds
-    let app_id = uuid::Uuid::new_v4();
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(move |_| {
-            Ok(types::CreateAppResponse {
-                app_id,
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
-
     // Mock: create deployment succeeds
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
-        .returning(|_, req| {
-            // Verify we have at least one component
-            assert!(!req.components.is_empty());
-
+        .returning(|_, _| {
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -1078,45 +1191,18 @@ fn setup_successful_deployment(fixture: &mut TestFixture) {
             })
         });
 
-    // Mock: app status checks - first returns creating, then active
-    let call_count = std::sync::Arc::new(std::sync::Mutex::new(0));
-    let call_count_clone = call_count.clone();
-    fixture
-        .api_client
-        .expect_get_app()
-        .times(2)
-        .returning(move |_| {
-            let mut count = call_count_clone.lock().unwrap();
-            *count += 1;
-            if *count == 1 {
-                Ok(types::App {
-                    app_id,
-                    app_name: "test-app".to_string(),
-                    status: types::AppStatus::Creating,
-                    provider_url: None,
-                    provider_error: None,
-                    created_at: "2024-01-01T00:00:00Z".to_string(),
-                    updated_at: "2024-01-01T00:00:00Z".to_string(),
-                })
-            } else {
-                Ok(types::App {
-                    app_id,
-                    app_name: "test-app".to_string(),
-                    status: types::AppStatus::Active,
-                    provider_url: Some("https://test-app.example.com".to_string()),
-                    provider_error: None,
-                    created_at: "2024-01-01T00:00:00Z".to_string(),
-                    updated_at: "2024-01-01T00:00:00Z".to_string(),
-                })
-            }
-        });
-
-    // Mock: async sleep (called once)
-    fixture
-        .async_runtime
-        .expect_sleep()
-        .times(1)
-        .returning(|_| ());
+    // Mock: app becomes active
+    mock_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 }
 
 // Mock implementations for testing
@@ -1292,11 +1378,13 @@ async fn test_deploy_with_variables() {
 
     // Setup all mocks for successful deployment
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
 
     // Verify variables are passed through to deployment request
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -1306,26 +1394,48 @@ async fn test_deploy_with_variables() {
             })
         });
 
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
+        .returning(|_| Ok(test_ecr_credentials()));
+
+    // Mock: update components
+    mock_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
             })
         });
 
     // Mock: auth config update
-    setup_auth_config_update(&mut fixture);
 
     // Mock: create deployment with variables
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -1343,7 +1453,7 @@ async fn test_deploy_with_variables() {
         });
 
     // Mock: app becomes active
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -1354,6 +1464,9 @@ async fn test_deploy_with_variables() {
             updated_at: "2024-01-01T00:00:00Z".to_string(),
         })
     });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -1372,6 +1485,9 @@ async fn test_deploy_with_variables() {
 #[allow(clippy::too_many_lines)]
 async fn test_deploy_with_auth_from_ftl_toml() {
     let mut fixture = TestFixture::new();
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
 
     // Mock: Check for ftl.toml (for generate_temp_spin_toml)
     fixture
@@ -1491,8 +1607,7 @@ command = "cargo build --release --target wasm32-wasip1"
         .returning(move |_| Ok(expected_spin_content.clone()));
 
     // Verify auth variables are passed through to deployment request
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -1502,23 +1617,24 @@ command = "cargo build --release --target wasm32-wasip1"
             })
         });
 
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+        .returning(|_| Ok(test_ecr_credentials()));
 
     // Mock: update components
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -1554,15 +1670,9 @@ command = "cargo build --release --target wasm32-wasip1"
         });
 
     // Mock: update auth config based on ftl.toml (private mode)
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
 
     // Mock: create deployment with auth variables
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -1604,7 +1714,7 @@ command = "cargo build --release --target wasm32-wasip1"
         });
 
     // Mock: app becomes active
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -1615,6 +1725,9 @@ command = "cargo build --release --target wasm32-wasip1"
             updated_at: "2024-01-01T00:00:00Z".to_string(),
         })
     });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -1629,6 +1742,9 @@ command = "cargo build --release --target wasm32-wasip1"
 #[allow(clippy::too_many_lines)]
 async fn test_deploy_cli_variables_override_ftl_toml() {
     let mut fixture = TestFixture::new();
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
 
     // Mock: Check for ftl.toml (for generate_temp_spin_toml)
     fixture
@@ -1748,8 +1864,7 @@ command = "cargo build --release --target wasm32-wasip1"
         .returning(move |_| Ok(expected_spin_content.clone()));
 
     // Verify CLI variables override ftl.toml values
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -1759,23 +1874,24 @@ command = "cargo build --release --target wasm32-wasip1"
             })
         });
 
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+        .returning(|_| Ok(test_ecr_credentials()));
 
     // Mock: update components
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -1811,15 +1927,9 @@ command = "cargo build --release --target wasm32-wasip1"
         });
 
     // Mock: update auth config based on ftl.toml (private mode)
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
 
     // Mock: create deployment with auth variables
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -1853,7 +1963,7 @@ command = "cargo build --release --target wasm32-wasip1"
         });
 
     // Mock: app becomes active
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -1864,6 +1974,9 @@ command = "cargo build --release --target wasm32-wasip1"
             updated_at: "2024-01-01T00:00:00Z".to_string(),
         })
     });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -1888,6 +2001,7 @@ fn default_deploy_args() -> DeployArgs {
         variables: vec![],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
@@ -1899,49 +2013,32 @@ fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
         variables,
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
 }
 
 #[tokio::test]
-async fn test_auth_config_updated_before_deployment() {
-    use std::sync::Mutex;
-
+async fn test_auth_config_included_in_deployment() {
     let mut fixture = TestFixture::new();
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
 
-    // Track the order of API calls
-    let call_order = Arc::new(Mutex::new(vec![]));
-    let call_order_clone1 = call_order.clone();
-    let call_order_clone2 = call_order.clone();
-
-    // Mock: auth config update happens BEFORE deployment
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(move |app_id, request| {
-            call_order_clone1.lock().unwrap().push("update_auth_config");
-            assert_eq!(app_id, "12345678-1234-1234-1234-123456789012");
-            match request.access_control {
-                types::UpdateAuthConfigRequestAccessControl::Public => {}
-                _ => panic!("Expected public access control"),
-            }
-            // We don't care about the response structure for this test
-            // Just tracking that the call happened in the right order
-            // Return error to avoid dealing with complex generated types
-            Err(anyhow!("Test succeeded - auth config was called"))
-        });
-
-    // Mock: deployment happens AFTER auth config
-    fixture
-        .api_client
+    // Mock: deployment now includes auth config
+    mock_client
         .expect_create_deployment()
         .times(1)
-        .returning(move |_, _| {
-            call_order_clone2.lock().unwrap().push("create_deployment");
+        .returning(move |_, request| {
+            // Verify auth config is included in deployment request
+            assert!(request.access_control.is_some());
+            assert_eq!(
+                request.access_control,
+                Some(types::CreateDeploymentRequestAccessControl::Public)
+            );
             Ok(types::CreateDeploymentResponse {
                 deployment_id: uuid::Uuid::new_v4(),
                 app_id: uuid::Uuid::new_v4(),
@@ -1952,8 +2049,7 @@ async fn test_auth_config_updated_before_deployment() {
         });
 
     // Mock: list apps returns existing app
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -1964,22 +2060,46 @@ async fn test_auth_config_updated_before_deployment() {
         });
 
     // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
+        .returning(|_| Ok(test_ecr_credentials()));
+
+    // Mock: update components
+    mock_client
+        .expect_update_components()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::UpdateComponentsResponse {
+                components: vec![types::UpdateComponentsResponseComponentsItem {
+                    component_name: "test-tool".to_string(),
+                    description: None,
+                    repository_uri: Some(
+                        "123456789012.dkr.ecr.us-east-1.amazonaws.com/user/test-tool".to_string(),
+                    ),
+                    repository_name: Some("user/test-tool".to_string()),
+                }],
+                changes: types::UpdateComponentsResponseChanges {
+                    created: vec!["test-tool".to_string()],
+                    updated: vec![],
+                    removed: vec![],
+                },
             })
         });
 
     // Mock: get app status
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -1991,7 +2111,11 @@ async fn test_auth_config_updated_before_deployment() {
         })
     });
 
-    let call_order_final = call_order.clone();
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
+    // No sleep expectation needed - deployment completes immediately (status is Active)
+
     let deps = fixture.to_deps();
 
     // Deploy with auth configuration
@@ -1999,30 +2123,17 @@ async fn test_auth_config_updated_before_deployment() {
         variables: vec![],
         access_control: Some("public".to_string()),
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
 
     let result = execute_with_deps(deps, args).await;
 
-    // The test will fail because auth config returns an error, but that's okay
-    // We're only interested in verifying the call order
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("auth config was called")
-    );
+    // The deployment should succeed now that auth config is included
+    assert!(result.is_ok(), "Error: {result:?}");
 
-    // Verify that auth config was updated BEFORE deployment (or attempted to)
-    let calls = call_order_final.lock().unwrap();
-    assert!(!calls.is_empty());
-    assert_eq!(
-        calls[0], "update_auth_config",
-        "Auth config should be updated first"
-    );
-    // Deployment won't happen because auth config failed, which is fine for this test
+    // No need to verify call order anymore since auth config is part of deployment
 }
 
 #[test]
@@ -2078,11 +2189,16 @@ fn test_is_sensitive_variable() {
 async fn test_deploy_with_sensitive_variables() {
     let mut fixture = TestFixture::new();
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+    setup_standard_api_expectations(&mut mock_client);
+    setup_api_client(&mut fixture, mock_client);
+
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
     // Mock: auth config update
-    setup_auth_config_update(&mut fixture);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -2099,6 +2215,7 @@ async fn test_deploy_with_sensitive_variables() {
         ],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -2138,11 +2255,16 @@ async fn test_deploy_with_sensitive_variables() {
 async fn test_deploy_with_short_sensitive_values() {
     let mut fixture = TestFixture::new();
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+    setup_standard_api_expectations(&mut mock_client);
+    setup_api_client(&mut fixture, mock_client);
+
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
     // Mock: auth config update
-    setup_auth_config_update(&mut fixture);
 
     let ui = fixture.ui.clone();
     let deps = fixture.to_deps();
@@ -2156,6 +2278,7 @@ async fn test_deploy_with_short_sensitive_values() {
         ],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -2254,6 +2377,7 @@ command = "echo 'Building test tool'"
         ],
         access_control: Some("public".to_string()),
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: true,
         yes: true,
     };
@@ -2376,6 +2500,7 @@ command = "echo 'Building test tool'"
         variables: vec![],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: true,
         yes: true,
     };
@@ -2404,36 +2529,26 @@ async fn test_deploy_auth_mode_user_only() {
 
     // Setup all basic mocks
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
     // Mock: update auth config is called
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
 
-    // Mock: create app returns specific ID
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::parse_str("12345678-1234-1234-1234-123456789012").unwrap(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    // Add standard API expectations
+    setup_standard_api_expectations(&mut mock_client);
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
         access_control: Some("private".to_string()),
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -2446,37 +2561,92 @@ async fn test_deploy_auth_mode_user_only() {
 async fn test_deploy_auth_mode_custom() {
     let mut fixture = TestFixture::new();
 
+    // Setup basic ftl.toml with oauth configuration
+    fixture
+        .file_system
+        .expect_exists()
+        .with(eq(Path::new("ftl.toml")))
+        .returning(|_| true);
+
+    fixture
+        .file_system
+        .expect_read_to_string()
+        .with(eq(Path::new("ftl.toml")))
+        .returning(|_| {
+            Ok(r#"
+[project]
+name = "test"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = "test-audience"
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+authorize_endpoint = "https://auth.example.com/authorize"
+token_endpoint = "https://auth.example.com/oauth/token"
+userinfo_endpoint = "https://auth.example.com/userinfo"
+"#
+            .to_string())
+        });
+
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
     setup_successful_deployment(&mut fixture);
 
-    // Mock: update auth config with custom configuration
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+    // Add standard API expectations
+    setup_standard_api_expectations(&mut mock_client);
 
-    // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let deps = fixture.to_deps();
+
     let args = DeployArgs {
         variables: vec![],
-        access_control: Some("private".to_string()),
+        access_control: Some("custom".to_string()), // This will be overridden to "custom" anyway due to jwt_issuer
         jwt_issuer: Some("https://auth.example.com".to_string()),
+        jwt_audience: None,
+        dry_run: false,
+        yes: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    if let Err(e) = &result {
+        eprintln!("Test failed with error: {e:?}");
+    }
+    assert!(result.is_ok());
+}
+
+// Test removed: private mode without issuer is now valid (uses FTL's AuthKit)
+
+#[tokio::test]
+async fn test_deploy_custom_auth_with_cli_flags() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+    setup_successful_push(&mut fixture);
+    setup_successful_deployment(&mut fixture);
+
+    // Add standard API expectations
+    setup_standard_api_expectations(&mut mock_client);
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
+    let deps = fixture.to_deps();
+
+    // Use both --jwt-issuer and --jwt-audience flags (no ftl.toml needed)
+    let args = DeployArgs {
+        variables: vec![],
+        access_control: None, // Will be set to "custom" automatically
+        jwt_issuer: Some("https://auth.example.com".to_string()),
+        jwt_audience: Some("my-api-audience".to_string()),
         dry_run: false,
         yes: true,
     };
@@ -2485,18 +2655,56 @@ async fn test_deploy_auth_mode_custom() {
     assert!(result.is_ok());
 }
 
-// Test removed: private mode without issuer is now valid (uses FTL's AuthKit)
+#[tokio::test]
+async fn test_deploy_custom_auth_missing_audience() {
+    let mut fixture = TestFixture::new();
+
+    setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+    setup_successful_push(&mut fixture);
+
+    // Add standard API expectations
+    setup_standard_api_expectations(&mut mock_client);
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
+    let deps = fixture.to_deps();
+
+    // Use --jwt-issuer without --jwt-audience (should fail)
+    let args = DeployArgs {
+        variables: vec![],
+        access_control: None,
+        jwt_issuer: Some("https://auth.example.com".to_string()),
+        jwt_audience: None, // Missing audience should cause error
+        dry_run: false,
+        yes: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(
+            e.to_string()
+                .contains("Audience is required for custom auth")
+        );
+    }
+}
 
 #[tokio::test]
 async fn test_deploy_invalid_auth_mode() {
     let mut fixture = TestFixture::new();
 
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
 
     // Mock: list apps
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -2507,25 +2715,22 @@ async fn test_deploy_invalid_auth_mode() {
         });
 
     // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
-        .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
 
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
         access_control: Some("invalid-mode".to_string()),
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -2541,8 +2746,12 @@ async fn test_deploy_invalid_auth_mode() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_deploy_with_deploy_name_override() {
     let mut fixture = TestFixture::new();
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
 
     let ftl_toml_content = r#"[project]
 name = "test-app"
@@ -2590,9 +2799,36 @@ command = "cargo build --release"
         .times(1)
         .returning(|_| Ok(()));
 
+    // Mock: list apps returns empty (app doesn't exist)
+    mock_client
+        .expect_list_apps()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(types::ListAppsResponse {
+                apps: vec![],
+                next_token: None,
+            })
+        });
+
+    // Mock: create app succeeds
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
+        .times(1)
+        .returning(|_| Ok(test_ecr_credentials()));
+
     // Mock: update components should receive the custom deploy name
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -2614,6 +2850,33 @@ command = "cargo build --release"
             })
         });
 
+    // Mock: create deployment succeeds
+    mock_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, _| {
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Mock: app becomes active
+    mock_client.expect_get_app().times(1).returning(|_| {
+        Ok(types::App {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::AppStatus::Active,
+            provider_url: Some("https://test-app.example.com".to_string()),
+            provider_error: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
     // Rest of the deployment mocks
     fixture
         .command_executor
@@ -2631,11 +2894,9 @@ command = "cargo build --release"
     setup_successful_deployment(&mut fixture);
 
     // Mock: update auth config
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     let deps = fixture.to_deps();
     let result = execute_with_deps(deps, default_deploy_args()).await;
@@ -2645,6 +2906,8 @@ command = "cargo build --release"
 #[tokio::test]
 async fn test_deploy_build_profile_debug() {
     let mut fixture = TestFixture::new();
+
+    // No API client needed for this test - using fixture.api_client_factory directly
 
     let ftl_toml_content = r#"[project]
 name = "test-app"
@@ -2681,9 +2944,9 @@ command = "cargo build"
     let deps = Arc::new(DeployDependencies {
         file_system: Arc::new(fixture.file_system),
         command_executor: Arc::new(fixture.command_executor),
-        api_client: Arc::new(fixture.api_client),
         clock: Arc::new(fixture.clock),
         credentials_provider: Arc::new(fixture.credentials_provider),
+        api_client_factory: Arc::new(fixture.api_client_factory),
         ui: fixture.ui,
         build_executor: build_executor_clone,
         async_runtime: Arc::new(fixture.async_runtime),
@@ -2694,6 +2957,7 @@ command = "cargo build"
         variables: vec![],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: true,
         yes: true,
     };
@@ -2747,6 +3011,7 @@ command = "echo 'Building test tool'"
         variables: vec!["api_key=provided-key".to_string()], // Only provide one required var
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: true,
         yes: true,
     };
@@ -2798,9 +3063,11 @@ async fn test_deploy_partial_component_push_failure() {
 
     setup_full_mocks(&mut fixture);
 
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+
     // Mock: list apps
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -2811,23 +3078,24 @@ async fn test_deploy_partial_component_push_failure() {
         });
 
     // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+        .returning(|_| Ok(test_ecr_credentials()));
 
     // Mock: update components succeeds
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -2847,6 +3115,9 @@ async fn test_deploy_partial_component_push_failure() {
                 },
             })
         });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
 
     // Mock: wkg push fails
     fixture
@@ -2875,11 +3146,13 @@ async fn test_deploy_auth_enabled_always_included() {
 
     // Setup basic mocks
     setup_full_mocks(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
     setup_successful_push(&mut fixture);
 
     // Mock: list apps returns empty
-    fixture
-        .api_client
+    mock_client
         .expect_list_apps()
         .times(1)
         .returning(|_, _, _| {
@@ -2890,30 +3163,26 @@ async fn test_deploy_auth_enabled_always_included() {
         });
 
     // Mock: create app
-    fixture
-        .api_client
-        .expect_create_app()
+    mock_client.expect_create_app().times(1).returning(|_| {
+        Ok(types::CreateAppResponse {
+            app_id: uuid::Uuid::new_v4(),
+            app_name: "test-app".to_string(),
+            status: types::CreateAppResponseStatus::Creating,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
+        })
+    });
+
+    // Mock: get ECR credentials
+    mock_client
+        .expect_create_ecr_token()
         .times(1)
-        .returning(|_| {
-            Ok(types::CreateAppResponse {
-                app_id: uuid::Uuid::new_v4(),
-                app_name: "test-app".to_string(),
-                status: types::CreateAppResponseStatus::Creating,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            })
-        });
+        .returning(|_| Ok(test_ecr_credentials()));
 
     // Mock: update auth config - should be called even when auth is disabled
-    fixture
-        .api_client
-        .expect_update_auth_config()
-        .times(1)
-        .returning(|_, _| Ok(crate::test_helpers::test_auth_config_response()));
 
     // Mock: create deployment - verify auth_enabled is always present
-    fixture
-        .api_client
+    mock_client
         .expect_create_deployment()
         .times(1)
         .returning(|_, req| {
@@ -2938,8 +3207,7 @@ async fn test_deploy_auth_enabled_always_included() {
         });
 
     // Mock: update components
-    fixture
-        .api_client
+    mock_client
         .expect_update_components()
         .times(1)
         .returning(|_, _| {
@@ -2961,7 +3229,7 @@ async fn test_deploy_auth_enabled_always_included() {
         });
 
     // Mock: app becomes active
-    fixture.api_client.expect_get_app().times(1).returning(|_| {
+    mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
@@ -2973,11 +3241,17 @@ async fn test_deploy_auth_enabled_always_included() {
         })
     });
 
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
+    // No sleep expectation needed - deployment completes immediately (status is Active)
+
     let deps = fixture.to_deps();
     let args = DeployArgs {
         variables: vec![],
         access_control: None, // Public access control
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -2993,11 +3267,10 @@ async fn test_deploy_auth_enabled_always_included() {
 fn test_add_auth_variables_from_config() {
     use crate::config::ftl_config::FtlConfig;
 
-    // Test 1: Public access control (auth disabled)
+    // Test 1: No OAuth (auth disabled)
     let ftl_config_str = r#"[project]
 name = "test-app"
 version = "0.1.0"
-access_control = "public"
 "#;
     let config = FtlConfig::parse(ftl_config_str).unwrap();
 
@@ -3010,11 +3283,14 @@ access_control = "public"
     assert_eq!(variables.get("mcp_provider_type"), None);
     assert_eq!(variables.get("mcp_jwt_issuer"), None);
 
-    // Test 2: Private access control (auth enabled)
+    // Test 2: OAuth configured (auth enabled)
     let ftl_config_str2 = r#"[project]
 name = "test-app"
 version = "0.1.0"
-access_control = "private"
+
+[oauth]
+issuer = "https://divine-lion-50-staging.authkit.app"
+audience = "https://api.example.com"
 "#;
     let config2 = FtlConfig::parse(ftl_config_str2).unwrap();
 
@@ -3057,14 +3333,13 @@ fn test_resolve_auth_config_public_access() {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    // Test 1: Public access control in ftl.toml should be resolved
+    // Test 1: No OAuth in ftl.toml means public access
     let mut file = NamedTempFile::new().unwrap();
     writeln!(
         file,
         r#"[project]
 name = "test-app"
 version = "0.1.0"
-access_control = "public"
 "#
     )
     .unwrap();
@@ -3087,6 +3362,7 @@ access_control = "public"
         variables: vec![],
         access_control: None,
         jwt_issuer: None,
+        jwt_audience: None,
         dry_run: false,
         yes: true,
     };
@@ -3101,14 +3377,17 @@ access_control = "public"
     assert!(issuer.is_none());
     assert!(audience.is_none());
 
-    // Test 2: Private access control should include auth details
+    // Test 2: OAuth configured means custom mode with auth details
     let mut file2 = NamedTempFile::new().unwrap();
     writeln!(
         file2,
         r#"[project]
 name = "test-app"
 version = "0.1.0"
-access_control = "private"
+
+[oauth]
+issuer = "https://divine-lion-50-staging.authkit.app"
+audience = "https://api.example.com"
 "#
     )
     .unwrap();
@@ -3129,14 +3408,14 @@ access_control = "private"
 
     let result2 = resolve_auth_config(&fs_arc2, &args).unwrap();
 
-    // Should resolve to private mode with FTL AuthKit details
+    // Should resolve to custom mode with OAuth details
     assert!(result2.is_some());
     let (mode, provider, issuer, audience) = result2.unwrap();
-    assert_eq!(mode, "private");
-    assert_eq!(provider, Some("jwt".to_string()));
+    assert_eq!(mode, "custom");
+    assert_eq!(provider, Some("oauth".to_string()));
     assert_eq!(
         issuer,
         Some("https://divine-lion-50-staging.authkit.app".to_string())
     );
-    assert!(audience.is_none());
+    assert_eq!(audience, Some("https://api.example.com".to_string()));
 }

@@ -141,15 +141,11 @@ type UpdateComponentsFn = Box<
         + Sync,
 >;
 type ListComponentsFn = Box<dyn Fn(&str) -> Result<types::ListComponentsResponse> + Send + Sync>;
-type CreateEcrTokenFn = Box<dyn Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
-type UpdateAuthConfigFn = Box<
-    dyn Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
-        + Send
-        + Sync,
->;
+type CreateEcrTokenFn = Box<dyn Fn(&str) -> Result<types::CreateEcrTokenResponse> + Send + Sync>;
 type GetAppLogsFn = Box<
     dyn Fn(&str, Option<&str>, Option<&str>) -> Result<types::GetAppLogsResponse> + Send + Sync,
 >;
+type GetUserOrgsFn = Box<dyn Fn() -> Result<types::GetUserOrgsResponse> + Send + Sync>;
 
 /// Manual mock implementation for `FtlApiClient` due to mockall issues with async traits and references.
 ///
@@ -164,8 +160,8 @@ pub struct MockFtlApiClientMock {
     update_components: Arc<Mutex<Option<UpdateComponentsFn>>>,
     list_app_components: Arc<Mutex<Option<ListComponentsFn>>>,
     create_ecr_token: Arc<Mutex<Option<CreateEcrTokenFn>>>,
-    update_auth_config: Arc<Mutex<Option<UpdateAuthConfigFn>>>,
     get_app_logs: Arc<Mutex<Option<GetAppLogsFn>>>,
+    get_user_orgs: Arc<Mutex<Option<GetUserOrgsFn>>>,
 }
 
 impl Default for MockFtlApiClientMock {
@@ -186,8 +182,8 @@ impl MockFtlApiClientMock {
             update_components: Arc::new(Mutex::new(None)),
             list_app_components: Arc::new(Mutex::new(None)),
             create_ecr_token: Arc::new(Mutex::new(None)),
-            update_auth_config: Arc::new(Mutex::new(None)),
             get_app_logs: Arc::new(Mutex::new(None)),
+            get_user_orgs: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -231,14 +227,14 @@ impl MockFtlApiClientMock {
         CreateEcrTokenExpectation { mock: self }
     }
 
-    /// Sets up an expectation for the `update_auth_config` method
-    pub fn expect_update_auth_config(&mut self) -> UpdateAuthConfigExpectation<'_> {
-        UpdateAuthConfigExpectation { mock: self }
-    }
-
     /// Sets up an expectation for the `get_app_logs` method
     pub fn expect_get_app_logs(&mut self) -> GetAppLogsExpectation<'_> {
         GetAppLogsExpectation { mock: self }
+    }
+
+    /// Sets up an expectation for the `get_user_orgs` method
+    pub fn expect_get_user_orgs(&mut self) -> GetUserOrgsExpectation<'_> {
+        GetUserOrgsExpectation { mock: self }
     }
 }
 
@@ -425,34 +421,19 @@ impl<'a> CreateEcrTokenExpectation<'a> {
     /// Sets the function to be called when this expectation is matched
     pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
+        F: Fn(&str) -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
     {
         *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(f));
         self.mock
     }
-}
 
-/// Builder for setting up expectations on the `update_auth_config` method
-pub struct UpdateAuthConfigExpectation<'a> {
-    mock: &'a mut MockFtlApiClientMock,
-}
-
-impl<'a> UpdateAuthConfigExpectation<'a> {
-    /// Specifies how many times this expectation should be called (currently unused)
-    #[must_use]
-    pub fn times(self, _n: usize) -> Self {
-        self
-    }
-
-    /// Sets the function to be called when this expectation is matched
-    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    /// Sets the function to be called when this expectation is matched (legacy - ignores `app_id`)
+    pub fn returning_const<F>(self, f: F) -> &'a mut MockFtlApiClientMock
     where
-        F: Fn(&str, &types::UpdateAuthConfigRequest) -> Result<types::AuthConfigResponse>
-            + Send
-            + Sync
-            + 'static,
+        F: Fn() -> Result<types::CreateEcrTokenResponse> + Send + Sync + 'static,
     {
-        *self.mock.update_auth_config.lock().unwrap() = Some(Box::new(f));
+        let wrapper = move |_app_id: &str| f();
+        *self.mock.create_ecr_token.lock().unwrap() = Some(Box::new(wrapper));
         self.mock
     }
 }
@@ -478,6 +459,28 @@ impl<'a> GetAppLogsExpectation<'a> {
             + 'static,
     {
         *self.mock.get_app_logs.lock().unwrap() = Some(Box::new(f));
+        self.mock
+    }
+}
+
+/// Expectation builder for `get_user_orgs` method
+pub struct GetUserOrgsExpectation<'a> {
+    mock: &'a mut MockFtlApiClientMock,
+}
+
+impl<'a> GetUserOrgsExpectation<'a> {
+    /// Specifies how many times this expectation should be called (currently unused)
+    #[must_use]
+    pub fn times(self, _n: usize) -> Self {
+        self
+    }
+
+    /// Sets the function to be called when this expectation is matched
+    pub fn returning<F>(self, f: F) -> &'a mut MockFtlApiClientMock
+    where
+        F: Fn() -> Result<types::GetUserOrgsResponse> + Send + Sync + 'static,
+    {
+        *self.mock.get_user_orgs.lock().unwrap() = Some(Box::new(f));
         self.mock
     }
 }
@@ -556,23 +559,11 @@ impl FtlApiClient for MockFtlApiClientMock {
         }
     }
 
-    async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
+    async fn create_ecr_token(&self, app_id: &str) -> Result<types::CreateEcrTokenResponse> {
         if let Some(ref f) = *self.create_ecr_token.lock().unwrap() {
-            f()
+            f(app_id)
         } else {
             Err(anyhow!("create_ecr_token not mocked"))
-        }
-    }
-
-    async fn update_auth_config(
-        &self,
-        app_id: &str,
-        request: &types::UpdateAuthConfigRequest,
-    ) -> Result<types::AuthConfigResponse> {
-        if let Some(ref f) = *self.update_auth_config.lock().unwrap() {
-            f(app_id, request)
-        } else {
-            Err(anyhow!("update_auth_config not mocked"))
         }
     }
 
@@ -586,6 +577,14 @@ impl FtlApiClient for MockFtlApiClientMock {
             f(app_id, since, tail)
         } else {
             Err(anyhow!("get_app_logs not mocked"))
+        }
+    }
+
+    async fn get_user_orgs(&self) -> Result<types::GetUserOrgsResponse> {
+        if let Some(ref f) = *self.get_user_orgs.lock().unwrap() {
+            f()
+        } else {
+            Err(anyhow!("get_user_orgs not mocked"))
         }
     }
 }

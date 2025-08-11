@@ -16,8 +16,9 @@ fn test_authkit_jwks_auto_derivation() {
     // Configure with AuthKit issuer only - JWKS should be auto-derived
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test-project.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     // DO NOT set mcp_jwt_jwks_uri - it should be auto-derived
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Test that metadata endpoint works with auto-derived JWKS
     let request = types::OutgoingRequest::new(types::Headers::new());
@@ -44,7 +45,8 @@ fn test_authkit_protected_resource_metadata() {
     // Configure with AuthKit issuer
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test-project.authkit.app");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_jwt_audience", "test-api");
+    variables::set("mcp_gateway_url", "none");
     
     // Request protected resource metadata
     let headers = types::Headers::new();
@@ -72,7 +74,8 @@ fn test_authkit_openid_configuration() {
     // Configure with AuthKit issuer
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test-project.authkit.app");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_jwt_audience", "test-api");
+    variables::set("mcp_gateway_url", "none");
     
     // Request OpenID configuration
     let request = types::OutgoingRequest::new(types::Headers::new());
@@ -98,7 +101,8 @@ fn test_workos_domain_support() {
     // Configure with workos.com domain
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://api.workos.com");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_jwt_audience", "test-api");
+    variables::set("mcp_gateway_url", "none");
     
     // Test that metadata endpoint works
     let request = types::OutgoingRequest::new(types::Headers::new());
@@ -122,7 +126,8 @@ fn test_non_authkit_domain() {
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://auth.example.com");
     variables::set("mcp_jwt_jwks_uri", "https://auth.example.com/jwks");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_jwt_audience", "test-api");
+    variables::set("mcp_gateway_url", "none");
     
     // Request authorization server metadata
     let request = types::OutgoingRequest::new(types::Headers::new());
@@ -150,8 +155,9 @@ fn test_authkit_token_validation() {
     // Configure with AuthKit issuer
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test-project.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());

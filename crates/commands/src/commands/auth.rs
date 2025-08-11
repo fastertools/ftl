@@ -115,6 +115,15 @@ pub struct AuthArgs {
 pub enum AuthCommand {
     /// Show authentication status
     Status,
+    /// Manage authentication tokens
+    Token(TokenCommand),
+}
+
+/// Token subcommands
+#[derive(Debug, Clone)]
+pub enum TokenCommand {
+    /// Output current user access token (for automation)
+    Show,
 }
 
 // Real credentials provider implementation
@@ -162,6 +171,15 @@ pub async fn execute(args: AuthArgs) -> Result<()> {
             status_with_deps(&deps);
             Ok(())
         }
+        AuthCommand::Token(token_cmd) => match token_cmd {
+            TokenCommand::Show => {
+                // Get user token for automation/scripting
+                let credentials = crate::commands::login::get_or_refresh_credentials().await?;
+                // Output just the token for scripting (no formatting)
+                println!("{}", credentials.access_token);
+                Ok(())
+            }
+        },
     }
 }
 

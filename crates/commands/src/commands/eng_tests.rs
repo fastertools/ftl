@@ -31,7 +31,7 @@ mod tests {
             &self,
             _request: &types::CreateAppRequest,
         ) -> Result<types::CreateAppResponse> {
-            unimplemented!()
+            Err(anyhow::anyhow!("create_app not implemented in test mock"))
         }
 
         async fn list_apps(
@@ -65,7 +65,9 @@ mod tests {
             _app_id: &str,
             _request: &types::CreateDeploymentRequest,
         ) -> Result<types::CreateDeploymentResponse> {
-            unimplemented!()
+            Err(anyhow::anyhow!(
+                "create_deployment not implemented in test mock"
+            ))
         }
 
         async fn update_components(
@@ -73,26 +75,24 @@ mod tests {
             _app_id: &str,
             _request: &types::UpdateComponentsRequest,
         ) -> Result<types::UpdateComponentsResponse> {
-            unimplemented!()
+            Err(anyhow::anyhow!(
+                "update_components not implemented in test mock"
+            ))
         }
 
         async fn list_app_components(
             &self,
             _app_id: &str,
         ) -> Result<types::ListComponentsResponse> {
-            unimplemented!()
+            Err(anyhow::anyhow!(
+                "list_app_components not implemented in test mock"
+            ))
         }
 
-        async fn create_ecr_token(&self) -> Result<types::CreateEcrTokenResponse> {
-            unimplemented!()
-        }
-
-        async fn update_auth_config(
-            &self,
-            _app_id: &str,
-            _request: &types::UpdateAuthConfigRequest,
-        ) -> Result<types::AuthConfigResponse> {
-            unimplemented!()
+        async fn create_ecr_token(&self, _app_id: &str) -> Result<types::CreateEcrTokenResponse> {
+            Err(anyhow::anyhow!(
+                "create_ecr_token not implemented in test mock"
+            ))
         }
 
         async fn get_app_logs(
@@ -105,6 +105,12 @@ mod tests {
                 Ok(resp) => Ok(resp.clone()),
                 Err(e) => Err(anyhow::anyhow!(e.to_string())),
             }
+        }
+
+        async fn get_user_orgs(&self) -> Result<types::GetUserOrgsResponse> {
+            Err(anyhow::anyhow!(
+                "get_user_orgs not implemented in test mock"
+            ))
         }
     }
 

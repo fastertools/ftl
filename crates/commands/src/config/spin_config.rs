@@ -510,8 +510,10 @@ fn validate_components(components: &HashMap<String, ComponentConfig>, _ctx: &())
             return Err(garde::Error::new("Component name cannot be empty"));
         }
 
-        // Must start with a letter
-        if !name.chars().next().unwrap().is_alphabetic() {
+        // Must start with a letter (safe to check first char since we verified non-empty above)
+        if let Some(first_char) = name.chars().next()
+            && !first_char.is_alphabetic()
+        {
             return Err(garde::Error::new(format!(
                 "Component name '{name}' must start with a letter"
             )));
