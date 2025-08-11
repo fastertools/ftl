@@ -28,8 +28,13 @@ fn mock_gateway_success_with_headers() {
 // Test: Verify gateway response is passed through correctly
 #[spin_test]
 fn test_gateway_response_passthrough() {
-    // Configure provider
-    configure_test_provider();
+    // Configure provider with actual gateway URL for forwarding
+    use spin_test_sdk::bindings::fermyon::spin_test_virt::variables;
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup keys and mock JWKS
     let (private_key, public_key) = crate::jwt_verification_tests::generate_test_key_pair();
@@ -96,7 +101,13 @@ fn test_gateway_response_passthrough() {
 // Test: Verify gateway errors are passed through
 #[spin_test]
 fn test_gateway_error_passthrough() {
-    configure_test_provider();
+    // Configure provider with actual gateway URL for forwarding
+    use spin_test_sdk::bindings::fermyon::spin_test_virt::variables;
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup valid auth
     let (private_key, public_key) = crate::jwt_verification_tests::generate_test_key_pair();

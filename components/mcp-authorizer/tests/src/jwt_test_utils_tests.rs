@@ -22,8 +22,9 @@ fn test_jwt_with_test_utils() {
     // Configure JWT provider with test public key
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.example.com");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -71,7 +72,7 @@ fn test_token_builder_features() {
     variables::set("mcp_jwt_issuer", "https://custom.issuer.com");
     variables::set("mcp_jwt_audience", "https://api.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -127,8 +128,9 @@ fn test_microsoft_scp_claim() {
     // Configure JWT provider
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.microsoft.com");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -208,8 +210,9 @@ fn test_expired_token_creation() {
     // Configure JWT provider
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.example.com");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Create an expired token
     let token = create_expired_token(&key_pair);
@@ -237,7 +240,7 @@ fn test_token_utils_multiple_audiences() {
     variables::set("mcp_jwt_issuer", "https://test.example.com");
     variables::set("mcp_jwt_audience", "https://api.example.com");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -290,9 +293,10 @@ fn test_utils_with_scope_validation() {
     // Configure JWT provider with required scopes
     variables::set("mcp_provider_type", "jwt");
     variables::set("mcp_jwt_issuer", "https://test.example.com");
+    variables::set("mcp_jwt_audience", "test-api");
     variables::set("mcp_jwt_public_key", &key_pair.public_key_pem());
     variables::set("mcp_jwt_required_scopes", "admin,write");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());

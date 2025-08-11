@@ -13,11 +13,11 @@ pub struct Config {
     /// Header name for request tracing
     pub trace_header: String,
 
-    /// JWT provider configuration (always required)
-    pub provider: Provider,
+    /// JWT provider configuration (optional - if not set, all requests pass through)
+    pub provider: Option<Provider>,
 
-    /// Required tenant ID for private mode (optional)
-    pub tenant_id: Option<String>,
+    /// Authorization rules to apply after authentication
+    pub authorization: Option<AuthorizationRules>,
 }
 
 /// Provider type enumeration
@@ -83,8 +83,28 @@ pub struct StaticTokenInfo {
     /// Optional expiration timestamp
     pub expires_at: Option<i64>,
 
-    /// Organization ID (optional)
-    pub org_id: Option<String>,
+    /// Additional claims for this token
+    #[serde(flatten)]
+    pub additional_claims: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// Authorization rules to apply after authentication
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthorizationRules {
+    /// List of allowed subjects (if empty, all subjects are allowed)
+    pub allowed_subjects: Option<Vec<String>>,
+
+    /// Required claims (key-value pairs that must match)
+    pub required_claims: Option<std::collections::HashMap<String, serde_json::Value>>,
+
+    /// Required scopes (token must have all of these)
+    pub required_scopes: Option<Vec<String>>,
+
+    /// Allowed issuers (if empty, any issuer is allowed)
+    pub allowed_issuers: Option<Vec<String>>,
+
+    /// Claims to forward in headers (claim name -> header name mapping)
+    pub forward_claims: Option<std::collections::HashMap<String, String>>,
 }
 
 /// OAuth 2.0 endpoint configuration
@@ -105,19 +125,48 @@ impl Config {
             .unwrap_or_else(|_| "x-trace-id".to_string())
             .to_lowercase();
 
-        // Provider configuration is always required
-        let provider = Provider::load()?;
+        // Load provider configuration - propagate errors for invalid configs
+        // but allow missing provider (returns None)
+        let provider = match Provider::load() {
+            Ok(p) => Some(p),
+            Err(e) => {
+                // Check if this is a "no provider configured" situation vs actual error
+                // If all provider variables are missing/empty, that's OK (no provider)
+                // Otherwise it's a configuration error that should be propagated
+                let has_provider_config = variables::get("mcp_jwt_issuer")
+                    .ok()
+                    .filter(|s| !s.is_empty())
+                    .is_some()
+                    || variables::get("mcp_jwt_jwks_uri")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .is_some()
+                    || variables::get("mcp_jwt_public_key")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .is_some()
+                    || variables::get("mcp_static_tokens")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .is_some();
 
-        // Load tenant ID for private mode
-        let tenant_id = variables::get("mcp_tenant_id")
-            .ok()
-            .filter(|s| !s.is_empty());
+                if has_provider_config {
+                    // Provider was configured but has errors - propagate the error
+                    return Err(e);
+                }
+                // No provider configured at all - that's OK
+                None
+            }
+        };
+
+        // Load authorization rules if configured
+        let authorization = AuthorizationRules::load().ok();
 
         Ok(Self {
             gateway_url,
             trace_header,
             provider,
-            tenant_id,
+            authorization,
         })
     }
 }
@@ -125,7 +174,30 @@ impl Config {
 impl Provider {
     /// Load provider configuration
     fn load() -> Result<Self> {
-        // Check provider type first
+        // Check if any provider configuration exists
+        let has_jwt_config = variables::get("mcp_jwt_issuer")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .is_some()
+            || variables::get("mcp_jwt_jwks_uri")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .is_some()
+            || variables::get("mcp_jwt_public_key")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .is_some();
+        let has_static_config = variables::get("mcp_static_tokens")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .is_some();
+
+        // If no provider configuration at all, return error (no provider configured)
+        if !has_jwt_config && !has_static_config {
+            return Err(anyhow::anyhow!("No authentication provider configured"));
+        }
+
+        // Check provider type
         let provider_type =
             variables::get("mcp_provider_type").unwrap_or_else(|_| "jwt".to_string());
 
@@ -186,11 +258,19 @@ impl Provider {
             ));
         }
 
-        // Load audience (optional)
-        let audience = variables::get("mcp_jwt_audience")
+        // Load audience (required for security)
+        let audience_str = variables::get("mcp_jwt_audience")
             .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| vec![s]);
+            .filter(|s| !s.is_empty());
+
+        // Audience is required when using JWT provider
+        if audience_str.is_none() {
+            return Err(anyhow::anyhow!(
+                "mcp_jwt_audience is required for JWT authentication (security best practice)"
+            ));
+        }
+
+        let audience = audience_str.map(|s| vec![s]);
 
         // Load algorithm (optional, defaults to RS256)
         let algorithm = variables::get("mcp_jwt_algorithm")
@@ -274,16 +354,21 @@ impl Provider {
             // Optional expiration timestamp as 5th part
             let expires_at = parts.get(4).and_then(|s| s.parse::<i64>().ok());
 
-            // Optional org_id as 6th part (or 5th if no expiration)
-            let org_id = if expires_at.is_some() {
-                parts.get(5).map(|s| (*s).to_string())
-            } else {
-                // If 5th part is not a number, treat it as org_id
-                parts
-                    .get(4)
-                    .filter(|s| s.parse::<i64>().is_err())
-                    .map(|s| (*s).to_string())
-            };
+            // Parse additional claims from remaining parts (format: key=value)
+            let mut additional_claims = std::collections::HashMap::new();
+            for (i, part) in parts.iter().enumerate().skip(4) {
+                // Skip if it's the expiration timestamp
+                if i == 4 && part.parse::<i64>().is_ok() {
+                    continue;
+                }
+                // Parse key=value pairs
+                if let Some((key, value)) = part.split_once('=') {
+                    additional_claims.insert(
+                        key.to_string(),
+                        serde_json::Value::String(value.to_string()),
+                    );
+                }
+            }
 
             tokens.insert(
                 token,
@@ -292,7 +377,7 @@ impl Provider {
                     sub,
                     scopes,
                     expires_at,
-                    org_id,
+                    additional_claims,
                 },
             );
         }
@@ -379,4 +464,67 @@ fn normalize_url(url: &str) -> Result<String> {
     }
 
     Ok(normalized)
+}
+
+impl AuthorizationRules {
+    /// Load authorization rules from Spin variables
+    pub fn load() -> Result<Self> {
+        use std::collections::HashMap;
+
+        // Load allowed subjects (comma-separated)
+        let allowed_subjects = variables::get("mcp_auth_allowed_subjects")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split(',').map(|sub| sub.trim().to_string()).collect());
+
+        // Load required claims (JSON object)
+        let required_claims = variables::get("mcp_auth_required_claims")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                serde_json::from_str::<HashMap<String, serde_json::Value>>(&s)
+                    .map_err(|e| anyhow::anyhow!("Invalid JSON in mcp_auth_required_claims: {e}"))
+            })
+            .transpose()?;
+
+        // Load required scopes (comma-separated)
+        let required_scopes = variables::get("mcp_auth_required_scopes")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
+
+        // Load allowed issuers (comma-separated)
+        let allowed_issuers = variables::get("mcp_auth_allowed_issuers")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split(',').map(|iss| iss.trim().to_string()).collect());
+
+        // Load claim forwarding rules (JSON object: claim_name -> header_name)
+        let forward_claims = variables::get("mcp_auth_forward_claims")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                serde_json::from_str::<HashMap<String, String>>(&s)
+                    .map_err(|e| anyhow::anyhow!("Invalid JSON in mcp_auth_forward_claims: {e}"))
+            })
+            .transpose()?;
+
+        // Return error if no rules are configured
+        if allowed_subjects.is_none()
+            && required_claims.is_none()
+            && required_scopes.is_none()
+            && allowed_issuers.is_none()
+            && forward_claims.is_none()
+        {
+            return Err(anyhow::anyhow!("No authorization rules configured"));
+        }
+
+        Ok(Self {
+            allowed_subjects,
+            required_claims,
+            required_scopes,
+            allowed_issuers,
+            forward_claims,
+        })
+    }
 }

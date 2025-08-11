@@ -15,7 +15,7 @@ fn test_static_token_auth() {
     // Configure static provider
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_static_tokens", "dev-token:dev-app:dev-user:read,write");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -54,7 +54,7 @@ fn test_invalid_static_token() {
     // Configure static provider
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_static_tokens", "dev-token:dev-app:dev-user:read,write");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Make request with invalid token
     let headers = types::Headers::new();
@@ -75,7 +75,7 @@ fn test_static_token_required_scopes() {
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_static_tokens", "admin-token:admin-app:admin:admin,write;user-token:user-app:user:read");
     variables::set("mcp_jwt_required_scopes", "admin");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -122,7 +122,7 @@ fn test_multiple_static_tokens() {
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_static_tokens", 
         "token1:app1:user1:read;token2:app2:user2:write;token3:app3:user3:read,write");
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());
@@ -181,7 +181,7 @@ fn test_static_token_expiration() {
     variables::set("mcp_provider_type", "static");
     variables::set("mcp_static_tokens", 
         &format!("valid-token:app:user:read:{};expired-token:app:user:read:{}", future_exp, past_exp));
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     
     // Mock gateway
     let response = types::OutgoingResponse::new(types::Headers::new());

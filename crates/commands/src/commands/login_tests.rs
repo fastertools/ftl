@@ -563,12 +563,14 @@ async fn test_login_expired_token() {
 #[tokio::test]
 async fn test_get_stored_credentials() {
     let keyring = Arc::new(MockKeyringStorage::new());
+    let http_client = Arc::new(MockHttpClient::new());
+    let clock = Arc::new(MockClock::new());
 
     let creds = StoredCredentials {
         access_token: "test_token".to_string(),
         refresh_token: Some("refresh_token".to_string()),
         id_token: None,
-        expires_at: Some(Utc::now() + chrono::Duration::hours(1)),
+        expires_at: Some(clock.now() + chrono::Duration::hours(1)),
         authkit_domain: "auth.example.com".to_string(),
     };
 
@@ -576,15 +578,18 @@ async fn test_get_stored_credentials() {
     let json = serde_json::to_string(&creds).unwrap();
     keyring.store("ftl-cli", "default", &json).unwrap();
 
-    // TODO: Fix this test - need to implement get_stored_credentials_with_deps
-    // Retrieve credentials
-    // let retrieved =
-    //     get_stored_credentials_with_deps(&(keyring.clone() as Arc<dyn login::KeyringStorage>))
-    //         .unwrap();
+    // Retrieve credentials using the function that exists
+    let keyring_dyn: Arc<dyn KeyringStorage> = keyring.clone();
+    let http_client_dyn: Arc<dyn HttpClient> = http_client.clone();
+    let clock_dyn: Arc<dyn Clock> = clock.clone();
+    let retrieved =
+        get_or_refresh_credentials_with_deps(&keyring_dyn, &http_client_dyn, &clock_dyn)
+            .await
+            .unwrap();
 
-    // assert_eq!(retrieved.access_token, "test_token");
-    // assert_eq!(retrieved.refresh_token, Some("refresh_token".to_string()));
-    // assert_eq!(retrieved.authkit_domain, "auth.example.com");
+    assert_eq!(retrieved.access_token, "test_token");
+    assert_eq!(retrieved.refresh_token, Some("refresh_token".to_string()));
+    assert_eq!(retrieved.authkit_domain, "auth.example.com");
 }
 
 #[tokio::test]

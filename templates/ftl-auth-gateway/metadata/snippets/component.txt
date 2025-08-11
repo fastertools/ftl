@@ -11,27 +11,32 @@
 #   route = { private = true }
 #   component = "ftl-mcp-gateway"
 
-# Auth Gateway Configuration
-# By default, authentication is disabled. To enable authentication, set
-# auth_enabled = "true" and configure a provider.
+# MCP Authorizer Configuration
 [variables]
-# Core auth settings
-auth_enabled = { default = "false" }
-auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
-auth_trace_header = { default = "X-Trace-Id" }
+# Core MCP settings
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
+mcp_trace_header = { default = "X-Trace-Id" }
 
-# Provider configuration (required when auth_enabled = "true")
-auth_provider_type = { default = "" }  # "authkit" or "oauth"
-auth_provider_issuer = { default = "" }
-auth_provider_audience = { default = "" }
+# JWT Provider configuration
+mcp_provider_type = { default = "jwt" }  # "jwt" or "static"
+mcp_jwt_issuer = { default = "" }
+mcp_jwt_audience = { default = "" }
+mcp_jwt_jwks_uri = { default = "" }
+mcp_jwt_public_key = { default = "" }
+mcp_jwt_algorithm = { default = "RS256" }
+mcp_jwt_required_scopes = { default = "" }
 
-# OAuth-specific settings (only required for auth_provider_type = "oauth")
-auth_provider_name = { default = "" }
-auth_provider_jwks_uri = { default = "" }
-auth_provider_authorize_endpoint = { default = "" }
-auth_provider_token_endpoint = { default = "" }
-auth_provider_userinfo_endpoint = { default = "" }
-auth_provider_allowed_domains = { default = "" }  # comma-separated list
+# OAuth endpoints (optional)
+mcp_oauth_authorize_endpoint = { default = "" }
+mcp_oauth_token_endpoint = { default = "" }
+mcp_oauth_userinfo_endpoint = { default = "" }
+
+# Ownership validation (set by platform for FTL-managed auth)
+mcp_user_id = { default = "" }  # For user-owned apps
+mcp_org_id = { default = "" }   # For org-owned apps
+
+# Static token provider (for development)
+mcp_static_tokens = { default = "" }
 
 # Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
@@ -47,21 +52,24 @@ route = "/.well-known/oauth-authorization-server"
 component = "mcp"
 
 [component.mcp]
-source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.6" }
-allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-authorizer", version = "0.0.14" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://*.workos.com"]
 [component.mcp.variables]
-auth_enabled = "{% raw %}{{ auth_enabled }}{% endraw %}"
-auth_gateway_url = "{% raw %}{{ auth_gateway_url }}{% endraw %}"
-auth_trace_header = "{% raw %}{{ auth_trace_header }}{% endraw %}"
-auth_provider_type = "{% raw %}{{ auth_provider_type }}{% endraw %}"
-auth_provider_issuer = "{% raw %}{{ auth_provider_issuer }}{% endraw %}"
-auth_provider_audience = "{% raw %}{{ auth_provider_audience }}{% endraw %}"
-auth_provider_name = "{% raw %}{{ auth_provider_name }}{% endraw %}"
-auth_provider_jwks_uri = "{% raw %}{{ auth_provider_jwks_uri }}{% endraw %}"
-auth_provider_authorize_endpoint = "{% raw %}{{ auth_provider_authorize_endpoint }}{% endraw %}"
-auth_provider_token_endpoint = "{% raw %}{{ auth_provider_token_endpoint }}{% endraw %}"
-auth_provider_userinfo_endpoint = "{% raw %}{{ auth_provider_userinfo_endpoint }}{% endraw %}"
-auth_provider_allowed_domains = "{% raw %}{{ auth_provider_allowed_domains }}{% endraw %}"
+mcp_gateway_url = "{% raw %}{{ mcp_gateway_url }}{% endraw %}"
+mcp_trace_header = "{% raw %}{{ mcp_trace_header }}{% endraw %}"
+mcp_provider_type = "{% raw %}{{ mcp_provider_type }}{% endraw %}"
+mcp_jwt_issuer = "{% raw %}{{ mcp_jwt_issuer }}{% endraw %}"
+mcp_jwt_audience = "{% raw %}{{ mcp_jwt_audience }}{% endraw %}"
+mcp_jwt_jwks_uri = "{% raw %}{{ mcp_jwt_jwks_uri }}{% endraw %}"
+mcp_jwt_public_key = "{% raw %}{{ mcp_jwt_public_key }}{% endraw %}"
+mcp_jwt_algorithm = "{% raw %}{{ mcp_jwt_algorithm }}{% endraw %}"
+mcp_jwt_required_scopes = "{% raw %}{{ mcp_jwt_required_scopes }}{% endraw %}"
+mcp_oauth_authorize_endpoint = "{% raw %}{{ mcp_oauth_authorize_endpoint }}{% endraw %}"
+mcp_oauth_token_endpoint = "{% raw %}{{ mcp_oauth_token_endpoint }}{% endraw %}"
+mcp_oauth_userinfo_endpoint = "{% raw %}{{ mcp_oauth_userinfo_endpoint }}{% endraw %}"
+mcp_user_id = "{% raw %}{{ mcp_user_id }}{% endraw %}"
+mcp_org_id = "{% raw %}{{ mcp_org_id }}{% endraw %}"
+mcp_static_tokens = "{% raw %}{{ mcp_static_tokens }}{% endraw %}"
 
 # MCP Gateway - internal endpoint (protected by auth gateway)
 [[trigger.http]]

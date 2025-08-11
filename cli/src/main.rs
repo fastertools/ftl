@@ -206,11 +206,12 @@ enum EngCommand {
         #[arg(long, value_name = "KEY=VALUE")]
         variable: Vec<String>,
 
-        /// Set access control mode (public, private)
+        /// Set access control mode (public, private, org, custom)
         /// Overrides `FTL_ACCESS_CONTROL` env var and ftl.toml `project.access_control`
         #[arg(
             long = "access-control",
-            value_name = "public|private",
+            value_name = "MODE",
+            help = "Access control: public (no auth), private (user only), org (organization), custom (BYO auth)",
             help_heading = "Authentication"
         )]
         access_control: Option<String>,
@@ -220,6 +221,11 @@ enum EngCommand {
         /// Overrides `FTL_JWT_ISSUER` env var and ftl.toml oauth.issuer
         #[arg(long, value_name = "URL", help_heading = "Authentication")]
         jwt_issuer: Option<String>,
+
+        /// JWT audience (required when using --jwt-issuer for custom auth)
+        /// Overrides `FTL_JWT_AUDIENCE` env var and ftl.toml oauth.audience
+        #[arg(long, value_name = "AUDIENCE", help_heading = "Authentication")]
+        jwt_audience: Option<String>,
 
         /// Run without making any changes (preview what would be deployed)
         #[arg(long)]
@@ -277,6 +283,17 @@ enum LogsOutputFormat {
 enum EngAuthCommand {
     /// Show authentication status
     Status,
+    /// Manage authentication tokens
+    Token {
+        #[command(subcommand)]
+        command: EngAuthTokenCommand,
+    },
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum EngAuthTokenCommand {
+    /// Output current user access token (for automation)
+    Show,
 }
 
 #[derive(Debug, Args)]
@@ -399,6 +416,15 @@ impl From<EngAuthCommand> for ftl_commands::auth::AuthCommand {
     fn from(cmd: EngAuthCommand) -> Self {
         match cmd {
             EngAuthCommand::Status => Self::Status,
+            EngAuthCommand::Token { command } => Self::Token(command.into()),
+        }
+    }
+}
+
+impl From<EngAuthTokenCommand> for ftl_commands::auth::TokenCommand {
+    fn from(cmd: EngAuthTokenCommand) -> Self {
+        match cmd {
+            EngAuthTokenCommand::Show => Self::Show,
         }
     }
 }
@@ -537,6 +563,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
             variable,
             access_control,
             jwt_issuer,
+            jwt_audience,
             dry_run,
             yes,
         } => {
@@ -544,6 +571,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
                 variables: variable,
                 access_control,
                 jwt_issuer,
+                jwt_audience,
                 dry_run,
                 yes,
             };

@@ -58,28 +58,49 @@ The `[project]` section contains essential metadata about your FTL project.
 | `version` | string | No | "0.1.0" | Project version (SemVer format) |
 | `description` | string | No | "" | Project description |
 | `authors` | array | No | [] | List of project authors |
-| `access_control` | string | No | "public" | Access control mode: "public" or "private" |
+| `access_control` | string | No | "public" | Access control mode: "public", "private", "org", or "custom" |
 | `default_registry` | string | No | - | Default registry for component references (e.g., "ghcr.io/myorg") |
 
 ### Access Control Modes
 
 - **`public`** (default): No authentication required. The MCP endpoint is publicly accessible.
-- **`private`**: Authentication required. When set to private:
-  - Without `[oauth]` section: Uses FTL's built-in auth provider
-  - With `[oauth]` section: Uses your custom OAuth provider
+- **`private`**: Authentication required for user-level access. Uses FTL's built-in auth provider. Only the user who deployed the app can access it.
+- **`org`**: Authentication required for organization-wide access. Uses FTL's built-in auth provider. All members of the organization that owns the app can access it.
+- **`custom`**: Custom authentication with your own OAuth provider. Requires an `[oauth]` section to configure the provider details.
 
-#### Example: Using FTL's Built-in Provider
+#### Examples: Access Control Modes
 
-Set `access_control = "private"` without an `[oauth]` section:
-
+**Private (User-level access):**
 ```toml
 [project]
-name = "secure-tools"
+name = "personal-tools"
 version = "1.0.0"
-description = "Collection of MCP tools for data processing"
-authors = ["Alice <alice@example.com>", "Bob <bob@example.com>"]
+description = "My personal MCP tools"
 access_control = "private"
-# No [oauth] section needed - uses FTL's provider automatically. Only the owner of the FTL server is authorized to access it.
+# Only you can access this app
+```
+
+**Organization-wide access:**
+```toml
+[project]
+name = "team-tools"
+version = "1.0.0"
+description = "Shared tools for our team"
+access_control = "org"
+# All members of your organization can access this app
+```
+
+**Custom OAuth provider:**
+```toml
+[project]
+name = "enterprise-tools"
+version = "1.0.0"
+access_control = "custom"
+
+[oauth]
+issuer = "https://auth.example.com/"
+audience = "https://api.example.com"
+# Configure your own OAuth provider
 ```
 
 ### Default Registry
@@ -117,34 +138,54 @@ allowed_outbound_hosts = ["https://api.example.com"]
 
 ## OAuth Section (Optional)
 
-The `[oauth]` section configures custom OpenID Connect authentication. This section is only used when `access_control = "private"`.
+The `[oauth]` section configures custom OpenID Connect authentication. This section is required when `access_control = "custom"` and ignored for other access control modes.
 
 ### Fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `issuer` | string | Yes | - | OAuth issuer URL |
-| `audience` | string | No | "" | Expected audience for tokens |
-| `jwks_uri` | string | No | "" | JWKS endpoint URL (auto-discovered if not set) |
-| `public_key` | string | No | "" | Public key in PEM format (alternative to JWKS) |
-| `algorithm` | string | No | "" | JWT signature algorithm (e.g., RS256, ES256) |
-| `required_scopes` | string | No | "" | Comma-separated list of required scopes |
-| `authorize_endpoint` | string | No | "" | OAuth authorization endpoint |
-| `token_endpoint` | string | No | "" | OAuth token endpoint |
-| `userinfo_endpoint` | string | No | "" | OAuth userinfo endpoint |
+| `issuer` | string | Yes | - | OAuth issuer URL (must use HTTPS for security) |
+| `audience` | string | Yes | - | Expected audience for tokens (required for security to prevent token confusion attacks) |
+| `jwks_uri` | string | No | Auto-derived | JWKS endpoint URL (auto-discovered for known providers like AuthKit) |
+| `public_key` | string | No | - | Public key in PEM format (alternative to JWKS, cannot be used with `jwks_uri`) |
+| `algorithm` | string | No | RS256 | JWT signature algorithm (RS256, RS384, RS512, ES256, ES384, PS256, PS384, PS512) |
+| `required_scopes` | string | No | - | Comma-separated list of required scopes |
+| `authorize_endpoint` | string | No | - | OAuth authorization endpoint |
+| `token_endpoint` | string | No | - | OAuth token endpoint |
+| `userinfo_endpoint` | string | No | - | OAuth userinfo endpoint |
+| `allowed_subjects` | array | No | [] | List of allowed subject IDs (user IDs) that can access this resource |
 
 ### Example: Using Auth0
 
 ```toml
 [project]
 name = "secure-tools"
-access_control = "private"
+access_control = "custom"  # Use "custom" for your own OAuth provider
 
 [oauth]
 issuer = "https://your-tenant.auth0.com/"
-audience = "https://api.example.com"
+audience = "https://api.example.com"  # Required for security
 jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
 required_scopes = "read:data,write:data"
+```
+
+### Example: Restricting Access to Specific Users
+
+```toml
+[project]
+name = "team-tools"
+access_control = "custom"
+
+[oauth]
+issuer = "https://auth.example.com/"
+audience = "https://api.example.com"
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
+# Only these specific users can access the app
+allowed_subjects = [
+    "alice@example.com",
+    "bob@example.com",
+    "service-account-prod"
+]
 ```
 
 ## MCP Section
@@ -184,6 +225,127 @@ default_registry = "ghcr.io/fastertools"
 [mcp]
 gateway = "mcp-gateway:0.0.11"  # Resolves to ghcr.io/fastertools/mcp-gateway:0.0.11
 authorizer = "mcp-authorizer:0.0.13"
+```
+
+## MCP Authorizer Configuration Details
+
+The MCP Authorizer component handles authentication and authorization for your MCP endpoints. When you configure authentication in `ftl.toml`, FTL automatically generates the appropriate configuration variables for the authorizer component.
+
+### Generated Configuration Variables
+
+Based on your `access_control` and `[oauth]` settings, FTL generates these variables for the MCP authorizer:
+
+#### Core Variables
+
+| Variable | Generated From | Description |
+|----------|---------------|-------------|
+| `mcp_gateway_url` | Internal | URL of the MCP gateway (set to "none" for testing) |
+| `mcp_trace_header` | Internal | Header name for request tracing (default: "x-trace-id") |
+| `mcp_provider_type` | `access_control` mode | Authentication provider type: "jwt" or "static" |
+
+#### JWT Provider Variables (for `private`, `org`, or `custom` modes)
+
+| Variable | Generated From | Required | Description |
+|----------|---------------|----------|-------------|
+| `mcp_jwt_issuer` | `[oauth].issuer` or FTL default | Yes | JWT issuer URL (must use HTTPS) |
+| `mcp_jwt_audience` | `[oauth].audience` or FTL default | Yes | Expected audience (prevents token confusion attacks) |
+| `mcp_jwt_jwks_uri` | `[oauth].jwks_uri` or auto-derived | No* | JWKS endpoint for key discovery |
+| `mcp_jwt_public_key` | `[oauth].public_key` | No* | Static public key in PEM format |
+| `mcp_jwt_algorithm` | `[oauth].algorithm` | No | Signature algorithm (default: RS256) |
+| `mcp_jwt_required_scopes` | `[oauth].required_scopes` | No | Comma-separated required scopes |
+
+*Note: Either `jwks_uri` or `public_key` must be provided, but not both.
+
+#### OAuth Endpoints (optional)
+
+| Variable | Generated From | Description |
+|----------|---------------|-------------|
+| `mcp_oauth_authorize_endpoint` | `[oauth].authorize_endpoint` | OAuth authorization endpoint |
+| `mcp_oauth_token_endpoint` | `[oauth].token_endpoint` | OAuth token endpoint |
+| `mcp_oauth_userinfo_endpoint` | `[oauth].userinfo_endpoint` | OAuth userinfo endpoint |
+
+#### Static Token Variables (for development/testing)
+
+| Variable | Format | Description |
+|----------|--------|-------------|
+| `mcp_static_tokens` | See below | Static tokens for testing |
+
+Static token format: `token:client_id:user_id:scope1,scope2[:expires_at[:key=value]]`
+
+Multiple tokens separated by semicolons: `token1:client1:user1:read;token2:client2:user2:write`
+
+### Security Requirements
+
+1. **HTTPS Required**: All OAuth URLs must use HTTPS for security
+2. **Audience Validation**: The `audience` field is mandatory to prevent confused deputy attacks
+3. **Issuer Validation**: Tokens are validated against the configured issuer
+4. **Scope Validation**: If `required_scopes` is set, tokens must include all specified scopes
+
+### Provider Auto-Configuration
+
+For certain providers, FTL automatically configures endpoints:
+
+#### WorkOS AuthKit
+If your issuer ends with `.authkit.app` or `.workos.com`:
+- JWKS URI is auto-derived as `{issuer}/oauth2/jwks`
+- OAuth endpoints are auto-configured
+
+#### Example Configurations
+
+**Private mode (FTL built-in auth):**
+```toml
+[project]
+access_control = "private"
+# FTL automatically configures:
+# - issuer: FTL's AuthKit instance
+# - audience: Your app's unique identifier
+# - jwks_uri: Auto-derived from issuer
+```
+
+**Custom OAuth with Auth0:**
+```toml
+[project]
+access_control = "custom"
+
+[oauth]
+issuer = "https://your-tenant.auth0.com/"
+audience = "https://api.yourapp.com"
+jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
+required_scopes = "read:data,write:data"
+```
+
+**Custom OAuth with static public key:**
+```toml
+[project]
+access_control = "custom"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = "my-api"
+public_key = """
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END PUBLIC KEY-----
+"""
+algorithm = "RS256"
+```
+
+### Authorization Rules (Advanced)
+
+Additional authorization rules can be configured via environment variables at deployment:
+
+| Variable | Format | Description |
+|----------|--------|-------------|
+| `mcp_auth_allowed_subjects` | Comma-separated | Restrict access to specific user IDs |
+| `mcp_auth_allowed_issuers` | Comma-separated | Allow tokens from specific issuers |
+| `mcp_auth_required_claims` | JSON object | Require specific claim values |
+| `mcp_auth_required_scopes` | Comma-separated | Additional required scopes |
+| `mcp_auth_forward_claims` | JSON object | Forward claims as headers |
+
+Example with authorization rules:
+```bash
+ftl deploy --var mcp_auth_allowed_subjects="user1,user2" \
+           --var mcp_auth_required_claims='{"org_id":"org_123"}'
 ```
 
 ## Variables Section

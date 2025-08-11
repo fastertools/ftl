@@ -1,0 +1,273 @@
+
+running 114 tests
+test test-invalid-static-token                                         ... [0m[32mok[0m
+test test-missing-authorization-header                                 ... [0m[32mok[0m
+test metadata-endpoint-with-provider                                   ... [0m[32mok[0m
+test test-error-trace-id-propagation                                   ... [0m[32mok[0m
+test test-error-without-host                                           ... [0m[32mok[0m
+test test-missing-token-error-format                                   ... [0m[32mok[0m
+test test-multiple-static-tokens                                       ... [0m[32mok[0m
+test test-https-enforcement-all-urls                                   ... [0m[32mok[0m
+test test-authkit-provider-config                                      ... [0m[32mok[0m
+test test-auth-failure-error-format                                    ... [0m[32mok[0m
+test test-oauth-authorization-server-metadata                          ... [0m[32mok[0m
+test test-static-token-with-org-validation                             ... [0m[32mok[0m
+test test-gateway-url-config                                           ... [0m[32mok[0m
+test test-www-authenticate-resource-metadata                           ... [0m[32mok[0m
+test test-malformed-jwt                                                ... [0m[32mok[0m
+test auth-enabled-requires-token                                       ... [0m[32mok[0m
+test https-enforcement-rejects-http                                    ... [0m[32mok[0m
+test test-error-json-content-type                                      ... [0m[32mok[0m
+test test-workos-domain-support                                        ... [0m[32mok[0m
+test test-authkit-protected-resource-metadata                          ... [0m[32mok[0m
+test https-enforcement-accepts-bare-domain                             ... [0m[32mok[0m
+test test-missing-jwt-key-source                                       ... [0m[32mok[0m
+test test-oauth-protected-resource-metadata                            ... [0m[32mok[0m
+test test-discovery-without-host                                       ... [0m[32mok[0m
+test test-bare-domain-https-prefix                                     ... [0m[32mok[0m
+test test-malformed-auth-header                                        ... [0m[32mok[0m
+test test-oauth-provider-config                                        ... [0m[32mok[0m
+test options-cors-request                                              ... [0m[32mok[0m
+test test-authkit-token-validation                                     ... [0m[32mok[0m
+test test-internal-error-format                                        ... [0m[32mok[0m
+test test-org-app-rejects-user-token                                   ... [0m[31mFAILED[0m
+test test-jwks-token-validation-with-kid-mismatch                      ... [0m[32mok[0m
+test test-wrong-audience-rejection                                     ... [0m[32mok[0m
+test test-wrong-issuer-rejection                                       ... [0m[32mok[0m
+test test-scope-extraction                                             ... [0m[32mok[0m
+test test-expired-token-rejection                                      ... [0m[32mok[0m
+test test-multiple-audiences                                           ... [0m[32mok[0m
+test trace-id-header                                                   ... [0m[32mok[0m
+test test-authkit-openid-configuration                                 ... [0m[32mok[0m
+test test-valid-token-with-public-key                                  ... [0m[32mok[0m
+test test-invalid-token-error-format                                   ... [0m[32mok[0m
+test test-public-app-accepts-any-token                                 ... [0m[31mFAILED[0m
+test test-invalid-bearer-format                                        ... [0m[32mok[0m
+test test-error-includes-resource-metadata-url                         ... [0m[32mok[0m
+test test-utils-with-scope-validation                                  ... [0m[32mok[0m
+test https-enforcement-oauth-urls                                      ... [0m[32mok[0m
+test test-static-token-required-scopes                                 ... [0m[32mok[0m
+test test-custom-trace-header                                          ... [0m[32mok[0m
+test test-single-provider-only                                         ... [0m[32mok[0m
+test test-jwks-cache-ttl                                               ... [0m[32mok[0m
+test test-provider-cannot-have-both-key-and-jwks                       ... [0m[32mok[0m
+test test-invalid-provider-type                                        ... [0m[32mok[0m
+test test-various-token-scenarios                                      ... [0m[32mok[0m
+test test-authkit-jwks-auto-derivation                                 ... [0m[32mok[0m
+test test-expired-token                                                ... [0m[32mok[0m
+test test-user-app-rejects-m2m-token                                   ... [0m[31mFAILED[0m
+test test-scope-formats                                                ... [0m[32mok[0m
+test test-jwks-token-validation-with-kid                               ... [0m[32mok[0m
+test authorization-server-metadata                                     ... [0m[32mok[0m
+test test-audience-optional                                            ... [0m[32mok[0m
+test test-gateway-error-passthrough                                    ... [0m[32mok[0m
+test test-optional-issuer-empty-string                                 ... [0m[32mok[0m
+test test-discovery-authkit-provider                                   ... [0m[32mok[0m
+test test-discovery-oauth-provider                                     ... [0m[32mok[0m
+test test-scope-precedence                                             ... [0m[32mok[0m
+test test-static-token-expiration                                      ... [0m[32mok[0m
+test test-non-authkit-domain                                           ... [0m[32mok[0m
+test test-jwks-token-validation-with-no-kid-and-kid-in-jwks            ... [0m[32mok[0m
+test test-token-builder-features                                       ... [0m[32mok[0m
+test test-sufficient-scopes                                            ... [0m[32mok[0m
+test metadata-endpoint                                                 ... [0m[32mok[0m
+test test-empty-required-scopes                                        ... [0m[32mok[0m
+test test-static-token-rejected-wrong-org                              ... [0m[31mFAILED[0m
+test test-options-request                                              ... [0m[32mok[0m
+test https-enforcement-accepts-https-prefix                            ... [0m[32mok[0m
+test test-no-scopes-in-token                                           ... [0m[32mok[0m
+test test-user-app-accepts-user-token                                  ... [0m[32mok[0m
+test unauthenticated-request                                           ... [0m[32mok[0m
+test test-org-app-accepts-m2m-token                                    ... [0m[32mok[0m
+test provider-config-works                                             ... [0m[32mok[0m
+test test-static-token-auth                                            ... [0m[32mok[0m
+test test-discovery-endpoints-no-auth-required                         ... [0m[32mok[0m
+test test-jwt-with-test-utils                                          ... [0m[32mok[0m
+test test-discovery-with-forwarded-host                                ... [0m[32mok[0m
+test test-various-invalid-tokens                                       ... [0m[32mok[0m
+test test-user-app-rejects-wrong-user-token                            ... [0m[31mFAILED[0m
+test test-provider-requires-key-or-jwks                                ... [0m[32mok[0m
+test test-discovery-cors-headers                                       ... [0m[32mok[0m
+test test-string-issuer-mismatch                                       ... [0m[32mok[0m
+test test-optional-issuer-string-support                               ... [0m[32mok[0m
+test test-client-id-extraction-explicit                                ... [0m[32mok[0m
+test test-jwks-token-validation-with-kid-and-no-kid-in-token           ... [0m[32mok[0m
+test test-valid-token-jwks-verification                                ... [0m[32mok[0m
+Response status: 200
+Response body: {"jsonrpc":"2.0","result":{},"id":1}
+test test-ownership-validation-debug                                   ... [0m[31mFAILED[0m
+test test-partial-scope-match-failure                                  ... [0m[32mok[0m
+test test-expired-token-creation                                       ... [0m[32mok[0m
+test test-scope-validation-with-scp-claim                              ... [0m[32mok[0m
+test test-client-id-extraction                                         ... [0m[32mok[0m
+test test-gateway-response-passthrough                                 ... [0m[32mok[0m
+test test-token-utils-multiple-audiences                               ... [0m[32mok[0m
+test test-algorithm-configuration                                      ... [0m[32mok[0m
+test test-optional-issuer-validation-when-configured                   ... [0m[32mok[0m
+test test-jwks-caching                                                 ... [0m[32mok[0m
+test test-no-issuer-validation                                         ... [0m[32mok[0m
+test test-exact-scope-match                                            ... [0m[32mok[0m
+test test-org-app-rejects-wrong-m2m-token                              ... [0m[31mFAILED[0m
+test test-insufficient-scopes                                          ... [0m[32mok[0m
+test test-string-issuer                                                ... [0m[32mok[0m
+test test-invalid-signature-rejection                                  ... [0m[32mok[0m
+test test-multiple-audiences-validation                                ... [0m[32mok[0m
+test test-multiple-expected-audiences                                  ... [0m[32mok[0m
+test test-microsoft-scp-claim                                          ... [0m[32mok[0m
+test test-jwks-token-validation-with-multiple-keys-and-no-kid-in-token ... [0m[32mok[0m
+test test-jwks-cache-per-issuer                                        ... [0m[32mok[0m
+
+failures:
+
+---- test-org-app-rejects-user-token ----
+test 'spin-test-test-org-app-rejects-user-token' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68cadc - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x591792 - tests.wasm!tests::ownership_validation_tests::test_org_app_rejects_user_token::he740bc589a6e3d9d
+   14: 0x5ce621 - tests.wasm!spin-test-test-org-app-rejects-user-token
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-public-app-accepts-any-token ----
+test 'spin-test-test-public-app-accepts-any-token' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68ca6d - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x5935d3 - tests.wasm!tests::ownership_validation_tests::test_public_app_accepts_any_token::h3b15c2aefab814d8
+   14: 0x5d5adb - tests.wasm!spin-test-test-public-app-accepts-any-token
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-user-app-rejects-m2m-token ----
+test 'spin-test-test-user-app-rejects-m2m-token' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68cadc - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x592c15 - tests.wasm!tests::ownership_validation_tests::test_user_app_rejects_m2m_token::hffffe571204d6be7
+   14: 0x5c7ef1 - tests.wasm!spin-test-test-user-app-rejects-m2m-token
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-static-token-rejected-wrong-org ----
+test 'spin-test-test-static-token-rejected-wrong-org' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68cadc - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x593c0f - tests.wasm!tests::ownership_validation_tests::test_static_token_rejected_wrong_org::h90bf6c4f5e22be91
+   14: 0x5bab03 - tests.wasm!spin-test-test-static-token-rejected-wrong-org
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-user-app-rejects-wrong-user-token ----
+test 'spin-test-test-user-app-rejects-wrong-user-token' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68cadc - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x592490 - tests.wasm!tests::ownership_validation_tests::test_user_app_rejects_wrong_user_token::h6e4d06a95e4ac2a1
+   14: 0x5bab12 - tests.wasm!spin-test-test-user-app-rejects-wrong-user-token
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-ownership-validation-debug ----
+test 'spin-test-test-ownership-validation-debug' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68ca6d - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x5aecf9 - tests.wasm!tests::ownership_debug_test::test_ownership_validation_debug::h1ba0f57eae7df3d0
+   14: 0x5c0ef6 - tests.wasm!spin-test-test-ownership-validation-debug
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+---- test-org-app-rejects-wrong-m2m-token ----
+test 'spin-test-test-org-app-rejects-wrong-m2m-token' failed 
+Caused by: error while executing at wasm backtrace:
+    0: 0x68437b - tests.wasm!abort
+    1: 0x67fc03 - tests.wasm!std::sys::pal::wasi::helpers::abort_internal::hcc3b2e0cde3c9001
+    2: 0x67de2c - tests.wasm!std::process::abort::h0e38511b4c8b6f04
+    3: 0x67de22 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_abort
+    4: 0x6812e6 - tests.wasm!__rustc[5224e6b81cd82a8f]::__rust_start_panic
+    5: 0x681157 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_panic
+    6: 0x6810dc - tests.wasm!std::panicking::rust_panic_with_hook::h085fb375cd657b2f
+    7: 0x6800b8 - tests.wasm!std::panicking::begin_panic_handler::{{closure}}::he68af7f9d5c53e56
+    8: 0x680024 - tests.wasm!std::sys::backtrace::__rust_end_short_backtrace::h4c38003a22ca226f
+    9: 0x680ac3 - tests.wasm!__rustc[5224e6b81cd82a8f]::rust_begin_unwind
+   10: 0x68aba8 - tests.wasm!core::panicking::panic_fmt::h4e32e8d1cab5f47e
+   11: 0x68cadc - tests.wasm!core::panicking::assert_failed_inner::hf7ede4d3870aaaec
+   12: 0x5d0361 - tests.wasm!core::panicking::assert_failed::h84edd7e0f6313d6c
+   13: 0x59115a - tests.wasm!tests::ownership_validation_tests::test_org_app_rejects_wrong_m2m_token::h7baa93a15a43abd6
+   14: 0x5c7f00 - tests.wasm!spin-test-test-org-app-rejects-wrong-m2m-token
+Caused by: wasm trap: wasm `unreachable` instruction executed
+
+
+failures:
+    test-org-app-rejects-user-token
+    test-public-app-accepts-any-token
+    test-user-app-rejects-m2m-token
+    test-static-token-rejected-wrong-org
+    test-user-app-rejects-wrong-user-token
+    test-ownership-validation-debug
+    test-org-app-rejects-wrong-m2m-token
+
+test result: [0m[31mFAILED[0m. 107 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.87s
+

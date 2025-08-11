@@ -6,10 +6,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-use ftl_runtime::deps::{AsyncRuntime, MessageStyle, StoredCredentials, UserInterface};
+use crate::config::UserConfig;
+use ftl_runtime::deps::{
+    AsyncRuntime, FtlApiClient, MessageStyle, StoredCredentials, UserInterface,
+};
 
 /// OAuth client ID for FTL authentication
-pub const CLIENT_ID: &str = "client_01K06E1DRP26N8A3T9CGMB1YSP";
+pub const CLIENT_ID: &str = "client_01K2ADMPRAFT9X83PFVJBQ6T49";
 /// Default `AuthKit` domain for authentication
 pub const AUTHKIT_DOMAIN: &str = "divine-lion-50-staging.authkit.app";
 /// Maximum time to wait for login completion
@@ -135,7 +138,7 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
     let client_id = config.client_id.as_deref().unwrap_or(CLIENT_ID);
 
     deps.ui
-        .print(&format!("→ Logging in to FTL ({authkit_domain})"));
+        .print(&format!("→ Logging in to FTL Engine ({authkit_domain})"));
     deps.ui.print("");
 
     // Request device authorization
@@ -187,6 +190,16 @@ pub async fn execute_with_deps(config: LoginConfig, deps: Arc<LoginDependencies>
     deps.ui
         .print_styled("✅ Successfully logged in!", MessageStyle::Success);
 
+    // Check for organization membership and offer selection
+    if let Err(e) = check_and_select_organization(&deps.ui).await {
+        // Don't fail login if org selection fails, just warn
+        deps.ui.print("");
+        deps.ui.print_styled(
+            &format!("⚠ Could not fetch organizations: {e}"),
+            MessageStyle::Warning,
+        );
+    }
+
     Ok(())
 }
 
@@ -196,6 +209,7 @@ async fn request_device_authorization(
     client_id: &str,
 ) -> Result<DeviceAuthResponse> {
     let url = format!("https://{authkit_domain}/oauth2/device_authorization");
+
     let body = format!("client_id={client_id}&scope=openid%20email%20profile%20offline_access");
 
     let response = http_client
@@ -379,28 +393,28 @@ impl Clock for RealClock {
 
 /// Helper function to get or refresh credentials using default implementations
 pub async fn get_or_refresh_credentials() -> Result<StoredCredentials> {
-    let keyring: Arc<dyn KeyringStorage> = Arc::new(RealKeyringStorage);
-    let http_client: Arc<dyn HttpClient> = Arc::new(RealHttpClient);
-    let clock: Arc<dyn Clock> = Arc::new(RealClock);
+    use ftl_runtime::deps::{CredentialsProvider, RealCredentialsProvider};
 
-    get_or_refresh_credentials_with_deps(&keyring, &http_client, &clock).await
+    let provider = RealCredentialsProvider;
+    provider.get_or_refresh_credentials().await
 }
 
-/// Get or refresh credentials with injected dependencies
+/// Get or refresh credentials with injected dependencies (for testing)
 pub async fn get_or_refresh_credentials_with_deps(
     keyring: &Arc<dyn KeyringStorage>,
     http_client: &Arc<dyn HttpClient>,
     clock: &Arc<dyn Clock>,
 ) -> Result<StoredCredentials> {
+    // This function is now only used for testing
+    // In production, use get_or_refresh_credentials() which uses RealCredentialsProvider
     let json = keyring.retrieve("ftl-cli", "default")?;
     let mut credentials: StoredCredentials = serde_json::from_str(&json)?;
 
-    // Check if token is expired or about to expire (within 30 seconds)
+    // Check if token is expired
     if let Some(expires_at) = credentials.expires_at {
         let now = clock.now();
-        let buffer = chrono::Duration::seconds(30);
 
-        if expires_at < now + buffer {
+        if expires_at < now {
             // Token is expired or about to expire, try to refresh
             if let Some(refresh_token) = credentials.refresh_token.clone() {
                 match refresh_access_token(http_client, &credentials.authkit_domain, &refresh_token)
@@ -443,6 +457,7 @@ pub async fn get_or_refresh_credentials_with_deps(
     Ok(credentials)
 }
 
+// Helper function for tests only
 async fn refresh_access_token(
     http_client: &Arc<dyn HttpClient>,
     authkit_domain: &str,
@@ -474,6 +489,65 @@ async fn refresh_access_token(
 pub fn clear_stored_credentials() -> Result<()> {
     let entry = keyring::Entry::new("ftl-cli", "default")?;
     entry.delete_credential()?;
+    Ok(())
+}
+
+/// Check for organization membership and offer selection
+async fn check_and_select_organization(ui: &Arc<dyn UserInterface>) -> Result<()> {
+    use ftl_runtime::deps::{CredentialsProvider, RealCredentialsProvider, RealFtlApiClient};
+
+    // Create API client with current credentials
+    let provider = RealCredentialsProvider;
+    let credentials = provider.get_or_refresh_credentials().await?;
+    let client = ftl_runtime::api_client::Client::new(ftl_runtime::config::DEFAULT_API_BASE_URL);
+    let api_client = RealFtlApiClient::new_with_auth(client, credentials.access_token.clone());
+
+    // Fetch user's organizations
+    let orgs_response = api_client.get_user_orgs().await?;
+
+    if orgs_response.organizations.is_empty() {
+        // User has no organizations, nothing to select
+        return Ok(());
+    }
+
+    if orgs_response.organizations.len() == 1 {
+        // Only one org, automatically select it
+        let org = &orgs_response.organizations[0];
+        let mut config = UserConfig::load()?;
+        config.set_selected_org(org.id.clone(), org.name.clone());
+        config.save()?;
+
+        ui.print("");
+        ui.print(&format!("Organization: {} ({})", org.name, org.id));
+        return Ok(());
+    }
+
+    // Multiple orgs, let user choose
+    ui.print("");
+    ui.print_styled("Select your organization:", MessageStyle::Cyan);
+
+    let org_names: Vec<String> = orgs_response
+        .organizations
+        .iter()
+        .map(|org| format!("{} ({})", org.name, org.id))
+        .collect();
+
+    let selection = ui.prompt_select(
+        "Which organization would you like to use?",
+        &org_names.iter().map(String::as_str).collect::<Vec<_>>(),
+        0,
+    )?;
+
+    let selected_org = &orgs_response.organizations[selection];
+
+    // Save the selection
+    let mut config = UserConfig::load()?;
+    config.set_selected_org(selected_org.id.clone(), selected_org.name.clone());
+    config.save()?;
+
+    ui.print("");
+    ui.print(&format!("Selected organization: {}", selected_org.name));
+
     Ok(())
 }
 

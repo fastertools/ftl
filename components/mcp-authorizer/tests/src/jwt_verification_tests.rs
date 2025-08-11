@@ -51,7 +51,7 @@ pub enum ScopeValue {
 /// Configure test provider
 pub fn configure_test_provider() {
     // Core settings - gateway URL is the full internal MCP endpoint
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_trace_header", "x-trace-id");
     
     // JWT provider settings
@@ -150,8 +150,12 @@ fn mock_mcp_gateway_success() {
 // Test: Valid token with JWKS verification
 #[spin_test]
 fn test_valid_token_jwks_verification() {
-    // Configure provider
-    configure_test_provider();
+    // Configure provider with gateway URL for forwarding
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup
     let (private_key, public_key) = generate_test_key_pair();
@@ -386,7 +390,12 @@ fn test_wrong_audience_rejection() {
 // Test: Multiple audiences validation
 #[spin_test]
 fn test_multiple_audiences_validation() {
-    configure_test_provider();
+    // Configure provider with gateway URL for forwarding
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup
     let (private_key, public_key) = generate_test_key_pair();
@@ -450,7 +459,12 @@ fn test_multiple_audiences_validation() {
 // Test: Scope extraction from different formats
 #[spin_test]
 fn test_scope_extraction() {
-    configure_test_provider();
+    // Configure provider with gateway URL for forwarding
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup
     let (private_key, public_key) = generate_test_key_pair();
@@ -511,7 +525,12 @@ fn test_scope_extraction() {
 // Test: Client ID extraction with explicit claim
 #[spin_test]
 fn test_client_id_extraction_explicit() {
-    configure_test_provider();
+    // Configure provider with actual gateway URL for forwarding
+    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_trace_header", "x-trace-id");
+    variables::set("mcp_jwt_issuer", "https://test.authkit.app");
+    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set("mcp_jwt_audience", "test-audience");
     
     // Setup
     let (private_key, public_key) = generate_test_key_pair();

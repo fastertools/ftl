@@ -165,7 +165,6 @@ fn create_ftl_project(
             version: "0.1.0".to_string(),
             description: "FTL MCP server for hosting MCP tools".to_string(),
             authors: vec![],
-            access_control: "public".to_string(),
             default_registry: None,
         },
         oauth: None,

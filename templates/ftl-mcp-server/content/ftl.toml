@@ -3,16 +3,12 @@ name = "{{project-name | kebab_case}}"
 version = "0.1.0"
 description = "{{project-description}}"
 authors = ["{{authors}}"]
-# Access control mode: "public" or "private"
-# - public: No authentication required (default)
-# - private: Authentication required
-access_control = "public"
 
 # ========================================
 # OAuth Configuration (Optional)
 # ========================================
-# For private access control with custom OAuth provider
-# If omitted with private mode, uses FTL's built-in AuthKit
+# If no [oauth] section: public access (no authentication)
+# If [oauth] section present: custom OAuth authentication
 
 # For custom OAuth (Auth0, Okta, etc.):
 # [oauth]

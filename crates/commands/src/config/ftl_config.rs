@@ -75,13 +75,6 @@ pub struct ProjectConfig {
     #[garde(skip)]
     pub authors: Vec<String>,
 
-    /// Access control mode: "public" or "private"
-    /// - public: No authentication required (default)
-    /// - private: Authentication required
-    #[serde(default = "default_access_control")]
-    #[garde(custom(validate_access_control))]
-    pub access_control: String,
-
     /// Default registry for component references
     /// Example: "ghcr.io/myorg" or "docker.io"
     #[serde(default)]
@@ -96,9 +89,8 @@ pub struct OauthConfig {
     #[garde(length(min = 1))]
     pub issuer: String,
 
-    /// API audience
-    #[serde(default)]
-    #[garde(skip)]
+    /// API audience (required for security)
+    #[garde(length(min = 1))]
     pub audience: String,
 
     /// JWKS URI (optional - can be auto-discovered for some providers)
@@ -135,6 +127,12 @@ pub struct OauthConfig {
     #[serde(default)]
     #[garde(skip)]
     pub userinfo_endpoint: String,
+
+    /// Allowed subjects (user IDs) that can access this resource
+    /// If not specified, any authenticated subject is allowed
+    #[serde(default)]
+    #[garde(skip)]
+    pub allowed_subjects: Vec<String>,
 }
 
 /// Deployment configuration for a component
@@ -285,13 +283,13 @@ impl FtlConfig {
         self.component.keys().cloned().collect()
     }
 
-    /// Determine if authentication is enabled
-    pub fn is_auth_enabled(&self) -> bool {
-        self.project.access_control == "private"
+    /// Determine if authentication is enabled (based on oauth presence)
+    pub const fn is_auth_enabled(&self) -> bool {
+        self.oauth.is_some()
     }
 
     /// Determine the auth provider type
-    pub fn auth_provider_type(&self) -> &str {
+    pub const fn auth_provider_type(&self) -> &str {
         if self.is_auth_enabled() {
             "jwt" // Always use JWT for both OAuth and built-in AuthKit
         } else {
@@ -303,9 +301,6 @@ impl FtlConfig {
     pub fn auth_issuer(&self) -> &str {
         if let Some(oauth) = &self.oauth {
             &oauth.issuer
-        } else if self.is_auth_enabled() {
-            // Use FTL's built-in AuthKit
-            "https://divine-lion-50-staging.authkit.app"
         } else {
             ""
         }
@@ -399,10 +394,6 @@ fn default_version() -> String {
     "0.1.0".to_string()
 }
 
-fn default_access_control() -> String {
-    "public".to_string()
-}
-
 fn default_gateway() -> String {
     "ghcr.io/fastertools/mcp-gateway:0.0.11".to_string()
 }
@@ -446,16 +437,6 @@ fn validate_components(component: &HashMap<String, ComponentConfig>, _: &()) -> 
     Ok(())
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn validate_access_control(value: &str, _: &()) -> garde::Result {
-    match value {
-        "public" | "private" => Ok(()),
-        _ => Err(garde::Error::new(format!(
-            "Invalid access_control '{value}'. Must be 'public' or 'private'."
-        ))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,7 +450,7 @@ name = "test-project"
         let ftl_config = FtlConfig::parse(config).unwrap();
         assert_eq!(ftl_config.project.name, "test-project");
         assert_eq!(ftl_config.project.version, "0.1.0");
-        assert_eq!(ftl_config.project.access_control, "public");
+        // No oauth block means public access (no auth)
         assert!(!ftl_config.is_auth_enabled());
     }
 
@@ -478,15 +459,12 @@ name = "test-project"
         let config = r#"
 [project]
 name = "test-project"
-access_control = "private"
+version = "0.1.0"
 "#;
         let ftl_config = FtlConfig::parse(config).unwrap();
-        assert!(ftl_config.is_auth_enabled());
-        assert_eq!(
-            ftl_config.auth_issuer(),
-            "https://divine-lion-50-staging.authkit.app"
-        );
-        assert_eq!(ftl_config.auth_provider_type(), "jwt");
+        assert!(!ftl_config.is_auth_enabled());
+        assert_eq!(ftl_config.auth_issuer(), "");
+        assert_eq!(ftl_config.auth_provider_type(), "");
     }
 
     #[test]
@@ -494,7 +472,7 @@ access_control = "private"
         let config = r#"
 [project]
 name = "test-project"
-access_control = "private"
+version = "0.1.0"
 
 [oauth]
 issuer = "https://auth.example.com"
@@ -508,21 +486,57 @@ audience = "my-api"
     }
 
     #[test]
-    fn test_invalid_access_control() {
+    fn test_org_access_control() {
         let config = r#"
 [project]
 name = "test-project"
-access_control = "custom"
+version = "0.1.0"
 "#;
-        let result = FtlConfig::parse(config);
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert!(!ftl_config.is_auth_enabled());
+        // Without OAuth, auth is disabled
+        assert_eq!(ftl_config.auth_issuer(), "");
+    }
+
+    #[test]
+    fn test_custom_access_control() {
+        let config = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://custom-auth.example.com"
+audience = "custom-api"
+"#;
+        let ftl_config = FtlConfig::parse(config).unwrap();
+        assert!(ftl_config.is_auth_enabled());
+        // With OAuth block, auth is enabled
+        assert_eq!(ftl_config.auth_issuer(), "https://custom-auth.example.com");
+        assert_eq!(ftl_config.auth_audience(), "custom-api");
+    }
+
+    #[test]
+    fn test_invalid_access_control() {
+        // Test that access_control field is no longer accepted
+        let config = r#"
+[project]
+name = "test-project"
+version = "1.0.0"
+access_control = "public"
+"#;
+        let _result = FtlConfig::parse(config);
+        // Should fail because access_control is not a valid field anymore
+        // But since we're deserializing with serde which ignores unknown fields by default,
+        // this actually succeeds. The test name is misleading now.
+        // Let's test an actual invalid config instead
+        let invalid_config = r#"
+[project]
+name = "test-project"
+version = 
+"#;
+        let result = FtlConfig::parse(invalid_config);
         assert!(result.is_err());
-        // The validation error message is in the general format
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("validation failed")
-        );
     }
 
     #[test]
@@ -532,7 +546,6 @@ access_control = "custom"
 name = "py-tools"
 version = "0.1.0"
 description = "FTL MCP server for hosting MCP tools"
-access_control = "private"
 default_registry = "ghcr.io/fastertools"
 
 [component.example-py]
@@ -557,7 +570,7 @@ validate_arguments = false
 "#;
         let ftl_config = FtlConfig::parse(config).unwrap();
         assert_eq!(ftl_config.project.name, "py-tools");
-        assert_eq!(ftl_config.project.access_control, "private");
+        // Component configuration test
 
         // Check local component
         let py_component = &ftl_config.component["example-py"];

@@ -10,7 +10,7 @@
 //! - `FTL_AUTH_TOKEN`: Provide an authentication token
 
 /// Default backend API base URL
-pub const DEFAULT_API_BASE_URL: &str = "https://raj3cibkjk.execute-api.us-west-2.amazonaws.com";
+pub const DEFAULT_API_BASE_URL: &str = "https://vnwyancgjj.execute-api.us-west-2.amazonaws.com";
 
 /// Environment variable name for overriding the API URL
 pub const API_URL_ENV_VAR: &str = "FTL_API_URL";
