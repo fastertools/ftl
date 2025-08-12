@@ -37,21 +37,10 @@ type TypedHandler[In, Out any] func(context.Context, In) (Out, error)
 //	
 //	HandleTypedTool("echo", EchoHandler)
 func HandleTypedTool[In, Out any](name string, handler TypedHandler[In, Out]) {
-	// Validate that input type is a struct (V3 requirement for proper schema generation)
-	var zero In
-	inputType := reflect.TypeOf(zero)
-	
-	// Handle pointer types by getting the underlying type
-	if inputType != nil && inputType.Kind() == reflect.Ptr {
-		inputType = inputType.Elem()
-	}
-	
-	// Reject primitive types - V3 handlers must use struct inputs for schema generation
-	if inputType == nil || inputType.Kind() != reflect.Struct {
-		panic(fmt.Sprintf("HandleTypedTool: input type for tool '%s' must be a struct, got %v. "+
-			"V3 handlers require struct types to enable automatic JSON schema generation. "+
-			"Wrap primitive types in a struct (e.g., type Input struct { Value %v `json:\"value\"` })",
-			name, inputType, inputType))
+	// Validate input type - must be a struct for proper schema generation
+	if err := validateHandlerInputType[In](name); err != nil {
+		secureLogf("Failed to register tool '%s': %v", name, err)
+		return
 	}
 	
 	// Generate basic schema from input type (stub implementation for CRAWL phase)
@@ -81,6 +70,27 @@ func HandleTypedTool[In, Out any](name string, handler TypedHandler[In, Out]) {
 	
 	// Debug logging
 	secureLogf("Registered V3 type-safe tool: %s", name)
+}
+
+// validateHandlerInputType ensures the input type is valid for V3 handlers
+func validateHandlerInputType[In any](toolName string) error {
+	var zero In
+	inputType := reflect.TypeOf(zero)
+	
+	// Handle pointer types by getting the underlying type
+	if inputType != nil && inputType.Kind() == reflect.Ptr {
+		inputType = inputType.Elem()
+	}
+	
+	// V3 handlers require struct inputs for automatic schema generation
+	if inputType == nil || inputType.Kind() != reflect.Struct {
+		return fmt.Errorf("input type for tool '%s' must be a struct, got %v. "+
+			"V3 handlers require struct types to enable automatic JSON schema generation. "+
+			"Wrap primitive types in a struct (e.g., type Input struct { Value %v `json:\"value\"` })",
+			toolName, inputType, inputType)
+	}
+	
+	return nil
 }
 
 // registerV3Tool registers a tool with the unified registry system
@@ -144,14 +154,126 @@ func executeTypedHandler[In, Out any](name string, handler TypedHandler[In, Out]
 
 // unmarshalInput converts a map[string]interface{} to a typed struct
 func unmarshalInput(input map[string]interface{}, target interface{}) error {
-	// Convert to JSON and back to get proper type conversion
-	jsonData, err := json.Marshal(input)
-	if err != nil {
-		return fmt.Errorf("failed to marshal input to JSON: %w", err)
+	// Use direct conversion with the mapstructure-like approach for better performance
+	return directMapToStruct(input, target)
+}
+
+// directMapToStruct converts a map[string]interface{} directly to a struct using reflection
+// This is more efficient than double JSON marshaling/unmarshaling
+func directMapToStruct(input map[string]interface{}, target interface{}) error {
+	targetVal := reflect.ValueOf(target)
+	if targetVal.Kind() != reflect.Ptr {
+		return fmt.Errorf("target must be a pointer to struct")
 	}
 	
-	if err := json.Unmarshal(jsonData, target); err != nil {
-		return fmt.Errorf("failed to unmarshal JSON to target type: %w", err)
+	targetElem := targetVal.Elem()
+	if targetElem.Kind() != reflect.Struct {
+		return fmt.Errorf("target must point to a struct")
+	}
+	
+	targetType := targetElem.Type()
+	
+	for i := 0; i < targetType.NumField(); i++ {
+		field := targetType.Field(i)
+		fieldVal := targetElem.Field(i)
+		
+		// Skip unexported fields
+		if !field.IsExported() || !fieldVal.CanSet() {
+			continue
+		}
+		
+		// Get JSON field name
+		jsonName := getJSONFieldName(field)
+		if jsonName == "-" || jsonName == "" {
+			continue
+		}
+		
+		// Get value from input map
+		inputVal, exists := input[jsonName]
+		if !exists {
+			continue
+		}
+		
+		// Convert and set the field value
+		if err := setFieldValue(fieldVal, inputVal); err != nil {
+			return fmt.Errorf("failed to set field %s: %w", field.Name, err)
+		}
+	}
+	
+	return nil
+}
+
+// setFieldValue sets a struct field value from an interface{} with type conversion
+func setFieldValue(fieldVal reflect.Value, inputVal interface{}) error {
+	if inputVal == nil {
+		return nil // Skip nil values
+	}
+	
+	inputValue := reflect.ValueOf(inputVal)
+	fieldType := fieldVal.Type()
+	
+	// Handle direct type matches
+	if inputValue.Type() == fieldType {
+		fieldVal.Set(inputValue)
+		return nil
+	}
+	
+	// Handle convertible types
+	if inputValue.Type().ConvertibleTo(fieldType) {
+		fieldVal.Set(inputValue.Convert(fieldType))
+		return nil
+	}
+	
+	// Handle special cases for common JSON->Go type conversions
+	switch fieldType.Kind() {
+	case reflect.String:
+		if str, ok := inputVal.(string); ok {
+			fieldVal.SetString(str)
+		} else {
+			fieldVal.SetString(fmt.Sprintf("%v", inputVal))
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if num, ok := inputVal.(float64); ok {
+			fieldVal.SetInt(int64(num))
+		} else if num, ok := inputVal.(int64); ok {
+			fieldVal.SetInt(num)
+		} else {
+			return fmt.Errorf("cannot convert %T to %s", inputVal, fieldType.Kind())
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if num, ok := inputVal.(float64); ok {
+			fieldVal.SetUint(uint64(num))
+		} else if num, ok := inputVal.(uint64); ok {
+			fieldVal.SetUint(num)
+		} else {
+			return fmt.Errorf("cannot convert %T to %s", inputVal, fieldType.Kind())
+		}
+	case reflect.Float32, reflect.Float64:
+		if num, ok := inputVal.(float64); ok {
+			fieldVal.SetFloat(num)
+		} else {
+			return fmt.Errorf("cannot convert %T to %s", inputVal, fieldType.Kind())
+		}
+	case reflect.Bool:
+		if b, ok := inputVal.(bool); ok {
+			fieldVal.SetBool(b)
+		} else {
+			return fmt.Errorf("cannot convert %T to bool", inputVal)
+		}
+	default:
+		// For complex types, fall back to JSON marshaling (still more efficient than double marshaling)
+		jsonData, err := json.Marshal(inputVal)
+		if err != nil {
+			return fmt.Errorf("failed to marshal field value: %w", err)
+		}
+		
+		// Create a new instance of the field type
+		newVal := reflect.New(fieldType)
+		if err := json.Unmarshal(jsonData, newVal.Interface()); err != nil {
+			return fmt.Errorf("failed to unmarshal field value: %w", err)
+		}
+		
+		fieldVal.Set(newVal.Elem())
 	}
 	
 	return nil
@@ -168,7 +290,10 @@ func convertTypedOutput(output interface{}) ToolResponse {
 	outputType := reflect.TypeOf(output)
 	switch outputType.Kind() {
 	case reflect.String:
-		return Text(output.(string))
+		if str, ok := output.(string); ok {
+			return Text(str)
+		}
+		return Text(fmt.Sprintf("%v", output))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return Text(fmt.Sprintf("%v", output))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:

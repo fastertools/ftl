@@ -474,39 +474,36 @@ func TestErrorHelpers(t *testing.T) {
 
 // TestGlobalRegistryFunctions tests global V3 registry functions
 func TestGlobalRegistryFunctions(t *testing.T) {
-	// Clear registry first by reassigning
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools = make(map[string]bool)
-	registeredV3ToolsMu.Unlock()
+	// Clear registry first
+	v3Registry.ClearV3Tools()
 	
 	// Test with empty registry
-	registeredV3ToolsMu.RLock()
-	exists := registeredV3Tools["non_existent"]
-	registeredV3ToolsMu.RUnlock()
+	exists := v3Registry.IsV3ToolRegistered("non_existent")
 	if exists {
 		t.Error("Registry should not contain non-existent tool")
 	}
 	
-	// Add a tool to registry (simulate via global map)
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools["test_tool"] = true
-	registeredV3ToolsMu.Unlock()
+	// Add a tool to registry using proper API
+	testDef := TypedToolDefinition{
+		ToolDefinition: ToolDefinition{
+			Description: "Test tool",
+			InputSchema: map[string]interface{}{"type": "object"},
+		},
+		InputType:       "TestInput",
+		OutputType:      "TestOutput", 
+		SchemaGenerated: true,
+	}
+	v3Registry.RegisterTypedTool("test_tool", testDef)
 	
 	// Test with existing tool
-	registeredV3ToolsMu.RLock()
-	exists = registeredV3Tools["test_tool"]
-	registeredV3ToolsMu.RUnlock()
+	exists = v3Registry.IsV3ToolRegistered("test_tool")
 	if !exists {
 		t.Error("Registry should contain registered tool")
 	}
 	
 	// Count tools in registry
-	count := 0
-	registeredV3ToolsMu.RLock()
-	for range registeredV3Tools {
-		count++
-	}
-	registeredV3ToolsMu.RUnlock()
+	allTools := v3Registry.GetAllTypedTools()
+	count := len(allTools)
 	
 	if count != 1 {
 		t.Errorf("Registry should have 1 tool, got %d", count)

@@ -10,12 +10,7 @@ import (
 // TestHandlerExecutionIntegration tests the complete handler execution flow
 func TestHandlerExecutionIntegration(t *testing.T) {
 	// Clear registry for clean test
-	v3Registry = &V3ToolRegistry{
-		tools: make(map[string]TypedToolDefinition),
-	}
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools = make(map[string]bool)
-	registeredV3ToolsMu.Unlock()
+	v3Registry.ClearV3Tools()
 	
 	// Define test input/output types
 	type TestInput struct {
@@ -150,12 +145,7 @@ func TestHandlerExecutionIntegration(t *testing.T) {
 // TestMultipleHandlers tests registering multiple V3 handlers
 func TestMultipleHandlers(t *testing.T) {
 	// Clear registry
-	v3Registry = &V3ToolRegistry{
-		tools: make(map[string]TypedToolDefinition),
-	}
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools = make(map[string]bool)
-	registeredV3ToolsMu.Unlock()
+	v3Registry.ClearV3Tools()
 	
 	// Define input/output structs for handler1
 	type Handler1Input struct {

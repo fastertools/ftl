@@ -41,22 +41,26 @@ func generateSchema[T any]() map[string]interface{} {
 
 // generateStructSchema creates schema for struct types
 func generateStructSchema(t reflect.Type) map[string]interface{} {
-	// Create a visited map to track circular references
-	visited := make(map[reflect.Type]bool)
-	return generateStructSchemaWithVisited(t, visited)
+	// Create a stack to track the current path for circular reference detection
+	stack := make([]reflect.Type, 0)
+	return generateStructSchemaWithStack(t, stack)
 }
 
-// generateStructSchemaWithVisited creates schema for struct types with circular reference detection
-func generateStructSchemaWithVisited(t reflect.Type, visited map[reflect.Type]bool) map[string]interface{} {
-	// Check for circular references
-	if visited[t] {
-		// Return a reference schema to break the cycle
-		return map[string]interface{}{
-			"type":        "object",
-			"description": fmt.Sprintf("Circular reference to %s", t.Name()),
+// generateStructSchemaWithStack creates schema for struct types with proper circular reference detection
+func generateStructSchemaWithStack(t reflect.Type, stack []reflect.Type) map[string]interface{} {
+	// Check for circular references by scanning the current stack
+	for _, stackType := range stack {
+		if stackType == t {
+			// Return a reference schema to break the cycle
+			return map[string]interface{}{
+				"type":        "object",
+				"description": fmt.Sprintf("Circular reference to %s", t.Name()),
+			}
 		}
 	}
-	visited[t] = true
+	
+	// Add current type to stack
+	newStack := append(stack, t)
 	
 	properties := make(map[string]interface{})
 	required := []string{}
@@ -76,7 +80,7 @@ func generateStructSchemaWithVisited(t reflect.Type, visited map[reflect.Type]bo
 		}
 		
 		// Generate field schema with full support
-		fieldSchema := generateFieldSchemaWithVisited(field, visited)
+		fieldSchema := generateFieldSchemaWithStack(field, newStack)
 		
 		// Add schema tag constraints
 		schemaProps := parseSchemaTag(field.Tag.Get("jsonschema"))
@@ -113,13 +117,13 @@ func generateScalarSchema(t reflect.Type) map[string]interface{} {
 
 // generateFieldSchema creates schema for individual struct fields
 func generateFieldSchema(field reflect.StructField) map[string]interface{} {
-	// Create a new visited map for this field traversal
-	visited := make(map[reflect.Type]bool)
-	return generateFieldSchemaWithVisited(field, visited)
+	// Create a new stack for this field traversal
+	stack := make([]reflect.Type, 0)
+	return generateFieldSchemaWithStack(field, stack)
 }
 
-// generateFieldSchemaWithVisited creates schema for individual struct fields with circular reference detection
-func generateFieldSchemaWithVisited(field reflect.StructField, visited map[reflect.Type]bool) map[string]interface{} {
+// generateFieldSchemaWithStack creates schema for individual struct fields with circular reference detection
+func generateFieldSchemaWithStack(field reflect.StructField, stack []reflect.Type) map[string]interface{} {
 	schema := map[string]interface{}{}
 	
 	// Get JSON type first
@@ -146,17 +150,17 @@ func generateFieldSchemaWithVisited(field reflect.StructField, visited map[refle
 	
 	// Handle nested structs
 	if field.Type.Kind() == reflect.Struct {
-		schema = generateStructSchemaWithVisited(field.Type, visited)
+		schema = generateStructSchemaWithStack(field.Type, stack)
 	} else if field.Type.Kind() == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct {
-		schema = generateStructSchemaWithVisited(field.Type.Elem(), visited)
+		schema = generateStructSchemaWithStack(field.Type.Elem(), stack)
 	} else if field.Type.Kind() == reflect.Slice && field.Type.Elem().Kind() != reflect.Uint8 {
 		// Handle slices (except []byte which is handled above)
 		schema["type"] = "array"
 		elemType := field.Type.Elem()
 		if elemType.Kind() == reflect.Struct {
-			schema["items"] = generateStructSchemaWithVisited(elemType, visited)
+			schema["items"] = generateStructSchemaWithStack(elemType, stack)
 		} else if elemType.Kind() == reflect.Ptr && elemType.Elem().Kind() == reflect.Struct {
-			schema["items"] = generateStructSchemaWithVisited(elemType.Elem(), visited)
+			schema["items"] = generateStructSchemaWithStack(elemType.Elem(), stack)
 		} else {
 			itemType := jsonTypeFromGo(elemType)
 			if itemType != "" {

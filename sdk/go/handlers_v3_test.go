@@ -464,12 +464,7 @@ func TestHandleTypedTool_DuplicateNames(t *testing.T) {
 
 // Helper function to clear V3 registry for testing
 func clearV3Registry() {
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools = make(map[string]bool)
-	registeredV3ToolsMu.Unlock()
-	v3Registry = &V3ToolRegistry{
-		tools: make(map[string]TypedToolDefinition),
-	}
+	v3Registry.ClearV3Tools()
 }
 
 // TestHandleTypedTool_ComplexTypes tests complex nested types

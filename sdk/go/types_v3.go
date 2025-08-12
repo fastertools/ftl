@@ -128,28 +128,23 @@ type TypedToolDefinition struct {
 // V3ToolRegistry manages V3 tool registrations.
 // This is used internally to track V3-specific tool metadata.
 type V3ToolRegistry struct {
-	mu    sync.RWMutex
-	tools map[string]TypedToolDefinition
+	mu               sync.RWMutex
+	tools            map[string]TypedToolDefinition
+	registeredV3Tools map[string]bool // Moved inside registry for thread safety
 }
 
 // Global V3 registry (for internal use)
 var v3Registry = &V3ToolRegistry{
-	tools: make(map[string]TypedToolDefinition),
+	tools:            make(map[string]TypedToolDefinition),
+	registeredV3Tools: make(map[string]bool),
 }
-
-// registeredV3Tools tracks which tools were registered via V3 API (for testing)
-var registeredV3Tools = make(map[string]bool)
-var registeredV3ToolsMu sync.RWMutex
 
 // RegisterTypedTool adds a tool to the V3 registry (internal use).
 func (r *V3ToolRegistry) RegisterTypedTool(name string, definition TypedToolDefinition) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.tools[name] = definition
-	
-	registeredV3ToolsMu.Lock()
-	registeredV3Tools[name] = true
-	registeredV3ToolsMu.Unlock()
+	r.registeredV3Tools[name] = true
 }
 
 // GetTypedTool retrieves a tool from the V3 registry (internal use).
@@ -170,6 +165,21 @@ func (r *V3ToolRegistry) GetAllTypedTools() map[string]TypedToolDefinition {
 		result[k] = v
 	}
 	return result
+}
+
+// IsV3ToolRegistered checks if a tool was registered via V3 API (for testing).
+func (r *V3ToolRegistry) IsV3ToolRegistered(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.registeredV3Tools[name]
+}
+
+// ClearV3Tools clears all V3 tool registrations (for testing).
+func (r *V3ToolRegistry) ClearV3Tools() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tools = make(map[string]TypedToolDefinition)
+	r.registeredV3Tools = make(map[string]bool)
 }
 
 // Helper functions
