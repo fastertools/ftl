@@ -9,7 +9,15 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+// schemaCache stores generated schemas to avoid repeated reflection
+var schemaCache sync.Map
+
+// schemaRegistry stores named type definitions for $ref support
+var schemaRegistry = make(map[string]map[string]interface{})
+var schemaRegistryMutex sync.RWMutex
 
 // generateSchema creates JSON schema from Go struct tags.
 // This is the core function that enables automatic schema generation
@@ -29,14 +37,23 @@ func generateSchema[T any]() map[string]interface{} {
 	var zero T
 	t := reflect.TypeOf(zero)
 	
+	// Check cache first
+	if cached, ok := schemaCache.Load(t); ok {
+		return cached.(map[string]interface{})
+	}
+	
 	// For CRAWL phase, we'll implement basic struct handling
 	// RUN phase will add full reflection-based schema generation
 	if t.Kind() != reflect.Struct {
 		// Non-struct types get basic schema for now
-		return generateScalarSchema(t)
+		schema := generateScalarSchema(t)
+		schemaCache.Store(t, schema)
+		return schema
 	}
 	
-	return generateStructSchema(t)
+	schema := generateStructSchema(t)
+	schemaCache.Store(t, schema)
+	return schema
 }
 
 // generateStructSchema creates schema for struct types
@@ -51,10 +68,35 @@ func generateStructSchemaWithStack(t reflect.Type, stack []reflect.Type) map[str
 	// Check for circular references by scanning the current stack
 	for _, stackType := range stack {
 		if stackType == t {
-			// Return a reference schema to break the cycle
+			// For named types, create a $ref to the definition
+			if t.Name() != "" {
+				refName := getTypeRefName(t)
+				
+				// Register the type definition if not already registered
+				schemaRegistryMutex.RLock()
+				_, exists := schemaRegistry[refName]
+				schemaRegistryMutex.RUnlock()
+				
+				if !exists {
+					// Register a placeholder to prevent infinite recursion
+					schemaRegistryMutex.Lock()
+					schemaRegistry[refName] = map[string]interface{}{
+						"type": "object",
+						"description": fmt.Sprintf("Type definition for %s", t.Name()),
+					}
+					schemaRegistryMutex.Unlock()
+				}
+				
+				return map[string]interface{}{
+					"$ref": fmt.Sprintf("#/definitions/%s", refName),
+				}
+			}
+			
+			// For anonymous types, return a simple reference indicator
 			return map[string]interface{}{
 				"type":        "object",
-				"description": fmt.Sprintf("Circular reference to %s", t.Name()),
+				"description": "Circular reference detected",
+				"additionalProperties": false,
 			}
 		}
 	}
@@ -254,6 +296,19 @@ func getFieldDescription(field reflect.StructField) string {
 	}
 	
 	return ""
+}
+
+// getTypeRefName generates a unique reference name for a type
+func getTypeRefName(t reflect.Type) string {
+	if t.Name() != "" {
+		// For named types, use package path + name
+		if t.PkgPath() != "" {
+			return strings.ReplaceAll(t.PkgPath(), "/", "_") + "_" + t.Name()
+		}
+		return t.Name()
+	}
+	// For anonymous types, generate a name based on structure
+	return fmt.Sprintf("AnonymousType_%p", t)
 }
 
 // jsonTypeFromGo maps Go types to JSON schema types

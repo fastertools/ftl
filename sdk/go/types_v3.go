@@ -7,6 +7,8 @@ package ftl
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -78,10 +80,16 @@ type ToolError struct {
 }
 
 func (e ToolError) Error() string {
+	sanitizedMessage := sanitizeErrorMessage(e.Message)
 	if e.Cause != nil {
-		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
+		// If the message was already sanitized to generic, don't add more text
+		if sanitizedMessage == "An error occurred during processing" {
+			return sanitizedMessage
+		}
+		// Don't expose underlying cause details in string representation
+		return fmt.Sprintf("%s: internal error occurred", sanitizedMessage)
 	}
-	return e.Message
+	return sanitizedMessage
 }
 
 func (e ToolError) Unwrap() error {
@@ -190,6 +198,44 @@ func generateRequestID() string {
 	return fmt.Sprintf("req_%d", time.Now().UnixNano()%1000000)
 }
 
+// sanitizeErrorMessage sanitizes error messages to prevent information disclosure.
+// Uses a hybrid approach: removes known-sensitive patterns but allows most other messages.
+func sanitizeErrorMessage(msg string) string {
+	// First, check for empty or whitespace-only messages
+	if msg == "" || len(strings.TrimSpace(msg)) == 0 {
+		return "An error occurred during processing"
+	}
+	
+	// Check for definitely sensitive patterns that should never be exposed
+	sensitivePatterns := []string{
+		`/[a-zA-Z0-9._/-]+\.go:\d+`,     // Go source file references
+		`panic:`,                         // Panic stack traces  
+		`runtime\.`,                      // Runtime internals
+		`reflect\.`,                      // Reflection internals
+		`0x[0-9a-fA-F]{8,}`,             // Memory addresses (8+ hex digits)
+		`goroutine \d+`,                  // Goroutine information
+		`\(\*[a-zA-Z]+\)`,               // Go type information
+		`/Users/[^\s]+`,                  // User paths
+		`/home/[^\s]+`,                   // Home paths
+		`[A-Z]:\\\\`,                      // Windows paths
+	}
+	
+	for _, pattern := range sensitivePatterns {
+		if matched, _ := regexp.MatchString(pattern, msg); matched {
+			// Message contains sensitive information
+			return "An error occurred during processing"
+		}
+	}
+	
+	// If message is too long, truncate it
+	if len(msg) > 200 {
+		return msg[:200] + "..."
+	}
+	
+	// Message appears safe, return as-is
+	return msg
+}
+
 // convertError converts Go errors to ToolResponse for V3 handlers.
 // This preserves existing security features while providing better error handling.
 func convertError(err error) ToolResponse {
@@ -201,15 +247,19 @@ func convertError(err error) ToolResponse {
 	// Handle specific error types
 	switch e := err.(type) {
 	case ValidationError:
-		return Error(fmt.Sprintf("Invalid input for field '%s': %s", e.Field, e.Message))
+		// ValidationError messages are user-facing and safe to expose
+		return Error(fmt.Sprintf("Invalid input for field '%s': %s", e.Field, sanitizeErrorMessage(e.Message)))
 	case ToolError:
+		// ToolError messages may contain sensitive information from underlying causes
+		sanitizedMessage := sanitizeErrorMessage(e.Message)
 		if e.Cause != nil {
-			return Error(fmt.Sprintf("%s: %v", e.Message, e.Cause))
+			// Don't expose the underlying cause details - they may contain sensitive info
+			return Error(fmt.Sprintf("%s: internal error occurred", sanitizedMessage))
 		}
-		return Error(e.Message)
+		return Error(sanitizedMessage)
 	default:
-		// Use existing security-aware error handling for unknown errors
-		return Error(err.Error())
+		// For unknown errors, provide minimal information to prevent leakage
+		return Error("An error occurred during processing")
 	}
 }
 
