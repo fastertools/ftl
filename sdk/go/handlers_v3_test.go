@@ -568,3 +568,166 @@ func TestHandleTypedTool_ComplexTypes(t *testing.T) {
 		t.Error("Handler should return content for complex input")
 	}
 }
+
+// TestHandleTypedTool_PrimitiveTypeValidation tests that primitive input types are rejected
+func TestHandleTypedTool_PrimitiveTypeValidation(t *testing.T) {
+	// Clear previous registrations
+	clearV3Registry()
+	
+	// Test that string input type is rejected
+	t.Run("StringInput", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when registering handler with string input type")
+			} else {
+				panicMsg := r.(string)
+				if !contains(panicMsg, "input type for tool") || !contains(panicMsg, "must be a struct") {
+					t.Errorf("Panic message should mention struct requirement, got: %s", panicMsg)
+				}
+			}
+		}()
+		
+		stringHandler := func(ctx context.Context, input string) (string, error) {
+			return "processed: " + input, nil
+		}
+		
+		HandleTypedTool("string_test", stringHandler)
+	})
+	
+	// Test that int input type is rejected
+	t.Run("IntInput", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when registering handler with int input type")
+			}
+		}()
+		
+		intHandler := func(ctx context.Context, input int) (int, error) {
+			return input * 2, nil
+		}
+		
+		HandleTypedTool("int_test", intHandler)
+	})
+	
+	// Test that slice input type is rejected
+	t.Run("SliceInput", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when registering handler with slice input type")
+			}
+		}()
+		
+		sliceHandler := func(ctx context.Context, input []string) ([]string, error) {
+			return input, nil
+		}
+		
+		HandleTypedTool("slice_test", sliceHandler)
+	})
+	
+	// Test that map input type is rejected
+	t.Run("MapInput", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when registering handler with map input type")
+			}
+		}()
+		
+		mapHandler := func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
+			return input, nil
+		}
+		
+		HandleTypedTool("map_test", mapHandler)
+	})
+	
+	// Test that interface{} input type is rejected
+	t.Run("InterfaceInput", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when registering handler with interface{} input type")
+			}
+		}()
+		
+		interfaceHandler := func(ctx context.Context, input interface{}) (interface{}, error) {
+			return input, nil
+		}
+		
+		HandleTypedTool("interface_test", interfaceHandler)
+	})
+	
+	// Test that pointer to struct input type is allowed
+	t.Run("PointerToStructInput", func(t *testing.T) {
+		type ValidInput struct {
+			Message string `json:"message"`
+		}
+		
+		type ValidOutput struct {
+			Result string `json:"result"`
+		}
+		
+		// This should NOT panic - pointer to struct is allowed
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Unexpected panic for pointer to struct input: %v", r)
+			}
+		}()
+		
+		pointerHandler := func(ctx context.Context, input *ValidInput) (ValidOutput, error) {
+			if input == nil {
+				return ValidOutput{Result: "nil input"}, nil
+			}
+			return ValidOutput{Result: "processed: " + input.Message}, nil
+		}
+		
+		HandleTypedTool("pointer_struct_test", pointerHandler)
+		
+		// Verify tool was registered successfully
+		if !IsV3Tool("pointer_struct_test") {
+			t.Error("Pointer to struct input should be allowed and tool should be registered")
+		}
+	})
+	
+	// Test that struct input type is allowed (baseline verification)
+	t.Run("StructInput", func(t *testing.T) {
+		type ValidInput struct {
+			Message string `json:"message"`
+		}
+		
+		type ValidOutput struct {
+			Result string `json:"result"`
+		}
+		
+		// This should NOT panic - struct is the expected type
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Unexpected panic for struct input: %v", r)
+			}
+		}()
+		
+		structHandler := func(ctx context.Context, input ValidInput) (ValidOutput, error) {
+			return ValidOutput{Result: "processed: " + input.Message}, nil
+		}
+		
+		HandleTypedTool("struct_test", structHandler)
+		
+		// Verify tool was registered successfully
+		if !IsV3Tool("struct_test") {
+			t.Error("Struct input should be allowed and tool should be registered")
+		}
+	})
+}
+
+// Helper function to check if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
+		 findInString(s, substr))))
+}
+
+func findInString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

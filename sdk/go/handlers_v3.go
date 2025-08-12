@@ -37,6 +37,23 @@ type TypedHandler[In, Out any] func(context.Context, In) (Out, error)
 //	
 //	HandleTypedTool("echo", EchoHandler)
 func HandleTypedTool[In, Out any](name string, handler TypedHandler[In, Out]) {
+	// Validate that input type is a struct (V3 requirement for proper schema generation)
+	var zero In
+	inputType := reflect.TypeOf(zero)
+	
+	// Handle pointer types by getting the underlying type
+	if inputType != nil && inputType.Kind() == reflect.Ptr {
+		inputType = inputType.Elem()
+	}
+	
+	// Reject primitive types - V3 handlers must use struct inputs for schema generation
+	if inputType == nil || inputType.Kind() != reflect.Struct {
+		panic(fmt.Sprintf("HandleTypedTool: input type for tool '%s' must be a struct, got %v. "+
+			"V3 handlers require struct types to enable automatic JSON schema generation. "+
+			"Wrap primitive types in a struct (e.g., type Input struct { Value %v `json:\"value\"` })",
+			name, inputType, inputType))
+	}
+	
 	// Generate basic schema from input type (stub implementation for CRAWL phase)
 	schema := generateBasicSchema[In]()
 	
