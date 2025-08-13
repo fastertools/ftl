@@ -79,10 +79,10 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) 
 
     // Parse ftl.toml
     let ftl_content = deps.file_system.read_to_string(&ftl_toml_path)?;
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content)?;
 
     // Display deployment header
-    let project_name = &ftl_config.project.name;
+    let project_name = &ftl_resolve.project.name;
     if args.dry_run {
         deps.ui.print_styled(
             &format!("{} Deploying {} to FTL Engine (DRY RUN)", "▶", project_name),
@@ -100,7 +100,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) 
     let resolver = ComponentResolver::new(deps.ui.clone());
     let resolved_components = resolver
         .resolve_components(
-            &ftl_config,
+            &ftl_resolve,
             ComponentResolutionStrategy::Deploy {
                 push_user_only: true, // Only resolve user components, not MCP
             },
@@ -108,8 +108,8 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) 
         .await?;
 
     // Create spin.toml with resolved paths (for parsing components)
-    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         resolved_components.mappings(),
         &project_path,
     )?;
@@ -126,7 +126,7 @@ pub async fn execute_with_deps(deps: Arc<DeployDependencies>, args: DeployArgs) 
     let _temp_dir = temp_dir.keep();
 
     // Run the deployment
-    execute_deploy_inner(deps.clone(), args, manifest_path, ftl_config, true).await
+    execute_deploy_inner(deps.clone(), args, manifest_path, ftl_resolve, true).await
 }
 
 /// Inner deployment logic separated for proper cleanup handling
@@ -135,7 +135,7 @@ async fn execute_deploy_inner(
     deps: Arc<DeployDependencies>,
     args: DeployArgs,
     manifest_path: PathBuf,
-    ftl_config: crate::config::ftl_config::FtlConfig,
+    ftl_resolve: ftl_resolve::FtlConfig,
     _is_temp_manifest: bool,
 ) -> Result<()> {
     // Create a spinner for status updates
@@ -144,7 +144,7 @@ async fn execute_deploy_inner(
 
     // Determine which build profile to use for deployment
     // For now, use release mode if any component has deploy.profile = "release" or no profile specified
-    let use_release = ftl_config.component.values().any(|component| {
+    let use_release = ftl_resolve.component.values().any(|component| {
         component
             .deploy
             .as_ref()
@@ -186,7 +186,7 @@ async fn execute_deploy_inner(
     }
 
     // Create a mapping of component names to their deploy names
-    let deploy_names: HashMap<String, String> = ftl_config
+    let deploy_names: HashMap<String, String> = ftl_resolve
         .component
         .iter()
         .filter_map(|(name, component)| {
@@ -202,9 +202,9 @@ async fn execute_deploy_inner(
     let mut parsed_variables = HashMap::new();
 
     // Step 1: Load from ftl.toml first (lowest priority)
-    // Note: We use the already-parsed ftl_config to avoid re-reading the file
-    add_variables_from_config(&ftl_config, &mut parsed_variables);
-    add_auth_variables_from_config(&ftl_config, &mut parsed_variables);
+    // Note: We use the already-parsed ftl_resolve to avoid re-reading the file
+    add_variables_from_config(&ftl_resolve, &mut parsed_variables);
+    add_auth_variables_from_config(&ftl_resolve, &mut parsed_variables);
 
     // Step 2: Override with environment variables (middle priority)
     // Spin uses SPIN_VARIABLE_ prefix for runtime variables
@@ -316,7 +316,7 @@ async fn execute_deploy_inner(
     if args.dry_run {
         spinner.finish_and_clear();
         let auth_config = resolve_auth_config(&deps.file_system, &args)?;
-        let auth_mode = auth_config.as_ref().map(|(mode, _, _, _)| mode);
+        let auth_mode = auth_config.as_ref().map(|(mode, _, _, _, _)| mode);
         display_dry_run_summary(
             &deps,
             &config,
@@ -362,7 +362,7 @@ async fn execute_deploy_inner(
         deps.ui.print(&format!("Build Profile: {profile}"));
 
         // Display access control configuration
-        if let Some((mode, _, _, _)) = &auth_config {
+        if let Some((mode, _, _, _, _)) = &auth_config {
             deps.ui.print(&format!("Access Control: {mode}"));
 
             // Show org info if using org access control
@@ -469,7 +469,7 @@ async fn execute_deploy_inner(
         // Determine access control from CLI flag or infer from oauth presence
         let access_control_mode = if let Some(mode) = &args.access_control {
             mode.as_str()
-        } else if ftl_config.oauth.is_some() {
+        } else if ftl_resolve.oauth.is_some() {
             "custom"
         } else {
             "public"
@@ -786,7 +786,7 @@ fn display_dry_run_summary(
 
 /// Add auth-related variables from parsed `FtlConfig` to the variables map
 fn add_auth_variables_from_config(
-    config: &crate::config::ftl_config::FtlConfig,
+    config: &ftl_resolve::FtlConfig,
     variables: &mut HashMap<String, String>,
 ) {
     // Always add auth_enabled variable (will be overridden by env/CLI if present)
@@ -866,10 +866,10 @@ fn add_auth_variables_from_config(
 
 /// Add general variables from parsed `FtlConfig` to the variables map
 fn add_variables_from_config(
-    config: &crate::config::ftl_config::FtlConfig,
+    config: &ftl_resolve::FtlConfig,
     variables: &mut HashMap<String, String>,
 ) {
-    use crate::config::ftl_config::ApplicationVariable;
+    use ftl_resolve::ApplicationVariable;
 
     // Add application-level variables that have default values
     // Required variables without defaults must be provided via CLI or env vars
@@ -1363,8 +1363,8 @@ async fn deploy_to_ftl_with_progress(
     spinner.set_message("Creating engine deployment...");
 
     // Build access control and custom auth config if provided
-    let (access_control, custom_auth_config) =
-        if let Some((mode, provider, issuer, audience)) = auth_config {
+    let (access_control, custom_auth, resolved_roles) =
+        if let Some((mode, _provider, issuer, audience, roles)) = auth_config {
             let access_control = match mode.as_str() {
                 "public" => Some(types::CreateDeploymentRequestAccessControl::Public),
                 "private" => Some(types::CreateDeploymentRequestAccessControl::Private),
@@ -1373,40 +1373,35 @@ async fn deploy_to_ftl_with_progress(
                 _ => None,
             };
 
-            let custom_auth_config = if mode == "custom" {
-                Some(types::CreateDeploymentRequestCustomAuthConfig {
-                    provider: provider
-                        .unwrap_or_else(|| "jwt".to_string())
-                        .try_into()
-                        .map_err(|_| anyhow!("Invalid provider name"))?,
+            let custom_auth = if mode == "custom" {
+                // Parse audience from comma-separated string to Vec<String>
+                let audience_vec = audience
+                    .ok_or_else(|| anyhow!("Audience is required for custom auth"))?
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .map(std::convert::TryInto::try_into)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| anyhow!("Invalid audience format"))?;
+
+                if audience_vec.is_empty() {
+                    return Err(anyhow!("At least one audience is required for custom auth"));
+                }
+
+                Some(types::CreateDeploymentRequestCustomAuth {
                     issuer: issuer
                         .ok_or_else(|| anyhow!("Issuer is required for custom auth"))?
                         .try_into()
                         .map_err(|_| anyhow!("Invalid issuer"))?,
-                    audience: audience
-                        .ok_or_else(|| anyhow!("Audience is required for custom auth"))?
-                        .try_into()
-                        .map_err(|_| anyhow!("Invalid audience"))?,
-                    jwks_uri: None,
-                    public_key: None,
-                    algorithm: None,
-                    required_scopes: None,
-                    authorize_endpoint: None,
-                    token_endpoint: None,
-                    userinfo_endpoint: None,
-                    allowed_subjects: None,
-                    allowed_issuers: None,
-                    required_claims: None,
-                    auth_required_scopes: None,
-                    forward_claims: None,
+                    audience: audience_vec,
                 })
             } else {
                 None
             };
 
-            (access_control, custom_auth_config)
+            (access_control, custom_auth, roles)
         } else {
-            (None, None)
+            (None, None, None)
         };
 
     // Use new API format with components and optional auth config
@@ -1414,8 +1409,8 @@ async fn deploy_to_ftl_with_progress(
         components,
         variables,
         access_control,
-        custom_auth_config,
-        subs: vec![], // Email list for org mode - not supported via CLI yet
+        custom_auth,
+        allowed_roles: resolved_roles.unwrap_or_default(),
     };
 
     let deployment_response = api_client
@@ -1447,6 +1442,8 @@ pub struct DeployArgs {
     pub jwt_issuer: Option<String>,
     /// JWT audience
     pub jwt_audience: Option<String>,
+    /// Allowed roles for organization mode
+    pub allowed_roles: Option<Vec<String>>,
     /// Run without making any changes (preview what would be deployed)
     pub dry_run: bool,
     /// Skip confirmation prompt
@@ -1454,31 +1451,47 @@ pub struct DeployArgs {
 }
 
 /// Auth configuration resolved from various sources
-type ResolvedAuthConfig = (String, Option<String>, Option<String>, Option<String>);
+type ResolvedAuthConfig = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<Vec<String>>,
+);
 
 /// Resolve auth configuration following hierarchy: CLI flags > env vars > ftl.toml
 fn resolve_auth_config(
     file_system: &Arc<dyn FileSystem>,
     args: &DeployArgs,
 ) -> Result<Option<ResolvedAuthConfig>> {
-    use crate::config::ftl_config::FtlConfig;
+    use ftl_resolve::FtlConfig;
 
     // Start with ftl.toml as the base
     let mut auth_mode = None;
     let mut auth_provider = None;
     let mut auth_issuer = None;
     let mut auth_audience = None;
+    let mut allowed_roles = None;
 
     // Load from ftl.toml if it exists
     if file_system.exists(Path::new("ftl.toml")) {
         let content = file_system.read_to_string(Path::new("ftl.toml"))?;
-        let config = FtlConfig::parse(&content)?;
+        let config: FtlConfig = toml::from_str(&content)?;
 
-        // Determine auth mode based on oauth presence (will be overridden by CLI flags)
-        if config.oauth.is_some() {
+        // Read access control and allowed roles from project config
+        if let Some(mode) = &config.project.access_control {
+            auth_mode = Some(mode.clone());
+        } else if config.oauth.is_some() {
+            // Default to custom if oauth is configured
             auth_mode = Some("custom".to_string());
         } else {
+            // Default to public if no auth config
             auth_mode = Some("public".to_string());
+        }
+
+        // Read allowed roles from project config
+        if !config.project.allowed_roles.is_empty() {
+            allowed_roles = Some(config.project.allowed_roles.clone());
         }
 
         // Extract provider details only when auth is enabled
@@ -1490,7 +1503,8 @@ fn resolve_auth_config(
                 auth_audience = if oauth.audience.is_empty() {
                     None
                 } else {
-                    Some(oauth.audience.clone())
+                    // Convert Vec to comma-separated string for API
+                    Some(oauth.audience.join(","))
                 };
             } else {
                 // Using FTL's built-in AuthKit
@@ -1537,14 +1551,23 @@ fn resolve_auth_config(
         auth_mode = Some(mode.clone());
     }
 
+    // Override allowed roles with CLI flags (highest priority)
+    if let Some(roles) = &args.allowed_roles {
+        allowed_roles = Some(roles.clone());
+    }
+
     // Return None if no auth mode is configured
     match auth_mode {
         Some(mode) => {
             // Validate the access control mode
             match mode.as_str() {
-                "public" | "private" | "org" | "custom" => {
-                    Ok(Some((mode, auth_provider, auth_issuer, auth_audience)))
-                }
+                "public" | "private" | "org" | "custom" => Ok(Some((
+                    mode,
+                    auth_provider,
+                    auth_issuer,
+                    auth_audience,
+                    allowed_roles,
+                ))),
                 _ => Err(anyhow!(
                     "Invalid access control mode: '{}'. Must be one of: public, private, org, custom",
                     mode

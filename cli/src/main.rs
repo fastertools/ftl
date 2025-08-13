@@ -227,6 +227,16 @@ enum EngCommand {
         #[arg(long, value_name = "AUDIENCE", help_heading = "Authentication")]
         jwt_audience: Option<String>,
 
+        /// Allowed roles for organization mode (e.g., "admin,developer")
+        /// Only users with these roles in the organization can access the app
+        #[arg(
+            long,
+            value_name = "ROLES",
+            value_delimiter = ',',
+            help_heading = "Authentication"
+        )]
+        allowed_roles: Option<Vec<String>>,
+
         /// Run without making any changes (preview what would be deployed)
         #[arg(long)]
         dry_run: bool,
@@ -564,6 +574,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
             access_control,
             jwt_issuer,
             jwt_audience,
+            allowed_roles,
             dry_run,
             yes,
         } => {
@@ -572,6 +583,7 @@ async fn handle_eng_command(args: EngArgs) -> Result<()> {
                 access_control,
                 jwt_issuer,
                 jwt_audience,
+                allowed_roles,
                 dry_run,
                 yes,
             };

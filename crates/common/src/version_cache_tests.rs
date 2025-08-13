@@ -140,8 +140,6 @@ impl UpdateExecutor for MockUpdateExecutor {
     }
 }
 
-// Clock trait is no longer used in version_cache, removed MockClock
-
 // Test-specific UI implementations
 struct TestUIWithUpdateChoice {
     inner: TestUserInterface,

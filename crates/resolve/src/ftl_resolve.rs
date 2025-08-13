@@ -5,11 +5,12 @@
 
 use anyhow::{Context, Result};
 use garde::Validate;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Root configuration structure for ftl.toml
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct FtlConfig {
     /// Project metadata
     #[garde(dive)]
@@ -37,7 +38,7 @@ pub struct FtlConfig {
 }
 
 /// Application-level variable configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ApplicationVariable {
     /// Variable with a default value
@@ -53,7 +54,7 @@ pub enum ApplicationVariable {
 }
 
 /// Project metadata
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct ProjectConfig {
     /// Project name
     #[garde(length(min = 1))]
@@ -80,18 +81,29 @@ pub struct ProjectConfig {
     #[serde(default)]
     #[garde(skip)]
     pub default_registry: Option<String>,
+
+    /// Access control mode for deployment (public, private, org, custom)
+    #[serde(default)]
+    #[garde(skip)]
+    pub access_control: Option<String>,
+
+    /// Allowed roles for organization mode
+    /// Only users with these roles in the organization can access the app
+    #[serde(default)]
+    #[garde(skip)]
+    pub allowed_roles: Vec<String>,
 }
 
 /// OAuth-specific configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct OauthConfig {
     /// OAuth issuer URL
     #[garde(length(min = 1))]
     pub issuer: String,
 
-    /// API audience (required for security)
-    #[garde(length(min = 1))]
-    pub audience: String,
+    /// API audience(s) (required for security) - array of audience strings
+    #[garde(custom(validate_audience))]
+    pub audience: Vec<String>,
 
     /// JWKS URI (optional - can be auto-discovered for some providers)
     #[serde(default)]
@@ -136,7 +148,7 @@ pub struct OauthConfig {
 }
 
 /// Deployment configuration for a component
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct DeployConfig {
     /// Build profile to use for deployment (e.g., "release", "production")
     #[garde(length(min = 1))]
@@ -150,7 +162,7 @@ pub struct DeployConfig {
 }
 
 /// Component configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ComponentConfig {
     /// Path to component directory relative to project root
     /// Required for local components, ignored for registry components
@@ -193,7 +205,7 @@ pub struct ComponentConfig {
 }
 
 /// Build profiles for a component
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 pub struct BuildProfiles {
     /// Build profiles mapped by name
     #[serde(flatten)]
@@ -201,7 +213,7 @@ pub struct BuildProfiles {
 }
 
 /// A single build profile
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct BuildProfile {
     /// Build command to execute
     #[garde(length(min = 1))]
@@ -219,7 +231,7 @@ pub struct BuildProfile {
 }
 
 /// Up configuration for development mode
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct UpConfig {
     /// Build profile to use for 'ftl up'
     #[garde(length(min = 1))]
@@ -227,7 +239,7 @@ pub struct UpConfig {
 }
 
 /// Build configuration for a tool
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct BuildConfig {
     /// Build command to execute
     #[garde(length(min = 1))]
@@ -245,7 +257,7 @@ pub struct BuildConfig {
 }
 
 /// MCP component configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, JsonSchema)]
 pub struct McpConfig {
     /// MCP gateway component registry URI
     #[serde(default = "default_gateway")]
@@ -261,6 +273,26 @@ pub struct McpConfig {
     #[serde(default = "default_validate_arguments")]
     #[garde(skip)]
     pub validate_arguments: bool,
+}
+
+impl Default for FtlConfig {
+    fn default() -> Self {
+        Self {
+            project: ProjectConfig {
+                name: "default-app".to_string(),
+                version: default_version(),
+                description: String::new(),
+                authors: Vec::new(),
+                default_registry: None,
+                access_control: None,
+                allowed_roles: Vec::new(),
+            },
+            oauth: None,
+            component: HashMap::new(),
+            mcp: McpConfig::default(),
+            variables: HashMap::new(),
+        }
+    }
 }
 
 impl FtlConfig {
@@ -306,13 +338,12 @@ impl FtlConfig {
         }
     }
 
-    /// Get the audience
-    #[allow(clippy::missing_const_for_fn)] // Can't be const due to String deref
-    pub fn auth_audience(&self) -> &str {
+    /// Get the audience as comma-separated string for passing through variables
+    pub fn auth_audience(&self) -> String {
         if let Some(oauth) = &self.oauth {
-            &oauth.audience
+            oauth.audience.join(",")
         } else {
-            ""
+            String::new()
         }
     }
 
@@ -418,6 +449,19 @@ impl Default for McpConfig {
 
 // Validation functions
 #[allow(clippy::trivially_copy_pass_by_ref)]
+fn validate_audience(audience: &Vec<String>, _: &()) -> garde::Result {
+    if audience.is_empty() {
+        return Err(garde::Error::new("At least one audience is required"));
+    }
+    for aud in audience {
+        if aud.is_empty() {
+            return Err(garde::Error::new("Audience values cannot be empty"));
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn validate_components(component: &HashMap<String, ComponentConfig>, _: &()) -> garde::Result {
     for (name, config) in component {
         config
@@ -447,11 +491,11 @@ mod tests {
 [project]
 name = "test-project"
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert_eq!(ftl_config.project.name, "test-project");
-        assert_eq!(ftl_config.project.version, "0.1.0");
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert_eq!(ftl_resolve.project.name, "test-project");
+        assert_eq!(ftl_resolve.project.version, "0.1.0");
         // No oauth block means public access (no auth)
-        assert!(!ftl_config.is_auth_enabled());
+        assert!(!ftl_resolve.is_auth_enabled());
     }
 
     #[test]
@@ -461,10 +505,10 @@ name = "test-project"
 name = "test-project"
 version = "0.1.0"
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert!(!ftl_config.is_auth_enabled());
-        assert_eq!(ftl_config.auth_issuer(), "");
-        assert_eq!(ftl_config.auth_provider_type(), "");
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert!(!ftl_resolve.is_auth_enabled());
+        assert_eq!(ftl_resolve.auth_issuer(), "");
+        assert_eq!(ftl_resolve.auth_provider_type(), "");
     }
 
     #[test]
@@ -476,13 +520,87 @@ version = "0.1.0"
 
 [oauth]
 issuer = "https://auth.example.com"
-audience = "my-api"
+audience = ["my-api"]
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert!(ftl_config.is_auth_enabled());
-        assert_eq!(ftl_config.auth_issuer(), "https://auth.example.com");
-        assert_eq!(ftl_config.auth_audience(), "my-api");
-        assert_eq!(ftl_config.auth_provider_type(), "jwt");
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert!(ftl_resolve.is_auth_enabled());
+        assert_eq!(ftl_resolve.auth_issuer(), "https://auth.example.com");
+        assert_eq!(ftl_resolve.auth_audience(), "my-api");
+        assert_eq!(ftl_resolve.auth_provider_type(), "jwt");
+    }
+
+    #[test]
+    fn test_multiple_audiences() {
+        let config = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = ["api-1", "api-2", "api-3"]
+"#;
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert!(ftl_resolve.is_auth_enabled());
+        assert_eq!(ftl_resolve.auth_audience(), "api-1,api-2,api-3");
+        // Check the actual vec
+        assert_eq!(
+            ftl_resolve.oauth.as_ref().unwrap().audience,
+            vec!["api-1", "api-2", "api-3"]
+        );
+    }
+
+    #[test]
+    fn test_single_audience_array() {
+        let config = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = ["single-api"]
+"#;
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert_eq!(ftl_resolve.auth_audience(), "single-api");
+        assert_eq!(
+            ftl_resolve.oauth.as_ref().unwrap().audience,
+            vec!["single-api"]
+        );
+    }
+
+    #[test]
+    fn test_empty_audience_validation() {
+        let config = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = []
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("At least one audience is required"));
+    }
+
+    #[test]
+    fn test_empty_string_audience_validation() {
+        let config = r#"
+[project]
+name = "test-project"
+version = "0.1.0"
+
+[oauth]
+issuer = "https://auth.example.com"
+audience = [""]
+"#;
+        let result = FtlConfig::parse(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Audience values cannot be empty"));
     }
 
     #[test]
@@ -492,10 +610,10 @@ audience = "my-api"
 name = "test-project"
 version = "0.1.0"
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert!(!ftl_config.is_auth_enabled());
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert!(!ftl_resolve.is_auth_enabled());
         // Without OAuth, auth is disabled
-        assert_eq!(ftl_config.auth_issuer(), "");
+        assert_eq!(ftl_resolve.auth_issuer(), "");
     }
 
     #[test]
@@ -507,13 +625,13 @@ version = "0.1.0"
 
 [oauth]
 issuer = "https://custom-auth.example.com"
-audience = "custom-api"
+audience = ["custom-api"]
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert!(ftl_config.is_auth_enabled());
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert!(ftl_resolve.is_auth_enabled());
         // With OAuth block, auth is enabled
-        assert_eq!(ftl_config.auth_issuer(), "https://custom-auth.example.com");
-        assert_eq!(ftl_config.auth_audience(), "custom-api");
+        assert_eq!(ftl_resolve.auth_issuer(), "https://custom-auth.example.com");
+        assert_eq!(ftl_resolve.auth_audience(), "custom-api");
     }
 
     #[test]
@@ -568,18 +686,18 @@ gateway = "ghcr.io/fastertools/mcp-gateway:0.0.11"
 authorizer = "ghcr.io/fastertools/mcp-authorizer:0.0.13"
 validate_arguments = false
 "#;
-        let ftl_config = FtlConfig::parse(config).unwrap();
-        assert_eq!(ftl_config.project.name, "py-tools");
+        let ftl_resolve = FtlConfig::parse(config).unwrap();
+        assert_eq!(ftl_resolve.project.name, "py-tools");
         // Component configuration test
 
         // Check local component
-        let py_component = &ftl_config.component["example-py"];
+        let py_component = &ftl_resolve.component["example-py"];
         assert_eq!(py_component.wasm, Some("example-py/app.wasm".to_string()));
         assert!(py_component.repo.is_none());
         assert!(py_component.build.is_some());
 
         // Check registry component
-        let rs_component = &ftl_config.component["example-rs"];
+        let rs_component = &ftl_resolve.component["example-rs"];
         assert!(rs_component.wasm.is_none());
         assert_eq!(
             rs_component.repo,

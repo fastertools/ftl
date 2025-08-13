@@ -219,6 +219,10 @@ mod tests {
             status,
             provider_url: Some(format!("https://{name}.example.com")),
             provider_error: None,
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
         }
@@ -235,6 +239,10 @@ mod tests {
             status,
             provider_url: Some(format!("https://{name}.example.com")),
             provider_error: None,
+            access_control: Some(types::ListAppsResponseAppsItemAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
         }

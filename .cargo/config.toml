@@ -1,3 +1,4 @@
 [alias]
 i = "install --path cli"
+ic = "install --path crates/ftl-resolve"
 build-wasm = "component build -p ftl-mcp-authorizer -p ftl-mcp-gateway --target wasm32-wasip1"

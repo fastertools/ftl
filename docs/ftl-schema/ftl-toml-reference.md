@@ -99,7 +99,7 @@ access_control = "custom"
 
 [oauth]
 issuer = "https://auth.example.com/"
-audience = "https://api.example.com"
+audience = ["https://api.example.com"]
 # Configure your own OAuth provider
 ```
 
@@ -145,7 +145,7 @@ The `[oauth]` section configures custom OpenID Connect authentication. This sect
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `issuer` | string | Yes | - | OAuth issuer URL (must use HTTPS for security) |
-| `audience` | string | Yes | - | Expected audience for tokens (required for security to prevent token confusion attacks) |
+| `audience` | array | Yes | - | Expected audience(s) for tokens. Must be an array even for single audience: `["api"]`. Multiple audiences allow accepting tokens meant for different services. Required for security to prevent token confusion attacks. |
 | `jwks_uri` | string | No | Auto-derived | JWKS endpoint URL (auto-discovered for known providers like AuthKit) |
 | `public_key` | string | No | - | Public key in PEM format (alternative to JWKS, cannot be used with `jwks_uri`) |
 | `algorithm` | string | No | RS256 | JWT signature algorithm (RS256, RS384, RS512, ES256, ES384, PS256, PS384, PS512) |
@@ -164,9 +164,23 @@ access_control = "custom"  # Use "custom" for your own OAuth provider
 
 [oauth]
 issuer = "https://your-tenant.auth0.com/"
-audience = "https://api.example.com"  # Required for security
+audience = ["https://api.example.com"]  # Required for security
 jwks_uri = "https://your-tenant.auth0.com/.well-known/jwks.json"
 required_scopes = "read:data,write:data"
+```
+
+### Example: Multiple Audiences
+
+```toml
+[project]
+name = "multi-service"
+access_control = "custom"
+
+[oauth]
+issuer = "https://auth.example.com/"
+# Accept tokens meant for any of these audiences
+audience = ["https://api.example.com", "https://admin.example.com", "my-service"]
+jwks_uri = "https://auth.example.com/.well-known/jwks.json"
 ```
 
 ### Example: Restricting Access to Specific Users
@@ -178,7 +192,7 @@ access_control = "custom"
 
 [oauth]
 issuer = "https://auth.example.com/"
-audience = "https://api.example.com"
+audience = ["https://api.example.com"]
 jwks_uri = "https://auth.example.com/.well-known/jwks.json"
 # Only these specific users can access the app
 allowed_subjects = [
@@ -264,16 +278,6 @@ Based on your `access_control` and `[oauth]` settings, FTL generates these varia
 | `mcp_oauth_token_endpoint` | `[oauth].token_endpoint` | OAuth token endpoint |
 | `mcp_oauth_userinfo_endpoint` | `[oauth].userinfo_endpoint` | OAuth userinfo endpoint |
 
-#### Static Token Variables (for development/testing)
-
-| Variable | Format | Description |
-|----------|--------|-------------|
-| `mcp_static_tokens` | See below | Static tokens for testing |
-
-Static token format: `token:client_id:user_id:scope1,scope2[:expires_at[:key=value]]`
-
-Multiple tokens separated by semicolons: `token1:client1:user1:read;token2:client2:user2:write`
-
 ### Security Requirements
 
 1. **HTTPS Required**: All OAuth URLs must use HTTPS for security
@@ -337,9 +341,7 @@ Additional authorization rules can be configured via environment variables at de
 | Variable | Format | Description |
 |----------|--------|-------------|
 | `mcp_auth_allowed_subjects` | Comma-separated | Restrict access to specific user IDs |
-| `mcp_auth_allowed_issuers` | Comma-separated | Allow tokens from specific issuers |
 | `mcp_auth_required_claims` | JSON object | Require specific claim values |
-| `mcp_auth_required_scopes` | Comma-separated | Additional required scopes |
 | `mcp_auth_forward_claims` | JSON object | Forward claims as headers |
 
 Example with authorization rules:

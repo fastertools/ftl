@@ -3,8 +3,8 @@
 //! This module provides pure functions for configuration transpilation.
 //! No file I/O, no downloads - just data transformation.
 
-use super::ftl_config::{ApplicationVariable, ComponentConfig, FtlConfig};
-use super::spin_config::{
+use crate::ftl_resolve::{ApplicationVariable, ComponentConfig, FtlConfig};
+use crate::spin_config::{
     ComponentBuildConfig, ComponentConfig as SpinComponentConfig, ComponentSource, HttpTrigger,
     RouteConfig, SpinConfig, SpinVariable, TriggerConfig,
 };
@@ -17,28 +17,28 @@ use std::path::{Path, PathBuf};
 /// This is a pure function that converts between configuration formats.
 /// Component paths are preserved as-is from the input configuration.
 #[allow(clippy::too_many_lines)]
-pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
-    let mut spin_config = SpinConfig::new(ftl_config.project.name.clone());
+pub fn transpile_ftl_to_spin(ftl_resolve: &FtlConfig) -> Result<String> {
+    let mut spin_config = SpinConfig::new(ftl_resolve.project.name.clone());
 
     // Set application metadata
     spin_config
         .application
         .version
-        .clone_from(&ftl_config.project.version);
+        .clone_from(&ftl_resolve.project.version);
     spin_config
         .application
         .description
-        .clone_from(&ftl_config.project.description);
+        .clone_from(&ftl_resolve.project.description);
     spin_config
         .application
         .authors
-        .clone_from(&ftl_config.project.authors);
+        .clone_from(&ftl_resolve.project.authors);
 
     // Build variables
     let mut variables = HashMap::new();
 
     // Add application-level variables
-    for (name, var) in &ftl_config.variables {
+    for (name, var) in &ftl_resolve.variables {
         let spin_var = match var {
             ApplicationVariable::Default { default } => SpinVariable::Default {
                 default: default.clone(),
@@ -51,7 +51,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     }
 
     // Add system variables
-    let component_names = ftl_config.component_names().join(",");
+    let component_names = ftl_resolve.component_names().join(",");
     variables.insert(
         "component_names".to_string(),
         SpinVariable::Default {
@@ -63,30 +63,22 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     variables.insert(
         "auth_enabled".to_string(),
         SpinVariable::Default {
-            default: ftl_config.is_auth_enabled().to_string(),
+            default: ftl_resolve.is_auth_enabled().to_string(),
         },
     );
 
     // Add core MCP variables (always needed)
-    add_core_mcp_variables(&mut variables, ftl_config);
+    add_core_mcp_variables(&mut variables, ftl_resolve);
 
     // Add authorization rules variables (always needed for platform integration)
-    add_ownership_variables(&mut variables, ftl_config);
+    add_ownership_variables(&mut variables, ftl_resolve);
 
     // Only add auth provider variables if auth is enabled
     // When auth is disabled, we don't set provider variables so the authorizer
     // knows no provider is configured
-    if ftl_config.is_auth_enabled() {
-        add_jwt_variables(&mut variables, ftl_config);
-        add_oauth_variables(&mut variables, ftl_config);
-
-        // Static provider variables (legacy, but still needed)
-        variables.insert(
-            "mcp_static_tokens".to_string(),
-            SpinVariable::Default {
-                default: String::new(),
-            },
-        );
+    if ftl_resolve.is_auth_enabled() {
+        add_jwt_variables(&mut variables, ftl_resolve);
+        add_oauth_variables(&mut variables, ftl_resolve);
     } else {
         // Explicitly set empty provider variables when auth is disabled
         // This ensures the authorizer knows no provider is configured
@@ -100,7 +92,6 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
             "mcp_oauth_authorize_endpoint",
             "mcp_oauth_token_endpoint",
             "mcp_oauth_userinfo_endpoint",
-            "mcp_static_tokens",
             "mcp_provider_type",
         ] {
             variables.insert(
@@ -116,19 +107,19 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 
     // Build components
     let mut components = HashMap::new();
-    let default_registry = ftl_config.project.default_registry.as_deref();
+    let default_registry = ftl_resolve.project.default_registry.as_deref();
 
-    if ftl_config.is_auth_enabled() {
+    if ftl_resolve.is_auth_enabled() {
         // When auth is enabled, add authorizer as "mcp" and gateway as "ftl-mcp-gateway"
         components.insert(
             "mcp".to_string(),
-            create_mcp_component(&ftl_config.mcp.authorizer, default_registry),
+            create_mcp_component(&ftl_resolve.mcp.authorizer, default_registry),
         );
         components.insert(
             "ftl-mcp-gateway".to_string(),
             create_gateway_component(
-                &ftl_config.mcp.gateway,
-                ftl_config.mcp.validate_arguments,
+                &ftl_resolve.mcp.gateway,
+                ftl_resolve.mcp.validate_arguments,
                 default_registry,
             ),
         );
@@ -137,15 +128,15 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
         components.insert(
             "mcp".to_string(),
             create_gateway_component(
-                &ftl_config.mcp.gateway,
-                ftl_config.mcp.validate_arguments,
+                &ftl_resolve.mcp.gateway,
+                ftl_resolve.mcp.validate_arguments,
                 default_registry,
             ),
         );
     }
 
     // Add user components
-    for (component_name, component_config) in &ftl_config.component {
+    for (component_name, component_config) in &ftl_resolve.component {
         components.insert(
             component_name.clone(),
             create_user_component(component_name, component_config, default_registry),
@@ -155,7 +146,7 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
     spin_config.component = components;
 
     // Build triggers
-    let triggers = build_triggers(ftl_config);
+    let triggers = build_triggers(ftl_resolve);
 
     // Generate the TOML with triggers
     spin_config.to_toml_string_with_triggers(&triggers)
@@ -166,11 +157,11 @@ pub fn transpile_ftl_to_spin(ftl_config: &FtlConfig) -> Result<String> {
 /// Takes an FTL config and mappings from `ComponentResolver`,
 /// returns the transpiled spin.toml content with local paths.
 pub fn create_spin_toml_with_resolved_paths<S: std::hash::BuildHasher>(
-    ftl_config: &FtlConfig,
+    ftl_resolve: &FtlConfig,
     resolved_mappings: &HashMap<String, PathBuf, S>,
     project_path: &Path,
 ) -> Result<String> {
-    let mut modified_config = ftl_config.clone();
+    let mut modified_config = ftl_resolve.clone();
     let abs_project_path = project_path
         .canonicalize()
         .unwrap_or_else(|_| project_path.to_path_buf());
@@ -244,14 +235,14 @@ fn make_path_absolute(path: &mut String, base: &Path) {
     }
 }
 
-fn add_ownership_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
+fn add_ownership_variables(variables: &mut HashMap<String, SpinVariable>, ftl_resolve: &FtlConfig) {
     // Authorization rules will be populated by the platform during deployment
     // based on the deployment configuration (org-scoped, user-scoped, etc.)
     // Note: mcp_auth_enabled is no longer used - the authorizer determines auth
     // based on whether a provider is configured
 
     // Get allowed_subjects from OAuth config if present
-    let allowed_subjects = ftl_config
+    let allowed_subjects = ftl_resolve
         .oauth
         .as_ref()
         .map(|oauth| oauth.allowed_subjects.join(","))
@@ -272,20 +263,6 @@ fn add_ownership_variables(variables: &mut HashMap<String, SpinVariable>, ftl_co
     );
 
     variables.insert(
-        "mcp_auth_required_scopes".to_string(),
-        SpinVariable::Default {
-            default: String::new(),
-        },
-    );
-
-    variables.insert(
-        "mcp_auth_allowed_issuers".to_string(),
-        SpinVariable::Default {
-            default: String::new(),
-        },
-    );
-
-    variables.insert(
         "mcp_auth_forward_claims".to_string(),
         SpinVariable::Default {
             default: String::new(),
@@ -293,10 +270,10 @@ fn add_ownership_variables(variables: &mut HashMap<String, SpinVariable>, ftl_co
     );
 }
 
-fn add_core_mcp_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
+fn add_core_mcp_variables(variables: &mut HashMap<String, SpinVariable>, ftl_resolve: &FtlConfig) {
     // Gateway URL only needed when auth is enabled (points to the actual gateway)
     // When auth is disabled, the gateway is accessed directly
-    let gateway_url = if ftl_config.is_auth_enabled() {
+    let gateway_url = if ftl_resolve.is_auth_enabled() {
         "http://ftl-mcp-gateway.spin.internal".to_string()
     } else {
         // No separate authorizer, so no forwarding needed
@@ -317,32 +294,32 @@ fn add_core_mcp_variables(variables: &mut HashMap<String, SpinVariable>, ftl_con
     variables.insert(
         "mcp_provider_type".to_string(),
         SpinVariable::Default {
-            default: ftl_config.auth_provider_type().to_string(),
+            default: ftl_resolve.auth_provider_type().to_string(),
         },
     );
 }
 
-fn add_jwt_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
+fn add_jwt_variables(variables: &mut HashMap<String, SpinVariable>, ftl_resolve: &FtlConfig) {
     variables.insert(
         "mcp_jwt_issuer".to_string(),
         SpinVariable::Default {
-            default: ftl_config.auth_issuer().to_string(),
+            default: ftl_resolve.auth_issuer().to_string(),
         },
     );
     variables.insert(
         "mcp_jwt_audience".to_string(),
         SpinVariable::Default {
-            default: ftl_config.auth_audience().to_string(),
+            default: ftl_resolve.auth_audience().to_string(),
         },
     );
     variables.insert(
         "mcp_jwt_required_scopes".to_string(),
         SpinVariable::Default {
-            default: ftl_config.auth_required_scopes().to_string(),
+            default: ftl_resolve.auth_required_scopes().to_string(),
         },
     );
 
-    let jwks_uri = ftl_config
+    let jwks_uri = ftl_resolve
         .oauth
         .as_ref()
         .map(|o| o.jwks_uri.clone())
@@ -353,8 +330,8 @@ fn add_jwt_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: 
     );
 }
 
-fn add_oauth_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config: &FtlConfig) {
-    if let Some(oauth) = &ftl_config.oauth {
+fn add_oauth_variables(variables: &mut HashMap<String, SpinVariable>, ftl_resolve: &FtlConfig) {
+    if let Some(oauth) = &ftl_resolve.oauth {
         variables.insert(
             "mcp_jwt_public_key".to_string(),
             SpinVariable::Default {
@@ -403,13 +380,13 @@ fn add_oauth_variables(variables: &mut HashMap<String, SpinVariable>, ftl_config
     }
 }
 
-fn build_triggers(ftl_config: &FtlConfig) -> TriggerConfig {
+fn build_triggers(ftl_resolve: &FtlConfig) -> TriggerConfig {
     let mut triggers = TriggerConfig {
         http: Vec::new(),
         redis: Vec::new(),
     };
 
-    if ftl_config.is_auth_enabled() {
+    if ftl_resolve.is_auth_enabled() {
         // When auth is enabled, all routes go through authorizer
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Path("/...".to_string()),
@@ -433,7 +410,7 @@ fn build_triggers(ftl_config: &FtlConfig) -> TriggerConfig {
     }
 
     // Add component endpoints
-    for component_name in ftl_config.component.keys() {
+    for component_name in ftl_resolve.component.keys() {
         triggers.http.push(HttpTrigger {
             route: RouteConfig::Private { private: true },
             component: component_name.clone(),
@@ -445,7 +422,32 @@ fn build_triggers(ftl_config: &FtlConfig) -> TriggerConfig {
 }
 
 fn parse_component_source(source: &str, _default_registry: Option<&str>) -> ComponentSource {
-    // Always return local source - registry resolution happens elsewhere
+    // Check if this looks like a registry reference (contains registry domain and colon)
+    // Registry references are in format: registry.domain/namespace/package:version
+    // or registry.domain/package:version
+    if source.contains('/') && source.contains(':') {
+        // Try to parse as a registry reference
+        // Find the last colon to separate version
+        if let Some(version_sep) = source.rfind(':') {
+            let package_part = &source[..version_sep];
+            let version = &source[version_sep + 1..];
+
+            // Find the first slash to separate registry from package
+            if let Some(registry_sep) = package_part.find('/') {
+                let registry = &package_part[..registry_sep];
+                let package_name = &package_part[registry_sep + 1..];
+
+                // For OCI registries, we keep the full package path
+                return ComponentSource::Registry {
+                    registry: registry.to_string(),
+                    package: package_name.to_string(),
+                    version: version.to_string(),
+                };
+            }
+        }
+    }
+
+    // Otherwise treat as a local path
     ComponentSource::Local(source.to_string())
 }
 
@@ -481,11 +483,8 @@ fn create_mcp_component(registry_uri: &str, default_registry: Option<&str>) -> S
         "mcp_oauth_authorize_endpoint",
         "mcp_oauth_token_endpoint",
         "mcp_oauth_userinfo_endpoint",
-        "mcp_static_tokens",
         "mcp_auth_allowed_subjects",
         "mcp_auth_required_claims",
-        "mcp_auth_required_scopes",
-        "mcp_auth_allowed_issuers",
         "mcp_auth_forward_claims",
     ] {
         variables.insert((*var).to_string(), format!("{{{{ {var} }}}}"));

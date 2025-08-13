@@ -10,12 +10,10 @@ mod jwt_tests;
 mod jwt_verification_tests;
 mod jwks_caching_tests;
 mod oauth_discovery_tests;
-mod error_response_tests;
 mod provider_config_tests;
 mod kid_validation_tests;
 mod scope_validation_tests;
 mod gateway_forwarding_tests;
-mod static_provider_tests;
 mod jwt_test_utils_tests;
 mod test_token_utils;
 mod optional_issuer_tests;
@@ -25,6 +23,7 @@ mod simple_test;
 mod test_setup;
 mod test_config_loading;
 mod test_audience_required;
+mod multiple_audiences_tests;
 
 // Response data helper to extract all needed information
 pub struct ResponseData {

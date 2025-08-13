@@ -48,7 +48,9 @@
         "operationId": "listApps",
         "summary": "List applications",
         "description": "Retrieves a paginated list of all applications for the authenticated user",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -143,7 +145,9 @@
         "operationId": "createApp",
         "summary": "Create a new application",
         "description": "Creates a new application resource. The app can then be deployed by calling the deployment endpoint.",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -226,7 +230,9 @@
         "operationId": "createDeployment",
         "summary": "Create a new deployment",
         "description": "Triggers a new deployment for an application. If the app does not exist, it will be created automatically. This operation is asynchronous and returns immediately while the deployment runs in the background.",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -313,7 +319,9 @@
         "operationId": "getApp",
         "summary": "Get application details",
         "description": "Retrieves detailed information for a specific application by ID",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -387,7 +395,9 @@
         "operationId": "deleteApp",
         "summary": "Delete an application",
         "description": "Permanently deletes an application and triggers cleanup on the provider",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -463,7 +473,9 @@
         "operationId": "createEcrToken",
         "summary": "Create ECR authorization token",
         "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories under the specified app namespace",
-        "tags": ["Registry"],
+        "tags": [
+          "Registry"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -526,7 +538,9 @@
         "operationId": "getUserOrgs",
         "summary": "Get user organizations",
         "description": "Retrieves a list of organizations the authenticated user belongs to",
-        "tags": ["User"],
+        "tags": [
+          "User"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -579,7 +593,9 @@
         "operationId": "listAppComponents",
         "summary": "List components for an app",
         "description": "Retrieves a list of all components for a specific application",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -653,7 +669,9 @@
         "operationId": "updateComponents",
         "summary": "Update components for an app",
         "description": "Sets the desired state of components for an application. Components not in the list will be removed. This is an idempotent operation.",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -749,7 +767,9 @@
         "operationId": "getAppLogs",
         "summary": "Get application logs",
         "description": "Retrieves recent logs for an application from the underlying platform",
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "parameters": [
           {
             "in": "header",
@@ -882,10 +902,17 @@
             "description": "Access control mode for the application",
             "default": "private",
             "type": "string",
-            "enum": ["public", "private", "org", "custom"]
+            "enum": [
+              "public",
+              "private",
+              "org",
+              "custom"
+            ]
           }
         },
-        "required": ["appName"]
+        "required": [
+          "appName"
+        ]
       },
       "CreateDeploymentRequest": {
         "description": "Request body for creating a deployment",
@@ -918,11 +945,14 @@
                   }
                 }
               },
-              "required": ["componentName", "tag"]
+              "required": [
+                "componentName",
+                "tag"
+              ]
             }
           },
           "variables": {
-            "description": "Environment variables as key-value pairs",
+            "description": "Environment variables and optional MCP auth variables for custom mode",
             "type": "object",
             "additionalProperties": {
               "type": "string"
@@ -931,78 +961,48 @@
           "accessControl": {
             "description": "Access control mode for the application",
             "type": "string",
-            "enum": ["public", "private", "org", "custom"]
+            "enum": [
+              "public",
+              "private",
+              "org",
+              "custom"
+            ]
           },
-          "customAuthConfig": {
-            "description": "Custom auth configuration with all MCP auth variables (required when accessControl is \"custom\")",
+          "allowedRoles": {
+            "description": "For org mode: list of roles that can access this app (e.g., [\"admin\", \"developer\"])",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customAuth": {
+            "description": "Required auth configuration when accessControl is \"custom\"",
             "type": "object",
             "properties": {
-              "provider": {
-                "description": "Auth provider type: jwt, oauth, static, etc.",
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 50
-              },
               "issuer": {
                 "description": "Token issuer URL",
                 "type": "string",
                 "minLength": 1
               },
               "audience": {
-                "description": "Expected audience for tokens",
-                "type": "string",
-                "minLength": 1
-              },
-              "jwksUri": {
-                "type": "string"
-              },
-              "publicKey": {
-                "type": "string"
-              },
-              "algorithm": {
-                "type": "string"
-              },
-              "requiredScopes": {
-                "type": "string"
-              },
-              "authorizeEndpoint": {
-                "type": "string"
-              },
-              "tokenEndpoint": {
-                "type": "string"
-              },
-              "userinfoEndpoint": {
-                "type": "string"
-              },
-              "allowedSubjects": {
-                "type": "string"
-              },
-              "allowedIssuers": {
-                "type": "string"
-              },
-              "requiredClaims": {
-                "type": "string"
-              },
-              "authRequiredScopes": {
-                "type": "string"
-              },
-              "forwardClaims": {
-                "type": "string"
+                "description": "Expected audience(s) for tokens - must be a non-empty array",
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             },
-            "required": ["provider", "issuer", "audience"]
-          },
-          "subs": {
-            "description": "List of authorized user emails for org access control (will be resolved to user IDs)",
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "email",
-              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-            }
+            "required": [
+              "issuer",
+              "audience"
+            ]
           }
         },
-        "required": ["components"]
+        "required": [
+          "components"
+        ]
       },
       "CreateEcrTokenRequest": {
         "description": "Request body for creating ECR token",
@@ -1015,7 +1015,9 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
           }
         },
-        "required": ["appId"]
+        "required": [
+          "appId"
+        ]
       },
       "UpdateComponentsRequest": {
         "description": "Request body for updating components",
@@ -1037,11 +1039,15 @@
                   "maxLength": 500
                 }
               },
-              "required": ["componentName"]
+              "required": [
+                "componentName"
+              ]
             }
           }
         },
-        "required": ["components"]
+        "required": [
+          "components"
+        ]
       },
       "ListAppsResponse": {
         "description": "List of applications with pagination",
@@ -1062,7 +1068,14 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
+                  "enum": [
+                    "PENDING",
+                    "CREATING",
+                    "ACTIVE",
+                    "FAILED",
+                    "DELETING",
+                    "DELETED"
+                  ]
                 },
                 "providerUrl": {
                   "type": "string",
@@ -1071,6 +1084,40 @@
                 "providerError": {
                   "type": "string"
                 },
+                "accessControl": {
+                  "type": "string",
+                  "enum": [
+                    "public",
+                    "private",
+                    "org",
+                    "custom"
+                  ]
+                },
+                "orgId": {
+                  "type": "string"
+                },
+                "allowedRoles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "customAuth": {
+                  "type": "object",
+                  "properties": {
+                    "issuer": {
+                      "type": "string"
+                    },
+                    "audience": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "issuer",
+                    "audience"
+                  ],
+                  "additionalProperties": false
+                },
                 "createdAt": {
                   "type": "string"
                 },
@@ -1078,7 +1125,13 @@
                   "type": "string"
                 }
               },
-              "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
+              "required": [
+                "appId",
+                "appName",
+                "status",
+                "createdAt",
+                "updatedAt"
+              ],
               "additionalProperties": false
             }
           },
@@ -1086,7 +1139,9 @@
             "type": "string"
           }
         },
-        "required": ["apps"],
+        "required": [
+          "apps"
+        ],
         "additionalProperties": false
       },
       "ErrorResponse": {
@@ -1104,7 +1159,9 @@
             "items": {}
           }
         },
-        "required": ["message"],
+        "required": [
+          "message"
+        ],
         "additionalProperties": false
       },
       "CreateAppResponse": {
@@ -1121,7 +1178,14 @@
           },
           "status": {
             "type": "string",
-            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
+            "enum": [
+              "PENDING",
+              "CREATING",
+              "ACTIVE",
+              "FAILED",
+              "DELETING",
+              "DELETED"
+            ]
           },
           "createdAt": {
             "type": "string"
@@ -1130,7 +1194,13 @@
             "type": "string"
           }
         },
-        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
+        "required": [
+          "appId",
+          "appName",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "CreateDeploymentResponse": {
@@ -1158,7 +1228,13 @@
             "type": "string"
           }
         },
-        "required": ["deploymentId", "appId", "appName", "status", "message"],
+        "required": [
+          "deploymentId",
+          "appId",
+          "appName",
+          "status",
+          "message"
+        ],
         "additionalProperties": false
       },
       "App": {
@@ -1175,7 +1251,14 @@
           },
           "status": {
             "type": "string",
-            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
+            "enum": [
+              "PENDING",
+              "CREATING",
+              "ACTIVE",
+              "FAILED",
+              "DELETING",
+              "DELETED"
+            ]
           },
           "providerUrl": {
             "type": "string",
@@ -1184,6 +1267,40 @@
           "providerError": {
             "type": "string"
           },
+          "accessControl": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private",
+              "org",
+              "custom"
+            ]
+          },
+          "orgId": {
+            "type": "string"
+          },
+          "allowedRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customAuth": {
+            "type": "object",
+            "properties": {
+              "issuer": {
+                "type": "string"
+              },
+              "audience": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "issuer",
+              "audience"
+            ],
+            "additionalProperties": false
+          },
           "createdAt": {
             "type": "string"
           },
@@ -1191,7 +1308,13 @@
             "type": "string"
           }
         },
-        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
+        "required": [
+          "appId",
+          "appName",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "DeleteAppResponse": {
@@ -1202,7 +1325,9 @@
             "type": "string"
           }
         },
-        "required": ["message"],
+        "required": [
+          "message"
+        ],
         "additionalProperties": false
       },
       "CreateEcrTokenResponse": {
@@ -1226,7 +1351,13 @@
             "type": "string"
           }
         },
-        "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
+        "required": [
+          "registryUri",
+          "authorizationToken",
+          "proxyEndpoint",
+          "expiresAt",
+          "region"
+        ],
         "additionalProperties": false
       },
       "GetUserOrgsResponse": {
@@ -1248,12 +1379,17 @@
                   "type": "string"
                 }
               },
-              "required": ["id", "name"],
+              "required": [
+                "id",
+                "name"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["organizations"],
+        "required": [
+          "organizations"
+        ],
         "additionalProperties": false
       },
       "ListComponentsResponse": {
@@ -1286,12 +1422,18 @@
                   "type": "string"
                 }
               },
-              "required": ["componentName"],
+              "required": [
+                "componentName"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["appId", "appName", "components"],
+        "required": [
+          "appId",
+          "appName",
+          "components"
+        ],
         "additionalProperties": false
       },
       "UpdateComponentsResponse": {
@@ -1316,7 +1458,9 @@
                   "type": "string"
                 }
               },
-              "required": ["componentName"],
+              "required": [
+                "componentName"
+              ],
               "additionalProperties": false
             }
           },
@@ -1342,11 +1486,18 @@
                 }
               }
             },
-            "required": ["created", "updated", "removed"],
+            "required": [
+              "created",
+              "updated",
+              "removed"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["components", "changes"],
+        "required": [
+          "components",
+          "changes"
+        ],
         "additionalProperties": false
       },
       "GetAppLogsResponse": {
@@ -1375,11 +1526,18 @@
                 "type": "string"
               }
             },
-            "required": ["tail", "since"],
+            "required": [
+              "tail",
+              "since"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["appId", "logs", "metadata"],
+        "required": [
+          "appId",
+          "logs",
+          "metadata"
+        ],
         "additionalProperties": false
       }
     },

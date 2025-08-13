@@ -12,7 +12,7 @@ use tempfile::TempDir;
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use crate::config::ftl_config::FtlConfig;
+use ftl_resolve::FtlConfig;
 use ftl_runtime::deps::{MessageStyle, UserInterface};
 
 /// Strategy for resolving components based on command needs
@@ -91,11 +91,11 @@ impl ComponentResolver {
     /// Resolve components based on strategy
     pub async fn resolve_components(
         &self,
-        ftl_config: &FtlConfig,
+        ftl_resolve: &FtlConfig,
         strategy: ComponentResolutionStrategy,
     ) -> Result<ResolvedComponents> {
         // Identify which components need resolving
-        let components = Self::identify_components(ftl_config, &strategy);
+        let components = Self::identify_components(ftl_resolve, &strategy);
 
         if components.is_empty() {
             // No components to resolve, return empty result with temp dir
@@ -120,7 +120,7 @@ impl ComponentResolver {
         );
 
         // Get default registry from config
-        let default_registry = ftl_config.project.default_registry.clone();
+        let default_registry = ftl_resolve.project.default_registry.clone();
 
         // Resolve components in parallel with progress
         let resolved = self
@@ -135,7 +135,7 @@ impl ComponentResolver {
 
     /// Identify components that need resolution based on strategy
     fn identify_components(
-        ftl_config: &FtlConfig,
+        ftl_resolve: &FtlConfig,
         strategy: &ComponentResolutionStrategy,
     ) -> Vec<ComponentToResolve> {
         let mut components = Vec::new();
@@ -148,21 +148,21 @@ impl ComponentResolver {
                 // Add MCP components if requested
                 if *include_mcp {
                     // Only add if they're registry references (not local .wasm files)
-                    if !ftl_config.mcp.gateway.to_lowercase().ends_with(".wasm") {
+                    if !ftl_resolve.mcp.gateway.to_lowercase().ends_with(".wasm") {
                         components.push(ComponentToResolve {
                             name: "mcp-gateway".to_string(),
-                            source: ftl_config.mcp.gateway.clone(),
+                            source: ftl_resolve.mcp.gateway.clone(),
                             is_mcp: true,
                         });
                     }
 
                     // Add authorizer if auth is enabled
-                    if ftl_config.is_auth_enabled()
-                        && !ftl_config.mcp.authorizer.to_lowercase().ends_with(".wasm")
+                    if ftl_resolve.is_auth_enabled()
+                        && !ftl_resolve.mcp.authorizer.to_lowercase().ends_with(".wasm")
                     {
                         components.push(ComponentToResolve {
                             name: "mcp-authorizer".to_string(),
-                            source: ftl_config.mcp.authorizer.clone(),
+                            source: ftl_resolve.mcp.authorizer.clone(),
                             is_mcp: true,
                         });
                     }
@@ -170,7 +170,7 @@ impl ComponentResolver {
 
                 // Add user components if requested
                 if *include_user {
-                    for (component_name, component_config) in &ftl_config.component {
+                    for (component_name, component_config) in &ftl_resolve.component {
                         if let Some(repo_ref) = &component_config.repo {
                             // This is a registry component
                             components.push(ComponentToResolve {
@@ -186,7 +186,7 @@ impl ComponentResolver {
             ComponentResolutionStrategy::Deploy { push_user_only } => {
                 if *push_user_only {
                     // Only resolve user registry components (not MCP, not local)
-                    for (component_name, component_config) in &ftl_config.component {
+                    for (component_name, component_config) in &ftl_resolve.component {
                         if let Some(repo_ref) = &component_config.repo {
                             // This is a registry component that needs to be pushed
                             components.push(ComponentToResolve {

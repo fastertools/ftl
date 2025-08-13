@@ -1,6 +1,6 @@
-# FTL Configuration System
+# FTL Resolveuration System
 
-The FTL configuration system provides a flexible, type-safe way to manage application configuration across different components of the FTL CLI.
+The FTL Resolveuration system provides a flexible, type-safe way to manage application configuration across different components of the FTL CLI.
 
 ## Overview
 

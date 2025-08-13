@@ -3,19 +3,16 @@
 /// Registry configuration types
 pub mod registry;
 
-/// FTL-specific configuration management
-pub mod ftl_config;
-
-/// Transpiler for converting ftl.toml to spin.toml
-pub mod transpiler;
-
-/// Spin manifest configuration types
-pub mod spin_config;
+/// Path resolution utilities for transpilation
+pub mod path_resolver;
 
 /// User configuration management
 pub mod user_config;
 
-pub use ftl_config::{ComponentConfig, FtlConfig};
+pub use ftl_resolve::{ComponentConfig, FtlConfig};
+pub use path_resolver::create_spin_toml_with_resolved_paths;
 pub use registry::{RegistryConfig, RegistryType};
-pub use transpiler::transpile_ftl_to_spin;
 pub use user_config::UserConfig;
+
+// Re-export from ftl-resolve crate
+pub use ftl_resolve::transpile_ftl_to_spin;

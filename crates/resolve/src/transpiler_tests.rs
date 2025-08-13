@@ -4,8 +4,8 @@
 //! between type-safe FTL and Spin configurations.
 
 use super::*;
-use crate::config::ftl_config::*;
-use crate::config::spin_config::SpinConfig;
+use crate::ftl_resolve::*;
+use crate::spin_config::SpinConfig;
 use std::collections::HashMap;
 
 /// Helper function to parse generated spin.toml and validate it
@@ -22,6 +22,8 @@ fn test_transpile_minimal_config() {
             description: "Test project".to_string(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -101,6 +103,8 @@ fn test_transpile_with_components() {
             description: String::new(),
             authors: vec!["Test Author <test@example.com>".to_string()],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -169,6 +173,8 @@ fn test_transpile_with_variables() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -201,6 +207,8 @@ fn test_transpile_with_auth() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -250,10 +258,12 @@ fn test_transpile_with_oauth_auth() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: Some(OauthConfig {
             issuer: "https://auth.example.com".to_string(),
-            audience: "api".to_string(),
+            audience: vec!["api".to_string()],
             jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
             public_key: String::new(),
             algorithm: String::new(),
@@ -307,10 +317,12 @@ fn test_transpile_with_allowed_subjects() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: Some(OauthConfig {
             issuer: "https://auth.example.com".to_string(),
-            audience: "api".to_string(),
+            audience: vec!["api".to_string()],
             jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
             public_key: String::new(),
             algorithm: String::new(),
@@ -344,8 +356,6 @@ fn test_transpile_with_allowed_subjects() {
     ));
 }
 
-// Static token auth is no longer supported in the new configuration
-// This test is replaced with a test for public access control
 #[test]
 fn test_transpile_with_public_access() {
     let config = FtlConfig {
@@ -355,6 +365,8 @@ fn test_transpile_with_public_access() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -390,6 +402,8 @@ fn test_transpile_with_custom_gateway_uris() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -414,8 +428,8 @@ fn test_transpile_with_custom_gateway_uris() {
 
     // Gateway component should exist with custom URI (named "mcp")
     assert!(result.contains("[component.mcp]"));
-    // Now we just use a simple source string, not a structured registry format
-    assert!(result.contains("source = \"ghcr.io/myorg/custom-gateway:2.0.0\""));
+    // Check for proper registry format
+    assert!(result.contains("source = { registry = \"ghcr.io\", package = \"myorg/custom-gateway\", version = \"2.0.0\" }"));
 
     // Validate the generated TOML
     let spin_config = validate_spin_toml(&result).unwrap();
@@ -424,12 +438,19 @@ fn test_transpile_with_custom_gateway_uris() {
     assert!(spin_config.component.contains_key("mcp"));
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
 
-    // Gateway component should have a local source (string path)
+    // Gateway component should have a registry source
     let gateway_component = &spin_config.component["mcp"];
-    if let ComponentSource::Local(path) = &gateway_component.source {
-        assert_eq!(path, "ghcr.io/myorg/custom-gateway:2.0.0");
+    if let ComponentSource::Registry {
+        registry,
+        package,
+        version,
+    } = &gateway_component.source
+    {
+        assert_eq!(registry, "ghcr.io");
+        assert_eq!(package, "myorg/custom-gateway");
+        assert_eq!(version, "2.0.0");
     } else {
-        panic!("Expected gateway component to have local source");
+        panic!("Expected gateway component to have registry source");
     }
 }
 
@@ -479,6 +500,8 @@ fn test_transpile_with_application_variables() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -599,6 +622,8 @@ fn test_transpile_complete_example() {
                 "Jane Smith <jane@example.com>".to_string(),
             ],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -723,6 +748,8 @@ fn test_transpile_with_build_profiles() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -793,6 +820,8 @@ fn test_transpile_with_special_characters() {
             description: "Testing \"special\" characters & symbols".to_string(),
             authors: vec!["Author <test@example.com> (Company & Co.)".to_string()],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -827,6 +856,8 @@ fn test_transpile_empty_collections() {
             description: String::new(), // Empty description
             authors: vec![],            // Empty authors
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(), // No components
@@ -853,26 +884,70 @@ fn test_transpile_empty_collections() {
 
 #[test]
 fn test_parse_component_source() {
-    // Test that parse_component_source now just returns local paths
-    // Since we're downloading registry components with wkg, everything becomes a local path
+    // Test that parse_component_source correctly identifies registry references vs local paths
 
-    let test_cases = vec![
-        ("app.wasm", "app.wasm"),
-        ("/path/to/app.wasm", "/path/to/app.wasm"),
-        // Even registry URLs are now treated as local paths (will be downloaded by wkg)
-        (
-            "ghcr.io/myorg/my-component:1.0.0",
-            "ghcr.io/myorg/my-component:1.0.0",
-        ),
+    // Test local paths
+    let local_cases = vec![
+        "app.wasm",
+        "/path/to/app.wasm",
+        "../relative/path.wasm",
+        "http://example.com/app.wasm", // URLs without version separator are treated as local
     ];
 
-    for (input, expected) in test_cases {
+    for input in local_cases {
         let result = parse_component_source(input, None);
         match result {
             ComponentSource::Local(path) => {
-                assert_eq!(path, expected, "Path mismatch for input: {input}");
+                assert_eq!(path, input, "Path mismatch for input: {input}");
             }
             _ => panic!("Expected Local source for input: {input}"),
+        }
+    }
+
+    // Test registry references
+    let registry_cases = vec![
+        (
+            "ghcr.io/myorg/my-component:1.0.0",
+            "ghcr.io",
+            "myorg/my-component",
+            "1.0.0",
+        ),
+        (
+            "docker.io/library/nginx:latest",
+            "docker.io",
+            "library/nginx",
+            "latest",
+        ),
+        (
+            "registry.example.com/team/app:v2.5.1",
+            "registry.example.com",
+            "team/app",
+            "v2.5.1",
+        ),
+    ];
+
+    for (input, expected_registry, expected_package, expected_version) in registry_cases {
+        let result = parse_component_source(input, None);
+        match result {
+            ComponentSource::Registry {
+                registry,
+                package,
+                version,
+            } => {
+                assert_eq!(
+                    registry, expected_registry,
+                    "Registry mismatch for input: {input}"
+                );
+                assert_eq!(
+                    package, expected_package,
+                    "Package mismatch for input: {input}"
+                );
+                assert_eq!(
+                    version, expected_version,
+                    "Version mismatch for input: {input}"
+                );
+            }
+            _ => panic!("Expected Registry source for input: {input}"),
         }
     }
 }
@@ -925,6 +1000,8 @@ fn test_http_trigger_generation() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -963,6 +1040,8 @@ fn test_auth_disabled_omits_authorizer() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -1025,10 +1104,12 @@ fn test_auth_enabled_includes_authorizer() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: Some(OauthConfig {
             issuer: "https://auth.example.com".to_string(),
-            audience: String::new(),
+            audience: vec![],
             authorize_endpoint: String::new(),
             token_endpoint: String::new(),
             userinfo_endpoint: String::new(),
@@ -1108,6 +1189,8 @@ fn test_validate_local_auth() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -1124,10 +1207,12 @@ fn test_validate_local_auth() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: Some(OauthConfig {
             issuer: "https://example.com".to_string(),
-            audience: String::new(),
+            audience: vec![],
             jwks_uri: "https://example.com/jwks".to_string(),
             public_key: String::new(),
             algorithm: String::new(),
@@ -1151,6 +1236,8 @@ fn test_validate_local_auth() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component: HashMap::new(),
@@ -1190,6 +1277,8 @@ fn test_auth_disabled_with_components() {
             description: String::new(),
             authors: vec![],
             default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
         },
         oauth: None,
         component,
@@ -1235,4 +1324,200 @@ fn test_auth_disabled_with_components() {
     assert!(spin_config.component.contains_key("mcp")); // Gateway is named "mcp"
     assert!(!spin_config.component.contains_key("ftl-mcp-gateway"));
     assert!(spin_config.component.contains_key("my-component"));
+}
+
+#[test]
+fn test_transpile_with_multiple_audiences() {
+    // Test with multiple audiences in OAuth config
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "multi-audience-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Project accepting multiple audiences".to_string(),
+            authors: vec![],
+            default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: vec![
+                "api-1".to_string(),
+                "api-2".to_string(),
+                "api-3".to_string(),
+            ],
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json".to_string(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Check that multiple audiences are converted to comma-separated string
+    assert!(result.contains("mcp_jwt_audience = { default = \"api-1,api-2,api-3\" }"));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["mcp_jwt_audience"],
+        SpinVariable::Default { default } if default == "api-1,api-2,api-3"
+    ));
+}
+
+#[test]
+fn test_transpile_with_single_audience_in_array() {
+    // Test with single audience in array format
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "single-audience-array".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: vec!["single-api".to_string()], // Single audience in array
+            jwks_uri: String::new(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Single audience should still work
+    assert!(result.contains("mcp_jwt_audience = { default = \"single-api\" }"));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["mcp_jwt_audience"],
+        SpinVariable::Default { default } if default == "single-api"
+    ));
+}
+
+#[test]
+fn test_transpile_with_audiences_containing_special_chars() {
+    // Test with audiences containing special characters that need escaping
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "special-audience-project".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: vec![
+                "https://api.example.com".to_string(),
+                "urn:example:api".to_string(),
+                "api-with-dash".to_string(),
+            ],
+            jwks_uri: String::new(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    let result = transpile_ftl_to_spin(&config).unwrap();
+
+    // Check that audiences with special characters are properly handled
+    assert!(result.contains(
+        "mcp_jwt_audience = { default = \"https://api.example.com,urn:example:api,api-with-dash\" }"
+    ));
+
+    // Validate the generated TOML
+    let spin_config = validate_spin_toml(&result).unwrap();
+    assert!(matches!(
+        &spin_config.variables["mcp_jwt_audience"],
+        SpinVariable::Default { default } if default == "https://api.example.com,urn:example:api,api-with-dash"
+    ));
+}
+
+#[test]
+fn test_auth_audience_method() {
+    // Test the auth_audience() method on FtlConfig
+    let config = FtlConfig {
+        project: ProjectConfig {
+            name: "test".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
+        },
+        oauth: Some(OauthConfig {
+            issuer: "https://auth.example.com".to_string(),
+            audience: vec![
+                "audience-1".to_string(),
+                "audience-2".to_string(),
+                "audience-3".to_string(),
+            ],
+            jwks_uri: String::new(),
+            public_key: String::new(),
+            algorithm: String::new(),
+            required_scopes: String::new(),
+            authorize_endpoint: String::new(),
+            token_endpoint: String::new(),
+            userinfo_endpoint: String::new(),
+            allowed_subjects: vec![],
+        }),
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    // Test that auth_audience() correctly joins multiple audiences
+    assert_eq!(config.auth_audience(), "audience-1,audience-2,audience-3");
+
+    // Test with no OAuth config
+    let config_no_oauth = FtlConfig {
+        project: ProjectConfig {
+            name: "test".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            default_registry: None,
+            access_control: None,
+            allowed_roles: vec![],
+        },
+        oauth: None,
+        component: HashMap::new(),
+        mcp: McpConfig::default(),
+        variables: HashMap::new(),
+    };
+
+    assert_eq!(config_no_oauth.auth_audience(), "");
 }

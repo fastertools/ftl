@@ -11,7 +11,6 @@ The MCP Authorizer provides OAuth 2.0 bearer token authentication for MCP endpoi
 - **JWT Authentication**: Validates tokens using JWKS endpoints or static public keys
 - **Scope-Based Authorization**: Enforce required scopes for API access
 - **WorkOS AuthKit**: Out-of-the-box support with automatic JWKS discovery
-- **Static Token Provider**: Development mode with predefined tokens
 - **OAuth 2.0 Discovery**: Standard-compliant metadata endpoints
 - **JWKS Caching**: 5-minute cache reduces provider API calls
 - **Optional Issuer Validation**: Support for tokens without issuer claims
@@ -29,7 +28,7 @@ mcp_gateway_url = "http://mcp-gateway.spin.internal"  # default
 # Header name for request tracing
 mcp_trace_header = "x-trace-id"  # default
 
-# Provider type: "jwt" or "static"
+# Provider type: "jwt"
 mcp_provider_type = "jwt"  # default
 ```
 
@@ -64,19 +63,6 @@ mcp_oauth_token_endpoint = "https://your-tenant.authkit.app/oauth2/token"
 mcp_oauth_userinfo_endpoint = "https://your-tenant.authkit.app/oauth2/userinfo"
 ```
 
-### Static Token Provider (Development)
-
-```toml
-mcp_provider_type = "static"
-
-# Format: token:client_id:sub:scope1,scope2[:expires_at]
-# Multiple tokens separated by semicolons
-mcp_static_tokens = "dev-token-1:client1:user1:read,write;dev-token-2:client2:user2:admin:1735689600"
-
-# Required scopes (optional)
-mcp_jwt_required_scopes = "read"
-```
-
 ## Configuration Examples
 
 ### WorkOS AuthKit
@@ -98,14 +84,6 @@ mcp_jwt_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
 mcp_jwt_audience = "your-api-identifier"
 ```
 
-### Development with Static Tokens
-
-```toml
-[component.mcp-authorizer.variables]
-mcp_provider_type = "static"
-mcp_static_tokens = "test-token:test-client:test-user:read,write"
-```
-
 ## Authentication Flow
 
 1. **Token Extraction**: Bearer token from `Authorization` header
@@ -115,7 +93,6 @@ mcp_static_tokens = "test-token:test-client:test-user:read,write"
    - Check audience (if configured)
    - Check expiration
    - Validate required scopes
-   - For Static: Lookup token and check expiration/scopes
 3. **Request Forwarding**: Add auth context headers and forward to gateway
    - `x-auth-client-id`: Client identifier
    - `x-auth-user-id`: User identifier (subject)

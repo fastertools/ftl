@@ -114,11 +114,11 @@ fn setup_project_file_mocks(fixture: &mut TestFixture, has_ftl_toml: bool) {
 /// 4. Component version file checks
 fn setup_comprehensive_ftl_mocks(fixture: &mut TestFixture, ftl_toml_content: &str) {
     // Parse ftl config to generate expected spin.toml content
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(ftl_toml_content).unwrap();
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(ftl_toml_content).unwrap();
     let resolved_mappings = std::collections::HashMap::new();
     let project_path = std::path::Path::new(".");
-    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let expected_spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         &resolved_mappings,
         project_path,
     )
@@ -213,12 +213,12 @@ command = "echo 'Building test tool'"
             .returning(move |_| Ok(content_for_read.clone()));
 
         // Generate expected spin.toml content and mock its reading
-        let ftl_config = crate::config::ftl_config::FtlConfig::parse(&content).unwrap();
+        let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&content).unwrap();
         let resolved_mappings = std::collections::HashMap::new();
         let project_path = std::path::Path::new(".");
         let expected_spin_content =
-            crate::config::transpiler::create_spin_toml_with_resolved_paths(
-                &ftl_config,
+            crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+                &ftl_resolve,
                 &resolved_mappings,
                 project_path,
             )
@@ -370,6 +370,10 @@ async fn test_deploy_docker_login_failure() {
                     updated_at: "2024-01-01T00:00:00Z".to_string(),
                     provider_url: Some("https://example.com".to_string()),
                     provider_error: None,
+                    access_control: Some(types::ListAppsResponseAppsItemAccessControl::Public),
+                    org_id: None,
+                    allowed_roles: vec![],
+                    custom_auth: None,
                 }],
                 next_token: None,
             })
@@ -613,6 +617,10 @@ async fn test_deploy_success() {
 
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -873,6 +881,10 @@ async fn test_deployment_timeout() {
     // Mock: status always returns "Creating" (60 times = timeout)
     mock_client.expect_get_app().times(60).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Creating,
@@ -960,6 +972,10 @@ async fn test_deployment_failed_status() {
     // Mock: status returns failed
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Failed,
@@ -1194,6 +1210,10 @@ fn setup_standard_api_expectations(mock_client: &mut MockFtlApiClientMock) {
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -1455,6 +1475,10 @@ async fn test_deploy_with_variables() {
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -1506,7 +1530,7 @@ access_control = "private"
 
 [oauth]
 issuer = "https://test.authkit.app"
-audience = "my-api"
+audience = ["my-api"]
 
 [component.api]
 path = "api"
@@ -1588,11 +1612,11 @@ command = "cargo build --release --target wasm32-wasip1"
     setup_successful_push_for_api(&mut fixture);
 
     // Generate expected spin.toml content and mock its reading
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content).unwrap();
     let resolved_mappings = std::collections::HashMap::new();
     let project_path = std::path::Path::new(".");
-    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let expected_spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         &resolved_mappings,
         project_path,
     )
@@ -1716,6 +1740,10 @@ command = "cargo build --release --target wasm32-wasip1"
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -1763,7 +1791,7 @@ access_control = "private"
 
 [oauth]
 issuer = "https://test.authkit.app"
-audience = "my-api"
+audience = ["my-api"]
 
 [component.api]
 path = "api"
@@ -1845,11 +1873,11 @@ command = "cargo build --release --target wasm32-wasip1"
     setup_successful_push_for_api(&mut fixture);
 
     // Generate expected spin.toml content and mock its reading
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content).unwrap();
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content).unwrap();
     let resolved_mappings = std::collections::HashMap::new();
     let project_path = std::path::Path::new(".");
-    let expected_spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let expected_spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         &resolved_mappings,
         project_path,
     )
@@ -1965,6 +1993,10 @@ command = "cargo build --release --target wasm32-wasip1"
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -2002,6 +2034,7 @@ fn default_deploy_args() -> DeployArgs {
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
@@ -2014,6 +2047,7 @@ fn deploy_args_with_variables(variables: Vec<String>) -> DeployArgs {
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true, // Skip confirmation in tests
     }
@@ -2101,6 +2135,10 @@ async fn test_auth_config_included_in_deployment() {
     // Mock: get app status
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -2124,6 +2162,7 @@ async fn test_auth_config_included_in_deployment() {
         access_control: Some("public".to_string()),
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2216,6 +2255,7 @@ async fn test_deploy_with_sensitive_variables() {
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2279,6 +2319,7 @@ async fn test_deploy_with_short_sensitive_values() {
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2378,6 +2419,7 @@ command = "echo 'Building test tool'"
         access_control: Some("public".to_string()),
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: true,
         yes: true,
     };
@@ -2501,6 +2543,7 @@ command = "echo 'Building test tool'"
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: true,
         yes: true,
     };
@@ -2549,6 +2592,7 @@ async fn test_deploy_auth_mode_user_only() {
         access_control: Some("private".to_string()),
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2580,7 +2624,7 @@ version = "0.1.0"
 
 [oauth]
 issuer = "https://auth.example.com"
-audience = "test-audience"
+audience = ["test-audience"]
 jwks_uri = "https://auth.example.com/.well-known/jwks.json"
 authorize_endpoint = "https://auth.example.com/authorize"
 token_endpoint = "https://auth.example.com/oauth/token"
@@ -2609,6 +2653,7 @@ userinfo_endpoint = "https://auth.example.com/userinfo"
         access_control: Some("custom".to_string()), // This will be overridden to "custom" anyway due to jwt_issuer
         jwt_issuer: Some("https://auth.example.com".to_string()),
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2619,8 +2664,6 @@ userinfo_endpoint = "https://auth.example.com/userinfo"
     }
     assert!(result.is_ok());
 }
-
-// Test removed: private mode without issuer is now valid (uses FTL's AuthKit)
 
 #[tokio::test]
 async fn test_deploy_custom_auth_with_cli_flags() {
@@ -2647,6 +2690,7 @@ async fn test_deploy_custom_auth_with_cli_flags() {
         access_control: None, // Will be set to "custom" automatically
         jwt_issuer: Some("https://auth.example.com".to_string()),
         jwt_audience: Some("my-api-audience".to_string()),
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2679,6 +2723,7 @@ async fn test_deploy_custom_auth_missing_audience() {
         access_control: None,
         jwt_issuer: Some("https://auth.example.com".to_string()),
         jwt_audience: None, // Missing audience should cause error
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2731,6 +2776,7 @@ async fn test_deploy_invalid_auth_mode() {
         access_control: Some("invalid-mode".to_string()),
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -2867,6 +2913,10 @@ command = "cargo build --release"
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -2958,6 +3008,7 @@ command = "cargo build"
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: true,
         yes: true,
     };
@@ -3012,6 +3063,7 @@ command = "echo 'Building test tool'"
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: true,
         yes: true,
     };
@@ -3231,6 +3283,10 @@ async fn test_deploy_auth_enabled_always_included() {
     // Mock: app becomes active
     mock_client.expect_get_app().times(1).returning(|_| {
         Ok(types::App {
+            access_control: Some(types::AppAccessControl::Public),
+            org_id: None,
+            allowed_roles: vec![],
+            custom_auth: None,
             app_id: uuid::Uuid::new_v4(),
             app_name: "test-app".to_string(),
             status: types::AppStatus::Active,
@@ -3252,6 +3308,7 @@ async fn test_deploy_auth_enabled_always_included() {
         access_control: None, // Public access control
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -3265,14 +3322,13 @@ async fn test_deploy_auth_enabled_always_included() {
 
 #[test]
 fn test_add_auth_variables_from_config() {
-    use crate::config::ftl_config::FtlConfig;
 
     // Test 1: No OAuth (auth disabled)
     let ftl_config_str = r#"[project]
 name = "test-app"
 version = "0.1.0"
 "#;
-    let config = FtlConfig::parse(ftl_config_str).unwrap();
+    let config = toml::from_str(ftl_config_str).unwrap();
 
     let mut variables = HashMap::new();
     add_auth_variables_from_config(&config, &mut variables);
@@ -3290,9 +3346,9 @@ version = "0.1.0"
 
 [oauth]
 issuer = "https://divine-lion-50-staging.authkit.app"
-audience = "https://api.example.com"
+audience = ["https://api.example.com"]
 "#;
-    let config2 = FtlConfig::parse(ftl_config_str2).unwrap();
+    let config2 = toml::from_str(ftl_config_str2).unwrap();
 
     let mut variables = HashMap::new();
     add_auth_variables_from_config(&config2, &mut variables);
@@ -3363,6 +3419,7 @@ version = "0.1.0"
         access_control: None,
         jwt_issuer: None,
         jwt_audience: None,
+        allowed_roles: None,
         dry_run: false,
         yes: true,
     };
@@ -3371,11 +3428,12 @@ version = "0.1.0"
 
     // Should resolve to public mode
     assert!(result.is_some());
-    let (mode, provider, issuer, audience) = result.unwrap();
+    let (mode, provider, issuer, audience, roles) = result.unwrap();
     assert_eq!(mode, "public");
     assert!(provider.is_none());
     assert!(issuer.is_none());
     assert!(audience.is_none());
+    assert!(roles.is_none());
 
     // Test 2: OAuth configured means custom mode with auth details
     let mut file2 = NamedTempFile::new().unwrap();
@@ -3387,7 +3445,7 @@ version = "0.1.0"
 
 [oauth]
 issuer = "https://divine-lion-50-staging.authkit.app"
-audience = "https://api.example.com"
+audience = ["https://api.example.com"]
 "#
     )
     .unwrap();
@@ -3410,7 +3468,7 @@ audience = "https://api.example.com"
 
     // Should resolve to custom mode with OAuth details
     assert!(result2.is_some());
-    let (mode, provider, issuer, audience) = result2.unwrap();
+    let (mode, provider, issuer, audience, _roles) = result2.unwrap();
     assert_eq!(mode, "custom");
     assert_eq!(provider, Some("oauth".to_string()));
     assert_eq!(
@@ -3418,4 +3476,63 @@ audience = "https://api.example.com"
         Some("https://divine-lion-50-staging.authkit.app".to_string())
     );
     assert_eq!(audience, Some("https://api.example.com".to_string()));
+}
+
+#[tokio::test]
+async fn test_deploy_org_mode_with_allowed_roles() {
+    let mut fixture = TestFixture::new();
+
+    // Setup basic project mocks
+    setup_full_mocks(&mut fixture);
+    setup_successful_push(&mut fixture);
+
+    // Create and configure mock API client
+    let mut mock_client = MockFtlApiClientMock::new();
+
+    // Setup standard API expectations
+    setup_standard_api_expectations(&mut mock_client);
+
+    // Mock: create deployment with allowed_roles verification
+    mock_client
+        .expect_create_deployment()
+        .times(1)
+        .returning(|_, req| {
+            // Verify that allowed_roles are passed correctly for org mode
+            assert_eq!(
+                req.access_control,
+                Some(types::CreateDeploymentRequestAccessControl::Org)
+            );
+
+            // Check that allowed_roles are properly set
+            assert_eq!(req.allowed_roles.len(), 2);
+            assert!(req.allowed_roles.contains(&"admin".to_string()));
+            assert!(req.allowed_roles.contains(&"developer".to_string()));
+
+            Ok(types::CreateDeploymentResponse {
+                deployment_id: uuid::Uuid::new_v4(),
+                app_id: uuid::Uuid::new_v4(),
+                app_name: "test-app".to_string(),
+                status: "DEPLOYING".to_string(),
+                message: "Deployment started".to_string(),
+            })
+        });
+
+    // Configure factory to return mock client
+    setup_api_client(&mut fixture, mock_client);
+
+    let deps = fixture.to_deps();
+
+    // Deploy with allowed roles for organization mode
+    let args = DeployArgs {
+        variables: vec![],
+        access_control: Some("org".to_string()),
+        jwt_issuer: None,
+        jwt_audience: None,
+        allowed_roles: Some(vec!["admin".to_string(), "developer".to_string()]),
+        dry_run: false,
+        yes: true,
+    };
+
+    let result = execute_with_deps(deps, args).await;
+    assert!(result.is_ok());
 }

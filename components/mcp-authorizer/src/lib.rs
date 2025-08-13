@@ -12,7 +12,6 @@ mod discovery;
 mod error;
 mod forwarding;
 mod jwks;
-mod static_token;
 mod token;
 
 use config::Config;
@@ -67,7 +66,7 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
         AuthError::Unauthorized("No authentication provider configured".to_string())
     })?;
 
-    // Verify token based on provider type
+    // Verify token using JWT provider
     let token_info = match provider {
         config::Provider::Jwt(jwt_provider) => {
             // Open KV store for JWKS caching
@@ -76,10 +75,6 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
 
             // Verify JWT token (signature, expiry, issuer, audience)
             token::verify(token, jwt_provider, &store).await?
-        }
-        config::Provider::Static(static_provider) => {
-            // Verify static token (for development/testing)
-            static_token::verify(token, static_provider)?
         }
     };
 
@@ -113,15 +108,6 @@ fn apply_authorization_rules(
         ));
     }
 
-    // Check allowed issuers
-    if let Some(allowed_issuers) = &rules.allowed_issuers
-        && !allowed_issuers.contains(&token_info.iss)
-    {
-        return Err(AuthError::Unauthorized(
-            "Access denied: issuer not authorized".to_string(),
-        ));
-    }
-
     // Check required claims
     if let Some(required_claims) = &rules.required_claims {
         for (claim_name, required_value) in required_claims {
@@ -139,17 +125,6 @@ fn apply_authorization_rules(
                         "Access denied: missing required claim '{claim_name}'"
                     )));
                 }
-            }
-        }
-    }
-
-    // Check required scopes
-    if let Some(required_scopes) = &rules.required_scopes {
-        for scope in required_scopes {
-            if !token_info.scopes.contains(scope) {
-                return Err(AuthError::Unauthorized(format!(
-                    "Access denied: missing required scope '{scope}'"
-                )));
             }
         }
     }
