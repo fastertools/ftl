@@ -1,4 +1,4 @@
-use clap::{Command, Arg, ArgAction, value_parser};
+use clap::{Arg, ArgAction, Command, value_parser};
 use clap_mangen::Man;
 use std::env;
 use std::fs;
@@ -6,18 +6,18 @@ use std::path::PathBuf;
 
 fn main() -> std::io::Result<()> {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    
+
     // Build the CLI structure (simplified version matching the actual CLI)
     let cmd = build_cli();
-    
+
     // Generate man page
     let man = Man::new(cmd);
     let mut buffer: Vec<u8> = Default::default();
     man.render(&mut buffer)?;
-    
+
     // Write to OUT_DIR for embedding in binary
     fs::write(out_dir.join("ftl-resolve.1"), &buffer)?;
-    
+
     // Also write to a predictable location in target directory for distribution
     // This makes it easy to find for packaging
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
@@ -26,12 +26,12 @@ fn main() -> std::io::Result<()> {
             .and_then(|p| p.parent())  // project root
             .map(|p| p.join("target"))
             .unwrap_or_else(|| PathBuf::from("target"));
-        
+
         let man_dir = target_dir.join("man");
         fs::create_dir_all(&man_dir).ok();
         fs::write(man_dir.join("ftl-resolve.1"), &buffer).ok();
     }
-    
+
     Ok(())
 }
 
