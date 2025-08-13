@@ -354,7 +354,7 @@ fn resolve_wasm_path(deps: &Arc<ComponentDependencies>, component_path: &Path) -
         let ftl_toml_path = PathBuf::from("ftl.toml");
         if deps.file_system.exists(&ftl_toml_path) {
             let ftl_content = deps.file_system.read_to_string(&ftl_toml_path)?;
-            let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+            let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content)?;
 
             // Find the tool that matches this component path
             let component_name = component_path
@@ -362,7 +362,7 @@ fn resolve_wasm_path(deps: &Arc<ComponentDependencies>, component_path: &Path) -
                 .and_then(|n| n.to_str())
                 .unwrap_or("");
 
-            for (component_config_name, component_config) in &ftl_config.component {
+            for (component_config_name, component_config) in &ftl_resolve.component {
                 // Match by name or path
                 if (component_config_name == component_name
                     || component_config.path.as_deref()
@@ -444,8 +444,8 @@ fn get_default_registry(deps: &Arc<ComponentDependencies>) -> Result<Option<Stri
         .file_system
         .read_to_string(ftl_path)
         .context("Failed to read ftl.toml")?;
-    let config = crate::config::ftl_config::FtlConfig::parse(&content)
-        .context("Failed to parse ftl.toml")?;
+    let config: ftl_resolve::FtlConfig =
+        toml::from_str(&content).context("Failed to parse ftl.toml")?;
 
     Ok(config.project.default_registry)
 }

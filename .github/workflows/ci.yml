@@ -51,7 +51,7 @@ jobs:
         run: |
           cargo fmt --package ftl-cli -- --check
           # Check formatting for all ftl-* crates
-          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
+          for pkg in ftl-commands ftl-common ftl-resolve ftl-language ftl-runtime; do
             cargo fmt --package $pkg -- --check
           done
       
@@ -59,9 +59,36 @@ jobs:
         run: |
           cargo clippy --package ftl-cli --all-targets --all-features -- -D warnings
           # Run clippy for all ftl-* crates
-          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
+          for pkg in ftl-commands ftl-common ftl-resolve ftl-language ftl-runtime; do
             cargo clippy --package $pkg --all-targets --all-features -- -D warnings
           done
+
+  test-ftl-resolve:
+    name: Test FTL Resolve
+    if: inputs.core-crates-changed == 'true' || inputs.ci-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: ci-test-ftl-resolve-v189
+      
+      - name: Run tests
+        run: |
+          cargo test --package ftl-resolve --all-features
+      
+      - name: Test CLI functionality
+        run: |
+          cargo build --package ftl-resolve --release
+          ./target/release/ftl-resolve --version
+          ./target/release/ftl-resolve --help
+          echo '[project]
+          name = "test"
+          [mcp]
+          gateway = "gateway.wasm"
+          authorizer = "auth.wasm"' | ./target/release/ftl-resolve transpile
 
   lint-rust-sdk:
     name: Lint Rust SDK

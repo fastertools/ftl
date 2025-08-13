@@ -1,0 +1,311 @@
+name: Release FTL Resolve
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.\-]+)?(\+[a-zA-Z0-9\.\-]+)?$ ]]; then
+            echo "::error::Invalid version format. Must be semver compliant (e.g., 1.0.0, 1.0.0-alpha.1)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Check if version already exists
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/ftl-resolve-v${{ steps.validate.outputs.version }}"; then
+            echo "::error::Version ${{ steps.validate.outputs.version }} already exists"
+            exit 1
+          fi
+      
+      - name: Verify Cargo.toml version
+        run: |
+          CARGO_VERSION=$(grep '^version' crates/resolve/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "$CARGO_VERSION" != "${{ steps.validate.outputs.version }}" ]]; then
+            echo "::error::Cargo.toml version ($CARGO_VERSION) doesn't match release version (${{ steps.validate.outputs.version }})"
+            echo "::notice::Please update crates/resolve/Cargo.toml version to ${{ steps.validate.outputs.version }}"
+            exit 1
+          fi
+
+  test:
+    name: Test
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: v0-rust-${{ matrix.os }}
+      
+      - name: Run tests
+        run: |
+          cargo test --package ftl-resolve --all-features
+          cargo test --package ftl-resolve --no-default-features
+      
+      - name: Run clippy
+        run: cargo clippy --package ftl-resolve --all-features -- -D warnings
+      
+      - name: Check formatting
+        run: cargo fmt --package ftl-resolve -- --check
+      
+      - name: Test CLI
+        run: |
+          cargo build --package ftl-resolve --release
+          ./target/release/ftl-resolve --version
+          ./target/release/ftl-resolve --help
+          echo '[project]
+          name = "test"
+          [mcp]
+          gateway = "gateway.wasm"
+          authorizer = "auth.wasm"' | ./target/release/ftl-resolve spin -
+
+  build:
+    name: Build Release Binaries
+    needs: [validate, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: ftl-resolve-linux-amd64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact: ftl-resolve-linux-amd64-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact: ftl-resolve-linux-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: ftl-resolve-darwin-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: ftl-resolve-darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install cross-compilation tools
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+          elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+      
+      - name: Build release binary
+        run: |
+          cargo build --package ftl-resolve --release --target ${{ matrix.target }}
+      
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/ftl-resolve dist/
+          chmod +x dist/ftl-resolve
+          cd dist && tar czf ${{ matrix.artifact }}.tar.gz ftl-resolve
+          
+          # Generate and include man page (only once, from linux build)
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
+            if [[ -f ../target/man/ftl-resolve.1 ]]; then
+              gzip -c ../target/man/ftl-resolve.1 > ftl-resolve.1.gz
+            fi
+          fi
+      
+      - name: Generate SHA256 checksum
+        shell: bash
+        run: |
+          cd dist
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            shasum -a 256 ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
+          else
+            sha256sum ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
+          fi
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Login to crates.io
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+      
+      - name: Publish crate
+        run: |
+          cd crates/resolve
+          cargo publish --dry-run
+          cargo publish
+      
+      - name: Verify publication
+        run: |
+          sleep 30  # Give crates.io time to index
+          cargo search ftl-resolve --limit 1
+
+  create-release:
+    name: Create GitHub Release
+    needs: [validate, build, publish-crate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          for dir in artifacts/*/; do
+            cp "$dir"/*.tar.gz release/ || true
+            cp "$dir"/*.tar.gz.sha256 release/ || true
+            cp "$dir"/ftl-resolve.1.gz release/ || true
+          done
+      
+      - name: Generate release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          # FTL Resolve v${{ needs.validate.outputs.version }}
+          
+          FTL configuration management tool.
+          
+          ## Installation
+          
+          ### From crates.io
+          ```bash
+          cargo install ftl-resolve
+          ```
+          
+          ### Download Binary
+          Download the appropriate binary for your platform from the assets below.
+          
+          ### Verify Checksums
+          ```bash
+          shasum -a 256 -c ftl-resolve-<platform>.tar.gz.sha256
+          ```
+          
+          ### Install Man Page (optional)
+          ```bash
+          wget https://github.com/${{ github.repository }}/releases/download/ftl-resolve-v${{ needs.validate.outputs.version }}/ftl-resolve.1.gz
+          sudo install -m 644 ftl-resolve.1.gz /usr/local/share/man/man1/
+          ```
+          
+          ## Usage
+          
+          ```bash
+          # Generate Spin TOML (with wkg resolution)
+          ftl-resolve spin ftl.toml -o spin.toml
+          
+          # Use Spin's native registry resolution
+          ftl-resolve spin ftl.toml -o spin.toml --spin-resolve
+          
+          # Generate JSON schema
+          ftl-resolve schema -o schema.json
+          
+          # Validate configuration
+          ftl-resolve validate ftl.toml
+          ```
+          
+          ## Changes
+          
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/crates/resolve/CHANGELOG.md) for detailed changes.
+          
+          ## Platforms
+          
+          - Linux (amd64, arm64, musl)
+          - macOS (Intel, Apple Silicon)
+          
+          EOF
+      
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ftl-resolve-v${{ needs.validate.outputs.version }}
+          name: FTL Resolve v${{ needs.validate.outputs.version }}
+          body_path: release_notes.md
+          prerelease: ${{ inputs.prerelease }}
+          files: release/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  verify-installation:
+    name: Verify Installation
+    needs: [create-release, publish-crate]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Install from crates.io
+        run: |
+          cargo install ftl-resolve --version ${{ needs.validate.outputs.version }}
+      
+      - name: Verify installation
+        run: |
+          ftl-resolve --version
+          ftl-resolve --help
+      
+      - name: Test basic functionality
+        shell: bash
+        run: |
+          echo '[project]
+          name = "test"
+          [mcp]
+          gateway = "g.wasm"
+          authorizer = "a.wasm"' | ftl-resolve spin -
+          
+          ftl-resolve schema | jq '.title' | grep -q "FtlConfig"

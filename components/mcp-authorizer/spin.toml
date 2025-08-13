@@ -25,14 +25,10 @@ mcp_oauth_authorize_endpoint = { default = "" }
 mcp_oauth_token_endpoint = { default = "" }
 mcp_oauth_userinfo_endpoint = { default = "" }
 
-# Static provider settings (for development/testing)
-mcp_static_tokens = { default = "" }
 
 # Authorization rules (applied after authentication)
 mcp_auth_allowed_subjects = { default = "" }
-mcp_auth_allowed_issuers = { default = "" }
 mcp_auth_required_claims = { default = "" }
-mcp_auth_required_scopes = { default = "" }
 mcp_auth_forward_claims = { default = "" }
 
 [[trigger.http]]
@@ -66,14 +62,10 @@ mcp_oauth_authorize_endpoint = "{{ mcp_oauth_authorize_endpoint }}"
 mcp_oauth_token_endpoint = "{{ mcp_oauth_token_endpoint }}"
 mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 
-# Static provider settings
-mcp_static_tokens = "{{ mcp_static_tokens }}"
 
 # Authorization rules
 mcp_auth_allowed_subjects = "{{ mcp_auth_allowed_subjects }}"
-mcp_auth_allowed_issuers = "{{ mcp_auth_allowed_issuers }}"
 mcp_auth_required_claims = "{{ mcp_auth_required_claims }}"
-mcp_auth_required_scopes = "{{ mcp_auth_required_scopes }}"
 mcp_auth_forward_claims = "{{ mcp_auth_forward_claims }}"
 
 # Test configuration

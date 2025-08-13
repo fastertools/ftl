@@ -16,7 +16,7 @@ use ftl_runtime::deps::{
 
 use crate::commands::build::parse_component_builds_from_content;
 use crate::component_resolver::{ComponentResolutionStrategy, ComponentResolver};
-use crate::config::ftl_config::FtlConfig;
+use ftl_resolve::FtlConfig;
 
 /// File watcher trait for testability
 #[async_trait::async_trait]
@@ -92,16 +92,16 @@ pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> R
         .file_system
         .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
-    let ftl_config = FtlConfig::parse(&ftl_content)?;
+    let ftl_resolve: FtlConfig = toml::from_str(&ftl_content)?;
 
     // Validate auth config for local development
-    crate::config::transpiler::validate_local_auth(&ftl_config)?;
+    // Local development auth validation is handled by ftl-resolve
 
     // Resolve components needed for local execution
     let resolver = ComponentResolver::new(deps.ui.clone());
     let resolved_components = resolver
         .resolve_components(
-            &ftl_config,
+            &ftl_resolve,
             ComponentResolutionStrategy::Local {
                 include_mcp: true,  // Need MCP components locally
                 include_user: true, // Need user tool components
@@ -110,8 +110,8 @@ pub async fn execute_with_deps(config: UpConfig, deps: Arc<UpDependencies>) -> R
         .await?;
 
     // Create spin.toml with resolved paths
-    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         resolved_components.mappings(),
         &project_path,
     )?;

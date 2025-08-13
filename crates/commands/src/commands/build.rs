@@ -8,9 +8,8 @@ use anyhow::{Context, Result};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 
-use crate::config::ftl_config::FtlConfig;
-use crate::config::transpiler::transpile_ftl_to_spin;
 use ftl_common::SpinInstaller;
+use ftl_resolve::{FtlConfig, transpile_ftl_to_spin};
 use ftl_runtime::deps::{
     CommandExecutor, CommandOutput, FileSystem, MessageStyle, ProgressIndicator, UserInterface,
 };
@@ -70,11 +69,11 @@ pub async fn execute_with_deps(config: BuildConfig, deps: Arc<BuildDependencies>
         .file_system
         .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content)?;
 
     // Create spin.toml for build parsing (no component resolution needed)
-    let spin_content = crate::config::transpiler::create_spin_toml_with_resolved_paths(
-        &ftl_config,
+    let spin_content = crate::config::path_resolver::create_spin_toml_with_resolved_paths(
+        &ftl_resolve,
         &std::collections::HashMap::new(), // No resolved components for build
         &working_path,
     )?;
@@ -153,8 +152,8 @@ fn handle_export(
         .read_to_string(&ftl_toml_path)
         .context("Failed to read ftl.toml")?;
 
-    let ftl_config = FtlConfig::parse(&ftl_content)?;
-    let spin_content = transpile_ftl_to_spin(&ftl_config)?;
+    let ftl_resolve: FtlConfig = toml::from_str(&ftl_content)?;
+    let spin_content = transpile_ftl_to_spin(&ftl_resolve)?;
 
     // Determine output path
     let output_path = config

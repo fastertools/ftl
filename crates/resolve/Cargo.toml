@@ -1,0 +1,41 @@
+[package]
+name = "ftl-resolve"
+version = "0.0.1"
+publish = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Component resolver and transpiler for FTL configuration files"
+readme = "README.md"
+keywords = ["ftl", "spin", "resolver", "wkg", "webassembly"]
+categories = ["command-line-utilities", "development-tools", "wasm"]
+
+[[bin]]
+name = "ftl-resolve"
+path = "src/bin/ftl_resolve.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+garde = { workspace = true, features = ["regex"] }
+schemars = "1.0"
+toml_edit = { workspace = true }
+atty = "0.2"
+rayon = "1.11"
+
+[build-dependencies]
+clap = { workspace = true }
+clap_mangen = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+rstest = { workspace = true }
+insta = { workspace = true }

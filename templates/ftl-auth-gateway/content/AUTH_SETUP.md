@@ -93,14 +93,6 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
 spin up
 ```
 
-### Static Tokens (Development Only)
-
-```bash
-export SPIN_VARIABLE_MCP_PROVIDER_TYPE="static"
-export SPIN_VARIABLE_MCP_STATIC_TOKENS="dev-token:client1:user1:read,write"
-spin up
-```
-
 ## 4. Access Control Modes
 
 **Local Development:**

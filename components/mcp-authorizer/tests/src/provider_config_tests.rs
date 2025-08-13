@@ -92,7 +92,6 @@ fn test_invalid_provider_type() {
     variables::set("mcp_jwt_issuer", "");
     variables::set("mcp_jwt_jwks_uri", "");
     variables::set("mcp_jwt_public_key", "");
-    variables::set("mcp_static_tokens", "");
     
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -324,9 +323,10 @@ fn test_no_issuer_validation() {
 #[spin_test]
 fn test_multiple_expected_audiences() {
     // Configure provider with multiple expected audiences
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
-    // Note: Our current implementation might not support multiple audiences in config
+    // Our implementation now supports multiple audiences via comma-separated values
     variables::set("mcp_jwt_audience", "audience1,audience2,audience3");
     
     let (private_key, public_key) = generate_test_key_pair();
@@ -351,9 +351,8 @@ fn test_multiple_expected_audiences() {
     
     let response = spin_test_sdk::perform_request(request);
     
-    // Document the expected behavior
-    // Our implementation might not support this yet
-    assert!(response.status() == 200 || response.status() == 401);
+    // Should succeed since audience2 matches one of the configured audiences
+    assert_eq!(response.status(), 200, "Token with matching audience should be accepted");
 }
 
 // Test: Algorithm configuration

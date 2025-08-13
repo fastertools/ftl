@@ -85,19 +85,6 @@ pub fn oauth_protected_resource(
                 },
             })
         }
-        Some(crate::config::Provider::Static(_)) => {
-            json!({
-                "resource": get_resource_urls(req),
-                "authorization_servers": [],
-                "bearer_methods_supported": ["header"],
-                "authentication_methods": {
-                    "bearer": {
-                        "required": true,
-                        "description": "Static token authentication for development",
-                    }
-                },
-            })
-        }
         None => {
             // Public mode - no authentication required
             json!({
@@ -173,13 +160,6 @@ pub fn oauth_authorization_server(
                     "grant_types_supported": ["authorization_code", "refresh_token"],
                 })
             }
-        }
-        Some(crate::config::Provider::Static(_)) => {
-            // Static provider has no authorization server
-            json!({
-                "error": "not_supported",
-                "error_description": "Static token provider does not support OAuth authorization server metadata"
-            })
         }
         None => {
             // Public mode - no authorization server
@@ -270,13 +250,6 @@ pub fn openid_configuration(
                     "code_challenge_methods_supported": ["S256"],
                 })
             }
-        }
-        Some(crate::config::Provider::Static(_)) => {
-            // Static provider has no OAuth support
-            json!({
-                "error": "not_supported",
-                "error_description": "Static token provider does not support OpenID Connect"
-            })
         }
         None => {
             // Public mode - no OpenID support

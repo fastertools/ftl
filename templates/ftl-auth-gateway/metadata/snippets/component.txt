@@ -18,7 +18,7 @@ mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
 mcp_trace_header = { default = "X-Trace-Id" }
 
 # JWT Provider configuration
-mcp_provider_type = { default = "jwt" }  # "jwt" or "static"
+mcp_provider_type = { default = "jwt" }  # "jwt"
 mcp_jwt_issuer = { default = "" }
 mcp_jwt_audience = { default = "" }
 mcp_jwt_jwks_uri = { default = "" }
@@ -35,8 +35,6 @@ mcp_oauth_userinfo_endpoint = { default = "" }
 mcp_user_id = { default = "" }  # For user-owned apps
 mcp_org_id = { default = "" }   # For org-owned apps
 
-# Static token provider (for development)
-mcp_static_tokens = { default = "" }
 
 # Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
@@ -69,7 +67,6 @@ mcp_oauth_token_endpoint = "{% raw %}{{ mcp_oauth_token_endpoint }}{% endraw %}"
 mcp_oauth_userinfo_endpoint = "{% raw %}{{ mcp_oauth_userinfo_endpoint }}{% endraw %}"
 mcp_user_id = "{% raw %}{{ mcp_user_id }}{% endraw %}"
 mcp_org_id = "{% raw %}{{ mcp_org_id }}{% endraw %}"
-mcp_static_tokens = "{% raw %}{{ mcp_static_tokens }}{% endraw %}"
 
 # MCP Gateway - internal endpoint (protected by auth gateway)
 [[trigger.http]]

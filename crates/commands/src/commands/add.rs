@@ -68,11 +68,11 @@ pub async fn execute_with_deps(config: AddConfig, deps: Arc<AddDependencies>) ->
         .file_system
         .read_to_string(Path::new("ftl.toml"))
         .context("Failed to read ftl.toml")?;
-    let ftl_config = crate::config::ftl_config::FtlConfig::parse(&ftl_content)?;
+    let ftl_resolve: ftl_resolve::FtlConfig = toml::from_str(&ftl_content)?;
 
     // Create temporary spin.toml without downloading components
     // Add command doesn't need resolved components
-    let spin_content = crate::config::transpiler::transpile_ftl_to_spin(&ftl_config)?;
+    let spin_content = ftl_resolve::transpile_ftl_to_spin(&ftl_resolve)?;
 
     let temp_dir = tempfile::Builder::new()
         .prefix("ftl-add-")
@@ -227,7 +227,7 @@ fn update_ftl_toml(
     component_name: &str,
     language: Language,
 ) -> Result<()> {
-    use crate::config::ftl_config::{BuildConfig, ComponentConfig, FtlConfig};
+    use ftl_resolve::{BuildConfig, ComponentConfig, FtlConfig};
     use std::collections::HashMap;
 
     // Read ftl.toml

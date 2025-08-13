@@ -27,10 +27,6 @@ pub enum Provider {
     /// JWT provider with JWKS or static key
     #[serde(rename = "jwt")]
     Jwt(JwtProvider),
-
-    /// Static token provider for development
-    #[serde(rename = "static")]
-    Static(StaticProvider),
 }
 
 /// JWT provider configuration
@@ -58,36 +54,6 @@ pub struct JwtProvider {
     pub oauth_endpoints: Option<OAuthEndpoints>,
 }
 
-/// Static token provider configuration for development
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaticProvider {
-    /// Map of token strings to their metadata
-    pub tokens: std::collections::HashMap<String, StaticTokenInfo>,
-
-    /// Required scopes for all requests
-    pub required_scopes: Option<Vec<String>>,
-}
-
-/// Static token information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaticTokenInfo {
-    /// Client ID for this token
-    pub client_id: String,
-
-    /// User ID (subject)
-    pub sub: String,
-
-    /// Scopes granted to this token
-    pub scopes: Vec<String>,
-
-    /// Optional expiration timestamp
-    pub expires_at: Option<i64>,
-
-    /// Additional claims for this token
-    #[serde(flatten)]
-    pub additional_claims: std::collections::HashMap<String, serde_json::Value>,
-}
-
 /// Authorization rules to apply after authentication
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorizationRules {
@@ -96,12 +62,6 @@ pub struct AuthorizationRules {
 
     /// Required claims (key-value pairs that must match)
     pub required_claims: Option<std::collections::HashMap<String, serde_json::Value>>,
-
-    /// Required scopes (token must have all of these)
-    pub required_scopes: Option<Vec<String>>,
-
-    /// Allowed issuers (if empty, any issuer is allowed)
-    pub allowed_issuers: Option<Vec<String>>,
 
     /// Claims to forward in headers (claim name -> header name mapping)
     pub forward_claims: Option<std::collections::HashMap<String, String>>,
@@ -144,10 +104,6 @@ impl Config {
                     || variables::get("mcp_jwt_public_key")
                         .ok()
                         .filter(|s| !s.is_empty())
-                        .is_some()
-                    || variables::get("mcp_static_tokens")
-                        .ok()
-                        .filter(|s| !s.is_empty())
                         .is_some();
 
                 if has_provider_config {
@@ -187,24 +143,13 @@ impl Provider {
                 .ok()
                 .filter(|s| !s.is_empty())
                 .is_some();
-        let has_static_config = variables::get("mcp_static_tokens")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .is_some();
 
         // If no provider configuration at all, return error (no provider configured)
-        if !has_jwt_config && !has_static_config {
+        if !has_jwt_config {
             return Err(anyhow::anyhow!("No authentication provider configured"));
         }
 
-        // Check provider type
-        let provider_type =
-            variables::get("mcp_provider_type").unwrap_or_else(|_| "jwt".to_string());
-
-        match provider_type.as_str() {
-            "static" => Self::load_static_provider(),
-            "jwt" | _ => Self::load_jwt_provider(),
-        }
+        Self::load_jwt_provider()
     }
 
     /// Load JWT provider configuration
@@ -270,7 +215,13 @@ impl Provider {
             ));
         }
 
-        let audience = audience_str.map(|s| vec![s]);
+        // Parse audience - can be comma-separated for multiple audiences
+        let audience = audience_str.map(|s| {
+            s.split(',')
+                .map(|aud| aud.trim().to_string())
+                .filter(|aud| !aud.is_empty())
+                .collect()
+        });
 
         // Load algorithm (optional, defaults to RS256)
         let algorithm = variables::get("mcp_jwt_algorithm")
@@ -307,94 +258,6 @@ impl Provider {
             algorithm,
             required_scopes,
             oauth_endpoints,
-        }))
-    }
-
-    /// Load static provider configuration
-    fn load_static_provider() -> Result<Self> {
-        use std::collections::HashMap;
-
-        // Load static tokens from configuration
-        // Format: mcp_static_tokens = "token1:client1:user1:read,write[:expires_at[:org_id]];token2:client2:user2:admin"
-        let tokens_config = variables::get("mcp_static_tokens")
-            .map_err(|_| anyhow::anyhow!("Missing mcp_static_tokens for static provider"))?;
-
-        let mut tokens = HashMap::new();
-
-        for token_def in tokens_config.split(';') {
-            let token_def = token_def.trim();
-            if token_def.is_empty() {
-                continue;
-            }
-
-            let parts: Vec<&str> = token_def.split(':').collect();
-            if parts.len() < 4 {
-                return Err(anyhow::anyhow!(
-                    "Invalid static token format. Expected: token:client_id:sub:scope1,scope2"
-                ));
-            }
-
-            let token = (*parts
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Missing token"))?)
-            .to_string();
-            let client_id = (*parts
-                .get(1)
-                .ok_or_else(|| anyhow::anyhow!("Missing client_id"))?)
-            .to_string();
-            let sub = (*parts.get(2).ok_or_else(|| anyhow::anyhow!("Missing sub"))?).to_string();
-            let scopes = parts
-                .get(3)
-                .ok_or_else(|| anyhow::anyhow!("Missing scopes"))?
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            // Optional expiration timestamp as 5th part
-            let expires_at = parts.get(4).and_then(|s| s.parse::<i64>().ok());
-
-            // Parse additional claims from remaining parts (format: key=value)
-            let mut additional_claims = std::collections::HashMap::new();
-            for (i, part) in parts.iter().enumerate().skip(4) {
-                // Skip if it's the expiration timestamp
-                if i == 4 && part.parse::<i64>().is_ok() {
-                    continue;
-                }
-                // Parse key=value pairs
-                if let Some((key, value)) = part.split_once('=') {
-                    additional_claims.insert(
-                        key.to_string(),
-                        serde_json::Value::String(value.to_string()),
-                    );
-                }
-            }
-
-            tokens.insert(
-                token,
-                StaticTokenInfo {
-                    client_id,
-                    sub,
-                    scopes,
-                    expires_at,
-                    additional_claims,
-                },
-            );
-        }
-
-        if tokens.is_empty() {
-            return Err(anyhow::anyhow!("No static tokens configured"));
-        }
-
-        // Load required scopes (optional)
-        let required_scopes = variables::get("mcp_jwt_required_scopes")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
-
-        Ok(Self::Static(StaticProvider {
-            tokens,
-            required_scopes,
         }))
     }
 }
@@ -487,18 +350,6 @@ impl AuthorizationRules {
             })
             .transpose()?;
 
-        // Load required scopes (comma-separated)
-        let required_scopes = variables::get("mcp_auth_required_scopes")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
-
-        // Load allowed issuers (comma-separated)
-        let allowed_issuers = variables::get("mcp_auth_allowed_issuers")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.split(',').map(|iss| iss.trim().to_string()).collect());
-
         // Load claim forwarding rules (JSON object: claim_name -> header_name)
         let forward_claims = variables::get("mcp_auth_forward_claims")
             .ok()
@@ -510,20 +361,13 @@ impl AuthorizationRules {
             .transpose()?;
 
         // Return error if no rules are configured
-        if allowed_subjects.is_none()
-            && required_claims.is_none()
-            && required_scopes.is_none()
-            && allowed_issuers.is_none()
-            && forward_claims.is_none()
-        {
+        if allowed_subjects.is_none() && required_claims.is_none() && forward_claims.is_none() {
             return Err(anyhow::anyhow!("No authorization rules configured"));
         }
 
         Ok(Self {
             allowed_subjects,
             required_claims,
-            required_scopes,
-            allowed_issuers,
             forward_claims,
         })
     }

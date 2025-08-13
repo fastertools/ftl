@@ -1,6 +1,6 @@
 # ftl-commands
 
-Command implementations for the FTL CLI (Faster Than Light).
+Command implementations for the FTL CLI.
 
 This crate provides all the command implementations for the FTL CLI, including:
 
