@@ -1,0 +1,48 @@
+# spin-compose configuration
+# This file defines your MCP (Model Context Protocol) application
+
+name: my-app
+version: 0.1.0
+description: MCP application with authentication and tool gateway
+
+# Authentication configuration
+# Set enabled: false to disable authentication entirely
+auth:
+  enabled: true
+  issuer: https://auth.example.com
+  audience:
+    - api.example.com
+  # Optional: specify additional auth parameters
+  # jwks_uri: https://auth.example.com/.well-known/jwks.json
+  # algorithm: RS256
+  # required_scopes: "read:tools write:tools"
+
+# MCP system configuration
+mcp:
+  gateway: ghcr.io/fastertools/mcp-gateway:latest
+  authorizer: ghcr.io/fastertools/mcp-authorizer:latest
+  validate_arguments: false
+
+# Application variables
+# These can be overridden at runtime or in different environments
+variables:
+  log_level: debug
+  # custom_var: 
+  #   default: "default-value"
+  # required_var:
+  #   required: true
+
+# Your application components
+# Add your tools and services here
+components:
+  # Example tool component (uncomment and modify as needed)
+  # example-tool:
+  #   source: ./build/example.wasm
+  #   route: /example
+  #   environment:
+  #     LOG_LEVEL: debug
+  #   build:
+  #     command: cargo build --target wasm32-wasip1 --release
+  #     watch:
+  #       - src/**/*.rs
+  #       - Cargo.toml

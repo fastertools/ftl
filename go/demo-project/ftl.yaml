@@ -1,0 +1,4 @@
+name: demo-project
+version: 0.1.0
+description: demo-project - An FTL application
+compose: ./spinc.yaml

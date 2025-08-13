@@ -488,6 +488,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
+name = "colored"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
+dependencies = [
+ "lazy_static",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,7 +1128,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "webbrowser",
- "which",
+ "which 8.0.0",
  "wiremock",
  "zip",
 ]
@@ -1151,7 +1161,7 @@ dependencies = [
  "tokio",
  "toml 0.9.5",
  "tracing",
- "which",
+ "which 8.0.0",
  "wiremock",
  "zip",
 ]
@@ -1251,7 +1261,7 @@ dependencies = [
  "toml 0.9.5",
  "tracing",
  "uuid",
- "which",
+ "which 8.0.0",
  "wiremock",
 ]
 
@@ -3608,6 +3618,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin-compose"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "clap",
+ "colored",
+ "predicates",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.23",
+ "which 7.0.3",
+]
+
+[[package]]
 name = "spin-executor"
 version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4522,6 +4548,18 @@ dependencies = [
  "objc2-foundation",
  "url",
  "web-sys",
+]
+
+[[package]]
+name = "which"
+version = "7.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
+dependencies = [
+ "either",
+ "env_home",
+ "rustix",
+ "winsafe",
 ]
 
 [[package]]

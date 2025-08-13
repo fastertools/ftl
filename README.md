@@ -25,6 +25,16 @@ We believe the future of AI tooling shouldn't be locked into proprietary ecosyst
 
 This foundation ensures that what you build with FTL today will be compatible with the open, interoperable ecosystem of tomorrow.
 
+## Project Components
+
+This monorepo contains everything you need to build and deploy AI tools:
+
+- **ftl**: CLI for managing FTL applications and deployments (Rust)
+- **spin-compose**: Infrastructure as Code for WebAssembly applications (Go)
+- **MCP Components**: Pre-built gateway and authorizer for secure MCP servers
+- **SDKs**: Multi-language support for building AI tools (Python, Rust, TypeScript, Go)
+- **Templates**: Quick-start patterns for common use cases
+
 ## FTL vs. FTL Engine
 - **ftl** (This Repo): The open-source framework and CLI for building MCP servers that can run anywhere Spin apps are supported.
 - **FTL Engine**: Our optional, managed platform for deploying ftl applications to a globally distributed edge network for the simplest path to production
