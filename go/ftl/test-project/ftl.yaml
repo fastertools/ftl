@@ -1,0 +1,4 @@
+name: test-project
+version: 0.1.0
+description: test-project - An FTL application
+compose: ./spinc.yaml

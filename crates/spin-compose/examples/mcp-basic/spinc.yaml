@@ -1,0 +1,21 @@
+# Basic MCP Application
+name: hello-mcp
+version: 1.0.0
+description: A simple MCP application
+
+template: mcp
+
+# Authentication disabled for development
+auth:
+  enabled: false
+
+# MCP configuration with default components
+mcp:
+  gateway: ghcr.io/fastertools/mcp-gateway:latest
+  authorizer: ghcr.io/fastertools/mcp-authorizer:latest
+
+# Simple component
+components:
+  calculator:
+    source: ghcr.io/example/calculator:1.0.0
+    route: /calc
