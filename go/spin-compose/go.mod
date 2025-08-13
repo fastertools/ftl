@@ -1,6 +1,6 @@
 module github.com/fastertools/ftl-cli/go/spin-compose
 
-go 1.23
+go 1.24
 
 require (
 	cuelang.org/go v0.10.1
