@@ -174,9 +174,15 @@ fn spin_command(
             .with_context(|| format!("Failed to write output file: {}", path.display()))?;
         if atty::is(atty::Stream::Stderr) {
             if spin_resolve {
-                eprintln!("✓ Successfully wrote spin.toml to {} (using Spin resolution)", path.display());
+                eprintln!(
+                    "✓ Successfully wrote spin.toml to {} (using Spin resolution)",
+                    path.display()
+                );
             } else {
-                eprintln!("✓ Successfully resolved components and wrote spin.toml to {}", path.display());
+                eprintln!(
+                    "✓ Successfully resolved components and wrote spin.toml to {}",
+                    path.display()
+                );
             }
         } else {
             eprintln!("Successfully wrote spin.toml to {}", path.display());
@@ -213,7 +219,6 @@ fn main() -> Result<()> {
         Commands::Validate { input, format } => validate(input, format),
     }
 }
-
 
 fn generate_schema(output: Option<PathBuf>, mini: bool) -> Result<()> {
     let schema = schema_for!(FtlConfig);

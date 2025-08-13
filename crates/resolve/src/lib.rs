@@ -13,8 +13,7 @@ pub use ftl_resolve::{
     ProjectConfig,
 };
 pub use resolver::{
-    check_wkg_available, resolve_all_components, resolve_and_transpile,
-    resolve_registry_component,
+    check_wkg_available, resolve_all_components, resolve_and_transpile, resolve_registry_component,
 };
 pub use transpiler::{
     create_spin_toml_with_resolved_paths, transpile_ftl_to_spin, validate_local_auth,

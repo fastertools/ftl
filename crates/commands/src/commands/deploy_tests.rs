@@ -3322,7 +3322,6 @@ async fn test_deploy_auth_enabled_always_included() {
 
 #[test]
 fn test_add_auth_variables_from_config() {
-
     // Test 1: No OAuth (auth disabled)
     let ftl_config_str = r#"[project]
 name = "test-app"
