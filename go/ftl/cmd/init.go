@@ -17,7 +17,7 @@ type InitOptions struct {
 	Name          string
 	Description   string
 	Template      string
-	Format        string  // Configuration format: yaml, go, cue, json
+	Format        string // Configuration format: yaml, go, cue, json
 	NoInteractive bool
 	Force         bool
 }
@@ -117,7 +117,6 @@ func runInit(opts *InitOptions) error {
 	}
 	Success("Created .gitignore")
 
-
 	// Print next steps based on format
 	fmt.Println()
 	Info("Next steps:")
@@ -159,12 +158,12 @@ func promptForFormat(opts *InitOptions) error {
 		},
 		Default: "yaml - Simple declarative YAML configuration",
 	}
-	
+
 	var choice string
 	if err := survey.AskOne(prompt, &choice); err != nil {
 		return err
 	}
-	
+
 	// Extract format from choice
 	switch choice {
 	case "yaml - Simple declarative YAML configuration":
@@ -176,7 +175,7 @@ func promptForFormat(opts *InitOptions) error {
 	case "json - JSON configuration":
 		opts.Format = "json"
 	}
-	
+
 	return nil
 }
 
@@ -229,7 +228,7 @@ func createGoConfig(dir string, opts *InitOptions) error {
 		description = fmt.Sprintf("%s - An FTL application", opts.Name)
 	}
 
-	// Create a main.go file with FTL SDK
+	// Create a main.go file with FTL CDK
 	content := fmt.Sprintf(`package main
 
 import (
@@ -240,15 +239,16 @@ import (
 )
 
 func main() {
-	// Create your FTL application
-	app := synthesis.NewApp("%s").
+	// Create your FTL application using the CDK
+	cdk := synthesis.NewCDK()
+	app := cdk.NewApp("%s").
 		SetDescription("%s").
 		SetVersion("0.1.0")
 
 	// Add your components here
 	// Example:
-	// app.AddTool("my-tool").
-	//     FromLocal("./build/tool.wasm").
+	// app.AddComponent("my-component").
+	//     FromLocal("./build/component.wasm").
 	//     WithBuild("cargo build --release").
 	//     WithEnv("LOG_LEVEL", "info").
 	//     Build()
@@ -256,9 +256,9 @@ func main() {
 	// Enable authentication (optional)
 	// app.EnableWorkOSAuth("org_123456")
 
-	// Synthesize to spin.toml
-	synth := synthesis.NewSynthesizer()
-	manifest, err := synth.SynthesizeApp(app)
+	// Build and synthesize to spin.toml
+	builtCDK := app.Build()
+	manifest, err := builtCDK.Synthesize()
 	if err != nil {
 		log.Fatalf("Failed to synthesize: %%v", err)
 	}
@@ -307,16 +307,16 @@ app: #FTLApplication & {
 	version:     "0.1.0"
 	description: "%s"
 	
-	// Add your tools here
-	tools: [
+	// Add your components here
+	components: [
 		// {
-		//     id: "my-tool"
-		//     source: "./build/tool.wasm"
+		//     id: "my-component"
+		//     source: "./build/component.wasm"
 		//     build: {
 		//         command: "cargo build --release"
 		//         watch: ["src/**/*.rs", "Cargo.toml"]
 		//     }
-		//     environment: {
+		//     variables: {
 		//         LOG_LEVEL: "info"
 		//     }
 		// },

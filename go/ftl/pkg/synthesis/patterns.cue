@@ -1,27 +1,28 @@
 package ftl
 
+import "strings"
+
 // ===========================================================================
-// Stage 1: Source formats → SpinDL Intermediate Model
+// FTL Application Types (what users write)
 // ===========================================================================
 
-// Layer 3: FTL Application (source format - what users write)
 #FTLApplication: {
 	name!:        string & =~"^[a-z][a-z0-9-]*$"
-	version?:     string | *"0.1.0"
-	description?: string
-	tools?: [...#Tool]
-	access?:  "public" | "private" | *"public"
-	auth?: #AuthConfig
+	version:      string | *"0.1.0"
+	description:  string | *""
+	components:   [...#Component] | *[]
+	access:       "public" | "private" | *"public"
+	auth:         #AuthConfig | *{provider: "workos", org_id: "", jwt_issuer: "https://api.workos.com", jwt_audience: ""}
 }
 
-#Tool: {
+#Component: {
 	id!: string & =~"^[a-z][a-z0-9-]*$"
-	source!: #ToolSource
-	build?: #BuildConfig
-	environment?: [string]: string
+	source!: #ComponentSource
+	build: #BuildConfig | *{command: "", workdir: "", watch: []}
+	variables?: {[string]: string}
 }
 
-#ToolSource: #LocalSource | #RegistrySource
+#ComponentSource: #LocalSource | #RegistrySource
 #LocalSource: string
 #RegistrySource: {
 	registry!: string
@@ -51,72 +52,38 @@ package ftl
 }
 
 // ===========================================================================
-// Layer 2: SpinDL Intermediate Model
-// ===========================================================================
-// This is the normalized, validated intermediate representation
-
-#SpinDLApp: {
-	name!:    string
-	version!: string
-	description?: string
-	
-	// All components with their configuration
-	components!: [string]: #SpinComponent
-	
-	// HTTP routing configuration
-	routes!: [...#Route]
-}
-
-#SpinComponent: {
-	source!: string | {
-		registry!: string
-		package!:  string
-		version!:  string
-	}
-	build?: {
-		command!: string
-		workdir?: string
-		watch?: [...string]
-	}
-	environment?: [string]: string
-	allowed_outbound_hosts?: [...string]
-	variables?: [string]: string
-	key_value_stores?: [...string]
-}
-
-#Route: {
-	path!: string | {private: bool}
-	component!: string
-}
-
-// ===========================================================================
-// Transformation: FTL → SpinDL
+// Direct Transformation: FTL → Spin Manifest
 // ===========================================================================
 
-// Transform FTL application to SpinDL intermediate model
-#FTLToSpinDL: {
+#TransformToSpin: {
 	input: #FTLApplication
 	
-	output: #SpinDLApp & {
-		name:    input.name
-		version: input.version
-		if input.description != _|_ {
-			description: input.description
+	// Helper to determine if we need auth
+	_needsAuth: input.access == "private"
+	
+	output: {
+		spin_manifest_version: 2
+		
+		application: {
+			name:    input.name
+			version: input.version
+			if input.description != "" {
+				description: input.description
+			}
 		}
 		
 		// Build components map
-		components: {
-			// User tools
-			if input.tools != _|_ {
-				for tool in input.tools {
-					"\(tool.id)": {
-						source: tool.source
-						if tool.build != _|_ {
-							build: tool.build
-						}
-						if tool.environment != _|_ {
-							variables: tool.environment
-						}
+		component: {
+			// User components  
+			for comp in input.components {
+				"\(comp.id)": {
+					source: comp.source
+					// Only include build for local sources (string type)
+					if (comp.source & string) != _|_ && comp.build != _|_ {
+						build: comp.build  
+					}
+					if comp.variables != _|_ {
+						variables: comp.variables
 					}
 				}
 			}
@@ -129,10 +96,17 @@ package ftl
 					version:  "0.0.13-alpha.0"
 				}
 				allowed_outbound_hosts: ["http://*.spin.internal"]
+				// Add component_names if there are user components
+				if len(input.components) > 0 {
+					variables: {
+						component_names: strings.Join([for c in input.components {c.id}], ",")
+					}
+				}
 			}
 			
-			// MCP Authorizer (if auth enabled)
-			if input.access != _|_ if input.access != "public" {
+			// MCP Authorizer (added when auth is enabled using comprehension)
+			// This produces either 0 or 1 component based on _needsAuth
+			if _needsAuth {
 				"mcp-authorizer": {
 					source: {
 						registry: "ghcr.io"
@@ -144,74 +118,47 @@ package ftl
 						"https://*.authkit.app",
 						"https://*.workos.com",
 					]
-					if input.auth != _|_ {
-						variables: {
-							mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal"
-							if input.auth.jwt_issuer != _|_ {
-								mcp_jwt_issuer: input.auth.jwt_issuer
-							}
-							if input.auth.jwt_audience != _|_ {
-								mcp_jwt_audience: input.auth.jwt_audience
-							}
-							if input.auth.jwt_audience == _|_ {
-								mcp_jwt_audience: input.name
-							}
-						}
+					variables: {
+						mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal"
+						mcp_jwt_issuer: input.auth.jwt_issuer | *"https://api.workos.com"
+						mcp_jwt_audience: input.auth.jwt_audience | *input.name
 					}
 				}
 			}
 		}
 		
-		// Build routes
-		routes: [
-			// Entry point
-			if input.access == _|_ || input.access == "public" {
-				{path: "/...", component: "ftl-mcp-gateway"}
-			},
-			if input.access != _|_ if input.access != "public" {
-				{path: "/...", component: "mcp-authorizer"}
-			},
-			
-			// Private gateway route (if auth enabled)
-			if input.access != _|_ if input.access != "public" {
-				{path: {private: true}, component: "ftl-mcp-gateway"}
-			},
-			
-			// Tool routes (always private)
-			if input.tools != _|_ for tool in input.tools {
-				{path: {private: true}, component: tool.id}
-			},
-		]
-	}
-}
-
-// ===========================================================================
-// Stage 2: SpinDL → Spin Manifest (spin.toml format)
-// ===========================================================================
-
-#SpinDLToManifest: {
-	input: #SpinDLApp
-	
-	output: {
-		spin_manifest_version: 2
-		
-		application: {
-			name:    input.name
-			version: input.version
-			if input.description != _|_ {
-				description: input.description
-			}
-		}
-		
-		component: input.components
-		
+		// Build trigger configuration - using concatenation instead of conditionals in lists
 		trigger: {
-			http: [
-				for r in input.routes {
-					route:     r.path
-					component: r.component
+			// Base routes
+			_publicRoutes: [{
+				route: "/..."
+				component: "ftl-mcp-gateway"
+			}]
+			
+			_privateRoutes: [
+				{
+					route: "/..."
+					component: "mcp-authorizer"
+				},
+				{
+					route: {private: true}
+					component: "ftl-mcp-gateway"
 				}
 			]
+			
+			// Component routes
+			_componentRoutes: [for comp in input.components {
+				route: {private: true}
+				component: comp.id
+			}]
+			
+			// Select routes based on access mode
+			if _needsAuth {
+				http: _privateRoutes + _componentRoutes
+			}
+			if !_needsAuth {
+				http: _publicRoutes + _componentRoutes
+			}
 		}
 	}
 }

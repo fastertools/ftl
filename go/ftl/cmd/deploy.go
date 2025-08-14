@@ -63,7 +63,7 @@ func runDeploy(ctx context.Context, configFile, environment string, dryRun bool)
 
 	// Run spin deploy
 	fmt.Printf("🚀 Deploying %s to %s environment...\n", cfg.Application.Name, environment)
-	
+
 	deployArgs := []string{"deploy"}
 	if environment != "" {
 		deployArgs = append(deployArgs, "--environment-name", environment)

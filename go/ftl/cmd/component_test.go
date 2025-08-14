@@ -57,7 +57,7 @@ func TestAddComponent(t *testing.T) {
 				assert.Equal(t, "test-component", cfg.Components[0].ID)
 				assert.Equal(t, "./test-comp", cfg.Components[0].Source)
 				assert.Equal(t, "Test component", cfg.Components[0].Description)
-				
+
 				// In new architecture, triggers are added at synthesis time
 				// Component add only adds a private trigger placeholder
 				assert.Len(t, cfg.Triggers, 1)
@@ -86,7 +86,7 @@ func TestAddComponent(t *testing.T) {
 
 				assert.Len(t, cfg.Components, 1)
 				assert.Equal(t, "registry-comp", cfg.Components[0].ID)
-				
+
 				// Check that source is properly structured as OCI reference
 				source := cfg.Components[0].Source
 				if sourceMap, ok := source.(map[string]interface{}); ok {
@@ -169,7 +169,7 @@ func TestListComponents(t *testing.T) {
 							Description: "Component 1",
 						},
 						{
-							ID:     "comp2",
+							ID: "comp2",
 							Source: map[string]interface{}{
 								"registry": "ghcr.io",
 								"package":  "example/comp2",
@@ -212,9 +212,9 @@ func TestListComponents(t *testing.T) {
 			setupFunc: func(t *testing.T, dir string) {},
 			checkFunc: func(t *testing.T, output string) {
 				// Should show error or empty list
-				assert.True(t, 
-					strings.Contains(output, "No components") || 
-					strings.Contains(output, "not found"))
+				assert.True(t,
+					strings.Contains(output, "No components") ||
+						strings.Contains(output, "not found"))
 			},
 		},
 	}
@@ -271,11 +271,11 @@ func TestRemoveComponent(t *testing.T) {
 			checkFunc: func(t *testing.T, dir string) {
 				cfg, err := loadSpinConfig(filepath.Join(dir, "ftl.yaml"))
 				require.NoError(t, err)
-				
+
 				// Should have one component left
 				assert.Len(t, cfg.Components, 1)
 				assert.Equal(t, "comp2", cfg.Components[0].ID)
-				
+
 				// Should have one trigger left
 				assert.Len(t, cfg.Triggers, 1)
 				assert.Equal(t, "comp2", cfg.Triggers[0].Component)
@@ -309,7 +309,7 @@ func TestRemoveComponent(t *testing.T) {
 			}
 
 			err := removeComponent(tt.compName)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -336,10 +336,10 @@ func captureListOutput(dir string) string {
 
 	var output strings.Builder
 	output.WriteString(fmt.Sprintf("Components in %s:\n\n", cfg.Application.Name))
-	
+
 	for i, comp := range cfg.Components {
 		output.WriteString(fmt.Sprintf("%d. %s\n", i+1, comp.ID))
-		
+
 		// Format source
 		switch s := comp.Source.(type) {
 		case string:
@@ -350,11 +350,11 @@ func captureListOutput(dir string) string {
 					"registry", registry, s["package"], s["version"]))
 			}
 		}
-		
+
 		if comp.Description != "" {
 			output.WriteString(fmt.Sprintf("   Description: %s\n", comp.Description))
 		}
-		
+
 		// In new architecture, routes are private by default
 		output.WriteString("   Route: private\n")
 		output.WriteString("\n")

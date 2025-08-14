@@ -1,32 +1,46 @@
 spin_manifest_version = 2
 
 [application]
-name = "demo-app"
-version = "0.1.0"
-description = "Demo MCP application with geo and fluid tools"
+name = 'demo-app'
+version = '0.1.0'
 
+[component]
 [component.fluid]
-source = { registry = "ghcr.io", package = "bowlofarugula:fluid", version = "0.0.1" }
+[component.fluid.source]
+package = 'bowlofarugula:fluid'
+registry = 'ghcr.io'
+version = '0.0.1'
 
 [component.ftl-mcp-gateway]
-source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.13-alpha.0" }
-allowed_outbound_hosts = ["http://*.spin.internal"]
+allowed_outbound_hosts = ['http://*.spin.internal']
+
+[component.ftl-mcp-gateway.source]
+package = 'fastertools:mcp-gateway'
+registry = 'ghcr.io'
+version = '0.0.13-alpha.0'
 
 [component.ftl-mcp-gateway.variables]
-component_names = "fluid,geo"
+component_names = 'fluid,geo'
 
 [component.geo]
-source = { registry = "ghcr.io", package = "bowlofarugula:geo", version = "0.0.1" }
+[component.geo.source]
+package = 'bowlofarugula:geo'
+registry = 'ghcr.io'
+version = '0.0.1'
+
+[trigger]
+[[trigger.http]]
+component = 'ftl-mcp-gateway'
+route = '/...'
 
 [[trigger.http]]
-route = "/..."
-component = "ftl-mcp-gateway"
+component = 'fluid'
+
+[trigger.http.route]
+private = true
 
 [[trigger.http]]
-route = { private = true }
-component = "geo"
+component = 'geo'
 
-[[trigger.http]]
-route = { private = true }
-component = "fluid"
-
+[trigger.http.route]
+private = true

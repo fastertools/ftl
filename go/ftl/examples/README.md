@@ -1,4 +1,4 @@
-# FTL Examples - Multiple Configuration Formats
+# FTL Examples
 
 These examples demonstrate FTL's multi-format configuration capability. Each example creates **identical** MCP applications using different configuration formats.
 

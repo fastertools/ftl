@@ -1,0 +1,46 @@
+spin_manifest_version = 2
+
+[application]
+name = 'demo-app'
+version = '0.1.0'
+
+[component]
+[component.fluid]
+[component.fluid.source]
+package = 'bowlofarugula:fluid'
+registry = 'ghcr.io'
+version = '0.0.1'
+
+[component.ftl-mcp-gateway]
+allowed_outbound_hosts = ['http://*.spin.internal']
+
+[component.ftl-mcp-gateway.source]
+package = 'fastertools:mcp-gateway'
+registry = 'ghcr.io'
+version = '0.0.13-alpha.0'
+
+[component.ftl-mcp-gateway.variables]
+component_names = 'fluid,geo'
+
+[component.geo]
+[component.geo.source]
+package = 'bowlofarugula:geo'
+registry = 'ghcr.io'
+version = '0.0.1'
+
+[trigger]
+[[trigger.http]]
+component = 'ftl-mcp-gateway'
+route = '/...'
+
+[[trigger.http]]
+component = 'fluid'
+
+[trigger.http.route]
+private = true
+
+[[trigger.http]]
+component = 'geo'
+
+[trigger.http.route]
+private = true
