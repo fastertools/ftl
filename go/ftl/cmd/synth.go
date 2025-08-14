@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
-	"github.com/fastertools/ftl-cli/go/shared/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -134,27 +133,18 @@ func detectFormat(input []byte) string {
 	return "yaml"
 }
 
-
 // synthesizeFromYAML converts YAML to spin.toml
 func synthesizeFromYAML(input []byte) (string, error) {
-	var ftlConfig config.FTLConfig
-	err := yaml.Unmarshal(input, &ftlConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse YAML: %w", err)
-	}
-	
-	return synthesizeFromFTLConfig(&ftlConfig)
+	// Use CUE-first synthesizer for direct YAML processing
+	synth := synthesis.NewSynthesizer()
+	return synth.SynthesizeYAML(input)
 }
 
 // synthesizeFromJSON converts JSON to spin.toml
 func synthesizeFromJSON(input []byte) (string, error) {
-	var ftlConfig config.FTLConfig
-	err := yaml.Unmarshal(input, &ftlConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	return synthesizeFromFTLConfig(&ftlConfig)
+	// Use CUE-first synthesizer for direct JSON processing
+	synth := synthesis.NewSynthesizer()
+	return synth.SynthesizeJSON(input)
 }
 
 // synthesizeFromGo runs a Go file and captures its output
@@ -200,81 +190,20 @@ func synthesizeFromGo(filename string) (string, error) {
 
 // synthesizeFromCUE converts CUE to spin.toml
 func synthesizeFromCUE(input []byte) (string, error) {
-	// Create a synthesizer to use CUE
+	// Use CUE-first synthesizer
 	synth := synthesis.NewSynthesizer()
-
-	// The input CUE should define an 'app' that matches #FTLApplication
-	// We'll pass it directly to the synthesizer's CUE pipeline
-	manifest, err := synth.SynthesizeCUE(string(input))
-	if err != nil {
-		return "", fmt.Errorf("failed to synthesize from CUE: %w", err)
-	}
-
-	return manifest, nil
+	return synth.SynthesizeCUE(string(input))
 }
 
 // synthesizeFromFTLConfig converts the FTL config struct to spin.toml
-func synthesizeFromFTLConfig(cfg *config.FTLConfig) (string, error) {
-	// Create FTL app
-	app := synthesis.NewApp(cfg.Application.Name)
-	
-	if cfg.Application.Version != "" {
-		app.SetVersion(cfg.Application.Version)
+func synthesizeFromFTLConfig(cfg interface{}) (string, error) {
+	// Convert the config to YAML and use CUE-first synthesizer
+	// This allows us to handle configs from Go while still using CUE
+	yamlData, err := yaml.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal config: %w", err)
 	}
-	if cfg.Application.Description != "" {
-		app.SetDescription(cfg.Application.Description)
-	}
-	
-	// Add components
-	for _, comp := range cfg.Components {
-		tb := app.AddTool(comp.ID)
-		
-		// Handle source
-		switch src := comp.Source.(type) {
-		case string:
-			// Local source
-			tb.FromLocal(src)
-		case map[string]interface{}:
-			// Registry source
-			registry, _ := src["registry"].(string)
-			pkg, _ := src["package"].(string)
-			version, _ := src["version"].(string)
-			if registry != "" && pkg != "" && version != "" {
-				tb.FromRegistry(registry, pkg, version)
-			}
-		}
-		
-		// Add build config
-		if comp.Build != nil {
-			tb.WithBuild(comp.Build.Command)
-			if len(comp.Build.Watch) > 0 {
-				tb.WithWatch(comp.Build.Watch...)
-			}
-		}
-		
-		// Add environment
-		for k, v := range comp.Environment {
-			tb.WithEnv(k, v)
-		}
-		
-		tb.Build()
-	}
-	
-	// Configure MCP if present
-	if cfg.MCP != nil && cfg.MCP.Authorizer != nil {
-		auth := cfg.MCP.Authorizer
-		if auth.AccessControl == config.AccessControlPrivate {
-			app.SetAccess(synthesis.PrivateAccess)
-		}
-		
-		if auth.AccessControl == config.AccessControlOrg && auth.OrgID != "" {
-			app.EnableWorkOSAuth(auth.OrgID)
-		} else if auth.AccessControl == config.AccessControlCustom {
-			app.EnableCustomAuth(auth.JWTIssuer, auth.JWTAudience)
-		}
-	}
-	
-	// Synthesize
+
 	synth := synthesis.NewSynthesizer()
-	return synth.SynthesizeApp(app)
+	return synth.SynthesizeYAML(yamlData)
 }

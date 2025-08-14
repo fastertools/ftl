@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fastertools/ftl-cli/go/shared/config"
-	"github.com/fastertools/ftl-cli/go/shared/spin"
 	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl-cli/go/shared/spin"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func newUpCmd() *cobra.Command {
@@ -40,54 +38,8 @@ func newUpCmd() *cobra.Command {
 			if _, err := os.Stat(configFile); err == nil && !skipSynth {
 				fmt.Printf("%s Synthesizing spin.toml from %s\n", blue("→"), configFile)
 
-				// Read ftl.yaml
-				configData, err := os.ReadFile(configFile)
-				if err != nil {
-					return fmt.Errorf("failed to read %s: %w", configFile, err)
-				}
-
-				// Parse YAML config
-				var cfg config.FTLConfig
-				if err := yaml.Unmarshal(configData, &cfg); err != nil {
-					return fmt.Errorf("failed to parse %s: %w", configFile, err)
-				}
-
-				// Create FTL app from config
-				app := synthesis.NewApp(cfg.Application.Name)
-				if cfg.Application.Version != "" {
-					app.SetVersion(cfg.Application.Version)
-				}
-				if cfg.Application.Description != "" {
-					app.SetDescription(cfg.Application.Description)
-				}
-
-				// Add components
-				for _, comp := range cfg.Components {
-					tb := app.AddTool(comp.ID)
-					
-					// Handle source
-					switch src := comp.Source.(type) {
-					case string:
-						tb.FromLocal(src)
-					case map[string]interface{}:
-						if registry, ok := src["registry"].(string); ok {
-							pkg, _ := src["package"].(string)
-							version, _ := src["version"].(string)
-							tb.FromRegistry(registry, pkg, version)
-						}
-					}
-					
-					// Add environment variables
-					for k, v := range comp.Environment {
-						tb.WithEnv(k, v)
-					}
-					
-					tb.Build()
-				}
-
-				// Synthesize using CUE engine
-				synth := synthesis.NewSynthesizer()
-				manifest, err := synth.SynthesizeApp(app)
+				// Use unified synthesis helper
+				manifest, err := synthesis.SynthesizeFromConfig(configFile)
 				if err != nil {
 					return fmt.Errorf("synthesis failed: %w", err)
 				}

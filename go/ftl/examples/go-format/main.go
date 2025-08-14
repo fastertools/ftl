@@ -8,26 +8,24 @@ import (
 )
 
 func main() {
-	// Create your FTL application
-	app := synthesis.NewApp("demo-app").
-		SetDescription("Demo MCP application with geo and fluid tools").
+	// Create the FTL application using the CDK
+	cdk := synthesis.NewCDK()
+	app := cdk.NewApp("demo-app").
 		SetVersion("0.1.0")
 
-	// Add geo and fluid components from registry
-	app.AddTool("geo").
-		FromRegistry("ghcr.io", "bowlofarugula:geo", "0.0.1").
-		Build()
-	
-	app.AddTool("fluid").
+	// Add fluid component from registry
+	app.AddComponent("fluid").
 		FromRegistry("ghcr.io", "bowlofarugula:fluid", "0.0.1").
 		Build()
 
-	// Enable authentication (optional)
-	// app.EnableWorkOSAuth("org_123456")
+	// Add geo component from registry
+	app.AddComponent("geo").
+		FromRegistry("ghcr.io", "bowlofarugula:geo", "0.0.1").
+		Build()
 
-	// Synthesize to spin.toml
-	synth := synthesis.NewSynthesizer()
-	manifest, err := synth.SynthesizeApp(app)
+	// Build and synthesize to spin.toml
+	builtCDK := app.Build()
+	manifest, err := builtCDK.Synthesize()
 	if err != nil {
 		log.Fatalf("Failed to synthesize: %v", err)
 	}

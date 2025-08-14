@@ -31,7 +31,7 @@ type ComponentConfig struct {
 	Source               interface{}            `yaml:"source" json:"source"` // Can be string or map for different source types
 	Description          string                 `yaml:"description,omitempty" json:"description,omitempty"`
 	Build                *BuildConfig           `yaml:"build,omitempty" json:"build,omitempty"`
-	Environment          map[string]string      `yaml:"environment,omitempty" json:"environment,omitempty"`
+	Variables            map[string]string      `yaml:"variables,omitempty" json:"variables,omitempty"`
 	Files                []FileMount            `yaml:"files,omitempty" json:"files,omitempty"`
 	AllowedOutboundHosts []string              `yaml:"allowed_outbound_hosts,omitempty" json:"allowed_outbound_hosts,omitempty"`
 	AllowedHTTPHosts     []string              `yaml:"allowed_http_hosts,omitempty" json:"allowed_http_hosts,omitempty"`

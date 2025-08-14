@@ -1,0 +1,24 @@
+application: {
+  name: "demo-app"
+  version: "0.1.0"
+  description: "Demo MCP application with geo and fluid tools"
+}
+
+components: [
+  {
+    id: "fluid"
+    source: {
+      registry: "ghcr.io"
+      package: "bowlofarugula:fluid"
+      version: "0.0.1"
+    }
+  },
+  {
+    id: "geo"
+    source: {
+      registry: "ghcr.io"
+      package: "bowlofarugula:geo"
+      version: "0.0.1"
+    }
+  }
+]
