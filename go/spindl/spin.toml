@@ -1,25 +1,28 @@
 spin_manifest_version = 2
 
 [application]
-name = "simple-platform"
+name = "my-scientific-platform"
 version = "0.1.0"
-description = "A simple MCP tool platform"
+description = "Geo and fluid dynamics computation platform"
 
-[component.calculator]
-source = "./calculator.wasm"
+[component.fluid]
+source = { registry = "ghcr.io", package = "bowlofarugula/fluid", version = "0.0.1" }
 
-[component.calculator.environment]
-LOG_LEVEL = "info"
+[component.fluid.variables]
+PRECISION = "double"
 
 [component.ftl-mcp-gateway]
 source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.13-alpha.0" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
 
 [component.ftl-mcp-gateway.variables]
-component_names = "calculator,weather"
+component_names = "fluid,geo"
 
-[component.weather]
-source = { registry = "ghcr.io", package = "mcp-tools/weather", version = "1.0.0" }
+[component.geo]
+source = { registry = "ghcr.io", package = "bowlofarugula/geo", version = "0.0.1" }
+
+[component.geo.variables]
+LOG_LEVEL = "info"
 
 [[trigger.http]]
 route = "/..."
@@ -27,10 +30,9 @@ component = "ftl-mcp-gateway"
 
 [[trigger.http]]
 route = { private = true }
-component = "calculator"
+component = "geo"
 
 [[trigger.http]]
 route = { private = true }
-component = "weather"
-
+component = "fluid"
 

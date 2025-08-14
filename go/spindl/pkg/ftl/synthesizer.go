@@ -44,6 +44,18 @@ func (s *Synthesizer) SynthesizeApp(app *App) (string, error) {
     return s.toTOML(manifest)
 }
 
+// SynthesizeCUE takes raw CUE and produces spin.toml
+func (s *Synthesizer) SynthesizeCUE(cueStr string) (string, error) {
+    // Transform through CUE stages (FTL → SpinDL → Manifest)
+    manifest, err := s.transformThroughCUE(cueStr)
+    if err != nil {
+        return "", fmt.Errorf("failed to transform through CUE: %w", err)
+    }
+    
+    // Convert to TOML
+    return s.toTOML(manifest)
+}
+
 // transformThroughCUE performs the complete transformation pipeline in CUE
 func (s *Synthesizer) transformThroughCUE(cueStr string) (map[string]interface{}, error) {
     // Load the FTL patterns
