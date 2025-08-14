@@ -569,84 +569,74 @@ func TestHandleTypedTool_PrimitiveTypeValidation(t *testing.T) {
 	// Clear previous registrations
 	clearV3Registry()
 	
-	// Test that string input type is rejected
+	// Test that string input type is rejected (tool should not be registered)
 	t.Run("StringInput", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic when registering handler with string input type")
-			} else {
-				panicMsg := r.(string)
-				if !contains(panicMsg, "input type for tool") || !contains(panicMsg, "must be a struct") {
-					t.Errorf("Panic message should mention struct requirement, got: %s", panicMsg)
-				}
-			}
-		}()
-		
 		stringHandler := func(ctx context.Context, input string) (string, error) {
 			return "processed: " + input, nil
 		}
 		
 		HandleTypedTool("string_test", stringHandler)
+		
+		// Tool should not be registered due to validation failure
+		if IsV3Tool("string_test") {
+			t.Error("String input type should be rejected - tool should not be registered")
+		}
 	})
 	
 	// Test that int input type is rejected
 	t.Run("IntInput", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic when registering handler with int input type")
-			}
-		}()
-		
 		intHandler := func(ctx context.Context, input int) (int, error) {
 			return input * 2, nil
 		}
 		
 		HandleTypedTool("int_test", intHandler)
+		
+		// Tool should not be registered due to validation failure
+		if IsV3Tool("int_test") {
+			t.Error("Int input type should be rejected - tool should not be registered")
+		}
 	})
 	
 	// Test that slice input type is rejected
 	t.Run("SliceInput", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic when registering handler with slice input type")
-			}
-		}()
-		
 		sliceHandler := func(ctx context.Context, input []string) ([]string, error) {
 			return input, nil
 		}
 		
 		HandleTypedTool("slice_test", sliceHandler)
+		
+		// Tool should not be registered due to validation failure
+		if IsV3Tool("slice_test") {
+			t.Error("Slice input type should be rejected - tool should not be registered")
+		}
 	})
 	
 	// Test that map input type is rejected
 	t.Run("MapInput", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic when registering handler with map input type")
-			}
-		}()
-		
 		mapHandler := func(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error) {
 			return input, nil
 		}
 		
 		HandleTypedTool("map_test", mapHandler)
+		
+		// Tool should not be registered due to validation failure
+		if IsV3Tool("map_test") {
+			t.Error("Map input type should be rejected - tool should not be registered")
+		}
 	})
 	
 	// Test that interface{} input type is rejected
 	t.Run("InterfaceInput", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic when registering handler with interface{} input type")
-			}
-		}()
-		
 		interfaceHandler := func(ctx context.Context, input interface{}) (interface{}, error) {
 			return input, nil
 		}
 		
 		HandleTypedTool("interface_test", interfaceHandler)
+		
+		// Tool should not be registered due to validation failure
+		if IsV3Tool("interface_test") {
+			t.Error("Interface{} input type should be rejected - tool should not be registered")
+		}
 	})
 	
 	// Test that pointer to struct input type is allowed

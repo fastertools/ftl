@@ -240,7 +240,8 @@ func TestToolError_CommonErrorCodes(t *testing.T) {
 // TestV3ToolRegistry tests the V3 tool registry
 func TestV3ToolRegistry(t *testing.T) {
 	registry := &V3ToolRegistry{
-		tools: make(map[string]TypedToolDefinition),
+		tools:             make(map[string]TypedToolDefinition),
+		registeredV3Tools: make(map[string]bool),
 	}
 	
 	// Test empty registry
@@ -286,7 +287,8 @@ func TestV3ToolRegistry(t *testing.T) {
 // TestV3ToolRegistry_Concurrent tests concurrent access to the registry
 func TestV3ToolRegistry_Concurrent(t *testing.T) {
 	registry := &V3ToolRegistry{
-		tools: make(map[string]TypedToolDefinition),
+		tools:             make(map[string]TypedToolDefinition),
+		registeredV3Tools: make(map[string]bool),
 	}
 	
 	// Create multiple goroutines that add tools concurrently
