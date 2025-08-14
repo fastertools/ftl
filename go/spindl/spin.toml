@@ -1,0 +1,36 @@
+spin_manifest_version = 2
+
+[application]
+name = "simple-platform"
+version = "0.1.0"
+description = "A simple MCP tool platform"
+
+[component.calculator]
+source = "./calculator.wasm"
+
+[component.calculator.environment]
+LOG_LEVEL = "info"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.13-alpha.0" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+
+[component.ftl-mcp-gateway.variables]
+component_names = "calculator,weather"
+
+[component.weather]
+source = { registry = "ghcr.io", package = "mcp-tools/weather", version = "1.0.0" }
+
+[[trigger.http]]
+route = "/..."
+component = "ftl-mcp-gateway"
+
+[[trigger.http]]
+route = { private = true }
+component = "calculator"
+
+[[trigger.http]]
+route = { private = true }
+component = "weather"
+
+

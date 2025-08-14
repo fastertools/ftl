@@ -77,6 +77,7 @@ func init() {
 		newAuthCmd(),
 		newUpCmd(),
 		newRegistryCmd(),
+		newSynthCmd(),
 	)
 }
 
