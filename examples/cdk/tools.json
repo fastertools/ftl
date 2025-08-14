@@ -1,0 +1,49 @@
+[
+    {
+        "id": "calculator",
+        "type": "local",
+        "source": "./components/calculator.wasm",
+        "build": {
+            "command": "cargo build --release",
+            "watch": ["src/**/*.rs", "Cargo.toml"]
+        },
+        "env": {
+            "PRECISION": "64",
+            "LOG_LEVEL": "info"
+        }
+    },
+    {
+        "id": "weather",
+        "type": "registry",
+        "registry": {
+            "registry": "ghcr.io",
+            "package": "example/weather-tool",
+            "version": "3.0.0"
+        },
+        "env": {
+            "API_ENDPOINT": "https://api.weather.com"
+        }
+    },
+    {
+        "id": "translator",
+        "type": "local",
+        "source": "./components/translator.wasm",
+        "build": {
+            "command": "make build-wasm",
+            "watch": ["src/**/*", "Makefile"]
+        }
+    },
+    {
+        "id": "database",
+        "type": "registry",
+        "registry": {
+            "registry": "internal.company.com",
+            "package": "tools/db-client",
+            "version": "1.2.3"
+        },
+        "env": {
+            "CONNECTION_POOL_SIZE": "10",
+            "QUERY_TIMEOUT": "30s"
+        }
+    }
+]
