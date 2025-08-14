@@ -237,3 +237,31 @@ func TestSynthesizer_DirectJSON(t *testing.T) {
 		t.Error("Missing tool2 component")
 	}
 }
+
+func TestSynthesizer_DirectCUE(t *testing.T) {
+	cueSource := `
+application: {
+	name: "cue-app"
+	version: "1.0.0"
+}
+components: [{
+	id: "cue-component"
+	source: "./component.wasm"
+}]
+`
+
+	synth := NewSynthesizer()
+	manifest, err := synth.SynthesizeCUE(cueSource)
+	if err != nil {
+		t.Fatalf("Failed to synthesize from CUE: %v", err)
+	}
+
+	// Verify the manifest contains expected elements
+	if !strings.Contains(manifest, "cue-app") {
+		t.Error("Missing application name from CUE")
+	}
+
+	if !strings.Contains(manifest, "[component.cue-component]") {
+		t.Error("Missing component from CUE")
+	}
+}

@@ -10,21 +10,23 @@ A production-ready CLI for building and deploying MCP (Model Context Protocol) t
 - Registry operations: `push`, `pull`, `list`
 - Authentication support: `login`, `logout`, `status`
 
-✅ **CUE-Powered Synthesis Engine**
-- Two-stage transformation pipeline (FTL → SpinDL → spin.toml)
-- Type-safe configurations with validation
-- Support for Go CDK, YAML, and direct CUE input
+✅ **Pure CUE-Based Synthesis**
+- Direct CUE transformations (no intermediate layers)
+- All business logic in CUE patterns
+- Native support for YAML, JSON, CUE, and Go inputs
+- Idiomatic Go CDK that uses CUE internally
 
 ✅ **Multiple Input Formats**
-- **Go CDK**: Programmatic, type-safe configuration
-- **YAML**: Declarative, GitOps-friendly
-- **CUE**: Maximum control with constraints
+- **YAML/JSON**: Simple declarative configuration
+- **CUE**: Type-safe configuration with validation
+- **Go CDK**: Programmatic API with fluent interface
+- All formats produce identical output
 
 ✅ **Production Ready**
-- 87.4% test coverage
+- 90.5% test coverage
 - Zero lint warnings
-- GNU-level completeness
 - Comprehensive error handling
+- Smart component handling (registry vs local sources)
 
 ## 📦 Installation
 
@@ -63,7 +65,8 @@ make build
 ### 1. Initialize a New Project
 
 ```bash
-ftl init my-platform
+# Choose your preferred format
+ftl init my-platform --format yaml  # or json, cue, go
 cd my-platform
 ```
 
@@ -71,18 +74,18 @@ cd my-platform
 
 From registry:
 ```bash
-ftl component add geo --from ghcr.io/bowlofarugula/geo:0.0.1
+ftl component add geo --from ghcr.io/bowlofarugula:geo:0.0.1
 ```
 
 From local source:
 ```bash
-ftl component add my-tool --from ./my-tool.wasm
+ftl component add my-component --from ./my-component.wasm
 ```
 
 ### 3. Build and Deploy
 
 ```bash
-ftl build
+ftl build    # Synthesizes and builds
 ftl up       # Local development
 ftl deploy   # Deploy to production
 ```
@@ -96,72 +99,77 @@ package main
 
 import (
     "fmt"
-    "github.com/fastertools/ftl-cli/go/spindl/pkg/ftl"
+    "log"
+    "github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
 )
 
 func main() {
-    app := ftl.NewApp("my-platform").
+    cdk := synthesis.NewCDK()
+    app := cdk.NewApp("my-platform").
+        SetVersion("1.0.0").
         SetDescription("My MCP platform")
     
-    app.AddTool("geo").
-        FromRegistry("ghcr.io", "bowlofarugula/geo", "0.0.1").
+    app.AddComponent("geo").
+        FromRegistry("ghcr.io", "bowlofarugula:geo", "0.0.1").
         WithEnv("LOG_LEVEL", "info").
         Build()
     
     // Enable authentication
     app.EnableWorkOSAuth("org_12345")
     
-    synth := ftl.NewSynthesizer()
-    manifest, _ := synth.SynthesizeApp(app)
-    fmt.Println(manifest)
+    builtCDK := app.Build()
+    manifest, err := builtCDK.Synthesize()
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Print(manifest)
 }
 ```
 
 ### YAML Configuration
 
 ```yaml
-name: my-platform
-version: 1.0.0
-description: My MCP platform
+application:
+  name: my-platform
+  version: "1.0.0"
+  description: My MCP platform
 
-tools:
+components:
   - id: geo
     source:
       registry: ghcr.io
-      package: bowlofarugula/geo
-      version: 0.0.1
-    environment:
+      package: "bowlofarugula:geo"
+      version: "0.0.1"
+    variables:
       LOG_LEVEL: info
 
-access: private
-auth:
-  provider: workos
-  org_id: org_12345
+# Optional authentication
+# access: private
+# auth:
+#   provider: workos
+#   org_id: org_12345
 ```
 
-### Direct CUE
+### CUE Configuration
 
 ```cue
-app: {
+application: {
     name: "my-platform"
     version: "1.0.0"
-    tools: [{
-        id: "geo"
-        source: {
-            registry: "ghcr.io"
-            package: "bowlofarugula/geo"
-            version: "0.0.1"
-        }
-        environment: {
-            LOG_LEVEL: "info"
-        }
-    }]
-    access: "private"
-    auth: {
-        provider: "workos"
-        org_id: "org_12345"
-    }
+    description: "My MCP platform"
 }
+
+components: [{
+    id: "geo"
+    source: {
+        registry: "ghcr.io"
+        package: "bowlofarugula:geo"
+        version: "0.0.1"
+    }
+    variables: {
+        LOG_LEVEL: "info"
+    }
+}]
 ```
 
 Generate spin.toml:
@@ -174,14 +182,14 @@ ftl synth platform.cue > spin.toml
 
 ## 🏗️ Architecture
 
-FTL uses a layered architecture with CUE as the synthesis engine:
+FTL uses pure CUE for all transformations:
 
 ```
-Layer 3: FTL (User Configuration)
-    ↓ [CUE Transformation]
-Layer 2: SpinDL (Intermediate Model)
-    ↓ [CUE Transformation]
-Layer 1: spin.toml (WebAssembly Manifest)
+User Input (YAML/JSON/CUE/Go)
+    ↓ [Parse to CUE Value]
+FTL Application Model
+    ↓ [CUE Pattern Matching]
+spin.toml (WebAssembly Manifest)
 ```
 
 ### Automatic Components
@@ -251,39 +259,41 @@ make test-coverage
 go test ./ftl/cmd -v
 ```
 
-Current coverage: **87.4%**
+Current coverage: **90.5%**
 
 ## 📁 Project Structure
 
 ```
 go/
-├── ftl/                # FTL CLI implementation
-│   ├── cmd/           # Command implementations
-│   ├── main.go        # Entry point
-│   └── go.mod         # Dependencies
+├── ftl/                      # FTL CLI implementation
+│   ├── cmd/                  # Command implementations
+│   ├── pkg/synthesis/        # Pure CUE synthesis engine
+│   │   ├── cdk.go           # Go CDK API
+│   │   ├── synthesizer.go   # CUE transformations
+│   │   ├── patterns.cue     # Core CUE patterns
+│   │   └── helpers.go       # Format detection
+│   ├── examples/             # All format examples
+│   │   ├── yaml-format/     # YAML example
+│   │   ├── json-format/     # JSON example
+│   │   ├── cue-format/      # CUE example
+│   │   └── go-format/       # Go CDK example
+│   └── main.go              # Entry point
 │
-├── spindl/            # Synthesis engine and CDK
-│   ├── pkg/ftl/       # Go CDK API
-│   │   ├── app.go     # Application builder
-│   │   ├── synthesizer.go  # CUE synthesis
-│   │   └── patterns.cue    # CUE patterns
-│   ├── examples/      # Usage examples
-│   └── internal/      # Internal schemas
-│
-└── shared/            # Shared utilities
-    ├── spin/          # Spin CLI wrapper
-    ├── auth/          # Authentication
-    └── config/        # Configuration
+└── shared/                   # Shared utilities
+    ├── spin/                 # Spin CLI wrapper
+    ├── auth/                 # Authentication
+    └── config/               # Configuration schemas
 ```
 
 ## 📚 Examples
 
-See [spindl/examples/](spindl/examples/) for:
-- Basic platforms
-- Authentication setup
-- Complex multi-tool configurations
-- Build and watch patterns
-- Environment variable configuration
+See [ftl/examples/](ftl/examples/) for complete examples in all formats:
+- YAML declarative configuration
+- JSON declarative configuration  
+- CUE type-safe configuration
+- Go programmatic configuration
+
+All examples produce identical `spin.toml` output.
 
 ## 🛠️ Development
 
@@ -304,10 +314,10 @@ make clean        # Clean build artifacts
 
 ### Code Quality
 
-- Test coverage: 87.4%
+- Test coverage: 90.5%
 - Zero lint warnings
-- No TODOs in production code
-- CUE validation on all configs
+- Pure CUE transformations
+- Smart component handling
 
 ## 🤝 Contributing
 
