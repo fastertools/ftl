@@ -59,11 +59,11 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := args[0]
-			
+
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
-			
+
 			return addComponentLocal(name, path, description, allowedHosts)
 		},
 	}
@@ -71,7 +71,7 @@ Examples:
 	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
 	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
 	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("name")
 
 	return cmd
 }
@@ -98,19 +98,19 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			url := args[0]
-			
+
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
-			
+
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 				return fmt.Errorf("URL must start with http:// or https://")
 			}
-			
+
 			if digest == "" {
 				return fmt.Errorf("--digest is required for security. Format: sha256:hexdigest")
 			}
-			
+
 			return addComponentURL(name, url, digest, description, allowedHosts)
 		},
 	}
@@ -119,8 +119,8 @@ Examples:
 	cmd.Flags().StringVar(&digest, "digest", "", "SHA256 digest (required, format: sha256:...)")
 	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
 	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	cmd.MarkFlagRequired("name")
-	cmd.MarkFlagRequired("digest")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("digest")
 
 	return cmd
 }
@@ -169,7 +169,7 @@ Examples:
 			if version == "" {
 				return fmt.Errorf("--version is required")
 			}
-			
+
 			return addComponentRegistry(name, registry, pkg, version, description, allowedHosts)
 		},
 	}
@@ -180,7 +180,7 @@ Examples:
 	cmd.Flags().StringVar(&version, "version", "", "Package version (required)")
 	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
 	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("name")
 	cmd.MarkFlagRequired("registry")
 	cmd.MarkFlagRequired("package")
 	cmd.MarkFlagRequired("version")
@@ -214,11 +214,11 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reference := args[0]
-			
+
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
-			
+
 			return addComponentOCI(name, reference, description, allowedHosts)
 		},
 	}
@@ -226,7 +226,7 @@ Examples:
 	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
 	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
 	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("name")
 
 	return cmd
 }
@@ -252,10 +252,10 @@ func addComponentLocal(name, path, description string, allowedHosts []string) er
 	}
 
 	// Load existing config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -270,7 +270,7 @@ func addComponentLocal(name, path, description string, allowedHosts []string) er
 	// Create component with string source (local path)
 	newComp := config.ComponentConfig{
 		ID:                   name,
-		Source:               path,  // Simple string for local path
+		Source:               path, // Simple string for local path
 		Description:          description,
 		AllowedOutboundHosts: allowedHosts,
 	}
@@ -291,15 +291,15 @@ func addComponentLocal(name, path, description string, allowedHosts []string) er
 	cfg.Components = append(cfg.Components, newComp)
 
 	// Save config
-	if err := saveSpinConfig("spindl.yml", cfg); err != nil {
+	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
-	
+
 	if info.IsDir() || !strings.HasSuffix(path, ".wasm") {
 		fmt.Println("\nNext steps:")
-		fmt.Println("  1. Configure build settings in spindl.yml")
+		fmt.Println("  1. Configure build settings in ftl.yaml")
 		fmt.Println("  2. Run 'ftl build' to compile")
 		fmt.Println("  3. Run 'ftl up' to test locally")
 	} else {
@@ -325,10 +325,10 @@ func addComponentURL(name, url, digest, description string, allowedHosts []strin
 	}
 
 	// Load existing config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -346,10 +346,10 @@ func addComponentURL(name, url, digest, description string, allowedHosts []strin
 		"url":    url,
 		"digest": digest,
 	}
-	
+
 	newComp := config.ComponentConfig{
 		ID:                   name,
-		Source:               sourceMap,  // Table format for URL source
+		Source:               sourceMap, // Table format for URL source
 		Description:          description,
 		AllowedOutboundHosts: allowedHosts,
 	}
@@ -365,13 +365,13 @@ func addComponentURL(name, url, digest, description string, allowedHosts []strin
 	cfg.Components = append(cfg.Components, newComp)
 
 	// Save config
-	if err := saveSpinConfig("spindl.yml", cfg); err != nil {
+	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
 	fmt.Printf("\n%s Component will be downloaded during build/deployment\n", blue("ℹ"))
-	
+
 	fmt.Println("\nNext steps:")
 	fmt.Println("  1. Run 'ftl build' to prepare the application")
 	fmt.Println("  2. Run 'ftl up' to test locally")
@@ -394,10 +394,10 @@ func addComponentRegistry(name, registry, pkg, version, description string, allo
 	}
 
 	// Load existing config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -415,10 +415,10 @@ func addComponentRegistry(name, registry, pkg, version, description string, allo
 		"package":  pkg,
 		"version":  version,
 	}
-	
+
 	newComp := config.ComponentConfig{
 		ID:                   name,
-		Source:               sourceMap,  // Table format for registry source
+		Source:               sourceMap, // Table format for registry source
 		Description:          description,
 		AllowedOutboundHosts: allowedHosts,
 	}
@@ -434,13 +434,13 @@ func addComponentRegistry(name, registry, pkg, version, description string, allo
 	cfg.Components = append(cfg.Components, newComp)
 
 	// Save config
-	if err := saveSpinConfig("spindl.yml", cfg); err != nil {
+	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
 	fmt.Printf("\n%s Registry components will be pulled during deployment\n", blue("ℹ"))
-	
+
 	fmt.Println("\nNext steps:")
 	fmt.Println("  1. Run 'ftl build' to prepare the application")
 	fmt.Println("  2. Run 'ftl up' to test locally")
@@ -457,12 +457,12 @@ func addComponentOCI(name, reference, description string, allowedHosts []string)
 
 	// Parse OCI reference to extract registry, package, and version
 	// Format: [registry/]namespace/image[:tag|@digest]
-	
+
 	var registry, pkg, version string
-	
+
 	// Handle different OCI formats
 	parts := strings.Split(reference, "/")
-	
+
 	if len(parts) >= 3 {
 		// Full format: registry.io/namespace/image:tag
 		registry = parts[0]
@@ -510,10 +510,10 @@ func addComponentOCI(name, reference, description string, allowedHosts []string)
 	}
 
 	// Load existing config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -532,10 +532,10 @@ func addComponentOCI(name, reference, description string, allowedHosts []string)
 		"package":  pkg,
 		"version":  version,
 	}
-	
+
 	newComp := config.ComponentConfig{
 		ID:                   name,
-		Source:               sourceMap,  // Table format for registry source
+		Source:               sourceMap, // Table format for registry source
 		Description:          description,
 		AllowedOutboundHosts: allowedHosts,
 	}
@@ -551,13 +551,13 @@ func addComponentOCI(name, reference, description string, allowedHosts []string)
 	cfg.Components = append(cfg.Components, newComp)
 
 	// Save config
-	if err := saveSpinConfig("spindl.yml", cfg); err != nil {
+	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
 	fmt.Printf("\n%s OCI registry components will be pulled during deployment\n", blue("ℹ"))
-	
+
 	fmt.Println("\nNext steps:")
 	fmt.Println("  1. Run 'ftl build' to prepare the application")
 	fmt.Println("  2. Run 'ftl up' to test locally")

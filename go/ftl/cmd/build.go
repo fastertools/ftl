@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fastertools/ftl-cli/go/shared/config"
 	"github.com/fastertools/ftl-cli/go/shared/spin"
-	"github.com/fastertools/ftl-cli/go/spindl/pkg/spindl"
+	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
+
 
 func newBuildCmd() *cobra.Command {
 	var skipSynth bool
@@ -32,27 +35,64 @@ func newBuildCmd() *cobra.Command {
 				return err
 			}
 
-			// Check if spindl.yml exists
+			// Check if ftl.yaml exists
 			if _, err := os.Stat(configFile); err == nil && !skipSynth {
 				fmt.Printf("%s Synthesizing spin.toml from %s\n", blue("→"), configFile)
 
-				// Read spindl.yml
+				// Read ftl.yaml
 				configData, err := os.ReadFile(configFile)
 				if err != nil {
 					return fmt.Errorf("failed to read %s: %w", configFile, err)
 				}
 
-				// Create synthesis engine
-				engine := spindl.NewEngine()
+				// Parse YAML config
+				var cfg config.FTLConfig
+				if err := yaml.Unmarshal(configData, &cfg); err != nil {
+					return fmt.Errorf("failed to parse %s: %w", configFile, err)
+				}
 
-				// Synthesize to spin.toml
-				manifestData, err := engine.SynthesizeConfig(configData, "yaml")
+				// Create FTL app from config
+				app := synthesis.NewApp(cfg.Application.Name)
+				if cfg.Application.Version != "" {
+					app.SetVersion(cfg.Application.Version)
+				}
+				if cfg.Application.Description != "" {
+					app.SetDescription(cfg.Application.Description)
+				}
+
+				// Add components
+				for _, comp := range cfg.Components {
+					tb := app.AddTool(comp.ID)
+					
+					// Handle source
+					switch src := comp.Source.(type) {
+					case string:
+						tb.FromLocal(src)
+					case map[string]interface{}:
+						if registry, ok := src["registry"].(string); ok {
+							pkg, _ := src["package"].(string)
+							version, _ := src["version"].(string)
+							tb.FromRegistry(registry, pkg, version)
+						}
+					}
+					
+					// Add environment variables
+					for k, v := range comp.Environment {
+						tb.WithEnv(k, v)
+					}
+					
+					tb.Build()
+				}
+
+				// Synthesize using CUE engine
+				synth := synthesis.NewSynthesizer()
+				manifest, err := synth.SynthesizeApp(app)
 				if err != nil {
 					return fmt.Errorf("synthesis failed: %w", err)
 				}
 
 				// Write spin.toml
-				if err := os.WriteFile("spin.toml", manifestData, 0644); err != nil {
+				if err := os.WriteFile("spin.toml", []byte(manifest), 0644); err != nil {
 					return fmt.Errorf("failed to write spin.toml: %w", err)
 				}
 
@@ -79,8 +119,8 @@ func newBuildCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&skipSynth, "skip-synth", false, "Skip synthesis of spin.toml from spindl.yml")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "spindl.yml", "Configuration file to synthesize")
+	cmd.Flags().BoolVar(&skipSynth, "skip-synth", false, "Skip synthesis of spin.toml from ftl.yaml")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "ftl.yaml", "Configuration file to synthesize")
 
 	return cmd
 }

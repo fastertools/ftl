@@ -1,0 +1,26 @@
+# My Scientific Platform
+# Simple configuration with just geo and fluid tools
+
+name: my-scientific-platform
+version: 0.1.0
+description: Geo and fluid dynamics computation platform
+
+tools:
+  - id: geo
+    source:
+      registry: ghcr.io
+      package: bowlofarugula/geo
+      version: 0.0.1
+    environment:
+      LOG_LEVEL: info
+
+  - id: fluid
+    source:
+      registry: ghcr.io
+      package: bowlofarugula/fluid  
+      version: 0.0.1
+    environment:
+      PRECISION: double
+
+# Public access (no authentication)
+access: public

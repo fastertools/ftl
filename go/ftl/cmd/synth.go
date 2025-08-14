@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/fastertools/ftl-cli/go/spindl/pkg/ftl"
+	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -44,13 +44,13 @@ Examples:
 			// Read input
 			if len(args) == 0 || args[0] == "-" {
 				// Read from stdin
-				input, err = ioutil.ReadAll(os.Stdin)
+				input, err = io.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("failed to read from stdin: %w", err)
 				}
 			} else {
 				// Read from file
-				input, err = ioutil.ReadFile(args[0])
+				input, err = os.ReadFile(args[0])
 				if err != nil {
 					return fmt.Errorf("failed to read file: %w", err)
 				}
@@ -64,7 +64,7 @@ Examples:
 
 			// Output result
 			if outputFile != "" {
-				err = ioutil.WriteFile(outputFile, []byte(manifest), 0644)
+				err = os.WriteFile(outputFile, []byte(manifest), 0644)
 				if err != nil {
 					return fmt.Errorf("failed to write output file: %w", err)
 				}
@@ -135,19 +135,19 @@ func detectFormat(input []byte) string {
 
 // FTLConfig represents the YAML/JSON configuration structure
 type FTLConfig struct {
-	Name        string     `yaml:"name" json:"name"`
-	Version     string     `yaml:"version" json:"version"`
-	Description string     `yaml:"description" json:"description"`
-	Tools       []ToolDef  `yaml:"tools" json:"tools"`
-	Access      string     `yaml:"access" json:"access"`
-	Auth        *AuthDef   `yaml:"auth" json:"auth"`
+	Name        string    `yaml:"name" json:"name"`
+	Version     string    `yaml:"version" json:"version"`
+	Description string    `yaml:"description" json:"description"`
+	Tools       []ToolDef `yaml:"tools" json:"tools"`
+	Access      string    `yaml:"access" json:"access"`
+	Auth        *AuthDef  `yaml:"auth" json:"auth"`
 }
 
 type ToolDef struct {
-	ID          string                 `yaml:"id" json:"id"`
-	Source      interface{}            `yaml:"source" json:"source"`
-	Build       *BuildDef              `yaml:"build" json:"build"`
-	Environment map[string]string      `yaml:"environment" json:"environment"`
+	ID          string            `yaml:"id" json:"id"`
+	Source      interface{}       `yaml:"source" json:"source"`
+	Build       *BuildDef         `yaml:"build" json:"build"`
+	Environment map[string]string `yaml:"environment" json:"environment"`
 }
 
 type BuildDef struct {
@@ -193,19 +193,19 @@ func synthesizeFromGo(filename string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
-	
+
 	// Check if file exists
 	if _, err := os.Stat(absPath); err != nil {
 		return "", fmt.Errorf("file not found: %w", err)
 	}
-	
+
 	// Run the Go file and capture its output
 	cmd := exec.Command("go", "run", absPath)
-	
+
 	// Set the working directory to the file's directory
 	// This ensures relative imports work correctly
 	cmd.Dir = filepath.Dir(absPath)
-	
+
 	// Capture stdout
 	output, err := cmd.Output()
 	if err != nil {
@@ -215,37 +215,37 @@ func synthesizeFromGo(filename string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to run Go file: %w", err)
 	}
-	
+
 	// The Go program should output the manifest to stdout
 	manifest := string(output)
-	
+
 	// Basic validation - check if it looks like a manifest
 	if !strings.Contains(manifest, "spin_manifest_version") {
 		return "", fmt.Errorf("Go program did not output a valid spin.toml manifest")
 	}
-	
+
 	return manifest, nil
 }
 
 // synthesizeFromCUE converts CUE to spin.toml
 func synthesizeFromCUE(input []byte) (string, error) {
 	// Create a synthesizer to use CUE
-	synth := ftl.NewSynthesizer()
-	
+	synth := synthesis.NewSynthesizer()
+
 	// The input CUE should define an 'app' that matches #FTLApplication
 	// We'll pass it directly to the synthesizer's CUE pipeline
 	manifest, err := synth.SynthesizeCUE(string(input))
 	if err != nil {
 		return "", fmt.Errorf("failed to synthesize from CUE: %w", err)
 	}
-	
+
 	return manifest, nil
 }
 
 // synthesizeFromConfig converts the config struct to spin.toml
 func synthesizeFromConfig(config *FTLConfig) (string, error) {
 	// Create FTL app
-	app := ftl.NewApp(config.Name)
+	app := synthesis.NewApp(config.Name)
 
 	if config.Version != "" {
 		app.SetVersion(config.Version)
@@ -291,7 +291,7 @@ func synthesizeFromConfig(config *FTLConfig) (string, error) {
 
 	// Configure access
 	if config.Access == "private" {
-		app.SetAccess(ftl.PrivateAccess)
+		app.SetAccess(synthesis.PrivateAccess)
 	}
 
 	// Configure auth
@@ -305,6 +305,6 @@ func synthesizeFromConfig(config *FTLConfig) (string, error) {
 	}
 
 	// Synthesize
-	synth := ftl.NewSynthesizer()
+	synth := synthesis.NewSynthesizer()
 	return synth.SynthesizeApp(app)
 }

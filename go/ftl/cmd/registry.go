@@ -51,26 +51,56 @@ func newRegistryPullCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "pull [reference]",
 		Short: "Pull application from registry",
-		Args:  cobra.ExactArgs(1),
+		Long: `Pull a Spin application from a registry.
+
+Example:
+  ftl registry pull ghcr.io/myorg/myapp:v1.0.0`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 			reference := args[0]
+
 			fmt.Printf("Pulling from registry: %s\n", reference)
-			// TODO: Implement registry pull logic
-			fmt.Println("Registry pull not yet implemented")
+
+			// Use spin registry pull
+			if err := spin.Registry(ctx, "pull", reference); err != nil {
+				return fmt.Errorf("failed to pull from registry: %w", err)
+			}
+
+			fmt.Println("Pull completed successfully")
 			return nil
 		},
 	}
 }
 
 func newRegistryListCmd() *cobra.Command {
-	return &cobra.Command{
+	var registry string
+
+	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List registry contents",
+		Short: "List applications in registry",
+		Long: `List available Spin applications in a registry.
+
+Example:
+  ftl registry list --registry ghcr.io/myorg`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Listing registry contents...")
-			// TODO: Implement registry list logic
-			fmt.Println("Registry list not yet implemented")
+			if registry == "" {
+				return fmt.Errorf("--registry flag is required")
+			}
+
+			ctx := context.Background()
+			fmt.Printf("Listing applications in registry: %s\n", registry)
+
+			// Use spin registry list (if available) or catalog
+			if err := spin.Registry(ctx, "catalog", "list", registry); err != nil {
+				return fmt.Errorf("failed to list registry contents: %w", err)
+			}
+
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&registry, "registry", "r", "", "Registry URL to list")
+
+	return cmd
 }

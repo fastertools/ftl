@@ -40,10 +40,10 @@ func newComponentListCmd() *cobra.Command {
 
 func listComponents() error {
 	// Load config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -56,10 +56,10 @@ func listComponents() error {
 
 	// Display components
 	fmt.Printf("Components in %s:\n\n", cfg.Application.Name)
-	
+
 	for i, comp := range cfg.Components {
 		fmt.Printf("%d. %s\n", i+1, comp.ID)
-		
+
 		// Display source based on type
 		switch src := comp.Source.(type) {
 		case string:
@@ -73,11 +73,11 @@ func listComponents() error {
 				fmt.Printf("   Source: %s/%s:%s (Registry)\n", registry, pkg, version)
 			}
 		}
-		
+
 		if comp.Description != "" {
 			fmt.Printf("   Description: %s\n", comp.Description)
 		}
-		
+
 		// Find associated triggers
 		for _, trigger := range cfg.Triggers {
 			if trigger.Component == comp.ID {
@@ -90,7 +90,7 @@ func listComponents() error {
 				}
 			}
 		}
-		
+
 		if len(comp.AllowedOutboundHosts) > 0 {
 			fmt.Printf("   Allowed hosts: %s\n", strings.Join(comp.AllowedOutboundHosts, ", "))
 		}
@@ -117,10 +117,10 @@ func removeComponent(name string) error {
 	green := color.New(color.FgGreen).SprintFunc()
 
 	// Load config
-	cfg, err := loadSpinConfig("spindl.yml")
+	cfg, err := loadSpinConfig("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("spindl.yml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
 		}
 		return err
 	}
@@ -152,7 +152,7 @@ func removeComponent(name string) error {
 	cfg.Triggers = newTriggers
 
 	// Save updated config
-	if err := saveSpinConfig("spindl.yml", cfg); err != nil {
+	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 

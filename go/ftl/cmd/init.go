@@ -32,7 +32,6 @@ func newInitCmd() *cobra.Command {
 
 This command creates a new FTL project directory with:
 - ftl.yaml configuration file
-- spindl.yml for application composition
 - Basic project structure
 - Example components (optional)`,
 		Args: cobra.MaximumNArgs(1),
@@ -77,11 +76,11 @@ func runInit(opts *InitOptions) error {
 
 	Info("Initializing FTL project '%s'", opts.Name)
 
-	// Create spindl.yml configuration
+	// Create ftl.yaml configuration
 	if err := createFTLConfig(projectDir, opts); err != nil {
-		return fmt.Errorf("failed to create spindl.yml: %w", err)
+		return fmt.Errorf("failed to create ftl.yaml: %w", err)
 	}
-	Success("Created spindl.yml")
+	Success("Created ftl.yaml")
 
 	// Create .gitignore
 	if err := createGitignore(projectDir); err != nil {
@@ -89,10 +88,6 @@ func runInit(opts *InitOptions) error {
 	}
 	Success("Created .gitignore")
 
-	// TODO: Create example component if using template
-	// if opts.Template != "empty" {
-	// 	// Component creation will be implemented later
-	// }
 
 	// Print next steps
 	fmt.Println()
@@ -127,7 +122,7 @@ func createFTLConfig(dir string, opts *InitOptions) error {
 		},
 	}
 
-	configPath := filepath.Join(dir, "spindl.yml")
+	configPath := filepath.Join(dir, "ftl.yaml")
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -135,7 +130,7 @@ func createFTLConfig(dir string, opts *InitOptions) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
-// createSpinComposeConfig is no longer needed as we create spindl.yml in createFTLConfig
+// createSpinComposeConfig is no longer needed as we create ftl.yaml in createFTLConfig
 
 func createGitignore(dir string) error {
 	content := `.spin/
