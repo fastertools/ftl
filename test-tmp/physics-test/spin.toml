@@ -1,0 +1,24 @@
+spin_manifest_version = 2
+
+[application]
+description = "physics - An FTL application"
+name = "physics"
+version = "0.1.0"
+
+[component.geo]
+source = { registry = "ghcr.io", package = "bowlofarugula:geo", version = "0.0.1" }
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.13-alpha.0" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+
+[component.ftl-mcp-gateway.variables]
+component_names = "geo"
+
+[[trigger.http]]
+route = "/..."
+component = "ftl-mcp-gateway"
+
+[[trigger.http]]
+route = { private = true }
+component = "geo"

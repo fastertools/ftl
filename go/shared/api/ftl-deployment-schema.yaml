@@ -1,0 +1,270 @@
+# FTL Deployment API Schema
+# This defines the contract between the CLI and the platform backend
+# The backend will use the same spin-compose tool to synthesize the final spin.toml
+
+openapi: 3.0.3
+info:
+  title: FTL Deployment API Schema
+  version: 1.0.0
+  description: |
+    The deployment API accepts the spinc.yaml configuration as the deployment specification.
+    The platform backend will:
+    1. Use spin-compose to synthesize the final spin.toml (adding platform components)
+    2. Deploy to Fermyon Cloud with proper isolation
+    3. Return deployment status/URL
+
+paths:
+  /v1/deployments:
+    post:
+      operationId: createDeployment
+      summary: Create a new deployment
+      description: |
+        Deploy an application using the spinc.yaml configuration.
+        Components should already be pushed to the registry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentRequest'
+      responses:
+        '202':
+          description: Deployment accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDeploymentResponse'
+
+components:
+  schemas:
+    CreateDeploymentRequest:
+      type: object
+      required:
+        - config
+        - components
+      properties:
+        config:
+          $ref: '#/components/schemas/SpinComposeConfig'
+        components:
+          type: array
+          description: Registry references for components that have been pushed
+          items:
+            $ref: '#/components/schemas/ComponentReference'
+        environment:
+          type: string
+          description: Target environment (staging, production, etc.)
+          default: production
+        
+    SpinComposeConfig:
+      type: object
+      description: |
+        The spinc.yaml configuration (L3 schema).
+        This is the same format used locally by spin-compose.
+      required:
+        - application
+      properties:
+        application:
+          $ref: '#/components/schemas/ApplicationConfig'
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentConfig'
+        triggers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriggerConfig'
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        mcp:
+          $ref: '#/components/schemas/MCPConfig'
+          
+    ApplicationConfig:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Application name
+        version:
+          type: string
+          default: "0.1.0"
+        description:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+            
+    ComponentConfig:
+      type: object
+      required:
+        - id
+        - source
+      properties:
+        id:
+          type: string
+          description: Component identifier
+        source:
+          type: string
+          description: |
+            Component source - can be:
+            - Registry reference (e.g., "registry.example.com/namespace/component:version")
+            - Local path (for platform-provided components)
+        description:
+          type: string
+        build:
+          type: object
+          properties:
+            command:
+              type: string
+            workdir:
+              type: string
+            watch:
+              type: array
+              items:
+                type: string
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              destination:
+                type: string
+        allowed_outbound_hosts:
+          type: array
+          items:
+            type: string
+        allowed_http_hosts:
+          type: array  
+          items:
+            type: string
+        key_value_stores:
+          type: array
+          items:
+            type: string
+        sqlite_databases:
+          type: array
+          items:
+            type: string
+        ai_models:
+          type: array
+          items:
+            type: string
+            
+    TriggerConfig:
+      type: object
+      required:
+        - type
+        - component
+      properties:
+        type:
+          type: string
+          enum: [http, redis]
+        component:
+          type: string
+          description: Component ID to trigger
+        route:
+          type: string
+          description: HTTP route (for http triggers)
+        channel:
+          type: string
+          description: Redis channel (for redis triggers)
+        executor:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [spin, wagi]
+              
+    MCPConfig:
+      type: object
+      description: MCP-specific configuration
+      properties:
+        gateway:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              default: true
+            component:
+              type: string
+              description: Override default MCP gateway component
+        authorizer:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              default: true
+            component:
+              type: string
+              description: Override default MCP authorizer component
+            config:
+              $ref: '#/components/schemas/AuthorizerConfig'
+              
+    AuthorizerConfig:
+      type: object
+      properties:
+        access_control:
+          type: string
+          enum: [public, private, org, custom]
+          default: public
+        jwt_issuer:
+          type: string
+          description: JWT issuer URL for custom auth
+        jwt_audience:
+          type: string
+          description: JWT audience for custom auth
+        allowed_roles:
+          type: array
+          items:
+            type: string
+        org_id:
+          type: string
+          description: Organization ID for org-level access
+          
+    ComponentReference:
+      type: object
+      required:
+        - id
+        - registry_uri
+        - digest
+      properties:
+        id:
+          type: string
+          description: Component ID (must match a component in the config)
+        registry_uri:
+          type: string
+          description: Full registry URI where component was pushed
+          example: "123456789.dkr.ecr.us-west-2.amazonaws.com/ftl/app-id/component-name:v1.0.0"
+        digest:
+          type: string
+          description: Content digest of the pushed component
+          example: "sha256:abc123..."
+          
+    CreateDeploymentResponse:
+      type: object
+      properties:
+        deployment_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, building, deploying, active, failed]
+        message:
+          type: string
+        app_url:
+          type: string
+          format: uri
+          description: URL where the app will be accessible once deployed
+        created_at:
+          type: string
+          format: date-time

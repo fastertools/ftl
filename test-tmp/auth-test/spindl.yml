@@ -1,0 +1,19 @@
+application:
+    name: auth-test
+    version: 0.1.0
+    description: Test app with authorization
+components:
+    - id: my-tool
+      source: ./my-tool.wasm
+triggers:
+    - type: http
+      component: my-tool
+      route: private
+mcp:
+    gateway:
+        enabled: true
+    authorizer:
+        enabled: true
+        access_control: private
+        jwt_issuer: https://auth.example.com
+        jwt_audience: my-app

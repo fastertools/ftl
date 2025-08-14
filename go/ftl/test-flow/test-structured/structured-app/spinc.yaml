@@ -1,0 +1,23 @@
+application:
+    name: structured-app
+    version: 0.1.0
+    description: structured-app - An FTL application
+components:
+    - id: hello-registry
+      source: fermyon:spin-hello@1.0.0
+    - id: hello-http
+      source: https://example.com/test.wasm
+    - id: hello-local
+      source: ./components/local-src
+    - id: hello-template
+      source: components/hello-template
+      build:
+        command: cargo build --target wasm32-wasi --release
+        workdir: components/hello-template
+triggers:
+    - type: http
+      component: hello-local
+      route: /local
+    - type: http
+      component: hello-template
+      route: /hello

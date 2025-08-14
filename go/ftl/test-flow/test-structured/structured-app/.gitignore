@@ -1,0 +1,12 @@
+.spin/
+spin.toml
+*.wasm
+.ftl/
+.env
+.env.local
+target/
+dist/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store

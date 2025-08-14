@@ -1,0 +1,38 @@
+spin_manifest_version = 2
+
+[application]
+description = "Test app with authorization"
+name = "auth-test"
+version = "0.1.0"
+
+[component.my-tool]
+source = "./my-tool.wasm"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "0.0.13-alpha.0" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+
+[component.ftl-mcp-gateway.variables]
+component_names = "my-tool"
+
+[component.mcp-authorizer]
+source = { registry = "ghcr.io", package = "fastertools:mcp-authorizer", version = "0.0.15-alpha.0" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://*.workos.com"]
+key_value_stores = ["default"]
+
+[component.mcp-authorizer.variables]
+mcp_jwt_issuer = "https://auth.example.com"
+mcp_jwt_audience = "my-app"
+mcp_gateway_url = "http://ftl-mcp-gateway.spin.internal"
+
+[[trigger.http]]
+route = "/..."
+component = "mcp-authorizer"
+
+[[trigger.http]]
+route = { private = true }
+component = "ftl-mcp-gateway"
+
+[[trigger.http]]
+route = { private = true }
+component = "my-tool"
