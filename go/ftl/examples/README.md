@@ -1,230 +1,87 @@
-# FTL Examples
+# FTL Examples - Multiple Configuration Formats
 
-This directory contains examples of using the FTL (Faster Tool Layer) framework to build MCP tool platforms.
+These examples demonstrate FTL's multi-format configuration capability. Each example creates **identical** MCP applications using different configuration formats.
 
-## Quick Start
+## The Application
 
-Choose your preferred approach:
+All examples create the same MCP application with:
+- Two MCP tools: `geo` and `fluid` (from ghcr.io registry)
+- Automatic MCP gateway integration
+- Private routing for tool components
+- Public `/...` route for the gateway
 
-### 1. Go CDK (Programmatic)
+## Configuration Formats
 
-```bash
-go run simple-public.go > spin.toml
-spin up
-```
-
-### 2. YAML (Declarative)
-
-```bash
-ftl synth my-platform.yaml > spin.toml
-spin up
-```
-
-### 3. Direct CUE (Advanced)
+### 1. YAML Format (`yaml-format/`)
+Simple, declarative configuration in YAML.
 
 ```bash
-ftl synth direct.cue > spin.toml
-spin up
+cd yaml-format
+ftl synth ftl.yaml -o spin.toml  # Generate spin.toml
+# or
+ftl build                         # Build with automatic synthesis
+spin up                           # Run the application
 ```
 
-## Examples by Category
+### 2. Go Format (`go-format/`)
+Programmatic configuration using the FTL SDK in Go.
 
-### Basic Examples
-
-| File | Description | Key Features |
-|------|-------------|--------------|
-| `simple-public.go` | Minimal public platform | Basic tool setup |
-| `simple-app.go` | Simple app with local WASM | Local component |
-| `my-platform.yaml` | YAML configuration | Declarative approach |
-
-### Authentication Examples
-
-| File | Description | Key Features |
-|------|-------------|--------------|
-| `auth-app.go` | WorkOS authentication | Enterprise SSO |
-| `scientific-platform.yaml` | Full platform with auth | Private access, WorkOS |
-
-### Advanced Examples
-
-| File | Description | Key Features |
-|------|-------------|--------------|
-| `cdk-app.go` | Complex multi-tool platform | Build configs, watch patterns |
-| `scientific-platform.go` | Programmatic with env vars | Complete configuration |
-| `direct.cue` | Direct CUE definition | Maximum control, type safety |
-| `working-example.go` | Production-ready example | All features combined |
-
-## Using the Examples
-
-### Step 1: Choose Your Approach
-
-**Go CDK** - Best for:
-- Dynamic configurations
-- CI/CD integration
-- Complex logic and conditionals
-
-**YAML** - Best for:
-- Static configurations
-- GitOps workflows
-- Simplicity and readability
-
-**CUE** - Best for:
-- Maximum type safety
-- Complex constraints
-- Multi-environment configs
-
-### Step 2: Generate spin.toml
-
-Using Go:
 ```bash
-go run examples/simple-public.go > spin.toml
+cd go-format
+ftl synth main.go -o spin.toml   # Generate spin.toml
+# or
+go run main.go > spin.toml        # Run directly
+spin up                           # Run the application
 ```
 
-Using FTL CLI with YAML:
+### 3. JSON Format (`json-format/`)
+Standard JSON configuration for programmatic generation or tool integration.
+
 ```bash
-ftl synth examples/my-platform.yaml > spin.toml
+cd json-format
+ftl synth ftl.json -o spin.toml  # Generate spin.toml
+# or
+ftl build --config ftl.json       # Build with automatic synthesis
+spin up                           # Run the application
 ```
 
-Using FTL CLI with CUE:
+## Key Point: Identical Output
+
+All three formats produce **identical** `spin.toml` files. This demonstrates FTL's powerful synthesis engine that:
+
+1. **Abstracts complexity** - Users write simple configs
+2. **Adds intelligence** - Automatically includes MCP gateway, routing, and wiring
+3. **Maintains consistency** - Same output regardless of input format
+
+## Testing the Applications
+
+Once running with `spin up`, test the MCP endpoint:
+
 ```bash
-ftl synth examples/direct.cue > spin.toml
+# List available tools
+curl -X POST http://127.0.0.1:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
+
+# Call a tool
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"geo__example_tool","arguments":{"message":"Hello"}},"id":2}' | \
+  curl -X POST http://127.0.0.1:3000/mcp \
+    -H "Content-Type: application/json" \
+    -d @-
 ```
 
-### Step 3: Deploy
+## Understanding the Synthesis
 
-Local development:
-```bash
-spin up
-# Your platform is now running at http://localhost:3000
-```
-
-Deploy to Fermyon Cloud:
-```bash
-spin deploy
-```
-
-## Key Concepts
-
-### Tools
-Components that provide MCP functionality. Examples:
-- `ghcr.io/bowlofarugula/geo@0.0.1` - Geological computations
-- `ghcr.io/bowlofarugula/fluid@0.0.1` - Fluid dynamics
-
-### MCP Gateway
-Automatically added to route requests to your tools. Handles:
-- Request routing
-- Protocol translation
-- Service discovery
-
-### MCP Authorizer
-Automatically added when authentication is enabled. Provides:
-- JWT validation
-- WorkOS SSO integration
-- Request authorization
-
-### Routes
-- **Public route** (`/...`) - Entry point for all requests
-- **Private routes** - Internal communication between components
-
-## Architecture
+FTL uses a sophisticated multi-stage transformation pipeline:
 
 ```
-Internet
-    ↓
-[Public Route: /...]
-    ↓
-[MCP Authorizer] (if auth enabled)
-    ↓
-[MCP Gateway] (always present)
-    ↓
-[Your Tools] (geo, fluid, etc.)
+User Config → CUE Representation → SpinDL (Intermediate) → Spin Manifest
 ```
 
-## The Synthesis Pipeline
+The magic happens in the CUE transformations that:
+- Automatically inject required components (MCP gateway)
+- Configure routing (public gateway, private tools)
+- Set up component communication
+- Apply security defaults
 
-FTL uses a two-stage CUE transformation pipeline:
-
-1. **Stage 1**: Your config (Go/YAML/CUE) → SpinDL (intermediate model)
-2. **Stage 2**: SpinDL → spin.toml
-
-This provides:
-- Type safety at each layer
-- Composable transformations
-- Consistent output regardless of input format
-
-## Environment Variables
-
-Configure your tools with environment variables:
-
-```go
-app.AddTool("geo").
-    FromRegistry("ghcr.io", "bowlofarugula/geo", "0.0.1").
-    WithEnv("LOG_LEVEL", "debug").
-    WithEnv("MAX_MEMORY", "4096").
-    Build()
-```
-
-```yaml
-tools:
-  - id: geo
-    environment:
-      LOG_LEVEL: debug
-      MAX_MEMORY: "4096"
-```
-
-## Authentication
-
-### WorkOS (Enterprise SSO)
-
-```go
-app.EnableWorkOSAuth("org_12345")
-```
-
-```yaml
-access: private
-auth:
-  provider: workos
-  org_id: org_12345
-```
-
-### Custom JWT
-
-```go
-app.EnableCustomAuth("https://auth.example.com", "my-audience")
-```
-
-```yaml
-access: private
-auth:
-  provider: custom
-  jwt_issuer: https://auth.example.com
-  jwt_audience: my-audience
-```
-
-## Build Configuration
-
-For local tools that need building:
-
-```go
-app.AddTool("my-tool").
-    FromLocal("./my-tool.wasm").
-    WithBuild("cargo build --release").
-    WithWatch("src/**/*.rs", "Cargo.toml").
-    Build()
-```
-
-```yaml
-tools:
-  - id: my-tool
-    source: ./my-tool.wasm
-    build:
-      command: cargo build --release
-      watch:
-        - src/**/*.rs
-        - Cargo.toml
-```
-
-## More Information
-
-- [WALKTHROUGH.md](WALKTHROUGH.md) - Detailed tutorial from idea to deployment
-- [FTL Documentation](https://github.com/fastertools/ftl-cli) - Main project docs
-- [Spin Documentation](https://developer.fermyon.com/spin) - WebAssembly platform docs
+This is **platform engineering as code** - encoding best practices, security, and architectural decisions into the synthesis process.

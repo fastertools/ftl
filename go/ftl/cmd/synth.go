@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl-cli/go/shared/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -133,57 +134,27 @@ func detectFormat(input []byte) string {
 	return "yaml"
 }
 
-// FTLConfig represents the YAML/JSON configuration structure
-type FTLConfig struct {
-	Name        string    `yaml:"name" json:"name"`
-	Version     string    `yaml:"version" json:"version"`
-	Description string    `yaml:"description" json:"description"`
-	Tools       []ToolDef `yaml:"tools" json:"tools"`
-	Access      string    `yaml:"access" json:"access"`
-	Auth        *AuthDef  `yaml:"auth" json:"auth"`
-}
-
-type ToolDef struct {
-	ID          string            `yaml:"id" json:"id"`
-	Source      interface{}       `yaml:"source" json:"source"`
-	Build       *BuildDef         `yaml:"build" json:"build"`
-	Environment map[string]string `yaml:"environment" json:"environment"`
-}
-
-type BuildDef struct {
-	Command string   `yaml:"command" json:"command"`
-	Workdir string   `yaml:"workdir" json:"workdir"`
-	Watch   []string `yaml:"watch" json:"watch"`
-}
-
-type AuthDef struct {
-	Provider    string `yaml:"provider" json:"provider"`
-	OrgID       string `yaml:"org_id" json:"org_id"`
-	JWTIssuer   string `yaml:"jwt_issuer" json:"jwt_issuer"`
-	JWTAudience string `yaml:"jwt_audience" json:"jwt_audience"`
-}
 
 // synthesizeFromYAML converts YAML to spin.toml
 func synthesizeFromYAML(input []byte) (string, error) {
-	var config FTLConfig
-	err := yaml.Unmarshal(input, &config)
+	var ftlConfig config.FTLConfig
+	err := yaml.Unmarshal(input, &ftlConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse YAML: %w", err)
 	}
-
-	return synthesizeFromConfig(&config)
+	
+	return synthesizeFromFTLConfig(&ftlConfig)
 }
 
 // synthesizeFromJSON converts JSON to spin.toml
 func synthesizeFromJSON(input []byte) (string, error) {
-	// For now, JSON uses the same structure as YAML
-	var config FTLConfig
-	err := yaml.Unmarshal(input, &config)
+	var ftlConfig config.FTLConfig
+	err := yaml.Unmarshal(input, &ftlConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	return synthesizeFromConfig(&config)
+	return synthesizeFromFTLConfig(&ftlConfig)
 }
 
 // synthesizeFromGo runs a Go file and captures its output
@@ -242,24 +213,24 @@ func synthesizeFromCUE(input []byte) (string, error) {
 	return manifest, nil
 }
 
-// synthesizeFromConfig converts the config struct to spin.toml
-func synthesizeFromConfig(config *FTLConfig) (string, error) {
+// synthesizeFromFTLConfig converts the FTL config struct to spin.toml
+func synthesizeFromFTLConfig(cfg *config.FTLConfig) (string, error) {
 	// Create FTL app
-	app := synthesis.NewApp(config.Name)
-
-	if config.Version != "" {
-		app.SetVersion(config.Version)
+	app := synthesis.NewApp(cfg.Application.Name)
+	
+	if cfg.Application.Version != "" {
+		app.SetVersion(cfg.Application.Version)
 	}
-	if config.Description != "" {
-		app.SetDescription(config.Description)
+	if cfg.Application.Description != "" {
+		app.SetDescription(cfg.Application.Description)
 	}
-
-	// Add tools
-	for _, tool := range config.Tools {
-		tb := app.AddTool(tool.ID)
-
+	
+	// Add components
+	for _, comp := range cfg.Components {
+		tb := app.AddTool(comp.ID)
+		
 		// Handle source
-		switch src := tool.Source.(type) {
+		switch src := comp.Source.(type) {
 		case string:
 			// Local source
 			tb.FromLocal(src)
@@ -272,38 +243,37 @@ func synthesizeFromConfig(config *FTLConfig) (string, error) {
 				tb.FromRegistry(registry, pkg, version)
 			}
 		}
-
+		
 		// Add build config
-		if tool.Build != nil {
-			tb.WithBuild(tool.Build.Command)
-			if len(tool.Build.Watch) > 0 {
-				tb.WithWatch(tool.Build.Watch...)
+		if comp.Build != nil {
+			tb.WithBuild(comp.Build.Command)
+			if len(comp.Build.Watch) > 0 {
+				tb.WithWatch(comp.Build.Watch...)
 			}
 		}
-
+		
 		// Add environment
-		for k, v := range tool.Environment {
+		for k, v := range comp.Environment {
 			tb.WithEnv(k, v)
 		}
-
+		
 		tb.Build()
 	}
-
-	// Configure access
-	if config.Access == "private" {
-		app.SetAccess(synthesis.PrivateAccess)
-	}
-
-	// Configure auth
-	if config.Auth != nil {
-		switch config.Auth.Provider {
-		case "workos":
-			app.EnableWorkOSAuth(config.Auth.OrgID)
-		case "custom":
-			app.EnableCustomAuth(config.Auth.JWTIssuer, config.Auth.JWTAudience)
+	
+	// Configure MCP if present
+	if cfg.MCP != nil && cfg.MCP.Authorizer != nil {
+		auth := cfg.MCP.Authorizer
+		if auth.AccessControl == config.AccessControlPrivate {
+			app.SetAccess(synthesis.PrivateAccess)
+		}
+		
+		if auth.AccessControl == config.AccessControlOrg && auth.OrgID != "" {
+			app.EnableWorkOSAuth(auth.OrgID)
+		} else if auth.AccessControl == config.AccessControlCustom {
+			app.EnableCustomAuth(auth.JWTIssuer, auth.JWTAudience)
 		}
 	}
-
+	
 	// Synthesize
 	synth := synthesis.NewSynthesizer()
 	return synth.SynthesizeApp(app)

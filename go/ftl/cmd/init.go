@@ -17,6 +17,7 @@ type InitOptions struct {
 	Name          string
 	Description   string
 	Template      string
+	Format        string  // Configuration format: yaml, go, cue, json
 	NoInteractive bool
 	Force         bool
 }
@@ -45,6 +46,7 @@ This command creates a new FTL project directory with:
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "project description")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "mcp", "project template (mcp, basic, empty)")
+	cmd.Flags().StringVar(&opts.Format, "format", "yaml", "configuration format (yaml, go, cue, json)")
 	cmd.Flags().BoolVar(&opts.NoInteractive, "no-interactive", false, "disable interactive prompts")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "overwrite existing files")
 
@@ -62,6 +64,13 @@ func runInit(opts *InitOptions) error {
 		}
 	}
 
+	// Prompt for format if not specified and in interactive mode
+	if !opts.NoInteractive && opts.Format == "" {
+		if err := promptForFormat(opts); err != nil {
+			return err
+		}
+	}
+
 	// Create project directory
 	projectDir := opts.Name
 	if !opts.Force {
@@ -74,13 +83,33 @@ func runInit(opts *InitOptions) error {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
-	Info("Initializing FTL project '%s'", opts.Name)
+	Info("Initializing FTL project '%s' with %s format", opts.Name, opts.Format)
 
-	// Create ftl.yaml configuration
-	if err := createFTLConfig(projectDir, opts); err != nil {
-		return fmt.Errorf("failed to create ftl.yaml: %w", err)
+	// Create configuration based on format
+	switch opts.Format {
+	case "yaml":
+		if err := createYAMLConfig(projectDir, opts); err != nil {
+			return fmt.Errorf("failed to create ftl.yaml: %w", err)
+		}
+		Success("Created ftl.yaml")
+	case "go":
+		if err := createGoConfig(projectDir, opts); err != nil {
+			return fmt.Errorf("failed to create main.go: %w", err)
+		}
+		Success("Created main.go")
+	case "cue":
+		if err := createCUEConfig(projectDir, opts); err != nil {
+			return fmt.Errorf("failed to create app.cue: %w", err)
+		}
+		Success("Created app.cue")
+	case "json":
+		if err := createJSONConfig(projectDir, opts); err != nil {
+			return fmt.Errorf("failed to create ftl.json: %w", err)
+		}
+		Success("Created ftl.json")
+	default:
+		return fmt.Errorf("unsupported format: %s", opts.Format)
 	}
-	Success("Created ftl.yaml")
 
 	// Create .gitignore
 	if err := createGitignore(projectDir); err != nil {
@@ -89,13 +118,24 @@ func runInit(opts *InitOptions) error {
 	Success("Created .gitignore")
 
 
-	// Print next steps
+	// Print next steps based on format
 	fmt.Println()
 	Info("Next steps:")
 	fmt.Println("  1. cd", opts.Name)
-	fmt.Println("  2. ftl component add <name> --language <lang>")
-	fmt.Println("  3. ftl build")
-	fmt.Println("  4. ftl up")
+	switch opts.Format {
+	case "go":
+		fmt.Println("  2. Edit main.go to add your components")
+		fmt.Println("  3. go run main.go > spin.toml")
+		fmt.Println("  4. spin up")
+	case "cue":
+		fmt.Println("  2. Edit app.cue to add your components")
+		fmt.Println("  3. ftl synth app.cue")
+		fmt.Println("  4. spin up")
+	default:
+		fmt.Println("  2. ftl component add <name>")
+		fmt.Println("  3. ftl build")
+		fmt.Println("  4. ftl up")
+	}
 
 	return nil
 }
@@ -108,7 +148,39 @@ func promptForName(opts *InitOptions) error {
 	return survey.AskOne(prompt, &opts.Name, survey.WithValidator(survey.Required))
 }
 
-func createFTLConfig(dir string, opts *InitOptions) error {
+func promptForFormat(opts *InitOptions) error {
+	prompt := &survey.Select{
+		Message: "Configuration format:",
+		Options: []string{
+			"yaml - Simple declarative YAML configuration",
+			"go - Programmatic Go code with FTL SDK",
+			"cue - Advanced CUE configuration language",
+			"json - JSON configuration",
+		},
+		Default: "yaml - Simple declarative YAML configuration",
+	}
+	
+	var choice string
+	if err := survey.AskOne(prompt, &choice); err != nil {
+		return err
+	}
+	
+	// Extract format from choice
+	switch choice {
+	case "yaml - Simple declarative YAML configuration":
+		opts.Format = "yaml"
+	case "go - Programmatic Go code with FTL SDK":
+		opts.Format = "go"
+	case "cue - Advanced CUE configuration language":
+		opts.Format = "cue"
+	case "json - JSON configuration":
+		opts.Format = "json"
+	}
+	
+	return nil
+}
+
+func createYAMLConfig(dir string, opts *InitOptions) error {
 	description := opts.Description
 	if description == "" {
 		description = fmt.Sprintf("%s - An FTL application", opts.Name)
@@ -150,8 +222,144 @@ __pycache__/
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }
 
-// Template generation functions will be reimplemented with the new schema
-// func createExampleComponent(dir string, template string) error { ... }
-// func generateMCPTemplate(name string) string { ... }
-// func generateBasicTemplate(name string) string { ... }
-// func generateEmptyTemplate(name string) string { ... }
+// createGoConfig creates a Go-based configuration
+func createGoConfig(dir string, opts *InitOptions) error {
+	description := opts.Description
+	if description == "" {
+		description = fmt.Sprintf("%s - An FTL application", opts.Name)
+	}
+
+	// Create a main.go file with FTL SDK
+	content := fmt.Sprintf(`package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+)
+
+func main() {
+	// Create your FTL application
+	app := synthesis.NewApp("%s").
+		SetDescription("%s").
+		SetVersion("0.1.0")
+
+	// Add your components here
+	// Example:
+	// app.AddTool("my-tool").
+	//     FromLocal("./build/tool.wasm").
+	//     WithBuild("cargo build --release").
+	//     WithEnv("LOG_LEVEL", "info").
+	//     Build()
+
+	// Enable authentication (optional)
+	// app.EnableWorkOSAuth("org_123456")
+
+	// Synthesize to spin.toml
+	synth := synthesis.NewSynthesizer()
+	manifest, err := synth.SynthesizeApp(app)
+	if err != nil {
+		log.Fatalf("Failed to synthesize: %%v", err)
+	}
+
+	// Output the manifest
+	fmt.Print(manifest)
+}
+`, opts.Name, description)
+
+	// Write main.go
+	mainPath := filepath.Join(dir, "main.go")
+	if err := os.WriteFile(mainPath, []byte(content), 0644); err != nil {
+		return err
+	}
+
+	// Create go.mod
+	goMod := fmt.Sprintf(`module %s
+
+go 1.21
+
+require github.com/fastertools/ftl-cli/go/ftl v0.1.0
+
+// For local development, uncomment and adjust the path:
+// replace github.com/fastertools/ftl-cli/go/ftl => ../path/to/ftl
+`, opts.Name)
+
+	goModPath := filepath.Join(dir, "go.mod")
+	return os.WriteFile(goModPath, []byte(goMod), 0644)
+}
+
+// createCUEConfig creates a CUE-based configuration
+func createCUEConfig(dir string, opts *InitOptions) error {
+	description := opts.Description
+	if description == "" {
+		description = fmt.Sprintf("%s - An FTL application", opts.Name)
+	}
+
+	// Create app.cue with FTL patterns
+	content := fmt.Sprintf(`package app
+
+import "github.com/fastertools/ftl-cli/patterns"
+
+// Define your FTL application
+app: #FTLApplication & {
+	name:        "%s"
+	version:     "0.1.0"
+	description: "%s"
+	
+	// Add your tools here
+	tools: [
+		// {
+		//     id: "my-tool"
+		//     source: "./build/tool.wasm"
+		//     build: {
+		//         command: "cargo build --release"
+		//         watch: ["src/**/*.rs", "Cargo.toml"]
+		//     }
+		//     environment: {
+		//         LOG_LEVEL: "info"
+		//     }
+		// },
+	]
+	
+	// Configure access (public or private)
+	access: "public"
+	
+	// Configure authentication (optional)
+	// auth: {
+	//     provider: "workos"
+	//     org_id: "org_123456"
+	// }
+}
+`, opts.Name, description)
+
+	cuePath := filepath.Join(dir, "app.cue")
+	return os.WriteFile(cuePath, []byte(content), 0644)
+}
+
+// createJSONConfig creates a JSON-based configuration
+func createJSONConfig(dir string, opts *InitOptions) error {
+	description := opts.Description
+	if description == "" {
+		description = fmt.Sprintf("%s - An FTL application", opts.Name)
+	}
+
+	// Create ftl.json
+	content := fmt.Sprintf(`{
+  "application": {
+    "name": "%s",
+    "version": "0.1.0",
+    "description": "%s"
+  },
+  "components": [
+    
+  ],
+  "triggers": [
+    
+  ]
+}
+`, opts.Name, description)
+
+	jsonPath := filepath.Join(dir, "ftl.json")
+	return os.WriteFile(jsonPath, []byte(content), 0644)
+}
