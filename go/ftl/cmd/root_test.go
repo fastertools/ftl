@@ -135,4 +135,3 @@ func TestRegistryCommand(t *testing.T) {
 	assert.Contains(t, strings.Join(names, ","), "pull")
 	assert.Contains(t, strings.Join(names, ","), "list")
 }
-

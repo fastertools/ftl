@@ -26,8 +26,8 @@ func TestInitCommand(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, dir string) {
-				// Check spinc.yaml exists and is valid
-				spincPath := filepath.Join(dir, "test-app", "spinc.yaml")
+				// Check ftl.yaml exists and is valid
+				spincPath := filepath.Join(dir, "test-app", "ftl.yaml")
 				assert.FileExists(t, spincPath)
 
 				content, err := os.ReadFile(spincPath)
@@ -48,7 +48,7 @@ func TestInitCommand(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, dir string) {
-				spincPath := filepath.Join(dir, "minimal-app", "spinc.yaml")
+				spincPath := filepath.Join(dir, "minimal-app", "ftl.yaml")
 				content, err := os.ReadFile(spincPath)
 				require.NoError(t, err)
 				assert.Contains(t, string(content), "application:")
@@ -73,7 +73,7 @@ func TestInitCommand(t *testing.T) {
 			errMsg:  "already exists",
 			checkFunc: func(t *testing.T, dir string) {
 				// Pre-create the directory
-				os.MkdirAll(filepath.Join(dir, "existing-app"), 0755)
+				_ = os.MkdirAll(filepath.Join(dir, "existing-app"), 0755)
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestInitCommand(t *testing.T) {
 			checkFunc: func(t *testing.T, dir string) {
 				// Pre-create the directory
 				forceDir := filepath.Join(dir, "force-app")
-				os.MkdirAll(forceDir, 0755)
+				_ = os.MkdirAll(forceDir, 0755)
 
 				// Create a file that should be overwritten
 				testFile := filepath.Join(forceDir, "test.txt")
@@ -95,7 +95,7 @@ func TestInitCommand(t *testing.T) {
 
 				// After init, check that new files exist
 				t.Cleanup(func() {
-					spincPath := filepath.Join(forceDir, "spinc.yaml")
+					spincPath := filepath.Join(forceDir, "ftl.yaml")
 					assert.FileExists(t, spincPath)
 				})
 			},
