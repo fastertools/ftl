@@ -251,6 +251,9 @@ func (s *Synthesizer) writeSource(buf *bytes.Buffer, source interface{}) {
 			buf.WriteString("source = { ")
 			buf.WriteString(fmt.Sprintf("registry = %q", registry))
 			if pkg, ok := src["package"].(string); ok {
+				// Convert slash to colon for Spin's registry format
+				// e.g., "bowlofarugula/geo" -> "bowlofarugula:geo"
+				pkg = strings.Replace(pkg, "/", ":", 1)
 				buf.WriteString(fmt.Sprintf(", package = %q", pkg))
 			}
 			if version, ok := src["version"].(string); ok {

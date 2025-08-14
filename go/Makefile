@@ -2,7 +2,6 @@
 
 # Variables
 BINARY_NAME=ftl
-SPINDL_BINARY=spindl
 VERSION?=dev
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -18,7 +17,6 @@ GOINSTALL=$(GOCMD) install
 
 # Directories
 FTL_DIR=./ftl
-SPINDL_DIR=./spindl
 SHARED_DIR=./shared
 
 .PHONY: all build clean test coverage install uninstall help
@@ -28,24 +26,16 @@ help:
 	@echo 'Usage:'
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
-## all: Build both FTL and SpinDL
-all: build-ftl build-spindl
+## all: Build FTL
+all: build
 
-## build: Build FTL CLI only
-build: build-ftl
-
-## build-ftl: Build the FTL CLI binary
-build-ftl:
+## build: Build the FTL CLI binary
+build:
 	@echo "Building FTL CLI..."
 	cd $(FTL_DIR) && $(GOBUILD) $(LDFLAGS) -o ../bin/$(BINARY_NAME) -v
 
-## build-spindl: Build the SpinDL binary
-build-spindl:
-	@echo "Building SpinDL..."
-	cd $(SPINDL_DIR) && $(GOBUILD) -o ../bin/$(SPINDL_BINARY) -v
-
 ## install: Install FTL CLI to system
-install: build-ftl
+install: build
 	@echo "Installing FTL CLI to $$(go env GOPATH)/bin..."
 	@mkdir -p $$(go env GOPATH)/bin
 	@cp bin/$(BINARY_NAME) $$(go env GOPATH)/bin/
@@ -54,27 +44,11 @@ install: build-ftl
 	@echo "Make sure $$(go env GOPATH)/bin is in your PATH:"
 	@echo '  export PATH=$$PATH:$$(go env GOPATH)/bin'
 
-## install-all: Install both FTL and SpinDL
-install-all: install install-spindl
-
-## install-spindl: Install SpinDL to system
-install-spindl: build-spindl
-	@echo "Installing SpinDL to $$(go env GOPATH)/bin..."
-	@mkdir -p $$(go env GOPATH)/bin
-	@cp bin/$(SPINDL_BINARY) $$(go env GOPATH)/bin/
-	@echo "✅ SpinDL installed to $$(go env GOPATH)/bin/$(SPINDL_BINARY)"
-
 ## uninstall: Remove FTL CLI from system
 uninstall:
 	@echo "Removing FTL CLI..."
 	@rm -f $$(go env GOPATH)/bin/$(BINARY_NAME)
 	@echo "✅ FTL CLI removed"
-
-## uninstall-all: Remove both FTL and SpinDL
-uninstall-all: uninstall
-	@echo "Removing SpinDL..."
-	@rm -f $$(go env GOPATH)/bin/$(SPINDL_BINARY)
-	@echo "✅ spin-compose removed"
 
 ## test: Run all tests
 test:
@@ -83,15 +57,11 @@ test:
 	@echo ""
 	@echo "Testing FTL CLI..."
 	cd $(FTL_DIR) && $(GOTEST) -v ./... -cover
-	@echo ""
-	@echo "Testing spin-compose..."
-	cd $(SPIN_COMPOSE_DIR) && $(GOTEST) -v ./... -cover || true
 
 ## test-short: Run tests without verbose output
 test-short:
 	cd $(SHARED_DIR) && $(GOTEST) ./... -cover
 	cd $(FTL_DIR) && $(GOTEST) ./... -cover
-	cd $(SPIN_COMPOSE_DIR) && $(GOTEST) ./... -cover || true
 
 ## coverage: Generate test coverage report
 coverage:
@@ -111,7 +81,6 @@ clean:
 	@rm -rf bin/
 	@rm -f $(SHARED_DIR)/coverage.out $(SHARED_DIR)/coverage.html
 	@rm -f $(FTL_DIR)/coverage.out $(FTL_DIR)/coverage.html
-	@rm -f $(SPIN_COMPOSE_DIR)/coverage.out $(SPIN_COMPOSE_DIR)/coverage.html
 	@echo "✅ Cleaned"
 
 ## deps: Download dependencies
@@ -119,14 +88,12 @@ deps:
 	@echo "Downloading dependencies..."
 	cd $(SHARED_DIR) && $(GOMOD) download
 	cd $(FTL_DIR) && $(GOMOD) download
-	cd $(SPIN_COMPOSE_DIR) && $(GOMOD) download
 
 ## tidy: Tidy go modules
 tidy:
 	@echo "Tidying modules..."
 	cd $(SHARED_DIR) && $(GOMOD) tidy
 	cd $(FTL_DIR) && $(GOMOD) tidy
-	cd $(SPIN_COMPOSE_DIR) && $(GOMOD) tidy
 
 ## fmt: Format code
 fmt:
@@ -138,7 +105,6 @@ vet:
 	@echo "Running go vet..."
 	cd $(SHARED_DIR) && $(GOCMD) vet ./...
 	cd $(FTL_DIR) && $(GOCMD) vet ./...
-	cd $(SPIN_COMPOSE_DIR) && $(GOCMD) vet ./...
 
 ## run: Run FTL CLI directly
 run:

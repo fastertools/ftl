@@ -70,7 +70,7 @@ func TestIntegration_CompleteWorkflow(t *testing.T) {
 		`PORT = "8080"`,
 
 		// Registry source
-		`source = { registry = "ghcr.io", package = "tools/db-connector", version = "3.1.0" }`,
+		`source = { registry = "ghcr.io", package = "tools:db-connector", version = "3.1.0" }`,
 
 		// Auth configuration
 		`mcp_jwt_issuer = "https://api.workos.com"`,
@@ -147,9 +147,9 @@ func TestIntegration_MultipleToolTypes(t *testing.T) {
 		"[component.local]",
 		`source = "./local.wasm"`,
 		"[component.ghcr]",
-		`source = { registry = "ghcr.io", package = "org/tool", version = "1.0.0" }`,
+		`source = { registry = "ghcr.io", package = "org:tool", version = "1.0.0" }`,
 		"[component.versioned]",
-		`source = { registry = "docker.io", package = "library/tool", version = "latest" }`,
+		`source = { registry = "docker.io", package = "library:tool", version = "latest" }`,
 	})
 }
 

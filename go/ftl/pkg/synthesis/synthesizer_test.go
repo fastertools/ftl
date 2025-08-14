@@ -96,7 +96,7 @@ func TestSynthesizer_RegistrySource(t *testing.T) {
 	}
 
 	// Verify registry source format
-	if !strings.Contains(manifest, `source = { registry = "ghcr.io", package = "example/tool", version = "1.0.0" }`) {
+	if !strings.Contains(manifest, `source = { registry = "ghcr.io", package = "example:tool", version = "1.0.0" }`) {
 		t.Error("Incorrect registry source format")
 	}
 }

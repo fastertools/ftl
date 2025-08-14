@@ -99,10 +99,16 @@ func newBuildCmd() *cobra.Command {
 				fmt.Printf("%s Generated spin.toml\n", green("✓"))
 			} else if err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to check %s: %w", configFile, err)
-			} else if os.IsNotExist(err) {
-				// Check if spin.toml exists directly
+			} else if os.IsNotExist(err) && !skipSynth {
+				// Only error if we're not skipping synthesis and no spin.toml exists
 				if _, err := os.Stat("spin.toml"); os.IsNotExist(err) {
-					return fmt.Errorf("neither %s nor spin.toml found. Run 'ftl init' first", configFile)
+					return fmt.Errorf("no %s found and no spin.toml exists. Run 'ftl init' first", configFile)
+				}
+				fmt.Printf("%s No %s found, using existing spin.toml\n", yellow("ℹ"), configFile)
+			} else if skipSynth {
+				// When skipping synthesis, just check if spin.toml exists
+				if _, err := os.Stat("spin.toml"); os.IsNotExist(err) {
+					return fmt.Errorf("no spin.toml found. Run 'ftl synth' or 'ftl build' without --skip-synth first")
 				}
 				fmt.Printf("%s Using existing spin.toml\n", yellow("ℹ"))
 			}

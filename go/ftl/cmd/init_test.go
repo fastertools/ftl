@@ -22,6 +22,7 @@ func TestInitCommand(t *testing.T) {
 			opts: &InitOptions{
 				Name:          "test-app",
 				Description:   "Test application",
+				Format:        "yaml",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -44,6 +45,7 @@ func TestInitCommand(t *testing.T) {
 			name: "successful init with minimal config",
 			opts: &InitOptions{
 				Name:          "minimal-app",
+				Format:        "yaml",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -80,6 +82,7 @@ func TestInitCommand(t *testing.T) {
 			name: "successful overwrite with force",
 			opts: &InitOptions{
 				Name:          "force-app",
+				Format:        "yaml",
 				Force:         true,
 				NoInteractive: true,
 			},
