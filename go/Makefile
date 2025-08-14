@@ -2,7 +2,7 @@
 
 # Variables
 BINARY_NAME=ftl
-SPIN_COMPOSE_BINARY=spin-compose
+SPINDL_BINARY=spindl
 VERSION?=dev
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -18,7 +18,7 @@ GOINSTALL=$(GOCMD) install
 
 # Directories
 FTL_DIR=./ftl
-SPIN_COMPOSE_DIR=./spin-compose
+SPINDL_DIR=./spindl
 SHARED_DIR=./shared
 
 .PHONY: all build clean test coverage install uninstall help
@@ -28,8 +28,8 @@ help:
 	@echo 'Usage:'
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
-## all: Build both FTL and spin-compose
-all: build-ftl build-spin-compose
+## all: Build both FTL and SpinDL
+all: build-ftl build-spindl
 
 ## build: Build FTL CLI only
 build: build-ftl
@@ -39,10 +39,10 @@ build-ftl:
 	@echo "Building FTL CLI..."
 	cd $(FTL_DIR) && $(GOBUILD) $(LDFLAGS) -o ../bin/$(BINARY_NAME) -v
 
-## build-spin-compose: Build the spin-compose binary
-build-spin-compose:
-	@echo "Building spin-compose..."
-	cd $(SPIN_COMPOSE_DIR) && $(GOBUILD) -o ../bin/$(SPIN_COMPOSE_BINARY) -v
+## build-spindl: Build the SpinDL binary
+build-spindl:
+	@echo "Building SpinDL..."
+	cd $(SPINDL_DIR) && $(GOBUILD) -o ../bin/$(SPINDL_BINARY) -v
 
 ## install: Install FTL CLI to system
 install: build-ftl
@@ -54,15 +54,15 @@ install: build-ftl
 	@echo "Make sure $$(go env GOPATH)/bin is in your PATH:"
 	@echo '  export PATH=$$PATH:$$(go env GOPATH)/bin'
 
-## install-all: Install both FTL and spin-compose
-install-all: install install-spin-compose
+## install-all: Install both FTL and SpinDL
+install-all: install install-spindl
 
-## install-spin-compose: Install spin-compose to system
-install-spin-compose: build-spin-compose
-	@echo "Installing spin-compose to $$(go env GOPATH)/bin..."
+## install-spindl: Install SpinDL to system
+install-spindl: build-spindl
+	@echo "Installing SpinDL to $$(go env GOPATH)/bin..."
 	@mkdir -p $$(go env GOPATH)/bin
-	@cp bin/$(SPIN_COMPOSE_BINARY) $$(go env GOPATH)/bin/
-	@echo "✅ spin-compose installed to $$(go env GOPATH)/bin/$(SPIN_COMPOSE_BINARY)"
+	@cp bin/$(SPINDL_BINARY) $$(go env GOPATH)/bin/
+	@echo "✅ SpinDL installed to $$(go env GOPATH)/bin/$(SPINDL_BINARY)"
 
 ## uninstall: Remove FTL CLI from system
 uninstall:
@@ -70,10 +70,10 @@ uninstall:
 	@rm -f $$(go env GOPATH)/bin/$(BINARY_NAME)
 	@echo "✅ FTL CLI removed"
 
-## uninstall-all: Remove both FTL and spin-compose
+## uninstall-all: Remove both FTL and SpinDL
 uninstall-all: uninstall
-	@echo "Removing spin-compose..."
-	@rm -f $$(go env GOPATH)/bin/$(SPIN_COMPOSE_BINARY)
+	@echo "Removing SpinDL..."
+	@rm -f $$(go env GOPATH)/bin/$(SPINDL_BINARY)
 	@echo "✅ spin-compose removed"
 
 ## test: Run all tests

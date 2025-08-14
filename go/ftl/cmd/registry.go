@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/fastertools/ftl-cli/go/shared/spin"
+	"github.com/spf13/cobra"
 )
 
 func newRegistryCmd() *cobra.Command {
@@ -14,14 +14,14 @@ func newRegistryCmd() *cobra.Command {
 		Short: "Manage registry operations",
 		Long:  `Manage registry operations including push, pull, and list.`,
 	}
-	
+
 	// Add subcommands
 	cmd.AddCommand(
 		newRegistryPushCmd(),
 		newRegistryPullCmd(),
 		newRegistryListCmd(),
 	)
-	
+
 	return cmd
 }
 
@@ -33,14 +33,14 @@ func newRegistryPushCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			reference := args[0]
-			
+
 			fmt.Printf("Pushing to registry: %s\n", reference)
-			
+
 			// Use spin registry push
 			if err := spin.Registry(ctx, "push", reference); err != nil {
 				return fmt.Errorf("failed to push to registry: %w", err)
 			}
-			
+
 			fmt.Println("Push completed successfully")
 			return nil
 		},

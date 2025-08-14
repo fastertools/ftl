@@ -7,17 +7,18 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/fastertools/ftl-cli/go/shared/config"
 )
 
 // InitOptions holds options for the init command
 type InitOptions struct {
-	Name        string
-	Description string
-	Template    string
+	Name          string
+	Description   string
+	Template      string
 	NoInteractive bool
-	Force       bool
+	Force         bool
 }
 
 // newInitCmd creates the init command
@@ -31,7 +32,7 @@ func newInitCmd() *cobra.Command {
 
 This command creates a new FTL project directory with:
 - ftl.yaml configuration file
-- spinc.yaml for application composition
+- spindl.yml for application composition
 - Basic project structure
 - Example components (optional)`,
 		Args: cobra.MaximumNArgs(1),
@@ -76,17 +77,11 @@ func runInit(opts *InitOptions) error {
 
 	Info("Initializing FTL project '%s'", opts.Name)
 
-	// Create ftl.yaml
+	// Create spindl.yml configuration
 	if err := createFTLConfig(projectDir, opts); err != nil {
-		return fmt.Errorf("failed to create ftl.yaml: %w", err)
+		return fmt.Errorf("failed to create spindl.yml: %w", err)
 	}
-	Success("Created ftl.yaml")
-
-	// Create spinc.yaml based on template
-	if err := createSpinComposeConfig(projectDir, opts); err != nil {
-		return fmt.Errorf("failed to create spinc.yaml: %w", err)
-	}
-	Success("Created spinc.yaml")
+	Success("Created spindl.yml")
 
 	// Create .gitignore
 	if err := createGitignore(projectDir); err != nil {
@@ -94,14 +89,10 @@ func runInit(opts *InitOptions) error {
 	}
 	Success("Created .gitignore")
 
-	// Create example component if using template
-	if opts.Template != "empty" {
-		if err := createExampleComponent(projectDir, opts.Template); err != nil {
-			Warn("Failed to create example component: %v", err)
-		} else {
-			Success("Created example component")
-		}
-	}
+	// TODO: Create example component if using template
+	// if opts.Template != "empty" {
+	// 	// Component creation will be implemented later
+	// }
 
 	// Print next steps
 	fmt.Println()
@@ -123,38 +114,28 @@ func promptForName(opts *InitOptions) error {
 }
 
 func createFTLConfig(dir string, opts *InitOptions) error {
+	description := opts.Description
+	if description == "" {
+		description = fmt.Sprintf("%s - An FTL application", opts.Name)
+	}
+
 	cfg := &config.FTLConfig{
-		Name:        opts.Name,
-		Version:     "0.1.0",
-		Description: opts.Description,
-		Compose:     "./spinc.yaml",
+		Application: config.ApplicationConfig{
+			Name:        opts.Name,
+			Version:     "0.1.0",
+			Description: description,
+		},
 	}
 
-	if opts.Description == "" {
-		cfg.Description = fmt.Sprintf("%s - An FTL application", opts.Name)
+	configPath := filepath.Join(dir, "spindl.yml")
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-
-	configPath := filepath.Join(dir, "ftl.yaml")
-	return cfg.Save(configPath)
+	return os.WriteFile(configPath, data, 0644)
 }
 
-func createSpinComposeConfig(dir string, opts *InitOptions) error {
-	var content string
-
-	switch opts.Template {
-	case "", "mcp": // Default to MCP template if not specified
-		content = generateMCPTemplate(opts.Name)
-	case "basic":
-		content = generateBasicTemplate(opts.Name)
-	case "empty":
-		content = generateEmptyTemplate(opts.Name)
-	default:
-		return fmt.Errorf("unknown template: %s", opts.Template)
-	}
-
-	configPath := filepath.Join(dir, "spinc.yaml")
-	return os.WriteFile(configPath, []byte(content), 0644)
-}
+// createSpinComposeConfig is no longer needed as we create spindl.yml in createFTLConfig
 
 func createGitignore(dir string) error {
 	content := `.spin/
@@ -174,65 +155,8 @@ __pycache__/
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }
 
-func createExampleComponent(dir string, template string) error {
-	// This would create an example component based on the template
-	// For now, we'll just create a placeholder directory
-	componentDir := filepath.Join(dir, "components", "example")
-	return os.MkdirAll(componentDir, 0755)
-}
-
-func generateMCPTemplate(name string) string {
-	return fmt.Sprintf(`# MCP Application Configuration
-name: %s
-version: 0.1.0
-description: MCP application with authentication and tool gateway
-
-# Authentication configuration
-auth:
-  enabled: false  # Set to true to enable authentication
-  # issuer: https://auth.example.com
-  # audience:
-  #   - api.example.com
-
-# MCP components
-mcp:
-  gateway: ghcr.io/fastertools/mcp-gateway:latest
-  authorizer: ghcr.io/fastertools/mcp-authorizer:latest
-  validate_arguments: false
-
-# Application variables
-variables:
-  log_level: info
-
-# Components - add your tools here
-components:
-  # example-tool:
-  #   source: ./components/example/build/example.wasm
-  #   route: /example
-`, name)
-}
-
-func generateBasicTemplate(name string) string {
-	return fmt.Sprintf(`# Basic Application Configuration
-name: %s
-version: 0.1.0
-description: Basic Spin application
-
-# Application variables
-variables:
-  log_level: info
-
-# Components
-components:
-  # Add your components here
-`, name)
-}
-
-func generateEmptyTemplate(name string) string {
-	return fmt.Sprintf(`# Application Configuration
-name: %s
-version: 0.1.0
-
-components: {}
-`, name)
-}
+// Template generation functions will be reimplemented with the new schema
+// func createExampleComponent(dir string, template string) error { ... }
+// func generateMCPTemplate(name string) string { ... }
+// func generateBasicTemplate(name string) string { ... }
+// func generateEmptyTemplate(name string) string { ... }

@@ -18,6 +18,6 @@ func newTestCmd() *cobra.Command {
 			return nil
 		},
 	}
-	
+
 	return cmd
 }

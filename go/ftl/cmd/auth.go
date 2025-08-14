@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fastertools/ftl-cli/go/shared/auth"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/fastertools/ftl-cli/go/shared/auth"
 )
 
 func newAuthCmd() *cobra.Command {
@@ -16,14 +16,14 @@ func newAuthCmd() *cobra.Command {
 		Short: "Manage authentication",
 		Long:  `Manage authentication for FTL platform and registries.`,
 	}
-	
+
 	// Add subcommands
 	cmd.AddCommand(
 		newAuthLoginCmd(),
 		newAuthLogoutCmd(),
 		newAuthStatusCmd(),
 	)
-	
+
 	return cmd
 }
 
@@ -31,7 +31,7 @@ func newAuthLoginCmd() *cobra.Command {
 	var noBrowser bool
 	var force bool
 	var authKitDomain string
-	
+
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Login to FTL platform",
@@ -83,7 +83,7 @@ func newAuthLoginCmd() *cobra.Command {
 			fmt.Println("📋 Or manually enter code:")
 			color.Yellow("   %s", deviceAuth.UserCode)
 			fmt.Println()
-			
+
 			if !noBrowser {
 				fmt.Println("🚀 Opening browser...")
 			}
@@ -97,22 +97,22 @@ func newAuthLoginCmd() *cobra.Command {
 			// Success
 			fmt.Println()
 			color.Green("✅ Successfully logged in!")
-			
+
 			if creds.ExpiresAt != nil {
 				duration := time.Until(*creds.ExpiresAt)
-				fmt.Printf("   Access token valid for %dh %dm\n", 
-					int(duration.Hours()), 
+				fmt.Printf("   Access token valid for %dh %dm\n",
+					int(duration.Hours()),
 					int(duration.Minutes())%60)
 			}
-			
+
 			return nil
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "Don't open browser automatically")
 	cmd.Flags().BoolVar(&force, "force", false, "Force re-authentication even if already logged in")
 	cmd.Flags().StringVar(&authKitDomain, "auth-domain", "", "Override AuthKit domain (for testing)")
-	
+
 	return cmd
 }
 
@@ -149,7 +149,7 @@ func newAuthLogoutCmd() *cobra.Command {
 
 func newAuthStatusCmd() *cobra.Command {
 	var showToken bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show authentication status",
@@ -184,10 +184,10 @@ func newAuthStatusCmd() *cobra.Command {
 
 			if status.Credentials != nil {
 				creds := status.Credentials
-				
+
 				// Show domain
 				fmt.Printf("AuthKit Domain: %s\n", color.CyanString(creds.AuthKitDomain))
-				
+
 				// Show token status
 				if creds.ExpiresAt != nil {
 					if creds.IsExpired() {
@@ -199,7 +199,7 @@ func newAuthStatusCmd() *cobra.Command {
 						duration := time.Until(*creds.ExpiresAt)
 						hours := int(duration.Hours())
 						minutes := int(duration.Minutes()) % 60
-						
+
 						fmt.Printf("Access Token: Valid for %s\n",
 							color.GreenString("%dh %dm", hours, minutes))
 					}
@@ -223,7 +223,7 @@ func newAuthStatusCmd() *cobra.Command {
 			return nil
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&showToken, "show-token", false, "Display the actual access token")
 	return cmd
 }

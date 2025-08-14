@@ -1,0 +1,22 @@
+application:
+    name: test-project
+    version: 0.1.0
+    description: test-project - An FTL application
+components:
+    - id: hello-service
+      source: ./hello
+      description: Hello World service
+    - id: test-warg
+      source: fermyon:spin-hello@1.0.0
+      description: Warg format test
+    - id: test-ghcr
+      source: ghcr.io/fermyon/spin-hello-world:latest
+    - id: test-http
+      source: https://example.com/components/test.wasm
+triggers:
+    - type: http
+      component: hello-service
+      route: /hello
+    - type: http
+      component: test-ghcr
+      route: /ghcr-hello

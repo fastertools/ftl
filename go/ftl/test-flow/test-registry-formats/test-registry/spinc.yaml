@@ -1,0 +1,13 @@
+application:
+    name: test-registry
+    version: 0.1.0
+    description: test-registry - An FTL application
+components:
+    - id: warg-test
+      source: fermyon:spin-hello@1.0.0
+    - id: ghcr-test
+      source: ghcr.io/fermyon/spin-hello-world:latest
+    - id: http-test
+      source: https://example.com/components/test.wasm
+    - id: local-test
+      source: ./local-component/test.wasm
