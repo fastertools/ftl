@@ -45,15 +45,15 @@ ftl up
 
 ## Architecture
 
-FTL uses a sophisticated multi-stage transformation pipeline:
+FTL uses a pure CUE-based transformation pipeline:
 
 ```
-User Config (Layer 3) → CUE Patterns → SpinDL (Layer 2) → Spin Manifest (Layer 1)
+User Config → CUE Patterns → Spin Manifest
 ```
 
-- **Layer 3 (User)**: Simple, declarative configuration
-- **Layer 2 (SpinDL)**: Normalized intermediate representation
-- **Layer 1 (Spin)**: Complete Spin manifest with all wiring
+- **User Config**: Simple, declarative configuration (YAML, JSON, CUE, or Go)
+- **CUE Patterns**: Powerful transformation and validation rules
+- **Spin Manifest**: Complete Spin v3 manifest with all components and configuration
 
 ## Commands
 

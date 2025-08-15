@@ -72,10 +72,10 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"geo__example_tool
 
 ## Understanding the Synthesis
 
-FTL uses a sophisticated multi-stage transformation pipeline:
+FTL uses a pure CUE-based transformation pipeline:
 
 ```
-User Config → CUE Representation → SpinDL (Intermediate) → Spin Manifest
+User Config → CUE Patterns → Spin Manifest
 ```
 
 The magic happens in the CUE transformations that:

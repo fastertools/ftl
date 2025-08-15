@@ -17,7 +17,6 @@ require (
 require (
 	github.com/fastertools/ftl-cli/go/shared v0.0.0
 	github.com/fastertools/ftl-cli/go/shared/auth v0.0.0
-	github.com/fastertools/ftl-cli/go/spindl v0.0.0
 )
 
 require (
@@ -62,5 +61,4 @@ require (
 replace (
 	github.com/fastertools/ftl-cli/go/shared => ../shared
 	github.com/fastertools/ftl-cli/go/shared/auth => ../shared/auth
-	github.com/fastertools/ftl-cli/go/spindl => ../spindl
 )

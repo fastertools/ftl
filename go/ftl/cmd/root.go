@@ -88,7 +88,7 @@ func initConfig() {
 	} else {
 		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName("spindl")
+		viper.SetConfigName("ftl")
 	}
 
 	viper.SetEnvPrefix("FTL")
