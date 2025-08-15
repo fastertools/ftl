@@ -193,4 +193,3 @@ func synthesizeFromCUE(input []byte) (string, error) {
 	synth := synthesis.NewSynthesizer()
 	return synth.SynthesizeCUE(string(input))
 }
-

@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -422,7 +423,174 @@ func TestGenerateComponent_NoFTLConfig(t *testing.T) {
 
 	err = scaffolder.GenerateComponent("my-tool", "rust")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ftl.yaml not found")
+	assert.Contains(t, err.Error(), "no FTL configuration found")
+}
+
+func TestDetectConfigFormat(t *testing.T) {
+	scaffolder, err := NewScaffolder()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		setupFiles func()
+		wantFormat string
+		wantPath   string
+		wantError  bool
+	}{
+		{
+			name: "yaml_config",
+			setupFiles: func() {
+				_ = os.WriteFile("ftl.yaml", []byte("application:\n  name: test\n"), 0644)
+			},
+			wantFormat: "yaml",
+			wantPath:   "ftl.yaml",
+		},
+		{
+			name: "json_config",
+			setupFiles: func() {
+				_ = os.WriteFile("ftl.json", []byte(`{"application":{"name":"test"}}`), 0644)
+			},
+			wantFormat: "json",
+			wantPath:   "ftl.json",
+		},
+		{
+			name: "cue_config",
+			setupFiles: func() {
+				_ = os.WriteFile("app.cue", []byte(`app: {name: "test"}`), 0644)
+			},
+			wantFormat: "cue",
+			wantPath:   "app.cue",
+		},
+		{
+			name: "go_config",
+			setupFiles: func() {
+				goCode := `package main
+import "github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+func main() {
+	cdk := synthesis.NewCDK()
+}`
+				_ = os.WriteFile("main.go", []byte(goCode), 0644)
+			},
+			wantFormat: "go",
+			wantPath:   "main.go",
+		},
+		{
+			name: "go_file_not_ftl",
+			setupFiles: func() {
+				_ = os.WriteFile("main.go", []byte(`package main
+func main() { println("hello") }`), 0644)
+			},
+			wantError: true,
+		},
+		{
+			name:       "no_config",
+			setupFiles: func() {},
+			wantError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			oldWd, _ := os.Getwd()
+			defer func() { _ = os.Chdir(oldWd) }()
+			_ = os.Chdir(tmpDir)
+
+			tt.setupFiles()
+
+			format, path, err := scaffolder.detectConfigFormat()
+			if tt.wantError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantFormat, format)
+				assert.Equal(t, tt.wantPath, path)
+			}
+		})
+	}
+}
+
+func TestGenerateComponent_JSONConfig(t *testing.T) {
+	// Create temp directory with ftl.json
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
+
+	// Create ftl.json
+	jsonConfig := `{
+  "application": {
+    "name": "test-app",
+    "version": "0.1.0"
+  },
+  "components": []
+}`
+	_ = os.WriteFile("ftl.json", []byte(jsonConfig), 0644)
+
+	// Generate component
+	scaffolder, err := NewScaffolder()
+	require.NoError(t, err)
+
+	err = scaffolder.GenerateComponent("my-tool", "rust")
+	require.NoError(t, err)
+
+	// Check component was added to ftl.json
+	data, err := os.ReadFile("ftl.json")
+	require.NoError(t, err)
+
+	var cfg config.FTLConfig
+	err = json.Unmarshal(data, &cfg)
+	require.NoError(t, err)
+
+	assert.Len(t, cfg.Components, 1)
+	assert.Equal(t, "my-tool", cfg.Components[0].ID)
+	assert.Contains(t, cfg.Components[0].Source, "my_tool.wasm") // Rust uses underscores
+}
+
+func TestGenerateComponent_GoConfig(t *testing.T) {
+	// Create temp directory with main.go
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
+
+	// Create main.go with CDK
+	goCode := `package main
+import "github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+func main() {
+	cdk := synthesis.NewCDK()
+	app := cdk.NewApp("test")
+}`
+	_ = os.WriteFile("main.go", []byte(goCode), 0644)
+
+	// Try to generate component
+	scaffolder, err := NewScaffolder()
+	require.NoError(t, err)
+
+	err = scaffolder.GenerateComponent("my-tool", "rust")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Go-based configurations require manual")
+	assert.Contains(t, err.Error(), "app.AddComponent")
+}
+
+func TestGenerateComponent_CUEConfig(t *testing.T) {
+	// Create temp directory with app.cue
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
+
+	// Create app.cue
+	_ = os.WriteFile("app.cue", []byte(`app: {name: "test"}`), 0644)
+
+	// Try to generate component
+	scaffolder, err := NewScaffolder()
+	require.NoError(t, err)
+
+	err = scaffolder.GenerateComponent("my-tool", "python")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "CUE configurations require manual")
+	assert.Contains(t, err.Error(), "app.cue components array")
 }
 
 func TestCreateComponentInstance(t *testing.T) {

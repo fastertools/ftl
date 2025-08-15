@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,45 @@ import (
 
 	"github.com/fastertools/ftl-cli/go/shared/config"
 )
+
+func TestComponentCommand(t *testing.T) {
+	cmd := newComponentCmd()
+
+	// Test command structure
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "component", cmd.Use)
+	assert.Contains(t, cmd.Short, "Manage FTL components")
+
+	// Test subcommands exist
+	expectedSubcommands := []string{"list", "add", "remove"}
+	for _, subcmd := range expectedSubcommands {
+		t.Run("has_"+subcmd, func(t *testing.T) {
+			found := false
+			for _, c := range cmd.Commands() {
+				if c.Name() == subcmd {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Subcommand %s not found", subcmd)
+		})
+	}
+}
+
+func TestComponentCommand_Help(t *testing.T) {
+	cmd := newComponentCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	assert.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Usage:")
+	assert.Contains(t, output, "component")
+	assert.Contains(t, output, "Available Commands:")
+}
 
 func TestAddComponent(t *testing.T) {
 	tests := []struct {
