@@ -32,12 +32,7 @@ ftl init my-app
 # Choose your preferred format: yaml, json, go, or cue
 ```
 
-2. **Add components:**
-```bash
-ftl component add oci ghcr.io/example/tool:latest --name my-tool
-```
-
-3. **Build and run:**
+2. **Edit your configuration to add components, then build and run:**
 ```bash
 ftl build
 ftl up
@@ -61,7 +56,6 @@ User Config → CUE Patterns → Spin Manifest
 - `ftl build` - Build the application and generate spin.toml
 - `ftl up` - Run the application locally
 - `ftl deploy` - Deploy to Fermyon Cloud
-- `ftl component` - Manage application components
 - `ftl synth` - Synthesize spin.toml from various formats
 - `ftl auth` - Manage authentication
 - `ftl registry` - Registry operations

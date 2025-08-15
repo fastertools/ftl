@@ -73,7 +73,6 @@ func init() {
 		newBuildCmd(),
 		newTestCmd(),
 		newDeployCmd(),
-		newComponentCmd(),
 		newAuthCmd(),
 		newUpCmd(),
 		newRegistryCmd(),

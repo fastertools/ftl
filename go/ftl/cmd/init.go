@@ -131,7 +131,8 @@ func runInit(opts *InitOptions) error {
 		fmt.Println("  3. ftl synth app.cue")
 		fmt.Println("  4. spin up")
 	default:
-		fmt.Println("  2. ftl component add <name>")
+		fmt.Printf("  2. Edit %s to add your components\n", 
+			map[string]string{"yaml": "ftl.yaml", "json": "ftl.json"}[opts.Format])
 		fmt.Println("  3. ftl build")
 		fmt.Println("  4. ftl up")
 	}
