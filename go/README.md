@@ -6,7 +6,6 @@ A production-ready CLI for building and deploying MCP (Model Context Protocol) t
 
 ✅ **Complete CLI Implementation**
 - Full command suite: `init`, `build`, `deploy`, `up`, `test`, `synth`
-- Component management: `add`, `list`, `remove`
 - Registry operations: `push`, `pull`, `list`
 - Authentication support: `login`, `logout`, `status`
 
@@ -70,17 +69,7 @@ ftl init my-platform --format yaml  # or json, cue, go
 cd my-platform
 ```
 
-### 2. Add Components
-
-From registry:
-```bash
-ftl component add geo --from ghcr.io/bowlofarugula:geo:0.0.1
-```
-
-From local source:
-```bash
-ftl component add my-component --from ./my-component.wasm
-```
+### 2. Configure your application by editing the configuration file
 
 ### 3. Build and Deploy
 
@@ -219,12 +208,6 @@ ftl deploy                # Deploy to production
 ftl test [path]           # Run tests
 ```
 
-### Component Management
-```bash
-ftl component add <name> --from <source>  # Add component
-ftl component list                        # List components
-ftl component remove <name>               # Remove component
-```
 
 ### Registry Operations
 ```bash

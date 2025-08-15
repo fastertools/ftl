@@ -482,11 +482,10 @@ func TestExecutor_VersionIntegration(t *testing.T) {
 	// Test Version with echo command that doesn't understand --version
 	e := NewExecutor(WithBinary("echo"))
 	version, err := e.Version()
-	// Will fail to parse version but tests the code path
-	if err != nil {
-		assert.Contains(t, err.Error(), "failed")
-		assert.Empty(t, version)
-	}
+	// Echo will output "--version" literally, which will fail to parse as a version
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected version output")
+	assert.Empty(t, version)
 }
 
 // Benchmark tests

@@ -33,7 +33,7 @@ func NewFTLClient(authManager *auth.Manager, baseURL string) (*FTLClient, error)
 	// Create HTTP client with auth interceptor
 	httpClient := &authHTTPClient{
 		authManager: authManager,
-		underlying:  &http.Client{
+		underlying: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
@@ -205,7 +205,7 @@ func (c *FTLClient) UpdateComponents(ctx context.Context, appID string, request 
 		return nil, fmt.Errorf("invalid app ID: %w", err)
 	}
 	params := &UpdateComponentsParams{}
-	
+
 	resp, err := c.client.UpdateComponentsWithResponse(ctx, appUUID, params, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update components: %w", err)
@@ -231,7 +231,7 @@ func (c *FTLClient) CreateDeployment(ctx context.Context, appID string, request 
 		return nil, fmt.Errorf("invalid app ID: %w", err)
 	}
 	params := &CreateDeploymentParams{}
-	
+
 	resp, err := c.client.CreateDeploymentWithResponse(ctx, appUUID, params, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deployment: %w", err)
