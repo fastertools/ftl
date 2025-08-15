@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -19,44 +20,44 @@ var cuePatterns string
 
 // SpinManifest represents the synthesized Spin manifest
 type SpinManifest struct {
-	SpinManifestVersion int                              `toml:"spin_manifest_version"`
-	Application         SpinApplication                  `toml:"application"`
-	Component           map[string]SpinComponent        `toml:"component"`
-	Trigger             SpinTrigger                      `toml:"trigger"`
-	Variables           map[string]SpinVariable         `toml:"variables,omitempty"`
+	SpinManifestVersion int                              `json:"spin_manifest_version" toml:"spin_manifest_version"`
+	Application         SpinApplication                  `json:"application" toml:"application"`
+	Component           map[string]SpinComponent        `json:"component" toml:"component"`
+	Trigger             SpinTrigger                      `json:"trigger" toml:"trigger"`
+	Variables           map[string]SpinVariable         `json:"variables,omitempty" toml:"variables,omitempty"`
 }
 
 // SpinApplication represents the application section of a Spin manifest
 type SpinApplication struct {
-	Name        string `toml:"name"`
-	Version     string `toml:"version,omitempty"`
-	Description string `toml:"description,omitempty"`
+	Name        string `json:"name" toml:"name"`
+	Version     string `json:"version,omitempty" toml:"version,omitempty"`
+	Description string `json:"description,omitempty" toml:"description,omitempty"`
 }
 
 // SpinComponent represents a component in the Spin manifest
 type SpinComponent struct {
-	Source               interface{}               `toml:"source"`
-	Build                *BuildConfig              `toml:"build,omitempty"`
-	Variables            map[string]string         `toml:"variables,omitempty"`
-	AllowedOutboundHosts []string                  `toml:"allowed_outbound_hosts,omitempty"`
+	Source               interface{}               `json:"source" toml:"source"`
+	Build                *BuildConfig              `json:"build,omitempty" toml:"build,omitempty"`
+	Variables            map[string]string         `json:"variables,omitempty" toml:"variables,omitempty"`
+	AllowedOutboundHosts []string                  `json:"allowed_outbound_hosts,omitempty" toml:"allowed_outbound_hosts,omitempty"`
 }
 
 // SpinTrigger represents the trigger configuration
 type SpinTrigger struct {
-	HTTP []SpinHTTPTrigger `toml:"http"`
+	HTTP []SpinHTTPTrigger `json:"http" toml:"http"`
 }
 
 // SpinHTTPTrigger represents an HTTP trigger
 type SpinHTTPTrigger struct {
-	Route     interface{} `toml:"route"`
-	Component string      `toml:"component"`
+	Route     interface{} `json:"route" toml:"route"`
+	Component string      `json:"component" toml:"component"`
 }
 
 // SpinVariable represents a Spin variable
 type SpinVariable struct {
-	Default  string `toml:"default,omitempty"`
-	Required bool   `toml:"required,omitempty"`
-	Secret   bool   `toml:"secret,omitempty"`
+	Default  string `json:"default,omitempty" toml:"default,omitempty"`
+	Required bool   `json:"required,omitempty" toml:"required,omitempty"`
+	Secret   bool   `json:"secret,omitempty" toml:"secret,omitempty"`
 }
 
 // Synthesizer handles the transformation of FTL applications to Spin manifests
@@ -123,7 +124,17 @@ manifest: _transform.output
 	// Fill in the input application
 	value = value.FillPath(cue.ParsePath("inputApp"), appValue)
 	if value.Err() != nil {
-		return nil, fmt.Errorf("failed to fill input app: %w", value.Err())
+		// Provide more helpful error messages for common issues
+		errStr := value.Err().Error()
+		if strings.Contains(errStr, "empty disjunction") {
+			if strings.Contains(errStr, "access") {
+				return nil, fmt.Errorf("invalid access mode '%s': must be one of 'public', 'private', 'org', or 'custom'", app.Access)
+			}
+			if strings.Contains(errStr, "provider") {
+				return nil, fmt.Errorf("invalid auth provider '%s': must be 'workos' or 'custom'", app.Auth.Provider)
+			}
+		}
+		return nil, fmt.Errorf("synthesis failed: %w", value.Err())
 	}
 	
 	// Extract the manifest

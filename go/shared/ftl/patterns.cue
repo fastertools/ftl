@@ -14,8 +14,9 @@ import (
 	version:      string | *"0.1.0"
 	description:  string | *""
 	components:   [...#Component] | *[]
-	access:       "public" | "private" | *"public"
+	access:       "public" | "private" | "org" | "custom" | *"public"
 	auth:         #AuthConfig | *{provider: "workos", org_id: "", jwt_issuer: "https://api.workos.com", jwt_audience: ""}
+	variables?:   {[string]: string}  // Application-level variables
 }
 
 #Component: {
@@ -62,7 +63,7 @@ import (
 	input: #FTLApplication
 	
 	// Helper to determine if we need auth
-	_needsAuth: input.access == "private"
+	_needsAuth: input.access != "public"
 	
 	output: {
 		spin_manifest_version: 2
@@ -125,6 +126,10 @@ import (
 						mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal"
 						mcp_jwt_issuer: input.auth.jwt_issuer | *"https://api.workos.com"
 						mcp_jwt_audience: input.auth.jwt_audience | *input.name
+						// org_id is always included but may be empty
+						mcp_org_id: input.auth.org_id | *""
+						// auth_provider defaults to workos
+						mcp_auth_provider: input.auth.provider | *"workos"
 					}
 				}
 			}
