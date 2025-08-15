@@ -23,7 +23,7 @@ A production-ready CLI for building and deploying MCP (Model Context Protocol) t
 - All formats produce identical output
 
 ✅ **Production Ready**
-- 90.5% test coverage
+- 88.9% test coverage
 - Zero lint warnings
 - Comprehensive error handling
 - Smart component handling (registry vs local sources)
@@ -259,7 +259,7 @@ make test-coverage
 go test ./ftl/cmd -v
 ```
 
-Current coverage: **90.5%**
+Current coverage: **88.9%**
 
 ## 📁 Project Structure
 
@@ -314,7 +314,7 @@ make clean        # Clean build artifacts
 
 ### Code Quality
 
-- Test coverage: 90.5%
+- Test coverage: 88.9%
 - Zero lint warnings
 - Pure CUE transformations
 - Smart component handling

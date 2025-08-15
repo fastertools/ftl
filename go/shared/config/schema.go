@@ -1,5 +1,5 @@
 // Package config defines the FTL configuration schema
-// This is the L3 schema (spindl.yml) that is used both locally and for deployments
+// This is used both locally and for deployments
 package config
 
 import (
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// FTLConfig represents the top-level FTL configuration (spindl.yml)
+// FTLConfig represents the top-level FTL configuration
 // This is the source of truth for both local development and platform deployments
 type FTLConfig struct {
 	Application ApplicationConfig        `yaml:"application" json:"application"`

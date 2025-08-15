@@ -296,15 +296,15 @@ Add new transformation functions:
 - **Type Safe**: CUE validates all inputs
 - **Sandboxed**: No file system or network access during synthesis
 
-## Comparison with Previous Architecture
+## Architecture Benefits
 
-| Aspect | Old (SpinDL) | New (Pure CUE) |
-|--------|--------------|----------------|
-| Layers | 3 (FTL→SpinDL→Spin) | 2 (FTL→Spin) |
-| Go Code | 500+ lines | 200 lines |
-| CUE Patterns | Split across files | Single patterns.cue |
-| Test Coverage | 87% | 90.5% |
-| Maintenance | Complex | Simple |
+| Aspect | Pure CUE Architecture |
+|--------|----------------------|
+| Layers | 2 (FTL→Spin) |
+| Go Code | ~200 lines |
+| CUE Patterns | Single patterns.cue |
+| Test Coverage | 88.9% |
+| Maintenance | Simple and focused |
 
 ## Best Practices
 

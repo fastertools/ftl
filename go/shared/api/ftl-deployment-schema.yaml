@@ -58,8 +58,8 @@ components:
     SpinComposeConfig:
       type: object
       description: |
-        The spinc.yaml configuration (L3 schema).
-        This is the same format used locally by spin-compose.
+        The FTL configuration.
+        This is the same format used locally by the FTL CLI.
       required:
         - application
       properties:

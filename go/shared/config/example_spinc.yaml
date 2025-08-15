@@ -1,5 +1,5 @@
 # Example spinc.yaml configuration
-# This demonstrates the L3 schema that both CLI and platform understand
+# This demonstrates the schema that both CLI and platform understand
 
 application:
   name: my-mcp-app

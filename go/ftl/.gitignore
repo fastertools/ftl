@@ -39,6 +39,5 @@ vendor/
 # Old/backup files
 *_old
 *.orig
-spindl
 test_*.go
 test_*.cue
