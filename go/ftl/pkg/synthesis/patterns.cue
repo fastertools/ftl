@@ -1,6 +1,9 @@
 package ftl
 
-import "strings"
+import (
+	"strings"
+	"list"
+)
 
 // ===========================================================================
 // FTL Application Types (what users write)
@@ -154,10 +157,10 @@ import "strings"
 			
 			// Select routes based on access mode
 			if _needsAuth {
-				http: _privateRoutes + _componentRoutes
+				http: list.Concat([_privateRoutes, _componentRoutes])
 			}
 			if !_needsAuth {
-				http: _publicRoutes + _componentRoutes
+				http: list.Concat([_publicRoutes, _componentRoutes])
 			}
 		}
 	}

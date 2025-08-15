@@ -10,7 +10,6 @@ import (
 
 	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 // synthCmd represents the synth command
@@ -195,15 +194,3 @@ func synthesizeFromCUE(input []byte) (string, error) {
 	return synth.SynthesizeCUE(string(input))
 }
 
-// synthesizeFromFTLConfig converts the FTL config struct to spin.toml
-func synthesizeFromFTLConfig(cfg interface{}) (string, error) {
-	// Convert the config to YAML and use CUE-first synthesizer
-	// This allows us to handle configs from Go while still using CUE
-	yamlData, err := yaml.Marshal(cfg)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	synth := synthesis.NewSynthesizer()
-	return synth.SynthesizeYAML(yamlData)
-}

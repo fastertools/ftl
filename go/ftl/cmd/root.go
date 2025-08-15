@@ -70,6 +70,7 @@ func init() {
 	// Add commands
 	rootCmd.AddCommand(
 		newInitCmd(),
+		newAddCmd(),
 		newBuildCmd(),
 		newTestCmd(),
 		newDeployCmd(),
