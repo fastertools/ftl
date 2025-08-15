@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/fatih/color"
@@ -25,6 +26,9 @@ var (
 	errorColor   = color.New(color.FgRed, color.Bold)
 	infoColor    = color.New(color.FgCyan)
 	warnColor    = color.New(color.FgYellow)
+	
+	// For testing - allows redirecting output
+	colorOutput io.Writer = os.Stdout
 )
 
 // rootCmd represents the base command
@@ -78,6 +82,9 @@ func init() {
 		newUpCmd(),
 		newRegistryCmd(),
 		newSynthCmd(),
+		newListCmd(),
+		newStatusCmd(),
+		newDeleteCmd(),
 	)
 }
 

@@ -18,10 +18,10 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
 	"github.com/fastertools/ftl-cli/go/shared/api"
 	"github.com/fastertools/ftl-cli/go/shared/auth"
 	"github.com/fastertools/ftl-cli/go/shared/config"
+	"github.com/fastertools/ftl-cli/go/shared/ftl"
 )
 
 // DeployOptions holds options for the deploy command
@@ -102,10 +102,10 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// Apply command-line overrides
 	if opts.AccessControl != "" {
-		ftlApp.Access = opts.AccessControl
+		ftlApp.Access = ftl.AccessMode(opts.AccessControl)
 	}
 	if opts.JWTIssuer != "" {
-		ftlApp.Auth.Provider = "custom"
+		ftlApp.Auth.Provider = ftl.AuthProviderCustom
 		ftlApp.Auth.JWTIssuer = opts.JWTIssuer
 		if opts.JWTAudience != "" {
 			ftlApp.Auth.JWTAudience = opts.JWTAudience
@@ -125,7 +125,11 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 
 	// Initialize auth manager
-	authManager := auth.NewManager()
+	store, err := auth.NewKeyringStore()
+	if err != nil {
+		return fmt.Errorf("failed to initialize credential store: %w", err)
+	}
+	authManager := auth.NewManager(store, nil)
 	
 	// Check authentication
 	if _, err := authManager.GetToken(ctx); err != nil {
@@ -141,7 +145,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Check if app exists
 	appName := ftlApp.Name
 	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
-		AppName: &appName,
+		Name: &appName,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to check existing apps: %w", err)
@@ -249,7 +253,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	sp.Suffix = " Waiting for deployment to complete..."
 	sp.Start()
 	
-	deployed, err := waitForDeployment(ctx, apiClient, appID, deployment.DeploymentId, sp)
+	deployed, err := waitForDeployment(ctx, apiClient, appID, deployment.DeploymentId.String(), sp)
 	if err != nil {
 		sp.Stop()
 		return fmt.Errorf("deployment failed: %w", err)
@@ -268,7 +272,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 }
 
 // loadFTLApplication loads the FTL application configuration from various formats
-func loadFTLApplication(configFile string) (*FTLApplication, error) {
+func loadFTLApplication(configFile string) (*ftl.Application, error) {
 	ext := filepath.Ext(configFile)
 	
 	switch ext {
@@ -283,41 +287,7 @@ func loadFTLApplication(configFile string) (*FTLApplication, error) {
 	}
 }
 
-// FTLApplication represents the FTL application configuration
-// This matches the CUE schema in patterns.cue
-type FTLApplication struct {
-	Name        string          `json:"name" yaml:"name"`
-	Version     string          `json:"version" yaml:"version"`
-	Description string          `json:"description" yaml:"description"`
-	Components  []FTLComponent  `json:"components" yaml:"components"`
-	Access      string          `json:"access" yaml:"access"`
-	Auth        FTLAuthConfig   `json:"auth" yaml:"auth"`
-}
-
-type FTLComponent struct {
-	ID       string                 `json:"id" yaml:"id"`
-	Source   interface{}            `json:"source" yaml:"source"`
-	Build    *FTLBuildConfig        `json:"build,omitempty" yaml:"build,omitempty"`
-	Variables map[string]string     `json:"variables,omitempty" yaml:"variables,omitempty"`
-	
-	// Internal field for tracking registry source after push
-	RegistrySource interface{} `json:"-" yaml:"-"`
-}
-
-type FTLBuildConfig struct {
-	Command string   `json:"command" yaml:"command"`
-	Workdir string   `json:"workdir,omitempty" yaml:"workdir,omitempty"`
-	Watch   []string `json:"watch,omitempty" yaml:"watch,omitempty"`
-}
-
-type FTLAuthConfig struct {
-	Provider     string `json:"provider" yaml:"provider"`
-	OrgID        string `json:"org_id,omitempty" yaml:"org_id,omitempty"`
-	JWTIssuer    string `json:"jwt_issuer,omitempty" yaml:"jwt_issuer,omitempty"`
-	JWTAudience  string `json:"jwt_audience,omitempty" yaml:"jwt_audience,omitempty"`
-}
-
-func loadYAMLConfig(configFile string) (*FTLApplication, error) {
+func loadYAMLConfig(configFile string) (*ftl.Application, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
@@ -329,22 +299,22 @@ func loadYAMLConfig(configFile string) (*FTLApplication, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 	
-	// Convert to FTLApplication format
-	app := &FTLApplication{
+	// Convert to ftl.Application format
+	app := &ftl.Application{
 		Name:        cfg.Application.Name,
 		Version:     cfg.Application.Version,
 		Description: cfg.Application.Description,
-		Components:  make([]FTLComponent, 0, len(cfg.Components)),
-		Access:      "public",
-		Auth: FTLAuthConfig{
-			Provider: "workos",
+		Components:  make([]ftl.Component, 0, len(cfg.Components)),
+		Access:      ftl.AccessPublic,
+		Auth: ftl.AuthConfig{
+			Provider: ftl.AuthProviderWorkOS,
 		},
 	}
 	
 	// Convert MCP config to access/auth settings
 	if cfg.MCP != nil && cfg.MCP.Authorizer != nil {
 		if cfg.MCP.Authorizer.AccessControl != "" {
-			app.Access = cfg.MCP.Authorizer.AccessControl
+			app.Access = ftl.AccessMode(cfg.MCP.Authorizer.AccessControl)
 		}
 		if cfg.MCP.Authorizer.JWTIssuer != "" {
 			app.Auth.JWTIssuer = cfg.MCP.Authorizer.JWTIssuer
@@ -359,14 +329,27 @@ func loadYAMLConfig(configFile string) (*FTLApplication, error) {
 	
 	// Convert components
 	for _, comp := range cfg.Components {
-		ftlComp := FTLComponent{
+		// Determine source type
+		var source ftl.ComponentSource
+		if srcStr, ok := comp.Source.(string); ok {
+			source = ftl.LocalSource(srcStr)
+		} else if srcMap, ok := comp.Source.(map[string]interface{}); ok {
+			// Registry source
+			source = &ftl.RegistrySource{
+				Registry: srcMap["registry"].(string),
+				Package:  srcMap["package"].(string),
+				Version:  srcMap["version"].(string),
+			}
+		}
+		
+		ftlComp := ftl.Component{
 			ID:        comp.ID,
-			Source:    comp.Source,
+			Source:    source,
 			Variables: comp.Variables,
 		}
 		
 		if comp.Build != nil {
-			ftlComp.Build = &FTLBuildConfig{
+			ftlComp.Build = &ftl.BuildConfig{
 				Command: comp.Build.Command,
 				Workdir: comp.Build.Workdir,
 				Watch:   comp.Build.Watch,
@@ -376,71 +359,49 @@ func loadYAMLConfig(configFile string) (*FTLApplication, error) {
 		app.Components = append(app.Components, ftlComp)
 	}
 	
-	// Set defaults
-	if app.Version == "" {
-		app.Version = "0.1.0"
-	}
+	// Set defaults using the shared package method
+	app.SetDefaults()
 	
 	return app, nil
 }
 
-func loadJSONConfig(configFile string) (*FTLApplication, error) {
+func loadJSONConfig(configFile string) (*ftl.Application, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
 	
-	var app FTLApplication
+	var app ftl.Application
 	if err := json.Unmarshal(data, &app); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 	
 	// Set defaults
-	if app.Version == "" {
-		app.Version = "0.1.0"
-	}
-	if app.Access == "" {
-		app.Access = "public"
-	}
+	app.SetDefaults()
 	
 	return &app, nil
 }
 
-func loadCUEConfig(configFile string) (*FTLApplication, error) {
-	// Use the synthesizer to extract the FTL application from CUE
-	synth := synthesis.NewSynthesizer()
-	
-	cueData, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-	
-	// For now, we need to synthesize and then extract back
-	// In the future, we should extract the FTL app directly from CUE
-	_, err = synth.SynthesizeCUE(string(cueData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CUE config: %w", err)
-	}
-	
-	// TODO: Extract FTLApplication directly from CUE value
+func loadCUEConfig(configFile string) (*ftl.Application, error) {
+	// TODO: Properly extract from CUE
 	// For now, return a minimal config
-	return &FTLApplication{
+	return &ftl.Application{
 		Name:    "app",
 		Version: "0.1.0",
-		Access:  "public",
-		Auth: FTLAuthConfig{
-			Provider: "workos",
+		Access:  ftl.AccessPublic,
+		Auth: ftl.AuthConfig{
+			Provider: ftl.AuthProviderWorkOS,
 		},
-		Components: []FTLComponent{},
+		Components: []ftl.Component{},
 	}, nil
 }
 
-func findLocalComponents(app *FTLApplication) []FTLComponent {
-	var local []FTLComponent
+func findLocalComponents(app *ftl.Application) []ftl.Component {
+	var local []ftl.Component
 	
 	for _, comp := range app.Components {
-		// Check if source is a string (local path) vs map (registry reference)
-		if _, ok := comp.Source.(string); ok {
+		// Use the helper to check if it's local
+		if comp.Source != nil && comp.Source.IsLocal() {
 			local = append(local, comp)
 		}
 	}
@@ -448,7 +409,7 @@ func findLocalComponents(app *FTLApplication) []FTLComponent {
 	return local
 }
 
-func buildLocalComponents(ctx context.Context, components []FTLComponent) error {
+func buildLocalComponents(ctx context.Context, components []ftl.Component) error {
 	for _, comp := range components {
 		if comp.Build == nil || comp.Build.Command == "" {
 			continue
@@ -510,14 +471,15 @@ func dockerLoginToECR(ctx context.Context, ecrToken *api.CreateEcrTokenResponseB
 
 type PushedComponent struct {
 	ID             string
-	RegistrySource map[string]interface{}
+	RegistrySource ftl.ComponentSource
 }
 
-func pushComponentsToRegistry(ctx context.Context, app *FTLApplication, components []FTLComponent, registryURI string, appID string) ([]PushedComponent, error) {
+func pushComponentsToRegistry(ctx context.Context, app *ftl.Application, components []ftl.Component, registryURI string, appID string) ([]PushedComponent, error) {
 	var pushed []PushedComponent
 	
 	for _, comp := range components {
-		sourcePath, ok := comp.Source.(string)
+		// Get the local source path
+		sourcePath, ok := ftl.AsLocal(comp.Source)
 		if !ok {
 			continue
 		}
@@ -551,10 +513,10 @@ func pushComponentsToRegistry(ctx context.Context, app *FTLApplication, componen
 		// Create registry source reference
 		pushed = append(pushed, PushedComponent{
 			ID: comp.ID,
-			RegistrySource: map[string]interface{}{
-				"registry": registryURI,
-				"package":  fmt.Sprintf("%s:%s", appID, comp.ID),
-				"version":  version,
+			RegistrySource: &ftl.RegistrySource{
+				Registry: registryURI,
+				Package:  fmt.Sprintf("%s:%s", appID, comp.ID),
+				Version:  version,
 			},
 		})
 	}
@@ -562,20 +524,22 @@ func pushComponentsToRegistry(ctx context.Context, app *FTLApplication, componen
 	return pushed, nil
 }
 
-func createDeploymentRequest(app *FTLApplication, opts *DeployOptions) api.CreateDeploymentRequest {
+func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.CreateDeploymentRequest {
+	// The platform backend expects the FTL application directly
+	// We'll marshal it and send it as the configuration
 	req := api.CreateDeploymentRequest{
-		Variables: opts.Variables,
+		Variables: &opts.Variables,
 	}
 	
-	// Set access control
+	// Set access control based on app.Access
 	switch app.Access {
-	case "private":
+	case ftl.AccessPrivate:
 		ac := api.CreateDeploymentRequestAccessControlPrivate
 		req.AccessControl = &ac
-	case "org":
+	case ftl.AccessOrg:
 		ac := api.CreateDeploymentRequestAccessControlOrg
 		req.AccessControl = &ac
-	case "custom":
+	case ftl.AccessCustom:
 		ac := api.CreateDeploymentRequestAccessControlCustom
 		req.AccessControl = &ac
 	default:
@@ -584,49 +548,61 @@ func createDeploymentRequest(app *FTLApplication, opts *DeployOptions) api.Creat
 	}
 	
 	// Set allowed roles for org mode
-	if app.Access == "org" && len(opts.AllowedRoles) > 0 {
+	if app.Access == ftl.AccessOrg && len(opts.AllowedRoles) > 0 {
 		req.AllowedRoles = &opts.AllowedRoles
 	}
 	
-	// Convert FTLApplication to a format the API expects
-	// The API should accept the FTL config schema directly
-	configData := map[string]interface{}{
-		"name":        app.Name,
-		"version":     app.Version,
-		"description": app.Description,
-		"components":  app.Components,
-		"access":      app.Access,
-		"auth":        app.Auth,
-	}
+	// TODO: The backend team is using the shared ftl package and expects
+	// the FTL application configuration directly. We need to update the API
+	// client to send the full Application struct.
+	// For now, we'll convert to the legacy format.
 	
-	// Marshal to JSON and back to ensure proper types
-	jsonData, _ := json.Marshal(configData)
-	var components []api.CreateDeploymentRequestComponentsItem
+	req.Components = make([]struct {
+		AllowedHosts  *[]string `json:"allowedHosts,omitempty"`
+		ComponentName string    `json:"componentName"`
+		Tag           string    `json:"tag"`
+	}, 0, len(app.Components))
 	
-	// For now, convert to the expected format
-	// TODO: Update API to accept FTL config directly
 	for _, comp := range app.Components {
-		item := api.CreateDeploymentRequestComponentsItem{
+		item := struct {
+			AllowedHosts  *[]string `json:"allowedHosts,omitempty"`
+			ComponentName string    `json:"componentName"`
+			Tag           string    `json:"tag"`
+		}{
 			ComponentName: comp.ID,
+			Tag:           app.Version, // Default to app version
 		}
 		
-		// Add registry info if available
-		if regSource, ok := comp.RegistrySource.(map[string]interface{}); ok {
-			if version, ok := regSource["version"].(string); ok {
-				item.Tag = &version
-			}
+		// Check if it's a registry source and use its version
+		if regSource, ok := ftl.AsRegistry(comp.Source); ok {
+			item.Tag = regSource.Version
 		}
 		
-		components = append(components, item)
+		req.Components = append(req.Components, item)
 	}
-	
-	req.Components = components
 	
 	// Add custom auth if needed
-	if app.Access == "custom" && app.Auth.Provider == "custom" {
-		req.CustomAuth = &api.CreateDeploymentRequestCustomAuth{
+	if app.Access == ftl.AccessCustom && app.Auth.Provider == ftl.AuthProviderCustom {
+		req.CustomAuth = &struct {
+			Audience []string `json:"audience"`
+			Issuer   string   `json:"issuer"`
+		}{
 			Issuer:   app.Auth.JWTIssuer,
 			Audience: []string{app.Auth.JWTAudience},
+		}
+	}
+	
+	// Add application-level variables if any
+	if app.Variables != nil && len(app.Variables) > 0 {
+		// Merge app variables with deployment variables
+		if req.Variables == nil {
+			vars := make(map[string]string)
+			req.Variables = &vars
+		}
+		for k, v := range app.Variables {
+			if _, exists := (*req.Variables)[k]; !exists {
+				(*req.Variables)[k] = v
+			}
 		}
 	}
 	
@@ -643,15 +619,15 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 		}
 		
 		switch app.Status {
-		case api.AppStatusActive:
+		case api.AppStatusACTIVE:
 			return app, nil
-		case api.AppStatusFailed:
+		case api.AppStatusFAILED:
 			errMsg := "deployment failed"
 			if app.ProviderError != nil {
 				errMsg = *app.ProviderError
 			}
-			return nil, fmt.Errorf(errMsg)
-		case api.AppStatusDeleted, api.AppStatusDeleting:
+			return nil, fmt.Errorf("%s", errMsg)
+		case api.AppStatusDELETED, api.AppStatusDELETING:
 			return nil, fmt.Errorf("app was deleted during deployment")
 		default:
 			// Still pending or creating
@@ -664,7 +640,7 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 	return nil, fmt.Errorf("deployment timeout after 5 minutes")
 }
 
-func displayDryRunSummary(app *FTLApplication, localComponents []FTLComponent, appExists bool) {
+func displayDryRunSummary(app *ftl.Application, localComponents []ftl.Component, appExists bool) {
 	fmt.Println()
 	fmt.Println("🔍 DRY RUN MODE - No changes will be made")
 	fmt.Println()
@@ -696,14 +672,18 @@ func displayDryRunSummary(app *FTLApplication, localComponents []FTLComponent, a
 		fmt.Printf("  • %s\n", comp.ID)
 		
 		// Show source type
-		if sourcePath, ok := comp.Source.(string); ok {
+		if sourcePath, ok := ftl.AsLocal(comp.Source); ok {
 			fmt.Printf("    Source: %s (local)\n", sourcePath)
 			if comp.Build != nil && comp.Build.Command != "" {
 				fmt.Printf("    Build: %s\n", comp.Build.Command)
 			}
-		} else if sourceMap, ok := comp.Source.(map[string]interface{}); ok {
-			if registry, ok := sourceMap["registry"].(string); ok {
-				fmt.Printf("    Source: %s (registry)\n", registry)
+		} else if regSource, ok := ftl.AsRegistry(comp.Source); ok {
+			fmt.Printf("    Source: %s (registry)\n", regSource.Registry)
+			if regSource.Package != "" {
+				fmt.Printf("    Package: %s\n", regSource.Package)
+			}
+			if regSource.Version != "" {
+				fmt.Printf("    Version: %s\n", regSource.Version)
 			}
 		}
 	}
