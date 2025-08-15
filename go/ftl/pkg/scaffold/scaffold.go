@@ -3,6 +3,7 @@ package scaffold
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -192,23 +193,61 @@ func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 	return nil
 }
 
-// updateFTLConfig adds the new component to ftl.yaml
+// updateFTLConfig adds the new component to ftl.yaml or ftl.json
 func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
-	// Check if ftl.yaml exists
-	configPath := "ftl.yaml"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return fmt.Errorf("ftl.yaml not found - not in an FTL project directory")
+	// Detect configuration format
+	format, configPath, err := s.detectConfigFormat()
+	if err != nil {
+		return err
+	}
+
+	// Handle unsupported formats with helpful messages
+	if format == "go" {
+		// Extract build configuration for the helpful message
+		language, _ := component.LookupPath(cue.ParsePath("language")).String()
+		wasmPath := s.getWasmPath(name, language)
+
+		return fmt.Errorf("Go-based configurations require manual component registration.\n"+
+			"Add this to your main.go:\n\n"+
+			"    app.AddComponent(\"%s\").\n"+
+			"        FromLocal(\"./%s\").\n"+
+			"        WithBuild(\"cd %s && make build\").\n"+
+			"        Build()\n", name, wasmPath, name)
+	}
+
+	if format == "cue" {
+		return fmt.Errorf("CUE configurations require manual component registration.\n"+
+			"Add this to your app.cue components array:\n\n"+
+			"    {\n"+
+			"        id: \"%s\"\n"+
+			"        source: \"./%s/%s.wasm\"\n"+
+			"        build: {\n"+
+			"            command: \"make build\"\n"+
+			"            workdir: \"%s\"\n"+
+			"        }\n"+
+			"    }\n", name, name, name, name)
 	}
 
 	// Read existing config
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to read ftl.yaml: %w", err)
+		return fmt.Errorf("failed to read %s: %w", configPath, err)
 	}
 
 	var cfg config.FTLConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("failed to parse ftl.yaml: %w", err)
+
+	// Parse based on format
+	switch format {
+	case "yaml":
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		}
+	case "json":
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		}
+	default:
+		return fmt.Errorf("unsupported configuration format: %s", format)
 	}
 
 	// Extract build configuration from component
@@ -249,19 +288,62 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	// Add component
 	cfg.Components = append(cfg.Components, newComponent)
 
-	// Write back
-	var buf bytes.Buffer
-	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(&cfg); err != nil {
-		return fmt.Errorf("failed to encode config: %w", err)
+	// Write back based on format
+	var output []byte
+	switch format {
+	case "yaml":
+		var buf bytes.Buffer
+		encoder := yaml.NewEncoder(&buf)
+		encoder.SetIndent(2)
+		if err := encoder.Encode(&cfg); err != nil {
+			return fmt.Errorf("failed to encode config: %w", err)
+		}
+		output = buf.Bytes()
+	case "json":
+		var err error
+		output, err = json.MarshalIndent(&cfg, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to encode config: %w", err)
+		}
+		// Add trailing newline for consistency
+		output = append(output, '\n')
 	}
 
-	if err := os.WriteFile(configPath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write ftl.yaml: %w", err)
+	if err := os.WriteFile(configPath, output, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", configPath, err)
 	}
 
 	return nil
+}
+
+// detectConfigFormat detects which configuration format is being used
+func (s *Scaffolder) detectConfigFormat() (string, string, error) {
+	// Check for YAML first (most common)
+	if _, err := os.Stat("ftl.yaml"); err == nil {
+		return "yaml", "ftl.yaml", nil
+	}
+
+	// Check for JSON
+	if _, err := os.Stat("ftl.json"); err == nil {
+		return "json", "ftl.json", nil
+	}
+
+	// Check for CUE
+	if _, err := os.Stat("app.cue"); err == nil {
+		return "cue", "app.cue", nil
+	}
+
+	// Check for Go
+	if _, err := os.Stat("main.go"); err == nil {
+		// Double-check it's actually an FTL Go config by looking for the CDK import
+		data, err := os.ReadFile("main.go")
+		if err == nil && strings.Contains(string(data), "synthesis.NewCDK") {
+			return "go", "main.go", nil
+		}
+	}
+
+	return "", "", fmt.Errorf("no FTL configuration found - not in an FTL project directory.\n" +
+		"Run 'ftl init' to create a new project")
 }
 
 // getWasmPath returns the WASM output path for a component

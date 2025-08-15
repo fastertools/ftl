@@ -34,8 +34,23 @@ func newUpCmd() *cobra.Command {
 				return err
 			}
 
-			// Check if ftl.yaml exists and synthesize
-			if _, err := os.Stat(configFile); err == nil && !skipSynth {
+			// Auto-detect config file if not specified
+			if configFile == "" {
+				// Try to detect the config format
+				if _, err := os.Stat("ftl.yaml"); err == nil {
+					configFile = "ftl.yaml"
+				} else if _, err := os.Stat("ftl.json"); err == nil {
+					configFile = "ftl.json"
+				} else if _, err := os.Stat("app.cue"); err == nil {
+					configFile = "app.cue"
+				} else if _, err := os.Stat("main.go"); err == nil {
+					configFile = "main.go"
+				}
+			}
+
+			// Check if config file exists and synthesize
+			if configFile != "" && !skipSynth {
+				if _, err := os.Stat(configFile); err == nil {
 				fmt.Printf("%s Synthesizing spin.toml from %s\n", blue("→"), configFile)
 
 				// Use unified synthesis helper
@@ -50,14 +65,13 @@ func newUpCmd() *cobra.Command {
 				}
 
 				fmt.Printf("%s Generated spin.toml\n", green("✓"))
-			} else if err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to check %s: %w", configFile, err)
-			} else if os.IsNotExist(err) {
-				// Check if spin.toml exists directly
-				if _, err := os.Stat("spin.toml"); os.IsNotExist(err) {
-					return fmt.Errorf("neither %s nor spin.toml found. Run 'ftl init' first", configFile)
 				}
-				fmt.Printf("%s Using existing spin.toml\n", yellow("ℹ"))
+			} else if configFile == "" && !skipSynth {
+				// No config file found, check for spin.toml
+				if _, err := os.Stat("spin.toml"); os.IsNotExist(err) {
+					return fmt.Errorf("no ftl.yaml, ftl.json, app.cue, or spin.toml found. Run 'ftl init' first")
+				}
+				fmt.Printf("%s No FTL config found, using existing spin.toml\n", yellow("ℹ"))
 			}
 
 			// Build if requested
@@ -90,8 +104,8 @@ func newUpCmd() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&build, "build", "b", false, "Build before running")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes and reload")
-	cmd.Flags().BoolVar(&skipSynth, "skip-synth", false, "Skip synthesis of spin.toml from ftl.yaml")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "ftl.yaml", "Configuration file to synthesize")
+	cmd.Flags().BoolVar(&skipSynth, "skip-synth", false, "Skip synthesis of spin.toml from FTL config")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Configuration file to synthesize (auto-detects if not specified)")
 
 	return cmd
 }

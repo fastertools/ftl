@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -41,13 +43,25 @@ Example:
 	}
 
 	cmd.Flags().StringVarP(&environment, "environment", "e", "production", "Deployment environment (production, staging, development)")
-	cmd.Flags().StringVarP(&configFile, "file", "f", "ftl.yaml", "FTL configuration file")
+	cmd.Flags().StringVarP(&configFile, "file", "f", "", "FTL configuration file (auto-detects if not specified)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate configuration without deploying")
 
 	return cmd
 }
 
 func runDeploy(ctx context.Context, configFile, environment string, dryRun bool) error {
+	// Auto-detect config file if not specified
+	if configFile == "" {
+		// Try to detect the config format
+		if _, err := os.Stat("ftl.yaml"); err == nil {
+			configFile = "ftl.yaml"
+		} else if _, err := os.Stat("ftl.json"); err == nil {
+			configFile = "ftl.json"
+		} else {
+			return fmt.Errorf("no ftl.yaml or ftl.json found. Run 'ftl init' first")
+		}
+	}
+
 	// Load configuration
 	cfg, err := loadConfig(configFile)
 	if err != nil {
@@ -77,7 +91,7 @@ func runDeploy(ctx context.Context, configFile, environment string, dryRun bool)
 	return nil
 }
 
-// loadConfig loads and parses the FTL configuration file
+// loadConfig loads and parses the FTL configuration file (YAML or JSON)
 func loadConfig(configFile string) (*config.FTLConfig, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
@@ -88,8 +102,20 @@ func loadConfig(configFile string) (*config.FTLConfig, error) {
 	}
 
 	var cfg config.FTLConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	
+	// Determine format by extension
+	ext := filepath.Ext(configFile)
+	switch ext {
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+	case ".json":
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported config format: %s (use .yaml or .json)", ext)
 	}
 
 	// Set defaults
