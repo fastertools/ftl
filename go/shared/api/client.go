@@ -170,13 +170,14 @@ func (c *FTLClient) DeleteApp(ctx context.Context, appID string) error {
 // Registry API methods
 
 // CreateECRToken creates a temporary ECR authorization token
-func (c *FTLClient) CreateECRToken(ctx context.Context, appID string) (*CreateEcrTokenResponseBody, error) {
+func (c *FTLClient) CreateECRToken(ctx context.Context, appID string, components []string) (*CreateEcrTokenResponseBody, error) {
 	appUUID, err := parseUUID(appID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid app ID: %w", err)
 	}
 	request := CreateEcrTokenRequest{
-		AppId: appUUID,
+		AppId:      appUUID,
+		Components: components,
 	}
 	params := &CreateEcrTokenParams{}
 

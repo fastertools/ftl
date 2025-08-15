@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -54,50 +53,50 @@ func listComponents() error {
 		return nil
 	}
 
-	// Display components
-	fmt.Printf("Components in %s:\n\n", cfg.Application.Name)
+	// Display components using shared DataWriter
+	dw := NewDataWriter(colorOutput, "table")
+	tb := NewTableBuilder("ID", "SOURCE", "ROUTE", "DESCRIPTION")
 
-	for i, comp := range cfg.Components {
-		fmt.Printf("%d. %s\n", i+1, comp.ID)
-
-		// Display source based on type
+	for _, comp := range cfg.Components {
+		// Format source
+		var source string
 		switch src := comp.Source.(type) {
 		case string:
-			fmt.Printf("   Source: %s\n", src)
+			source = src
 		case map[string]interface{}:
 			if url, ok := src["url"]; ok {
-				fmt.Printf("   Source: %s (URL)\n", url)
+				source = fmt.Sprintf("%s (URL)", url)
 			} else if registry, ok := src["registry"]; ok {
 				pkg := src["package"]
 				version := src["version"]
-				fmt.Printf("   Source: %s/%s:%s (Registry)\n", registry, pkg, version)
+				source = fmt.Sprintf("%s/%s:%s", registry, pkg, version)
 			}
 		}
 
-		if comp.Description != "" {
-			fmt.Printf("   Description: %s\n", comp.Description)
-		}
-
-		// Find associated triggers
+		// Find route from triggers
+		route := "-"
 		for _, trigger := range cfg.Triggers {
 			if trigger.Component == comp.ID {
 				if trigger.Type == config.TriggerTypeHTTP && trigger.Route != "" {
-					if trigger.Route == "private" {
-						fmt.Printf("   Route: private\n")
-					} else {
-						fmt.Printf("   Route: %s\n", trigger.Route)
-					}
+					route = trigger.Route
 				}
 			}
 		}
 
-		if len(comp.AllowedOutboundHosts) > 0 {
-			fmt.Printf("   Allowed hosts: %s\n", strings.Join(comp.AllowedOutboundHosts, ", "))
+		// Format description (truncate if too long)
+		description := comp.Description
+		if len(description) > 40 {
+			description = description[:37] + "..."
 		}
-		fmt.Println()
+		if description == "" {
+			description = "-"
+		}
+
+		tb.AddRow(comp.ID, source, route, description)
 	}
 
-	return nil
+	fmt.Printf("\nComponents in %s:\n", cfg.Application.Name)
+	return tb.Write(dw)
 }
 
 func newComponentRemoveCmd() *cobra.Command {

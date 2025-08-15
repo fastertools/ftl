@@ -106,6 +106,13 @@ vet:
 	cd $(SHARED_DIR) && $(GOCMD) vet ./...
 	cd $(FTL_DIR) && $(GOCMD) vet ./...
 
+## generate: Regenerate API client from OpenAPI spec
+generate:
+	@echo "Regenerating API client from OpenAPI spec..."
+	@rm -f $(SHARED_DIR)/api/client.gen.go
+	cd $(SHARED_DIR)/api && $(GOCMD) generate ./...
+	@echo "✅ API client regenerated"
+
 ## run: Run FTL CLI directly
 run:
 	cd $(FTL_DIR) && $(GOCMD) run . $(ARGS)

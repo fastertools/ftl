@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
@@ -57,7 +55,7 @@ func runStatusImpl(ctx context.Context, appIdentifier string, format string) err
 
 	// Determine if identifier is UUID or name
 	var app *api.App
-	
+
 	// Try to parse as UUID
 	if _, err := uuid.Parse(appIdentifier); err == nil {
 		// It's a UUID, get app directly
@@ -73,11 +71,11 @@ func runStatusImpl(ctx context.Context, appIdentifier string, format string) err
 		if err != nil {
 			return fmt.Errorf("failed to list apps: %w", err)
 		}
-		
+
 		if len(response.Apps) == 0 {
 			return fmt.Errorf("application '%s' not found", appIdentifier)
 		}
-		
+
 		// Get full details using the UUID
 		appID := response.Apps[0].AppId.String()
 		app, err = apiClient.GetApp(ctx, appID)
@@ -86,9 +84,12 @@ func runStatusImpl(ctx context.Context, appIdentifier string, format string) err
 		}
 	}
 
+	// Use shared DataWriter for consistent output
+	dw := NewDataWriter(colorOutput, format)
+
 	switch format {
 	case "json":
-		return displayAppStatusJSON(app)
+		return dw.WriteStruct(app)
 	case "table":
 		return displayAppStatusTable(app)
 	default:
@@ -97,51 +98,48 @@ func runStatusImpl(ctx context.Context, appIdentifier string, format string) err
 }
 
 func displayAppStatusTable(app *api.App) error {
-	fmt.Fprintln(colorOutput)
-	color.New(color.Bold).Fprintln(colorOutput, "Application Details")
-	
-	fmt.Fprintf(colorOutput, "  Name:         %s\n", app.AppName)
-	fmt.Fprintf(colorOutput, "  ID:           %s\n", app.AppId.String())
-	
-	// Color-code status
-	statusColor := color.New(color.FgWhite)
-	switch app.Status {
-	case api.AppStatusACTIVE:
-		statusColor = color.New(color.FgGreen)
-	case api.AppStatusFAILED:
-		statusColor = color.New(color.FgRed)
-	case api.AppStatusPENDING, api.AppStatusCREATING:
-		statusColor = color.New(color.FgYellow)
-	case api.AppStatusDELETED, api.AppStatusDELETING:
-		statusColor = color.New(color.FgHiBlack)
-	}
-	fmt.Fprintf(colorOutput, "  Status:       %s\n", statusColor.Sprint(app.Status))
-	
+	dw := NewDataWriter(colorOutput, "table")
+	kvb := NewKeyValueBuilder("Application Details")
+
+	// Add basic fields
+	kvb.Add("Name", app.AppName)
+	kvb.Add("ID", app.AppId.String())
+	kvb.Add("Status", app.Status)
+
+	// Add optional fields
 	if app.ProviderUrl != nil && *app.ProviderUrl != "" {
-		fmt.Fprintf(colorOutput, "  URL:          %s\n", *app.ProviderUrl)
+		kvb.Add("URL", *app.ProviderUrl)
 	}
-	
+
 	if app.ProviderError != nil && *app.ProviderError != "" {
-		fmt.Fprintf(colorOutput, "  %s\n", color.RedString("Error:        %s", *app.ProviderError))
+		kvb.Add("Error", *app.ProviderError)
 	}
-	
-	// Timestamps are already strings from the API
-	fmt.Fprintf(colorOutput, "  Created:      %s\n", app.CreatedAt)
-	fmt.Fprintf(colorOutput, "  Updated:      %s\n", app.UpdatedAt)
-	
-	// Show access control
+
+	// Timestamps
+	kvb.Add("Created", app.CreatedAt)
+	kvb.Add("Updated", app.UpdatedAt)
+
+	// Access control
 	if app.AccessControl != nil {
 		access := strings.ToLower(string(*app.AccessControl))
-		fmt.Fprintf(colorOutput, "  Access:       %s\n", access)
+		kvb.Add("Access", access)
+
+		// Show additional auth details based on access type
+		if *app.AccessControl == api.AppAccessControlOrg && app.OrgId != nil {
+			kvb.Add("OrgID", *app.OrgId)
+		}
+
+		if *app.AccessControl == api.AppAccessControlOrg && app.AllowedRoles != nil && len(*app.AllowedRoles) > 0 {
+			kvb.Add("AllowedRoles", strings.Join(*app.AllowedRoles, ", "))
+		}
+
+		if *app.AccessControl == api.AppAccessControlCustom && app.CustomAuth != nil {
+			kvb.Add("JWTIssuer", app.CustomAuth.Issuer)
+			kvb.Add("JWTAudience", app.CustomAuth.Audience)
+		}
 	}
-	
-	fmt.Fprintln(colorOutput)
-	
-	return nil
+
+	return kvb.Write(dw)
 }
 
-func displayAppStatusJSON(app *api.App) error {
-	encoder := json.NewEncoder(colorOutput)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(app)
-}
+// displayAppStatusJSON is no longer needed - using shared DataWriter

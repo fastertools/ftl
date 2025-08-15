@@ -47,40 +47,74 @@ const (
 	CreateAppRequestAccessControlPublic  CreateAppRequestAccessControl = "public"
 )
 
-// Defines values for CreateAppResponseStatus.
+// Defines values for CreateAppResponseBodyStatus.
 const (
-	CreateAppResponseStatusACTIVE   CreateAppResponseStatus = "ACTIVE"
-	CreateAppResponseStatusCREATING CreateAppResponseStatus = "CREATING"
-	CreateAppResponseStatusDELETED  CreateAppResponseStatus = "DELETED"
-	CreateAppResponseStatusDELETING CreateAppResponseStatus = "DELETING"
-	CreateAppResponseStatusFAILED   CreateAppResponseStatus = "FAILED"
-	CreateAppResponseStatusPENDING  CreateAppResponseStatus = "PENDING"
+	CreateAppResponseBodyStatusACTIVE   CreateAppResponseBodyStatus = "ACTIVE"
+	CreateAppResponseBodyStatusCREATING CreateAppResponseBodyStatus = "CREATING"
+	CreateAppResponseBodyStatusDELETED  CreateAppResponseBodyStatus = "DELETED"
+	CreateAppResponseBodyStatusDELETING CreateAppResponseBodyStatus = "DELETING"
+	CreateAppResponseBodyStatusFAILED   CreateAppResponseBodyStatus = "FAILED"
+	CreateAppResponseBodyStatusPENDING  CreateAppResponseBodyStatus = "PENDING"
 )
 
-// Defines values for CreateDeploymentRequestAccessControl.
+// Defines values for CreateDeploymentRequestAccess.
 const (
-	CreateDeploymentRequestAccessControlCustom  CreateDeploymentRequestAccessControl = "custom"
-	CreateDeploymentRequestAccessControlOrg     CreateDeploymentRequestAccessControl = "org"
-	CreateDeploymentRequestAccessControlPrivate CreateDeploymentRequestAccessControl = "private"
-	CreateDeploymentRequestAccessControlPublic  CreateDeploymentRequestAccessControl = "public"
+	CreateDeploymentRequestAccessCustom  CreateDeploymentRequestAccess = "custom"
+	CreateDeploymentRequestAccessOrg     CreateDeploymentRequestAccess = "org"
+	CreateDeploymentRequestAccessPrivate CreateDeploymentRequestAccess = "private"
+	CreateDeploymentRequestAccessPublic  CreateDeploymentRequestAccess = "public"
 )
 
-// Defines values for ListAppsResponseAppsAccessControl.
+// Defines values for CreateDeploymentRequestApplicationAccess.
 const (
-	ListAppsResponseAppsAccessControlCustom  ListAppsResponseAppsAccessControl = "custom"
-	ListAppsResponseAppsAccessControlOrg     ListAppsResponseAppsAccessControl = "org"
-	ListAppsResponseAppsAccessControlPrivate ListAppsResponseAppsAccessControl = "private"
-	ListAppsResponseAppsAccessControlPublic  ListAppsResponseAppsAccessControl = "public"
+	CreateDeploymentRequestApplicationAccessCustom  CreateDeploymentRequestApplicationAccess = "custom"
+	CreateDeploymentRequestApplicationAccessOrg     CreateDeploymentRequestApplicationAccess = "org"
+	CreateDeploymentRequestApplicationAccessPrivate CreateDeploymentRequestApplicationAccess = "private"
+	CreateDeploymentRequestApplicationAccessPublic  CreateDeploymentRequestApplicationAccess = "public"
 )
 
-// Defines values for ListAppsResponseAppsStatus.
+// Defines values for CreateDeploymentRequestApplicationAuthProvider.
 const (
-	ACTIVE   ListAppsResponseAppsStatus = "ACTIVE"
-	CREATING ListAppsResponseAppsStatus = "CREATING"
-	DELETED  ListAppsResponseAppsStatus = "DELETED"
-	DELETING ListAppsResponseAppsStatus = "DELETING"
-	FAILED   ListAppsResponseAppsStatus = "FAILED"
-	PENDING  ListAppsResponseAppsStatus = "PENDING"
+	CreateDeploymentRequestApplicationAuthProviderCustom CreateDeploymentRequestApplicationAuthProvider = "custom"
+	CreateDeploymentRequestApplicationAuthProviderWorkos CreateDeploymentRequestApplicationAuthProvider = "workos"
+)
+
+// Defines values for CreateDeploymentRequestAuthProvider.
+const (
+	CreateDeploymentRequestAuthProviderCustom CreateDeploymentRequestAuthProvider = "custom"
+	CreateDeploymentRequestAuthProviderWorkos CreateDeploymentRequestAuthProvider = "workos"
+)
+
+// Defines values for CreateDeploymentRequestEnvironment.
+const (
+	Development CreateDeploymentRequestEnvironment = "development"
+	Production  CreateDeploymentRequestEnvironment = "production"
+	Staging     CreateDeploymentRequestEnvironment = "staging"
+)
+
+// Defines values for CreateDeploymentResponseBodyStatus.
+const (
+	CreateDeploymentResponseBodyStatusDEPLOYED  CreateDeploymentResponseBodyStatus = "DEPLOYED"
+	CreateDeploymentResponseBodyStatusDEPLOYING CreateDeploymentResponseBodyStatus = "DEPLOYING"
+	CreateDeploymentResponseBodyStatusFAILED    CreateDeploymentResponseBodyStatus = "FAILED"
+)
+
+// Defines values for ListAppsResponseBodyAppsAccessControl.
+const (
+	Custom  ListAppsResponseBodyAppsAccessControl = "custom"
+	Org     ListAppsResponseBodyAppsAccessControl = "org"
+	Private ListAppsResponseBodyAppsAccessControl = "private"
+	Public  ListAppsResponseBodyAppsAccessControl = "public"
+)
+
+// Defines values for ListAppsResponseBodyAppsStatus.
+const (
+	ListAppsResponseBodyAppsStatusACTIVE   ListAppsResponseBodyAppsStatus = "ACTIVE"
+	ListAppsResponseBodyAppsStatusCREATING ListAppsResponseBodyAppsStatus = "CREATING"
+	ListAppsResponseBodyAppsStatusDELETED  ListAppsResponseBodyAppsStatus = "DELETED"
+	ListAppsResponseBodyAppsStatusDELETING ListAppsResponseBodyAppsStatus = "DELETING"
+	ListAppsResponseBodyAppsStatusFAILED   ListAppsResponseBodyAppsStatus = "FAILED"
+	ListAppsResponseBodyAppsStatusPENDING  ListAppsResponseBodyAppsStatus = "PENDING"
 )
 
 // App Application object
@@ -119,79 +153,158 @@ type CreateAppRequest struct {
 // CreateAppRequestAccessControl Access control mode for the application
 type CreateAppRequestAccessControl string
 
-// CreateAppResponse Response for successful app creation
+// CreateAppResponseBody Response for successful app creation
 type CreateAppResponseBody struct {
-	AppId     openapi_types.UUID      `json:"appId"`
-	AppName   string                  `json:"appName"`
-	CreatedAt string                  `json:"createdAt"`
-	Status    CreateAppResponseStatus `json:"status"`
-	UpdatedAt string                  `json:"updatedAt"`
+	AppId     openapi_types.UUID          `json:"appId"`
+	AppName   string                      `json:"appName"`
+	CreatedAt string                      `json:"createdAt"`
+	Status    CreateAppResponseBodyStatus `json:"status"`
+	UpdatedAt string                      `json:"updatedAt"`
 }
 
-// CreateAppResponseStatus defines model for CreateAppResponse.Status.
-type CreateAppResponseStatus string
+// CreateAppResponseBodyStatus defines model for CreateAppResponseBody.Status.
+type CreateAppResponseBodyStatus string
 
 // CreateDeploymentRequest Request body for creating a deployment
 type CreateDeploymentRequest struct {
-	// AccessControl Access control mode for the application
-	AccessControl *CreateDeploymentRequestAccessControl `json:"accessControl,omitempty"`
+	// Access Access control override
+	Access *CreateDeploymentRequestAccess `json:"access,omitempty"`
 
-	// AllowedRoles For org mode: list of roles that can access this app (e.g., ["admin", "developer"])
-	AllowedRoles *[]string `json:"allowedRoles,omitempty"`
+	// Application FTL application configuration
+	Application struct {
+		// Access Access control mode
+		Access *CreateDeploymentRequestApplicationAccess `json:"access,omitempty"`
 
-	// Components List of components to deploy with the application
-	Components []struct {
-		// AllowedHosts Allowed host patterns for the component
-		AllowedHosts *[]string `json:"allowedHosts,omitempty"`
+		// Auth Authentication configuration
+		Auth *struct {
+			JwtAudience *string                                         `json:"jwt_audience,omitempty"`
+			JwtIssuer   *string                                         `json:"jwt_issuer,omitempty"`
+			OrgId       *string                                         `json:"org_id,omitempty"`
+			Provider    *CreateDeploymentRequestApplicationAuthProvider `json:"provider,omitempty"`
+		} `json:"auth,omitempty"`
 
-		// ComponentName Component name
-		ComponentName string `json:"componentName"`
+		// Components Application components
+		Components *[]struct {
+			// Id Component ID
+			Id string `json:"id"`
 
-		// Tag Component version tag
-		Tag string `json:"tag"`
-	} `json:"components"`
+			// Source Registry reference to pushed component (components must be pushed to ECR first)
+			Source struct {
+				// Package Package path (e.g., app123abc/graph)
+				Package string `json:"package"`
 
-	// CustomAuth Required auth configuration when accessControl is "custom"
-	CustomAuth *struct {
-		// Audience Expected audience(s) for tokens - must be a non-empty array
-		Audience []string `json:"audience"`
+				// Registry ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)
+				Registry string `json:"registry"`
 
-		// Issuer Token issuer URL
-		Issuer string `json:"issuer"`
-	} `json:"customAuth,omitempty"`
+				// Version Component version (e.g., 0.1.0)
+				Version string `json:"version"`
+			} `json:"source"`
 
-	// Variables Environment variables and optional MCP auth variables for custom mode
+			// Variables Component-specific variables
+			Variables *map[string]string `json:"variables,omitempty"`
+		} `json:"components,omitempty"`
+
+		// Description Application description
+		Description *string `json:"description,omitempty"`
+
+		// Name Application name
+		Name string `json:"name"`
+
+		// Variables Application variables
+		Variables *map[string]string `json:"variables,omitempty"`
+
+		// Version Application version
+		Version *string `json:"version,omitempty"`
+	} `json:"application"`
+
+	// Auth Auth configuration override
+	Auth *struct {
+		JwtAudience *string                              `json:"jwt_audience,omitempty"`
+		JwtIssuer   *string                              `json:"jwt_issuer,omitempty"`
+		OrgId       *string                              `json:"org_id,omitempty"`
+		Provider    *CreateDeploymentRequestAuthProvider `json:"provider,omitempty"`
+	} `json:"auth,omitempty"`
+
+	// Environment Deployment environment
+	Environment *CreateDeploymentRequestEnvironment `json:"environment,omitempty"`
+
+	// Variables Environment-specific variables
 	Variables *map[string]string `json:"variables,omitempty"`
 }
 
-// CreateDeploymentRequestAccessControl Access control mode for the application
-type CreateDeploymentRequestAccessControl string
+// CreateDeploymentRequestAccess Access control override
+type CreateDeploymentRequestAccess string
 
-// CreateDeploymentResponse Response for successful deployment creation
+// CreateDeploymentRequestApplicationAccess Access control mode
+type CreateDeploymentRequestApplicationAccess string
+
+// CreateDeploymentRequestApplicationAuthProvider defines model for CreateDeploymentRequest.Application.Auth.Provider.
+type CreateDeploymentRequestApplicationAuthProvider string
+
+// CreateDeploymentRequestAuthProvider defines model for CreateDeploymentRequest.Auth.Provider.
+type CreateDeploymentRequestAuthProvider string
+
+// CreateDeploymentRequestEnvironment Deployment environment
+type CreateDeploymentRequestEnvironment string
+
+// CreateDeploymentResponseBody Response for successful deployment creation
 type CreateDeploymentResponseBody struct {
-	AppId        openapi_types.UUID `json:"appId"`
-	AppName      string             `json:"appName"`
-	DeploymentId openapi_types.UUID `json:"deploymentId"`
-	Message      string             `json:"message"`
-	Status       string             `json:"status"`
+	// AppId Application identifier
+	AppId string `json:"appId"`
+
+	// AppName Application name
+	AppName string `json:"appName"`
+
+	// AppUrl Application URL once deployed
+	AppUrl *string `json:"appUrl,omitempty"`
+
+	// DeploymentId Unique deployment identifier
+	DeploymentId string `json:"deploymentId"`
+
+	// Message Status message
+	Message string `json:"message"`
+
+	// Status Deployment status
+	Status CreateDeploymentResponseBodyStatus `json:"status"`
 }
+
+// CreateDeploymentResponseBodyStatus Deployment status
+type CreateDeploymentResponseBodyStatus string
 
 // CreateEcrTokenRequest Request body for creating ECR token
 type CreateEcrTokenRequest struct {
 	// AppId Application ID to create ECR token for
 	AppId openapi_types.UUID `json:"appId"`
+
+	// Components Component names to create/ensure repositories for
+	Components []string `json:"components"`
 }
 
-// CreateEcrTokenResponse ECR token response
+// CreateEcrTokenResponseBody ECR token response with app-scoped credentials
 type CreateEcrTokenResponseBody struct {
+	// AppId Original app UUID for reference
+	AppId *string `json:"appId,omitempty"`
+
+	// AuthorizationToken Base64 encoded username:password for Docker login
 	AuthorizationToken string `json:"authorizationToken"`
-	ExpiresAt          string `json:"expiresAt"`
-	ProxyEndpoint      string `json:"proxyEndpoint"`
-	Region             string `json:"region"`
-	RegistryUri        string `json:"registryUri"`
+
+	// ExpiresAt Token expiration time in ISO 8601 format
+	ExpiresAt string `json:"expiresAt"`
+
+	// PackageNamespace Sanitized namespace for spin deps publish commands
+	PackageNamespace *string `json:"packageNamespace,omitempty"`
+
+	// ProxyEndpoint Full ECR endpoint URL
+	ProxyEndpoint string `json:"proxyEndpoint"`
+
+	// Region AWS region
+	Region string `json:"region"`
+
+	// RegistryUri ECR registry URI without https://
+	RegistryUri string `json:"registryUri"`
 }
 
-// DeleteAppResponse Response for successful app deletion
+// DeleteAppResponseBody Response for successful app deletion
 type DeleteAppResponseBody struct {
 	Message string `json:"message"`
 }
@@ -203,7 +316,7 @@ type ErrorResponse struct {
 	Message string         `json:"message"`
 }
 
-// GetAppLogsResponse Application logs response
+// GetAppLogsResponseBody Application logs response
 type GetAppLogsResponseBody struct {
 	// AppId Application ID
 	AppId openapi_types.UUID `json:"appId"`
@@ -219,7 +332,7 @@ type GetAppLogsResponseBody struct {
 	} `json:"metadata"`
 }
 
-// GetUserOrgsResponse List of user organizations
+// GetUserOrgsResponseBody List of user organizations
 type GetUserOrgsResponseBody struct {
 	// Organizations List of organizations the user belongs to
 	Organizations []struct {
@@ -231,35 +344,35 @@ type GetUserOrgsResponseBody struct {
 	} `json:"organizations"`
 }
 
-// ListAppsResponse List of applications with pagination
+// ListAppsResponseBody List of applications with pagination
 type ListAppsResponseBody struct {
 	Apps []struct {
-		AccessControl *ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-		AllowedRoles  *[]string                          `json:"allowedRoles,omitempty"`
-		AppId         openapi_types.UUID                 `json:"appId"`
-		AppName       string                             `json:"appName"`
-		CreatedAt     string                             `json:"createdAt"`
+		AccessControl *ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+		AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+		AppId         openapi_types.UUID                     `json:"appId"`
+		AppName       string                                 `json:"appName"`
+		CreatedAt     string                                 `json:"createdAt"`
 		CustomAuth    *struct {
 			Audience string `json:"audience"`
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
-		OrgId         *string                    `json:"orgId,omitempty"`
-		ProviderError *string                    `json:"providerError,omitempty"`
-		ProviderUrl   *string                    `json:"providerUrl,omitempty"`
-		Status        ListAppsResponseAppsStatus `json:"status"`
-		UpdatedAt     string                     `json:"updatedAt"`
+		OrgId         *string                        `json:"orgId,omitempty"`
+		ProviderError *string                        `json:"providerError,omitempty"`
+		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+		Status        ListAppsResponseBodyAppsStatus `json:"status"`
+		UpdatedAt     string                         `json:"updatedAt"`
 	} `json:"apps"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
-// ListAppsResponseAppsAccessControl defines model for ListAppsResponse.Apps.AccessControl.
-type ListAppsResponseAppsAccessControl string
+// ListAppsResponseBodyAppsAccessControl defines model for ListAppsResponseBody.Apps.AccessControl.
+type ListAppsResponseBodyAppsAccessControl string
 
-// ListAppsResponseAppsStatus defines model for ListAppsResponse.Apps.Status.
-type ListAppsResponseAppsStatus string
+// ListAppsResponseBodyAppsStatus defines model for ListAppsResponseBody.Apps.Status.
+type ListAppsResponseBodyAppsStatus string
 
-// ListComponentsResponse List of components for an app
-type ListComponentsResponse struct {
+// ListComponentsResponseBody List of components for an app
+type ListComponentsResponseBody struct {
 	AppId      openapi_types.UUID `json:"appId"`
 	AppName    string             `json:"appName"`
 	Components []struct {
@@ -278,7 +391,7 @@ type UpdateComponentsRequest struct {
 	} `json:"components"`
 }
 
-// UpdateComponentsResponse Response for successful components update
+// UpdateComponentsResponseBody Response for successful components update
 type UpdateComponentsResponseBody struct {
 	Changes struct {
 		Created []string `json:"created"`
@@ -1432,7 +1545,7 @@ func (r GetAppResponse) StatusCode() int {
 type ListAppComponentsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ListComponentsResponse
+	JSON200      *ListComponentsResponseBody
 	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
@@ -1912,7 +2025,7 @@ func ParseListAppComponentsResponse(rsp *http.Response) (*ListAppComponentsRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ListComponentsResponse
+		var dest ListComponentsResponseBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

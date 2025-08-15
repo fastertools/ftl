@@ -135,7 +135,8 @@ func TestDisplayAppStatusJSON(t *testing.T) {
 	colorOutput = &buf
 	defer func() { colorOutput = oldOutput }()
 
-	err := displayAppStatusJSON(app)
+	dw := NewDataWriter(&buf, "json")
+	err := dw.WriteStruct(app)
 	require.NoError(t, err)
 
 	// Verify JSON output
@@ -270,7 +271,7 @@ func TestStatusTableFormatting(t *testing.T) {
 
 	output := buf.String()
 	lines := strings.Split(output, "\n")
-	
+
 	// Check that indentation is consistent
 	for _, line := range lines {
 		if strings.Contains(line, ":") && !strings.Contains(line, "Application Details") {
@@ -301,7 +302,7 @@ func TestStatusMinimalApp(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "minimal")
 	assert.Contains(t, output, "ACTIVE")
-	assert.NotContains(t, output, "URL:")     // Should not show if nil
-	assert.NotContains(t, output, "Access:")  // Should not show if nil
-	assert.NotContains(t, output, "Error:")   // Should not show if nil
+	assert.NotContains(t, output, "URL:")    // Should not show if nil
+	assert.NotContains(t, output, "Access:") // Should not show if nil
+	assert.NotContains(t, output, "Error:")  // Should not show if nil
 }

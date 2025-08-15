@@ -14,7 +14,7 @@ func TestIsInteractive(t *testing.T) {
 	// This function checks if stdin is a terminal
 	// The result will vary based on test environment
 	result := isInteractive()
-	
+
 	// Just verify it returns a boolean without panicking
 	assert.IsType(t, bool(true), result)
 }
@@ -62,7 +62,7 @@ func TestDeleteDisplayOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			
+
 			// Simulate the delete display output
 			buf.WriteString("Application to be deleted:\n")
 			buf.WriteString("  Name: " + tt.app.AppName + "\n")
@@ -70,7 +70,7 @@ func TestDeleteDisplayOutput(t *testing.T) {
 			if tt.app.ProviderUrl != nil && *tt.app.ProviderUrl != "" {
 				buf.WriteString("  URL: " + *tt.app.ProviderUrl + "\n")
 			}
-			
+
 			output := buf.String()
 			for _, expected := range tt.expected {
 				assert.Contains(t, output, expected)
@@ -128,7 +128,7 @@ func TestDeleteConfirmationLogic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the logic of confirmation
 			shouldProceed := tt.userInput == tt.appName
-			assert.Equal(t, tt.shouldProceed, shouldProceed, 
+			assert.Equal(t, tt.shouldProceed, shouldProceed,
 				"For app '%s' with input '%s', should proceed: %v",
 				tt.appName, tt.userInput, tt.shouldProceed)
 		})
@@ -167,11 +167,11 @@ func TestDeleteWithForceFlag(t *testing.T) {
 
 func TestDeleteSuccessMessage(t *testing.T) {
 	var buf bytes.Buffer
-	
+
 	// Simulate successful deletion
 	buf.WriteString("ℹ Deleting application...\n")
 	buf.WriteString("✓ Application deleted successfully\n")
-	
+
 	output := buf.String()
 	assert.Contains(t, output, "Deleting application")
 	assert.Contains(t, output, "Application deleted successfully")
@@ -179,10 +179,10 @@ func TestDeleteSuccessMessage(t *testing.T) {
 
 func TestDeleteCancellation(t *testing.T) {
 	var buf bytes.Buffer
-	
+
 	// Simulate cancellation
 	buf.WriteString("Deletion cancelled.\n")
-	
+
 	output := buf.String()
 	assert.Contains(t, output, "Deletion cancelled")
 }
@@ -232,15 +232,15 @@ func TestDeleteErrorMessages(t *testing.T) {
 func TestDeleteAppStates(t *testing.T) {
 	// Test that delete works for apps in various states
 	states := []struct {
-		status   api.AppStatus
+		status    api.AppStatus
 		canDelete bool
 	}{
 		{api.AppStatusACTIVE, true},
 		{api.AppStatusFAILED, true},
 		{api.AppStatusPENDING, true},
 		{api.AppStatusCREATING, true},
-		{api.AppStatusDELETING, true},  // Already deleting
-		{api.AppStatusDELETED, true},   // Already deleted
+		{api.AppStatusDELETING, true}, // Already deleting
+		{api.AppStatusDELETED, true},  // Already deleted
 	}
 
 	for _, st := range states {
@@ -252,7 +252,7 @@ func TestDeleteAppStates(t *testing.T) {
 				CreatedAt: "2024-01-01T00:00:00Z",
 				UpdatedAt: "2024-01-01T00:00:00Z",
 			}
-			
+
 			// All states should be deletable (the API decides)
 			assert.True(t, st.canDelete, "App in status %s should be deletable", st.status)
 			assert.NotNil(t, app)
@@ -310,14 +310,14 @@ func TestDeleteCommandIntegration(t *testing.T) {
 			CreatedAt: "2024-01-01T00:00:00Z",
 			UpdatedAt: "2024-01-01T00:00:00Z",
 		}
-		
+
 		force := true
-		
+
 		// With force=true, deletion should proceed without confirmation
 		assert.True(t, force)
 		assert.NotNil(t, app)
 	})
-	
+
 	t.Run("delete with confirmation", func(t *testing.T) {
 		app := &api.App{
 			AppId:     uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
@@ -326,10 +326,10 @@ func TestDeleteCommandIntegration(t *testing.T) {
 			CreatedAt: "2024-01-01T00:00:00Z",
 			UpdatedAt: "2024-01-01T00:00:00Z",
 		}
-		
+
 		force := false
 		userInput := "confirm-test"
-		
+
 		// Confirmation matches app name
 		shouldDelete := !force && (userInput == app.AppName)
 		assert.True(t, shouldDelete)
