@@ -16,19 +16,23 @@ require (
 
 require (
 	cuelang.org/go v0.14.1
+	github.com/briandowns/spinner v1.23.2
 	github.com/fastertools/ftl-cli/go/shared v0.0.0
 	github.com/fastertools/ftl-cli/go/shared/auth v0.0.0
+	github.com/fastertools/ftl-cli/go/shared/ftl v0.0.0-00010101000000-000000000000
+	github.com/google/uuid v1.6.0
 )
 
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/aws/aws-lambda-go v1.41.0 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/proto v1.14.2 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
@@ -38,6 +42,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/oapi-codegen/runtime v1.1.2 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20250627152318-f293424e46b5 // indirect
@@ -47,6 +52,7 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.7 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/zalando/go-keyring v0.2.6 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
@@ -55,7 +61,6 @@ require (
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
 
@@ -63,3 +68,9 @@ replace (
 	github.com/fastertools/ftl-cli/go/shared => ../shared
 	github.com/fastertools/ftl-cli/go/shared/auth => ../shared/auth
 )
+
+replace github.com/fastertools/ftl-cli/go/shared/ftl => ../shared/ftl
+
+replace github.com/fastertools/ftl-cli/go/shared/api => ../shared/api
+
+replace github.com/fastertools/ftl-cli/go/shared/config => ../shared/config
