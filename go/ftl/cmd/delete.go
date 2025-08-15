@@ -57,7 +57,7 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 
 	// Get app details first to show what will be deleted
 	var app *api.App
-	
+
 	// Try to parse as UUID
 	if _, err := uuid.Parse(appIdentifier); err == nil {
 		// It's a UUID, get app directly
@@ -73,11 +73,11 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 		if err != nil {
 			return fmt.Errorf("failed to list apps: %w", err)
 		}
-		
+
 		if len(response.Apps) == 0 {
 			return fmt.Errorf("application '%s' not found", appIdentifier)
 		}
-		
+
 		// Get full details using the UUID
 		appID := response.Apps[0].AppId.String()
 		app, err = apiClient.GetApp(ctx, appID)
@@ -86,14 +86,18 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 		}
 	}
 
-	// Display what will be deleted
+	// Display what will be deleted using shared DataWriter
 	color.Yellow("Application to be deleted:")
-	fmt.Printf("  Name: %s\n", app.AppName)
-	fmt.Printf("  ID: %s\n", app.AppId.String())
+	dw := NewDataWriter(colorOutput, "table")
+	kvb := NewKeyValueBuilder("")
+	kvb.Add("Name", app.AppName)
+	kvb.Add("ID", app.AppId.String())
 	if app.ProviderUrl != nil && *app.ProviderUrl != "" {
-		fmt.Printf("  URL: %s\n", *app.ProviderUrl)
+		kvb.Add("URL", *app.ProviderUrl)
 	}
-	fmt.Println()
+	if err := kvb.Write(dw); err != nil {
+		return fmt.Errorf("failed to display app details: %w", err)
+	}
 
 	// Ask for confirmation unless --force is used
 	if !force {
@@ -103,17 +107,17 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 		}
 
 		color.New(color.FgRed, color.Bold).Println("⚠️  This action cannot be undone!")
-		
+
 		// Ask user to type the app name to confirm
 		prompt := &survey.Input{
 			Message: fmt.Sprintf("Type '%s' to confirm deletion:", app.AppName),
 		}
-		
+
 		var confirmation string
 		if err := survey.AskOne(prompt, &confirmation); err != nil {
 			return fmt.Errorf("failed to get confirmation: %w", err)
 		}
-		
+
 		if confirmation != app.AppName {
 			color.Yellow("Deletion cancelled.")
 			return nil
@@ -122,14 +126,14 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 
 	// Perform deletion
 	Info("Deleting application...")
-	
+
 	err = apiClient.DeleteApp(ctx, app.AppId.String())
 	if err != nil {
 		return fmt.Errorf("failed to delete app: %w", err)
 	}
 
 	Success("Application deleted successfully")
-	
+
 	return nil
 }
 

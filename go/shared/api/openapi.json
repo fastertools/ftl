@@ -48,9 +48,7 @@
         "operationId": "listApps",
         "summary": "List applications",
         "description": "Retrieves a paginated list of all applications for the authenticated user",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -104,7 +102,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListAppsResponse"
+                  "$ref": "#/components/schemas/ListAppsResponseBody"
                 }
               }
             }
@@ -145,9 +143,7 @@
         "operationId": "createApp",
         "summary": "Create a new application",
         "description": "Creates a new application resource. The app can then be deployed by calling the deployment endpoint.",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -177,7 +173,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateAppResponse"
+                  "$ref": "#/components/schemas/CreateAppResponseBody"
                 }
               }
             }
@@ -230,9 +226,7 @@
         "operationId": "createDeployment",
         "summary": "Create a new deployment",
         "description": "Triggers a new deployment for an application. If the app does not exist, it will be created automatically. This operation is asynchronous and returns immediately while the deployment runs in the background.",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -276,7 +270,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateDeploymentResponse"
+                  "$ref": "#/components/schemas/CreateDeploymentResponseBody"
                 }
               }
             }
@@ -319,9 +313,7 @@
         "operationId": "getApp",
         "summary": "Get application details",
         "description": "Retrieves detailed information for a specific application by ID",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -395,9 +387,7 @@
         "operationId": "deleteApp",
         "summary": "Delete an application",
         "description": "Permanently deletes an application and triggers cleanup on the provider",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -430,7 +420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteAppResponse"
+                  "$ref": "#/components/schemas/DeleteAppResponseBody"
                 }
               }
             }
@@ -473,9 +463,7 @@
         "operationId": "createEcrToken",
         "summary": "Create ECR authorization token",
         "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories under the specified app namespace",
-        "tags": [
-          "Registry"
-        ],
+        "tags": ["Registry"],
         "parameters": [
           {
             "in": "header",
@@ -505,7 +493,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateEcrTokenResponse"
+                  "$ref": "#/components/schemas/CreateEcrTokenResponseBody"
                 }
               }
             }
@@ -538,9 +526,7 @@
         "operationId": "getUserOrgs",
         "summary": "Get user organizations",
         "description": "Retrieves a list of organizations the authenticated user belongs to",
-        "tags": [
-          "User"
-        ],
+        "tags": ["User"],
         "parameters": [
           {
             "in": "header",
@@ -560,7 +546,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetUserOrgsResponse"
+                  "$ref": "#/components/schemas/GetUserOrgsResponseBody"
                 }
               }
             }
@@ -593,9 +579,7 @@
         "operationId": "listAppComponents",
         "summary": "List components for an app",
         "description": "Retrieves a list of all components for a specific application",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -628,7 +612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListComponentsResponse"
+                  "$ref": "#/components/schemas/ListComponentsResponseBody"
                 }
               }
             }
@@ -669,9 +653,7 @@
         "operationId": "updateComponents",
         "summary": "Update components for an app",
         "description": "Sets the desired state of components for an application. Components not in the list will be removed. This is an idempotent operation.",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -714,7 +696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UpdateComponentsResponse"
+                  "$ref": "#/components/schemas/UpdateComponentsResponseBody"
                 }
               }
             }
@@ -767,9 +749,7 @@
         "operationId": "getAppLogs",
         "summary": "Get application logs",
         "description": "Retrieves recent logs for an application from the underlying platform",
-        "tags": [
-          "Apps"
-        ],
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -827,7 +807,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetAppLogsResponse"
+                  "$ref": "#/components/schemas/GetAppLogsResponseBody"
                 }
               }
             }
@@ -902,107 +882,146 @@
             "description": "Access control mode for the application",
             "default": "private",
             "type": "string",
-            "enum": [
-              "public",
-              "private",
-              "org",
-              "custom"
-            ]
+            "enum": ["public", "private", "org", "custom"]
           }
         },
-        "required": [
-          "appName"
-        ]
+        "required": ["appName"]
       },
       "CreateDeploymentRequest": {
         "description": "Request body for creating a deployment",
         "type": "object",
         "properties": {
-          "components": {
-            "description": "List of components to deploy with the application",
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "componentName": {
-                  "description": "Component name",
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 50
-                },
-                "tag": {
-                  "description": "Component version tag",
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
-                },
-                "allowedHosts": {
-                  "description": "Allowed host patterns for the component",
-                  "type": "array",
-                  "items": {
+          "application": {
+            "description": "FTL application configuration",
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Application name",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "version": {
+                "description": "Application version",
+                "type": "string"
+              },
+              "description": {
+                "description": "Application description",
+                "type": "string"
+              },
+              "components": {
+                "description": "Application components",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "description": "Component ID",
+                      "type": "string"
+                    },
+                    "source": {
+                      "description": "Registry reference to pushed component (components must be pushed to ECR first)",
+                      "type": "object",
+                      "properties": {
+                        "registry": {
+                          "description": "ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)",
+                          "type": "string"
+                        },
+                        "package": {
+                          "description": "Package path (e.g., app123abc/graph)",
+                          "type": "string"
+                        },
+                        "version": {
+                          "description": "Component version (e.g., 0.1.0)",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["registry", "package", "version"]
+                    },
+                    "variables": {
+                      "description": "Component-specific variables",
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["id", "source"]
+                }
+              },
+              "access": {
+                "description": "Access control mode",
+                "type": "string",
+                "enum": ["public", "private", "org", "custom"]
+              },
+              "auth": {
+                "description": "Authentication configuration",
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["workos", "custom"]
+                  },
+                  "org_id": {
+                    "type": "string"
+                  },
+                  "jwt_issuer": {
+                    "type": "string"
+                  },
+                  "jwt_audience": {
                     "type": "string"
                   }
                 }
               },
-              "required": [
-                "componentName",
-                "tag"
-              ]
-            }
+              "variables": {
+                "description": "Application variables",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["name"]
           },
           "variables": {
-            "description": "Environment variables and optional MCP auth variables for custom mode",
+            "description": "Environment-specific variables",
             "type": "object",
             "additionalProperties": {
               "type": "string"
             }
           },
-          "accessControl": {
-            "description": "Access control mode for the application",
+          "environment": {
+            "description": "Deployment environment",
+            "default": "production",
             "type": "string",
-            "enum": [
-              "public",
-              "private",
-              "org",
-              "custom"
-            ]
+            "enum": ["development", "staging", "production"]
           },
-          "allowedRoles": {
-            "description": "For org mode: list of roles that can access this app (e.g., [\"admin\", \"developer\"])",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "access": {
+            "description": "Access control override",
+            "type": "string",
+            "enum": ["public", "private", "org", "custom"]
           },
-          "customAuth": {
-            "description": "Required auth configuration when accessControl is \"custom\"",
+          "auth": {
+            "description": "Auth configuration override",
             "type": "object",
             "properties": {
-              "issuer": {
-                "description": "Token issuer URL",
+              "provider": {
                 "type": "string",
-                "minLength": 1
+                "enum": ["workos", "custom"]
               },
-              "audience": {
-                "description": "Expected audience(s) for tokens - must be a non-empty array",
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                }
+              "org_id": {
+                "type": "string"
+              },
+              "jwt_issuer": {
+                "type": "string"
+              },
+              "jwt_audience": {
+                "type": "string"
               }
-            },
-            "required": [
-              "issuer",
-              "audience"
-            ]
+            }
           }
         },
-        "required": [
-          "components"
-        ]
+        "required": ["application"]
       },
       "CreateEcrTokenRequest": {
         "description": "Request body for creating ECR token",
@@ -1013,11 +1032,17 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          },
+          "components": {
+            "description": "Component names to create/ensure repositories for",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "required": [
-          "appId"
-        ]
+        "required": ["appId", "components"]
       },
       "UpdateComponentsRequest": {
         "description": "Request body for updating components",
@@ -1039,17 +1064,13 @@
                   "maxLength": 500
                 }
               },
-              "required": [
-                "componentName"
-              ]
+              "required": ["componentName"]
             }
           }
         },
-        "required": [
-          "components"
-        ]
+        "required": ["components"]
       },
-      "ListAppsResponse": {
+      "ListAppsResponseBody": {
         "description": "List of applications with pagination",
         "type": "object",
         "properties": {
@@ -1068,14 +1089,7 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "PENDING",
-                    "CREATING",
-                    "ACTIVE",
-                    "FAILED",
-                    "DELETING",
-                    "DELETED"
-                  ]
+                  "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
                 },
                 "providerUrl": {
                   "type": "string",
@@ -1086,12 +1100,7 @@
                 },
                 "accessControl": {
                   "type": "string",
-                  "enum": [
-                    "public",
-                    "private",
-                    "org",
-                    "custom"
-                  ]
+                  "enum": ["public", "private", "org", "custom"]
                 },
                 "orgId": {
                   "type": "string"
@@ -1112,10 +1121,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "issuer",
-                    "audience"
-                  ],
+                  "required": ["issuer", "audience"],
                   "additionalProperties": false
                 },
                 "createdAt": {
@@ -1125,13 +1131,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "appId",
-                "appName",
-                "status",
-                "createdAt",
-                "updatedAt"
-              ],
+              "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
               "additionalProperties": false
             }
           },
@@ -1139,9 +1139,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "apps"
-        ],
+        "required": ["apps"],
         "additionalProperties": false
       },
       "ErrorResponse": {
@@ -1159,12 +1157,10 @@
             "items": {}
           }
         },
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "additionalProperties": false
       },
-      "CreateAppResponse": {
+      "CreateAppResponseBody": {
         "description": "Response for successful app creation",
         "type": "object",
         "properties": {
@@ -1178,14 +1174,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "CREATING",
-              "ACTIVE",
-              "FAILED",
-              "DELETING",
-              "DELETED"
-            ]
+            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
           },
           "createdAt": {
             "type": "string"
@@ -1194,47 +1183,40 @@
             "type": "string"
           }
         },
-        "required": [
-          "appId",
-          "appName",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
+        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
         "additionalProperties": false
       },
-      "CreateDeploymentResponse": {
+      "CreateDeploymentResponseBody": {
         "description": "Response for successful deployment creation",
         "type": "object",
         "properties": {
           "deploymentId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            "description": "Unique deployment identifier",
+            "type": "string"
           },
           "appId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            "description": "Application identifier",
+            "type": "string"
           },
           "appName": {
+            "description": "Application name",
             "type": "string"
           },
           "status": {
+            "description": "Deployment status",
             "type": "string",
-            "const": "DEPLOYING"
+            "enum": ["DEPLOYING", "DEPLOYED", "FAILED"]
           },
           "message": {
+            "description": "Status message",
+            "type": "string"
+          },
+          "appUrl": {
+            "description": "Application URL once deployed",
             "type": "string"
           }
         },
-        "required": [
-          "deploymentId",
-          "appId",
-          "appName",
-          "status",
-          "message"
-        ],
+        "required": ["deploymentId", "appId", "appName", "status", "message"],
         "additionalProperties": false
       },
       "App": {
@@ -1251,14 +1233,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "CREATING",
-              "ACTIVE",
-              "FAILED",
-              "DELETING",
-              "DELETED"
-            ]
+            "enum": ["PENDING", "CREATING", "ACTIVE", "FAILED", "DELETING", "DELETED"]
           },
           "providerUrl": {
             "type": "string",
@@ -1269,12 +1244,7 @@
           },
           "accessControl": {
             "type": "string",
-            "enum": [
-              "public",
-              "private",
-              "org",
-              "custom"
-            ]
+            "enum": ["public", "private", "org", "custom"]
           },
           "orgId": {
             "type": "string"
@@ -1295,10 +1265,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "issuer",
-              "audience"
-            ],
+            "required": ["issuer", "audience"],
             "additionalProperties": false
           },
           "createdAt": {
@@ -1308,16 +1275,10 @@
             "type": "string"
           }
         },
-        "required": [
-          "appId",
-          "appName",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
+        "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
         "additionalProperties": false
       },
-      "DeleteAppResponse": {
+      "DeleteAppResponseBody": {
         "description": "Response for successful app deletion",
         "type": "object",
         "properties": {
@@ -1325,42 +1286,47 @@
             "type": "string"
           }
         },
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "additionalProperties": false
       },
-      "CreateEcrTokenResponse": {
-        "description": "ECR token response",
+      "CreateEcrTokenResponseBody": {
+        "description": "ECR token response with app-scoped credentials",
         "type": "object",
         "properties": {
           "registryUri": {
+            "description": "ECR registry URI without https://",
             "type": "string"
           },
           "authorizationToken": {
+            "description": "Base64 encoded username:password for Docker login",
             "type": "string"
           },
           "proxyEndpoint": {
+            "description": "Full ECR endpoint URL",
             "type": "string",
             "format": "uri"
           },
           "expiresAt": {
+            "description": "Token expiration time in ISO 8601 format",
             "type": "string"
           },
           "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "packageNamespace": {
+            "description": "Sanitized namespace for spin deps publish commands",
+            "type": "string"
+          },
+          "appId": {
+            "description": "Original app UUID for reference",
             "type": "string"
           }
         },
-        "required": [
-          "registryUri",
-          "authorizationToken",
-          "proxyEndpoint",
-          "expiresAt",
-          "region"
-        ],
+        "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
         "additionalProperties": false
       },
-      "GetUserOrgsResponse": {
+      "GetUserOrgsResponseBody": {
         "description": "List of user organizations",
         "type": "object",
         "properties": {
@@ -1379,20 +1345,15 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id",
-                "name"
-              ],
+              "required": ["id", "name"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "organizations"
-        ],
+        "required": ["organizations"],
         "additionalProperties": false
       },
-      "ListComponentsResponse": {
+      "ListComponentsResponseBody": {
         "description": "List of components for an app",
         "type": "object",
         "properties": {
@@ -1422,21 +1383,15 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "componentName"
-              ],
+              "required": ["componentName"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "appId",
-          "appName",
-          "components"
-        ],
+        "required": ["appId", "appName", "components"],
         "additionalProperties": false
       },
-      "UpdateComponentsResponse": {
+      "UpdateComponentsResponseBody": {
         "description": "Response for successful components update",
         "type": "object",
         "properties": {
@@ -1458,9 +1413,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "componentName"
-              ],
+              "required": ["componentName"],
               "additionalProperties": false
             }
           },
@@ -1486,21 +1439,14 @@
                 }
               }
             },
-            "required": [
-              "created",
-              "updated",
-              "removed"
-            ],
+            "required": ["created", "updated", "removed"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "components",
-          "changes"
-        ],
+        "required": ["components", "changes"],
         "additionalProperties": false
       },
-      "GetAppLogsResponse": {
+      "GetAppLogsResponseBody": {
         "description": "Application logs response",
         "type": "object",
         "properties": {
@@ -1526,18 +1472,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "tail",
-              "since"
-            ],
+            "required": ["tail", "since"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "appId",
-          "logs",
-          "metadata"
-        ],
+        "required": ["appId", "logs", "metadata"],
         "additionalProperties": false
       }
     },

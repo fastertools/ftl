@@ -31,7 +31,7 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					AppId:       uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 					AppName:     "active-app",
-					Status:      api.ACTIVE,
+					Status:      api.ListAppsResponseBodyAppsStatusACTIVE,
 					ProviderUrl: ptr("https://example.com"),
 					CreatedAt:   "2024-01-01T00:00:00Z",
 					UpdatedAt:   "2024-01-01T00:00:00Z",
@@ -39,23 +39,23 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					AppId:     uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
 					AppName:   "failed-app",
-					Status:    api.FAILED,
+					Status:    api.ListAppsResponseBodyAppsStatusFAILED,
 					CreatedAt: "2024-01-01T00:00:00Z",
 					UpdatedAt: "2024-01-01T00:00:00Z",
 				},
 				{
 					AppId:     uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
 					AppName:   "pending-app",
-					Status:    api.PENDING,
+					Status:    api.ListAppsResponseBodyAppsStatusPENDING,
 					CreatedAt: "2024-01-01T00:00:00Z",
 					UpdatedAt: "2024-01-01T00:00:00Z",
 				},
 			},
 			expected: []string{
-				"NAME", "ID", "STATUS", "URL",
-				"active-app", "123e4567-e89b-12d3-a456-426614174000", "ACTIVE", "https://example.com",
-				"failed-app", "223e4567-e89b-12d3-a456-426614174000", "FAILED",
-				"pending-app", "323e4567-e89b-12d3-a456-426614174000", "PENDING",
+				"NAME", "STATUS", "ACCESS", "URL", "CREATED",
+				"active-app", "ACTIVE", "https://example.com",
+				"failed-app", "FAILED",
+				"pending-app", "PENDING",
 				"Total: 3 applications",
 			},
 		},
@@ -65,14 +65,14 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					AppId:     uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 					AppName:   "solo-app",
-					Status:    api.ACTIVE,
+					Status:    api.ListAppsResponseBodyAppsStatusACTIVE,
 					CreatedAt: "2024-01-01T00:00:00Z",
 					UpdatedAt: "2024-01-01T00:00:00Z",
 				},
 			},
 			expected: []string{
-				"solo-app",
-				"123e4567-e89b-12d3-a456-426614174000",
+				"NAME", "STATUS", "ACCESS", "URL", "CREATED",
+				"solo-app", "ACTIVE",
 				"Total: 1 application", // singular
 			},
 			notWant: []string{
@@ -95,20 +95,20 @@ func TestDisplayAppsTable(t *testing.T) {
 
 			// Convert test data to actual type
 			apps := make([]struct {
-				AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-				AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-				AppId         uuid.UUID                               `json:"appId"`
-				AppName       string                                  `json:"appName"`
-				CreatedAt     string                                  `json:"createdAt"`
+				AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+				AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+				AppId         uuid.UUID                              `json:"appId"`
+				AppName       string                                 `json:"appName"`
+				CreatedAt     string                                 `json:"createdAt"`
 				CustomAuth    *struct {
 					Audience string `json:"audience"`
 					Issuer   string `json:"issuer"`
 				} `json:"customAuth,omitempty"`
-				OrgId         *string                                 `json:"orgId,omitempty"`
-				ProviderError *string                                 `json:"providerError,omitempty"`
-				ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-				Status        api.ListAppsResponseAppsStatus         `json:"status"`
-				UpdatedAt     string                                  `json:"updatedAt"`
+				OrgId         *string                        `json:"orgId,omitempty"`
+				ProviderError *string                        `json:"providerError,omitempty"`
+				ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+				Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+				UpdatedAt     string                         `json:"updatedAt"`
 			}, len(tt.apps))
 
 			for i, app := range tt.apps {
@@ -120,7 +120,8 @@ func TestDisplayAppsTable(t *testing.T) {
 				apps[i].UpdatedAt = app.UpdatedAt
 			}
 
-			err := displayAppsTable(apps)
+			dw := NewDataWriter(&buf, "table")
+			err := displayAppsTable(apps, false, dw) // not verbose
 			require.NoError(t, err)
 
 			output := buf.String()
@@ -139,7 +140,7 @@ func TestDisplayAppsJSON(t *testing.T) {
 		{
 			AppId:       uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 			AppName:     "test-app",
-			Status:      api.ACTIVE,
+			Status:      api.ListAppsResponseBodyAppsStatusACTIVE,
 			ProviderUrl: ptr("https://example.com"),
 			CreatedAt:   "2024-01-01T00:00:00Z",
 			UpdatedAt:   "2024-01-01T00:00:00Z",
@@ -147,7 +148,7 @@ func TestDisplayAppsJSON(t *testing.T) {
 		{
 			AppId:     uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
 			AppName:   "another-app",
-			Status:    api.PENDING,
+			Status:    api.ListAppsResponseBodyAppsStatusPENDING,
 			CreatedAt: "2024-01-02T00:00:00Z",
 			UpdatedAt: "2024-01-02T00:00:00Z",
 		},
@@ -160,20 +161,20 @@ func TestDisplayAppsJSON(t *testing.T) {
 
 	// Convert test data
 	actualApps := make([]struct {
-		AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-		AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-		AppId         uuid.UUID                               `json:"appId"`
-		AppName       string                                  `json:"appName"`
-		CreatedAt     string                                  `json:"createdAt"`
+		AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+		AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+		AppId         uuid.UUID                              `json:"appId"`
+		AppName       string                                 `json:"appName"`
+		CreatedAt     string                                 `json:"createdAt"`
 		CustomAuth    *struct {
 			Audience string `json:"audience"`
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
-		OrgId         *string                                 `json:"orgId,omitempty"`
-		ProviderError *string                                 `json:"providerError,omitempty"`
-		ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-		Status        api.ListAppsResponseAppsStatus         `json:"status"`
-		UpdatedAt     string                                  `json:"updatedAt"`
+		OrgId         *string                        `json:"orgId,omitempty"`
+		ProviderError *string                        `json:"providerError,omitempty"`
+		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+		Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+		UpdatedAt     string                         `json:"updatedAt"`
 	}, len(apps))
 
 	for i, app := range apps {
@@ -185,7 +186,8 @@ func TestDisplayAppsJSON(t *testing.T) {
 		actualApps[i].UpdatedAt = app.UpdatedAt
 	}
 
-	err := displayAppsJSON(actualApps)
+	dw := NewDataWriter(&buf, "json")
+	err := dw.WriteStruct(actualApps)
 	require.NoError(t, err)
 
 	// Verify JSON output
@@ -202,15 +204,15 @@ func TestDisplayAppsJSON(t *testing.T) {
 func TestListCommandColorCoding(t *testing.T) {
 	// Test that different statuses get different colors (when color is enabled)
 	statuses := []struct {
-		status   api.ListAppsResponseAppsStatus
+		status   api.ListAppsResponseBodyAppsStatus
 		contains string
 	}{
-		{api.ACTIVE, "ACTIVE"},
-		{api.FAILED, "FAILED"},
-		{api.PENDING, "PENDING"},
-		{api.CREATING, "CREATING"},
-		{api.DELETING, "DELETING"},
-		{api.DELETED, "DELETED"},
+		{api.ListAppsResponseBodyAppsStatusACTIVE, "ACTIVE"},
+		{api.ListAppsResponseBodyAppsStatusFAILED, "FAILED"},
+		{api.ListAppsResponseBodyAppsStatusPENDING, "PENDING"},
+		{api.ListAppsResponseBodyAppsStatusCREATING, "CREATING"},
+		{api.ListAppsResponseBodyAppsStatusDELETING, "DELETING"},
+		{api.ListAppsResponseBodyAppsStatusDELETED, "DELETED"},
 	}
 
 	for _, st := range statuses {
@@ -221,20 +223,20 @@ func TestListCommandColorCoding(t *testing.T) {
 			defer func() { colorOutput = oldOutput }()
 
 			apps := []struct {
-				AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-				AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-				AppId         uuid.UUID                               `json:"appId"`
-				AppName       string                                  `json:"appName"`
-				CreatedAt     string                                  `json:"createdAt"`
+				AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+				AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+				AppId         uuid.UUID                              `json:"appId"`
+				AppName       string                                 `json:"appName"`
+				CreatedAt     string                                 `json:"createdAt"`
 				CustomAuth    *struct {
 					Audience string `json:"audience"`
 					Issuer   string `json:"issuer"`
 				} `json:"customAuth,omitempty"`
-				OrgId         *string                                 `json:"orgId,omitempty"`
-				ProviderError *string                                 `json:"providerError,omitempty"`
-				ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-				Status        api.ListAppsResponseAppsStatus         `json:"status"`
-				UpdatedAt     string                                  `json:"updatedAt"`
+				OrgId         *string                        `json:"orgId,omitempty"`
+				ProviderError *string                        `json:"providerError,omitempty"`
+				ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+				Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+				UpdatedAt     string                         `json:"updatedAt"`
 			}{
 				{
 					AppId:     uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
@@ -245,7 +247,8 @@ func TestListCommandColorCoding(t *testing.T) {
 				},
 			}
 
-			err := displayAppsTable(apps)
+			dw := NewDataWriter(&buf, "table")
+			err := displayAppsTable(apps, false, dw) // not verbose
 			require.NoError(t, err)
 			assert.Contains(t, buf.String(), st.contains)
 		})
@@ -260,25 +263,26 @@ func TestListEmptyApps(t *testing.T) {
 	defer func() { colorOutput = oldOutput }()
 
 	apps := []struct {
-		AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-		AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-		AppId         uuid.UUID                               `json:"appId"`
-		AppName       string                                  `json:"appName"`
-		CreatedAt     string                                  `json:"createdAt"`
+		AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+		AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+		AppId         uuid.UUID                              `json:"appId"`
+		AppName       string                                 `json:"appName"`
+		CreatedAt     string                                 `json:"createdAt"`
 		CustomAuth    *struct {
 			Audience string `json:"audience"`
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
-		OrgId         *string                                 `json:"orgId,omitempty"`
-		ProviderError *string                                 `json:"providerError,omitempty"`
-		ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-		Status        api.ListAppsResponseAppsStatus         `json:"status"`
-		UpdatedAt     string                                  `json:"updatedAt"`
+		OrgId         *string                        `json:"orgId,omitempty"`
+		ProviderError *string                        `json:"providerError,omitempty"`
+		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+		Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+		UpdatedAt     string                         `json:"updatedAt"`
 	}{}
 
-	err := displayAppsTable(apps)
+	dw := NewDataWriter(&buf, "table")
+	err := displayAppsTable(apps, false, dw)
 	require.NoError(t, err)
-	
+
 	// Should still show header and total
 	output := buf.String()
 	assert.Contains(t, output, "NAME")
@@ -292,25 +296,25 @@ func TestListWithURLs(t *testing.T) {
 	defer func() { colorOutput = oldOutput }()
 
 	apps := []struct {
-		AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-		AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-		AppId         uuid.UUID                               `json:"appId"`
-		AppName       string                                  `json:"appName"`
-		CreatedAt     string                                  `json:"createdAt"`
+		AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+		AllowedRoles  *[]string                              `json:"allowedRoles,omitempty"`
+		AppId         uuid.UUID                              `json:"appId"`
+		AppName       string                                 `json:"appName"`
+		CreatedAt     string                                 `json:"createdAt"`
 		CustomAuth    *struct {
 			Audience string `json:"audience"`
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
-		OrgId         *string                                 `json:"orgId,omitempty"`
-		ProviderError *string                                 `json:"providerError,omitempty"`
-		ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-		Status        api.ListAppsResponseAppsStatus         `json:"status"`
-		UpdatedAt     string                                  `json:"updatedAt"`
+		OrgId         *string                        `json:"orgId,omitempty"`
+		ProviderError *string                        `json:"providerError,omitempty"`
+		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+		Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+		UpdatedAt     string                         `json:"updatedAt"`
 	}{
 		{
 			AppId:       uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 			AppName:     "with-url",
-			Status:      api.ACTIVE,
+			Status:      api.ListAppsResponseBodyAppsStatusACTIVE,
 			ProviderUrl: ptr("https://example.com"),
 			CreatedAt:   "2024-01-01T00:00:00Z",
 			UpdatedAt:   "2024-01-01T00:00:00Z",
@@ -318,13 +322,14 @@ func TestListWithURLs(t *testing.T) {
 		{
 			AppId:     uuid.MustParse("223e4567-e89b-12d3-a456-426614174000"),
 			AppName:   "without-url",
-			Status:    api.ACTIVE,
+			Status:    api.ListAppsResponseBodyAppsStatusACTIVE,
 			CreatedAt: "2024-01-01T00:00:00Z",
 			UpdatedAt: "2024-01-01T00:00:00Z",
 		},
 	}
 
-	err := displayAppsTable(apps)
+	dw := NewDataWriter(&buf, "table")
+	err := displayAppsTable(apps, false, dw)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -343,7 +348,7 @@ func TestListWithURLs(t *testing.T) {
 type appItem struct {
 	AppId         uuid.UUID
 	AppName       string
-	Status        api.ListAppsResponseAppsStatus
+	Status        api.ListAppsResponseBodyAppsStatus
 	ProviderUrl   *string
 	ProviderError *string
 	CreatedAt     string

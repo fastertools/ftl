@@ -193,7 +193,7 @@ func TestDeployCommand_LoadJSONConfig(t *testing.T) {
 	// TODO: Fix this test when loadConfig is available
 	// cfg, err := loadConfig("custom.json")
 	// require.NoError(t, err)
-	// 
+	//
 	// assert.Equal(t, "json-app", cfg.Application.Name)
 	// assert.Equal(t, "1.0.0", cfg.Application.Version)
 	// assert.Equal(t, "Test JSON app", cfg.Application.Description)

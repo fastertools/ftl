@@ -49,20 +49,20 @@ func newBuildCmd() *cobra.Command {
 			// Check if config file exists
 			if configFile != "" && !skipSynth {
 				if _, err := os.Stat(configFile); err == nil {
-				fmt.Printf("%s Synthesizing spin.toml from %s\n", blue("→"), configFile)
+					fmt.Printf("%s Synthesizing spin.toml from %s\n", blue("→"), configFile)
 
-				// Use unified synthesis helper
-				manifest, err := synthesis.SynthesizeFromConfig(configFile)
-				if err != nil {
-					return fmt.Errorf("synthesis failed: %w", err)
-				}
+					// Use unified synthesis helper
+					manifest, err := synthesis.SynthesizeFromConfig(configFile)
+					if err != nil {
+						return fmt.Errorf("synthesis failed: %w", err)
+					}
 
-				// Write spin.toml
-				if err := os.WriteFile("spin.toml", []byte(manifest), 0644); err != nil {
-					return fmt.Errorf("failed to write spin.toml: %w", err)
-				}
+					// Write spin.toml
+					if err := os.WriteFile("spin.toml", []byte(manifest), 0644); err != nil {
+						return fmt.Errorf("failed to write spin.toml: %w", err)
+					}
 
-				fmt.Printf("%s Generated spin.toml\n", green("✓"))
+					fmt.Printf("%s Generated spin.toml\n", green("✓"))
 				}
 			} else if configFile == "" && !skipSynth {
 				// No config file found, check for spin.toml

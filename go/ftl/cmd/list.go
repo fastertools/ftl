@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"text/tabwriter"
+	"strings"
 
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
@@ -16,6 +14,7 @@ import (
 
 func newListCmd() *cobra.Command {
 	var format string
+	var verbose bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -23,11 +22,12 @@ func newListCmd() *cobra.Command {
 		Long:  `List all FTL applications deployed on the platform.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			return runList(ctx, format)
+			return runList(ctx, format, verbose)
 		},
 	}
 
 	cmd.Flags().StringVarP(&format, "output", "o", "table", "Output format (table, json)")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details (app ID)")
 
 	return cmd
 }
@@ -35,7 +35,7 @@ func newListCmd() *cobra.Command {
 // Allow overriding for tests
 var runList = runListImpl
 
-func runListImpl(ctx context.Context, format string) error {
+func runListImpl(ctx context.Context, format string, verbose bool) error {
 	// Initialize auth manager
 	store, err := auth.NewKeyringStore()
 	if err != nil {
@@ -61,97 +61,101 @@ func runListImpl(ctx context.Context, format string) error {
 	}
 
 	if len(response.Apps) == 0 {
-		color.Yellow("No applications found.")
+		fmt.Fprintln(colorOutput, "No applications found.")
 		return nil
 	}
 
+	// Use shared DataWriter for consistent output
+	dw := NewDataWriter(colorOutput, format)
+
 	switch format {
 	case "json":
-		return displayAppsJSON(response.Apps)
+		return dw.WriteStruct(response.Apps)
 	case "table":
-		return displayAppsTable(response.Apps)
+		return displayAppsTable(response.Apps, verbose, dw)
 	default:
 		return fmt.Errorf("invalid output format: %s (use 'table' or 'json')", format)
 	}
 }
 
 func displayAppsTable(apps []struct {
-	AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-	AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-	AppId         uuid.UUID                               `json:"appId"`
-	AppName       string                                  `json:"appName"`
-	CreatedAt     string                                  `json:"createdAt"`
+	AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
+	AllowedRoles  *[]string                                   `json:"allowedRoles,omitempty"`
+	AppId         uuid.UUID                                   `json:"appId"`
+	AppName       string                                      `json:"appName"`
+	CreatedAt     string                                      `json:"createdAt"`
 	CustomAuth    *struct {
 		Audience string `json:"audience"`
 		Issuer   string `json:"issuer"`
 	} `json:"customAuth,omitempty"`
-	OrgId         *string                                 `json:"orgId,omitempty"`
-	ProviderError *string                                 `json:"providerError,omitempty"`
-	ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-	Status        api.ListAppsResponseAppsStatus         `json:"status"`
-	UpdatedAt     string                                  `json:"updatedAt"`
-}) error {
-	fmt.Fprintln(colorOutput)
-	
-	// Create a tabwriter for aligned output
-	w := tabwriter.NewWriter(colorOutput, 0, 0, 2, ' ', 0)
-	
-	// Print header
-	fmt.Fprintf(w, "NAME\tID\tSTATUS\tURL\n")
-	fmt.Fprintf(w, "----\t--\t------\t---\n")
-	
+	OrgId         *string                             `json:"orgId,omitempty"`
+	ProviderError *string                             `json:"providerError,omitempty"`
+	ProviderUrl   *string                             `json:"providerUrl,omitempty"`
+	Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
+	UpdatedAt     string                              `json:"updatedAt"`
+}, verbose bool, dw *DataWriter) error {
+	// Build headers
+	var headers []string
+	if verbose {
+		headers = []string{"NAME", "ID", "STATUS", "ACCESS", "URL", "CREATED"}
+	} else {
+		headers = []string{"NAME", "STATUS", "ACCESS", "URL", "CREATED"}
+	}
+
+	// Build table
+	tb := NewTableBuilder(headers...)
+
 	for _, app := range apps {
 		url := "-"
 		if app.ProviderUrl != nil && *app.ProviderUrl != "" {
 			url = *app.ProviderUrl
 		}
-		
-		statusColor := color.New(color.FgWhite)
-		switch app.Status {
-		case api.ACTIVE:
-			statusColor = color.New(color.FgGreen)
-		case api.FAILED:
-			statusColor = color.New(color.FgRed)
-		case api.PENDING, api.CREATING:
-			statusColor = color.New(color.FgYellow)
-		case api.DELETED, api.DELETING:
-			statusColor = color.New(color.FgHiBlack)
+
+		// Format access control
+		access := "public"
+		if app.AccessControl != nil {
+			access = strings.ToLower(string(*app.AccessControl))
 		}
-		
-		status := statusColor.Sprint(app.Status)
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", app.AppName, app.AppId.String(), status, url)
+
+		// If failed, show error in URL column
+		if app.Status == api.ListAppsResponseBodyAppsStatusFAILED {
+			if app.ProviderError != nil && *app.ProviderError != "" {
+				// Truncate long errors for table display
+				errMsg := *app.ProviderError
+				if len(errMsg) > 40 {
+					errMsg = errMsg[:37] + "..."
+				}
+				url = errMsg
+			}
+		}
+
+		// Format timestamp (just date for list view)
+		created := app.CreatedAt
+		if len(created) > 10 {
+			created = created[:10] // Just YYYY-MM-DD
+		}
+
+		// Add row based on verbose mode
+		if verbose {
+			tb.AddRow(app.AppName, app.AppId.String(), string(app.Status), access, url, created)
+		} else {
+			tb.AddRow(app.AppName, string(app.Status), access, url, created)
+		}
 	}
-	
-	w.Flush()
-	fmt.Fprintln(colorOutput)
-	
+
+	// Write the table
+	if err := tb.Write(dw); err != nil {
+		return err
+	}
+
 	count := len(apps)
 	plural := ""
 	if count != 1 {
 		plural = "s"
 	}
 	fmt.Fprintf(colorOutput, "Total: %d application%s\n", count, plural)
-	
+
 	return nil
 }
 
-func displayAppsJSON(apps []struct {
-	AccessControl *api.ListAppsResponseAppsAccessControl `json:"accessControl,omitempty"`
-	AllowedRoles  *[]string                               `json:"allowedRoles,omitempty"`
-	AppId         uuid.UUID                               `json:"appId"`
-	AppName       string                                  `json:"appName"`
-	CreatedAt     string                                  `json:"createdAt"`
-	CustomAuth    *struct {
-		Audience string `json:"audience"`
-		Issuer   string `json:"issuer"`
-	} `json:"customAuth,omitempty"`
-	OrgId         *string                                 `json:"orgId,omitempty"`
-	ProviderError *string                                 `json:"providerError,omitempty"`
-	ProviderUrl   *string                                 `json:"providerUrl,omitempty"`
-	Status        api.ListAppsResponseAppsStatus         `json:"status"`
-	UpdatedAt     string                                  `json:"updatedAt"`
-}) error {
-	encoder := json.NewEncoder(colorOutput)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(apps)
-}
+// displayAppsJSON is no longer needed - using shared DataWriter
