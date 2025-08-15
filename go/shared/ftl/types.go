@@ -12,12 +12,13 @@ import (
 // Application represents the FTL application configuration
 // This is the canonical schema that both CLI and platform use
 type Application struct {
-	Name        string      `json:"name" yaml:"name" cue:"name!"`
-	Version     string      `json:"version,omitempty" yaml:"version,omitempty" cue:"version"`
-	Description string      `json:"description,omitempty" yaml:"description,omitempty" cue:"description"`
-	Components  []Component `json:"components,omitempty" yaml:"components,omitempty" cue:"components"`
-	Access      AccessMode  `json:"access,omitempty" yaml:"access,omitempty" cue:"access"`
-	Auth        AuthConfig  `json:"auth,omitempty" yaml:"auth,omitempty" cue:"auth"`
+	Name        string            `json:"name" yaml:"name" cue:"name!"`
+	Version     string            `json:"version,omitempty" yaml:"version,omitempty" cue:"version"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty" cue:"description"`
+	Components  []Component       `json:"components,omitempty" yaml:"components,omitempty" cue:"components"`
+	Access      AccessMode        `json:"access,omitempty" yaml:"access,omitempty" cue:"access"`
+	Auth        AuthConfig        `json:"auth,omitempty" yaml:"auth,omitempty" cue:"auth"`
+	Variables   map[string]string `json:"variables,omitempty" yaml:"variables,omitempty" cue:"variables?"`
 }
 
 // Component represents a component in the FTL application
@@ -52,6 +53,24 @@ type RegistrySource struct {
 func (r *RegistrySource) IsLocal() bool                { return false }
 func (r *RegistrySource) GetPath() string              { return "" }
 func (r *RegistrySource) GetRegistry() *RegistrySource { return r }
+
+// AsRegistry attempts to cast ComponentSource to RegistrySource
+func AsRegistry(source ComponentSource) (*RegistrySource, bool) {
+	if source == nil {
+		return nil, false
+	}
+	reg, ok := source.(*RegistrySource)
+	return reg, ok
+}
+
+// AsLocal attempts to cast ComponentSource to LocalSource
+func AsLocal(source ComponentSource) (string, bool) {
+	if source == nil {
+		return "", false
+	}
+	local, ok := source.(LocalSource)
+	return string(local), ok
+}
 
 // BuildConfig defines build configuration for a component
 type BuildConfig struct {
@@ -120,8 +139,9 @@ func (a *Application) Validate() error {
 		}
 	}
 	
-	// Validate auth configuration
-	if a.Access == AccessCustom {
+	// Validate auth configuration based on access mode
+	switch a.Access {
+	case AccessCustom:
 		if a.Auth.Provider != AuthProviderCustom {
 			return fmt.Errorf("custom access requires custom auth provider")
 		}
@@ -131,6 +151,24 @@ func (a *Application) Validate() error {
 		if a.Auth.JWTAudience == "" {
 			return fmt.Errorf("JWT audience is required for custom auth")
 		}
+	case AccessOrg:
+		if a.Auth.Provider != AuthProviderWorkOS {
+			return fmt.Errorf("org access requires WorkOS auth provider")
+		}
+		if a.Auth.OrgID == "" {
+			return fmt.Errorf("org ID is required for org access mode")
+		}
+	case AccessPrivate:
+		// Private mode can use either WorkOS or custom auth
+		if a.Auth.Provider == AuthProviderCustom {
+			if a.Auth.JWTIssuer == "" {
+				return fmt.Errorf("JWT issuer is required for custom auth")
+			}
+		}
+	case AccessPublic:
+		// No auth required for public access
+	default:
+		return fmt.Errorf("invalid access mode: %s", a.Access)
 	}
 	
 	return nil
