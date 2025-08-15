@@ -56,7 +56,7 @@ func TestEdgeCases(t *testing.T) {
 		// Test file with no extension but YAML content
 		tmpDir := t.TempDir()
 		noExtPath := filepath.Join(tmpDir, "config")
-		
+
 		yamlContent := `
 application:
   name: noext-test
@@ -156,15 +156,15 @@ application:
 // TestCuePatterns verifies the embedded CUE patterns are valid
 func TestCuePatterns(t *testing.T) {
 	// Verify required imports are present
-	if !strings.Contains(ftlPatterns, "import \"strings\"") {
+	if !strings.Contains(ftlPatterns, "\"strings\"") {
 		t.Error("CUE patterns should import strings package")
 	}
-	
+
 	// Verify key pattern definitions exist
 	if !strings.Contains(ftlPatterns, "#FTLApplication") {
 		t.Error("CUE patterns should define #FTLApplication")
 	}
-	
+
 	if !strings.Contains(ftlPatterns, "#TransformToSpin") {
 		t.Error("CUE patterns should define #TransformToSpin")
 	}

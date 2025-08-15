@@ -92,7 +92,7 @@ func TestCDK_ValidateWithSchema(t *testing.T) {
 	app.AddComponent("comp1").FromLocal("./comp1.wasm").Build()
 
 	app.Build()
-	
+
 	// Test validation with a schema
 	schema := `
 	#CDKApp: {
@@ -105,12 +105,11 @@ func TestCDK_ValidateWithSchema(t *testing.T) {
 	}
 }
 
-
 func TestSynthesizeFromConfig_YAML(t *testing.T) {
 	// Create a temporary YAML file
 	tmpDir := t.TempDir()
 	yamlPath := filepath.Join(tmpDir, "ftl.yaml")
-	
+
 	yamlContent := `
 application:
   name: config-test
@@ -119,7 +118,7 @@ components:
   - id: comp1
     source: ./comp1.wasm
 `
-	
+
 	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -142,7 +141,7 @@ func TestSynthesizeFromConfig_JSON(t *testing.T) {
 	// Create a temporary JSON file
 	tmpDir := t.TempDir()
 	jsonPath := filepath.Join(tmpDir, "ftl.json")
-	
+
 	jsonContent := `{
 		"application": {
 			"name": "json-config-test",
@@ -153,7 +152,7 @@ func TestSynthesizeFromConfig_JSON(t *testing.T) {
 			"source": "./json.wasm"
 		}]
 	}`
-	
+
 	if err := os.WriteFile(jsonPath, []byte(jsonContent), 0644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -176,7 +175,7 @@ func TestSynthesizeFromConfig_CUE(t *testing.T) {
 	// Create a temporary CUE file
 	tmpDir := t.TempDir()
 	cuePath := filepath.Join(tmpDir, "app.cue")
-	
+
 	cueContent := `
 application: {
 	name: "cue-config-test"
@@ -186,7 +185,7 @@ components: [{
 	id: "cue-comp"
 	source: "./cue.wasm"
 }]`
-	
+
 	if err := os.WriteFile(cuePath, []byte(cueContent), 0644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -209,7 +208,7 @@ func TestSynthesizeFromConfig_UnsupportedFormat(t *testing.T) {
 	// Create a temporary file with unsupported extension
 	tmpDir := t.TempDir()
 	txtPath := filepath.Join(tmpDir, "config.txt")
-	
+
 	// Write content that's not valid YAML
 	if err := os.WriteFile(txtPath, []byte("{{invalid"), 0644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
@@ -238,7 +237,7 @@ func TestCDK_ValidationCases(t *testing.T) {
 		app := cdk.NewApp("INVALID-NAME") // Invalid: uppercase
 		app.AddComponent("comp").FromLocal("./comp.wasm").Build()
 		builtCDK := app.Build()
-		
+
 		_, err := builtCDK.Synthesize()
 		if err == nil {
 			t.Error("Should fail with invalid app name")
@@ -250,7 +249,7 @@ func TestCDK_ValidationCases(t *testing.T) {
 		app := cdk.NewApp("valid-app")
 		app.AddComponent("comp").FromLocal("./comp.wasm").Build()
 		builtCDK := app.Build()
-		
+
 		cue, err := builtCDK.ToCUE()
 		if err != nil {
 			t.Errorf("ToCUE should not fail: %v", err)
@@ -260,7 +259,6 @@ func TestCDK_ValidationCases(t *testing.T) {
 		}
 	})
 }
-
 
 func TestCDK_ComplexScenario(t *testing.T) {
 	// Test a complex app with multiple components and configurations
@@ -296,7 +294,7 @@ func TestCDK_ComplexScenario(t *testing.T) {
 	app.EnableWorkOSAuth("org_complex123")
 
 	builtCDK := app.Build()
-	
+
 	// Test CUE generation
 	cue, err := builtCDK.ToCUE()
 	if err != nil {

@@ -181,9 +181,9 @@ Examples:
 	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
 	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
 	_ = cmd.MarkFlagRequired("name")
-	cmd.MarkFlagRequired("registry")
-	cmd.MarkFlagRequired("package")
-	cmd.MarkFlagRequired("version")
+	_ = cmd.MarkFlagRequired("registry")
+	_ = cmd.MarkFlagRequired("package")
+	_ = cmd.MarkFlagRequired("version")
 
 	return cmd
 }

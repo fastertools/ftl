@@ -94,7 +94,7 @@ func TestInitCommand(t *testing.T) {
 
 				// Create a file that should be overwritten
 				testFile := filepath.Join(forceDir, "test.txt")
-				os.WriteFile(testFile, []byte("old content"), 0644)
+				_ = os.WriteFile(testFile, []byte("old content"), 0644)
 
 				// After init, check that new files exist
 				t.Cleanup(func() {
@@ -113,7 +113,7 @@ func TestInitCommand(t *testing.T) {
 			// Change to temp directory
 			origDir, err := os.Getwd()
 			require.NoError(t, err)
-			defer os.Chdir(origDir)
+			defer func() { _ = os.Chdir(origDir) }()
 
 			err = os.Chdir(tmpDir)
 			require.NoError(t, err)
