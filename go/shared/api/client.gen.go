@@ -29,6 +29,15 @@ const (
 	AppAccessControlPublic  AppAccessControl = "public"
 )
 
+// Defines values for AppLatestDeploymentStatus.
+const (
+	AppLatestDeploymentStatusDeployed   AppLatestDeploymentStatus = "deployed"
+	AppLatestDeploymentStatusDeploying  AppLatestDeploymentStatus = "deploying"
+	AppLatestDeploymentStatusFailed     AppLatestDeploymentStatus = "failed"
+	AppLatestDeploymentStatusPending    AppLatestDeploymentStatus = "pending"
+	AppLatestDeploymentStatusRolledBack AppLatestDeploymentStatus = "rolled_back"
+)
+
 // Defines values for AppStatus.
 const (
 	AppStatusACTIVE   AppStatus = "ACTIVE"
@@ -107,6 +116,15 @@ const (
 	Public  ListAppsResponseBodyAppsAccessControl = "public"
 )
 
+// Defines values for ListAppsResponseBodyAppsLatestDeploymentStatus.
+const (
+	ListAppsResponseBodyAppsLatestDeploymentStatusDeployed   ListAppsResponseBodyAppsLatestDeploymentStatus = "deployed"
+	ListAppsResponseBodyAppsLatestDeploymentStatusDeploying  ListAppsResponseBodyAppsLatestDeploymentStatus = "deploying"
+	ListAppsResponseBodyAppsLatestDeploymentStatusFailed     ListAppsResponseBodyAppsLatestDeploymentStatus = "failed"
+	ListAppsResponseBodyAppsLatestDeploymentStatusPending    ListAppsResponseBodyAppsLatestDeploymentStatus = "pending"
+	ListAppsResponseBodyAppsLatestDeploymentStatusRolledBack ListAppsResponseBodyAppsLatestDeploymentStatus = "rolled_back"
+)
+
 // Defines values for ListAppsResponseBodyAppsStatus.
 const (
 	ListAppsResponseBodyAppsStatusACTIVE   ListAppsResponseBodyAppsStatus = "ACTIVE"
@@ -128,6 +146,17 @@ type App struct {
 		Audience string `json:"audience"`
 		Issuer   string `json:"issuer"`
 	} `json:"customAuth,omitempty"`
+
+	// LatestDeployment Latest deployment information for this app
+	LatestDeployment *struct {
+		CreatedAt          *float32                  `json:"createdAt,omitempty"`
+		DeployedAt         *float32                  `json:"deployedAt,omitempty"`
+		DeploymentDuration *float32                  `json:"deploymentDuration,omitempty"`
+		DeploymentId       string                    `json:"deploymentId"`
+		Environment        *string                   `json:"environment,omitempty"`
+		Status             AppLatestDeploymentStatus `json:"status"`
+		StatusMessage      *string                   `json:"statusMessage,omitempty"`
+	} `json:"latestDeployment"`
 	OrgId         *string   `json:"orgId,omitempty"`
 	ProviderError *string   `json:"providerError,omitempty"`
 	ProviderUrl   *string   `json:"providerUrl,omitempty"`
@@ -137,6 +166,9 @@ type App struct {
 
 // AppAccessControl defines model for App.AccessControl.
 type AppAccessControl string
+
+// AppLatestDeploymentStatus defines model for App.LatestDeployment.Status.
+type AppLatestDeploymentStatus string
 
 // AppStatus defines model for App.Status.
 type AppStatus string
@@ -356,6 +388,17 @@ type ListAppsResponseBody struct {
 			Audience string `json:"audience"`
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
+
+		// LatestDeployment Latest deployment information for this app
+		LatestDeployment *struct {
+			CreatedAt          *float32                                       `json:"createdAt,omitempty"`
+			DeployedAt         *float32                                       `json:"deployedAt,omitempty"`
+			DeploymentDuration *float32                                       `json:"deploymentDuration,omitempty"`
+			DeploymentId       string                                         `json:"deploymentId"`
+			Environment        *string                                        `json:"environment,omitempty"`
+			Status             ListAppsResponseBodyAppsLatestDeploymentStatus `json:"status"`
+			StatusMessage      *string                                        `json:"statusMessage,omitempty"`
+		} `json:"latestDeployment"`
 		OrgId         *string                        `json:"orgId,omitempty"`
 		ProviderError *string                        `json:"providerError,omitempty"`
 		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
@@ -367,6 +410,9 @@ type ListAppsResponseBody struct {
 
 // ListAppsResponseBodyAppsAccessControl defines model for ListAppsResponseBody.Apps.AccessControl.
 type ListAppsResponseBodyAppsAccessControl string
+
+// ListAppsResponseBodyAppsLatestDeploymentStatus defines model for ListAppsResponseBody.Apps.LatestDeployment.Status.
+type ListAppsResponseBodyAppsLatestDeploymentStatus string
 
 // ListAppsResponseBodyAppsStatus defines model for ListAppsResponseBody.Apps.Status.
 type ListAppsResponseBodyAppsStatus string

@@ -1124,6 +1124,37 @@
                   "required": ["issuer", "audience"],
                   "additionalProperties": false
                 },
+                "latestDeployment": {
+                  "description": "Latest deployment information for this app",
+                  "type": "object",
+                  "properties": {
+                    "deploymentId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "deploying", "deployed", "failed", "rolled_back"]
+                    },
+                    "statusMessage": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "deployedAt": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "deploymentDuration": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["deploymentId", "status"],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
                 "createdAt": {
                   "type": "string"
                 },
@@ -1267,6 +1298,37 @@
             },
             "required": ["issuer", "audience"],
             "additionalProperties": false
+          },
+          "latestDeployment": {
+            "description": "Latest deployment information for this app",
+            "type": "object",
+            "properties": {
+              "deploymentId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["pending", "deploying", "deployed", "failed", "rolled_back"]
+              },
+              "statusMessage": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "deployedAt": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "deploymentDuration": {
+                "type": "number"
+              }
+            },
+            "required": ["deploymentId", "status"],
+            "additionalProperties": false,
+            "nullable": true
           },
           "createdAt": {
             "type": "string"

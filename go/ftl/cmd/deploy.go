@@ -679,20 +679,51 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 			return nil, fmt.Errorf("failed to get app status: %w", err)
 		}
 
-		switch app.Status {
-		case api.AppStatusACTIVE:
-			return app, nil
-		case api.AppStatusFAILED:
-			errMsg := "deployment failed"
-			if app.ProviderError != nil {
-				errMsg = *app.ProviderError
+		// Check the latest deployment status if available
+		if app.LatestDeployment != nil {
+			// Check if this is our deployment
+			if app.LatestDeployment.DeploymentId == deploymentID {
+				switch app.LatestDeployment.Status {
+				case api.AppLatestDeploymentStatusDeployed:
+					// Deployment succeeded
+					return app, nil
+				case api.AppLatestDeploymentStatusFailed:
+					// Deployment failed
+					errMsg := "deployment failed"
+					if app.LatestDeployment.StatusMessage != nil && *app.LatestDeployment.StatusMessage != "" {
+						errMsg = *app.LatestDeployment.StatusMessage
+					}
+					return nil, fmt.Errorf("%s", errMsg)
+				case api.AppLatestDeploymentStatusPending, api.AppLatestDeploymentStatusDeploying:
+					// Still in progress
+					sp.Suffix = fmt.Sprintf(" Deployment in progress... (%s)", app.LatestDeployment.Status)
+				default:
+					// Unknown status, continue polling
+					sp.Suffix = fmt.Sprintf(" Deployment in progress... (%s)", app.LatestDeployment.Status)
+				}
+			} else {
+				// This is a different deployment, might be a race condition
+				// Continue polling to see if our deployment shows up
+				sp.Suffix = " Waiting for deployment to start..."
 			}
-			return nil, fmt.Errorf("%s", errMsg)
-		case api.AppStatusDELETED, api.AppStatusDELETING:
-			return nil, fmt.Errorf("app was deleted during deployment")
-		default:
-			// Still pending or creating
-			sp.Suffix = fmt.Sprintf(" Deployment in progress... (%s)", app.Status)
+		} else {
+			// No deployment info yet, check app status as fallback
+			switch app.Status {
+			case api.AppStatusACTIVE:
+				// App is active but no deployment info, consider it success
+				return app, nil
+			case api.AppStatusFAILED:
+				errMsg := "app failed"
+				if app.ProviderError != nil {
+					errMsg = *app.ProviderError
+				}
+				return nil, fmt.Errorf("%s", errMsg)
+			case api.AppStatusDELETED, api.AppStatusDELETING:
+				return nil, fmt.Errorf("app was deleted during deployment")
+			default:
+				// Still pending or creating
+				sp.Suffix = fmt.Sprintf(" Waiting for deployment... (app: %s)", app.Status)
+			}
 		}
 
 		time.Sleep(5 * time.Second)
