@@ -259,7 +259,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// Poll for deployment status
 	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	sp.Suffix = " Waiting for deployment to complete..."
+	sp.Suffix = " Waiting for deployment to start..."
 	sp.Start()
 
 	deployed, err := waitForDeployment(ctx, apiClient, appID, deployment.DeploymentId, sp)
@@ -572,9 +572,9 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 	// Set auth configuration if needed
 	if app.Access == ftl.AccessOrg || app.Access == ftl.AccessCustom {
 		req.Application.Auth = &struct {
-			JwtAudience *string                                         `json:"jwt_audience,omitempty"`
-			JwtIssuer   *string                                         `json:"jwt_issuer,omitempty"`
-			OrgId       *string                                         `json:"org_id,omitempty"`
+			JwtAudience *string                                             `json:"jwt_audience,omitempty"`
+			JwtIssuer   *string                                             `json:"jwt_issuer,omitempty"`
+			OrgId       *string                                             `json:"org_id,omitempty"`
 			Provider    *api.CreateDeploymentRequestApplicationAuthProvider `json:"provider,omitempty"`
 		}{}
 
@@ -704,7 +704,7 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 			} else {
 				// This is a different deployment, might be a race condition
 				// Continue polling to see if our deployment shows up
-				sp.Suffix = " Waiting for deployment to start..."
+				sp.Suffix = fmt.Sprintf(" Waiting for deployment to start... (%s, %s, %s)", app.LatestDeployment.DeploymentId, deploymentID, app.LatestDeployment.Status)
 			}
 		} else {
 			// No deployment info yet, check app status as fallback
