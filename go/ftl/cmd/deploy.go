@@ -278,9 +278,8 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	Success("Deployment completed successfully!")
 
 	if deployed.ProviderUrl != nil && *deployed.ProviderUrl != "" {
-		fmt.Println()
-		fmt.Printf("  MCP URL: %s\n", *deployed.ProviderUrl)
-		fmt.Println()
+		// Display MCP URLs for the deployed application
+		displayMCPUrls(*deployed.ProviderUrl, ftlApp.Components)
 	}
 
 	return nil
@@ -941,4 +940,38 @@ func promptConfirm(message string, defaultYes bool) bool {
 	}
 
 	return result
+}
+
+// displayMCPUrls displays a table showing MCP URLs for the application and its components
+func displayMCPUrls(baseURL string, components []ftl.Component) {
+	// Ensure the base URL ends with /mcp
+	mcpBaseURL := strings.TrimRight(baseURL, "/") + "/mcp"
+
+	// Create data writer for table output
+	dw := NewDataWriter(colorOutput, "table")
+
+	// Build table with headers
+	tb := NewTableBuilder("COMPONENT", "URL")
+
+	// Add the main application MCP URL
+	tb.AddRow("all", mcpBaseURL)
+
+	// Add component-specific MCP URLs
+	for _, comp := range components {
+		componentURL := fmt.Sprintf("%s/x/%s", mcpBaseURL, comp.ID)
+		tb.AddRow(comp.ID, componentURL)
+	}
+
+	// Write the table (with empty line before it)
+	fmt.Println()
+	if err := tb.Write(dw); err != nil {
+		// Fallback to simple display if table fails
+		fmt.Printf("Application MCP: %s\n", mcpBaseURL)
+		for _, comp := range components {
+			fmt.Printf("%s: %s/x/%s\n", comp.ID, mcpBaseURL, comp.ID)
+		}
+	}
+
+	// Add summary line after table
+	fmt.Fprintf(colorOutput, "Use these URLs to connect from MCP clients.\n")
 }
