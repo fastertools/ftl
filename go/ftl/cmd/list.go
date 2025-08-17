@@ -106,7 +106,7 @@ func displayAppsTable(apps []struct {
 	// Build headers
 	var headers []string
 	if verbose {
-		headers = []string{"NAME", "ID", "STATUS", "ACCESS", "URL", "CREATED"}
+		headers = []string{"NAME", "ID", "STATUS", "ACCESS", "URL", "DEPLOYMENT", "ENVIRONMENT", "CREATED"}
 	} else {
 		headers = []string{"NAME", "STATUS", "ACCESS", "URL", "CREATED"}
 	}
@@ -146,7 +146,16 @@ func displayAppsTable(apps []struct {
 
 		// Add row based on verbose mode
 		if verbose {
-			tb.AddRow(app.AppName, app.AppId.String(), string(app.Status), access, url, created)
+			// Get deployment info if available
+			deploymentId := "-"
+			environment := "-"
+			if app.LatestDeployment != nil {
+				deploymentId = app.LatestDeployment.DeploymentId
+				if app.LatestDeployment.Environment != nil {
+					environment = *app.LatestDeployment.Environment
+				}
+			}
+			tb.AddRow(app.AppName, app.AppId.String(), string(app.Status), access, url, deploymentId, environment, created)
 		} else {
 			tb.AddRow(app.AppName, string(app.Status), access, url, created)
 		}

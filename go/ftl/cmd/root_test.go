@@ -110,7 +110,7 @@ func TestExecute(t *testing.T) {
 
 	// Execute should not panic
 	assert.NotPanics(t, func() {
-		Execute()
+		_ = Execute()
 	})
 }
 
@@ -447,7 +447,7 @@ func BenchmarkRootCommand(b *testing.B) {
 		}
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetArgs([]string{"--help"})
-		cmd.Execute()
+		_ = cmd.Execute()
 	}
 }
 

@@ -62,8 +62,8 @@ func TestUpCommand_NoConfig(t *testing.T) {
 	// Create test environment without config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	cmd := newUpCmd()
 	var buf bytes.Buffer
@@ -80,8 +80,8 @@ func TestUpCommand_WithBuildFlag(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -121,8 +121,8 @@ func TestUpCommand_WithWatchFlag(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create configs
 	yamlContent := `application:
@@ -158,8 +158,8 @@ func TestUpCommand_WithConfigFlag(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create custom config
 	yamlContent := `application:
@@ -226,6 +226,6 @@ func BenchmarkUpCommand(b *testing.B) {
 		cmd := newUpCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetArgs([]string{"--help"})
-		cmd.Execute()
+		_ = cmd.Execute()
 	}
 }

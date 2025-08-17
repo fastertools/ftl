@@ -13,8 +13,8 @@ func TestBuildCommand_AutoDetectJSON(t *testing.T) {
 	// Create test environment with JSON config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.json
 	jsonContent := `{
@@ -49,8 +49,8 @@ func TestBuildCommand_AutoDetectYAML(t *testing.T) {
 	// Create test environment with YAML config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -81,8 +81,8 @@ func TestBuildCommand_PreferYAMLOverJSON(t *testing.T) {
 	// Create test environment with both YAML and JSON configs
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create both ftl.yaml and ftl.json
 	yamlContent := `application:
@@ -128,8 +128,8 @@ func TestDeployCommand_AutoDetectJSON(t *testing.T) {
 	// Create test environment with JSON config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.json
 	jsonContent := `{
@@ -170,8 +170,8 @@ func TestDeployCommand_LoadJSONConfig(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.json
 	jsonContent := `{

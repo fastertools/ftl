@@ -136,7 +136,7 @@ func TestRunAdd_ValidationErrors(t *testing.T) {
 			// Create temp directory
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
+			defer func() { _ = os.Chdir(oldWd) }()
 			_ = os.Chdir(tmpDir)
 
 			if tt.setupDir != nil {
@@ -159,7 +159,7 @@ func TestRunAdd_Success(t *testing.T) {
 	// Create temp directory with ftl.yaml
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
