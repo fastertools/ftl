@@ -50,10 +50,7 @@ func TestConfigureWkgAuth(t *testing.T) {
 	err = toml.Unmarshal(data, &config)
 	require.NoError(t, err)
 
-	// Check default registry
-	assert.Equal(t, "ghcr.io", config["default_registry"])
-
-	// Check registry configuration
+	// Check registry configuration (we should NOT have set default_registry)
 	registry, ok := config["registry"].(map[string]interface{})
 	require.True(t, ok, "registry should be a map")
 
@@ -101,6 +98,80 @@ func TestConfigureWkgAuth(t *testing.T) {
 	ecrConfig2 := registry[ecrAuth2.Registry].(map[string]interface{})
 	auth2 := ecrConfig2["oci"].(map[string]interface{})["auth"].(map[string]interface{})
 	assert.Equal(t, "another-password-456", auth2["password"])
+}
+
+func TestConfigureWkgAuth_PreservesExistingConfig(t *testing.T) {
+	// Create a temporary directory for the test
+	tmpDir := t.TempDir()
+
+	// Override the config home for testing
+	oldXDG := os.Getenv("XDG_CONFIG_HOME")
+	defer func() {
+		if oldXDG != "" {
+			os.Setenv("XDG_CONFIG_HOME", oldXDG)
+		} else {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		}
+	}()
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create existing config with user's settings
+	configDir := filepath.Join(tmpDir, "wasm-pkg")
+	configPath := filepath.Join(configDir, "config.toml")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	existingConfig := `default_registry = "my-custom-registry.io"
+namespace_prefix = "my-org"
+
+[registry."my-custom-registry.io"]
+url = "https://my-custom-registry.io"
+
+[registry."my-custom-registry.io".oci]
+protocol = "oci"
+
+[registry."my-custom-registry.io".oci.auth]
+username = "myuser"
+password = "mypass"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(existingConfig), 0600))
+
+	// Configure ECR auth
+	ecrAuth := &ftl.ECRAuth{
+		Registry: "123456789.dkr.ecr.us-west-2.amazonaws.com",
+		Username: "AWS",
+		Password: "test-password-123",
+	}
+
+	err := configureWkgAuth(ecrAuth)
+	require.NoError(t, err)
+
+	// Read and verify the config
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+
+	var config map[string]interface{}
+	err = toml.Unmarshal(data, &config)
+	require.NoError(t, err)
+
+	// Verify existing settings are preserved
+	assert.Equal(t, "my-custom-registry.io", config["default_registry"], "default_registry should be unchanged")
+	assert.Equal(t, "my-org", config["namespace_prefix"], "namespace_prefix should be unchanged")
+
+	// Verify existing registry is preserved
+	registry := config["registry"].(map[string]interface{})
+	assert.Contains(t, registry, "my-custom-registry.io", "existing registry should be preserved")
+
+	existingReg := registry["my-custom-registry.io"].(map[string]interface{})
+	existingAuth := existingReg["oci"].(map[string]interface{})["auth"].(map[string]interface{})
+	assert.Equal(t, "myuser", existingAuth["username"], "existing registry auth should be unchanged")
+	assert.Equal(t, "mypass", existingAuth["password"], "existing registry auth should be unchanged")
+
+	// Verify ECR registry was added
+	assert.Contains(t, registry, ecrAuth.Registry, "ECR registry should be added")
+	ecrConfig := registry[ecrAuth.Registry].(map[string]interface{})
+	ecrAuthConfig := ecrConfig["oci"].(map[string]interface{})["auth"].(map[string]interface{})
+	assert.Equal(t, "AWS", ecrAuthConfig["username"])
+	assert.Equal(t, "test-password-123", ecrAuthConfig["password"])
 }
 
 func TestConfigureMultiPlatformAuth(t *testing.T) {

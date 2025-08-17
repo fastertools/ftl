@@ -166,19 +166,19 @@ func convertToAPIApps(testApps []testApp) []struct {
 		Issuer   string `json:"issuer"`
 	} `json:"customAuth,omitempty"`
 	LatestDeployment *struct {
-		CreatedAt          *float32                                       `json:"createdAt,omitempty"`
-		DeployedAt         *float32                                       `json:"deployedAt,omitempty"`
-		DeploymentDuration *float32                                       `json:"deploymentDuration,omitempty"`
-		DeploymentId       string                                         `json:"deploymentId"`
-		Environment        *string                                        `json:"environment,omitempty"`
+		CreatedAt          *float32                                           `json:"createdAt,omitempty"`
+		DeployedAt         *float32                                           `json:"deployedAt,omitempty"`
+		DeploymentDuration *float32                                           `json:"deploymentDuration,omitempty"`
+		DeploymentId       string                                             `json:"deploymentId"`
+		Environment        *string                                            `json:"environment,omitempty"`
 		Status             api.ListAppsResponseBodyAppsLatestDeploymentStatus `json:"status"`
-		StatusMessage      *string                                        `json:"statusMessage,omitempty"`
+		StatusMessage      *string                                            `json:"statusMessage,omitempty"`
 	} `json:"latestDeployment"`
-	OrgId         *string                        `json:"orgId,omitempty"`
-	ProviderError *string                        `json:"providerError,omitempty"`
-	ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+	OrgId         *string                            `json:"orgId,omitempty"`
+	ProviderError *string                            `json:"providerError,omitempty"`
+	ProviderUrl   *string                            `json:"providerUrl,omitempty"`
 	Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
-	UpdatedAt     string                         `json:"updatedAt"`
+	UpdatedAt     string                             `json:"updatedAt"`
 } {
 	result := make([]struct {
 		AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
@@ -191,19 +191,19 @@ func convertToAPIApps(testApps []testApp) []struct {
 			Issuer   string `json:"issuer"`
 		} `json:"customAuth,omitempty"`
 		LatestDeployment *struct {
-			CreatedAt          *float32                                       `json:"createdAt,omitempty"`
-			DeployedAt         *float32                                       `json:"deployedAt,omitempty"`
-			DeploymentDuration *float32                                       `json:"deploymentDuration,omitempty"`
-			DeploymentId       string                                         `json:"deploymentId"`
-			Environment        *string                                        `json:"environment,omitempty"`
+			CreatedAt          *float32                                           `json:"createdAt,omitempty"`
+			DeployedAt         *float32                                           `json:"deployedAt,omitempty"`
+			DeploymentDuration *float32                                           `json:"deploymentDuration,omitempty"`
+			DeploymentId       string                                             `json:"deploymentId"`
+			Environment        *string                                            `json:"environment,omitempty"`
 			Status             api.ListAppsResponseBodyAppsLatestDeploymentStatus `json:"status"`
-			StatusMessage      *string                                        `json:"statusMessage,omitempty"`
+			StatusMessage      *string                                            `json:"statusMessage,omitempty"`
 		} `json:"latestDeployment"`
-		OrgId         *string                        `json:"orgId,omitempty"`
-		ProviderError *string                        `json:"providerError,omitempty"`
-		ProviderUrl   *string                        `json:"providerUrl,omitempty"`
+		OrgId         *string                            `json:"orgId,omitempty"`
+		ProviderError *string                            `json:"providerError,omitempty"`
+		ProviderUrl   *string                            `json:"providerUrl,omitempty"`
 		Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
-		UpdatedAt     string                         `json:"updatedAt"`
+		UpdatedAt     string                             `json:"updatedAt"`
 	}, len(testApps))
 
 	for i, app := range testApps {
@@ -214,17 +214,17 @@ func convertToAPIApps(testApps []testApp) []struct {
 		result[i].ProviderError = app.providerError
 		result[i].CreatedAt = app.createdAt
 		result[i].UpdatedAt = app.updatedAt
-		
+
 		// Add deployment info if present
 		if app.hasDeployment {
 			result[i].LatestDeployment = &struct {
-				CreatedAt          *float32                                       `json:"createdAt,omitempty"`
-				DeployedAt         *float32                                       `json:"deployedAt,omitempty"`
-				DeploymentDuration *float32                                       `json:"deploymentDuration,omitempty"`
-				DeploymentId       string                                         `json:"deploymentId"`
-				Environment        *string                                        `json:"environment,omitempty"`
+				CreatedAt          *float32                                           `json:"createdAt,omitempty"`
+				DeployedAt         *float32                                           `json:"deployedAt,omitempty"`
+				DeploymentDuration *float32                                           `json:"deploymentDuration,omitempty"`
+				DeploymentId       string                                             `json:"deploymentId"`
+				Environment        *string                                            `json:"environment,omitempty"`
 				Status             api.ListAppsResponseBodyAppsLatestDeploymentStatus `json:"status"`
-				StatusMessage      *string                                        `json:"statusMessage,omitempty"`
+				StatusMessage      *string                                            `json:"statusMessage,omitempty"`
 			}{
 				DeploymentId: app.deploymentId,
 				Environment:  app.environment,
