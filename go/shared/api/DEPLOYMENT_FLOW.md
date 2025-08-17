@@ -9,7 +9,7 @@ The deployment flow uses `spinc.yaml` as the single source of truth for applicat
 1. **Read spinc.yaml** - Load the FTL configuration
 2. **Build components** - Run `spin build` if needed
 3. **Get ECR credentials** - Call `/v1/registry/tokens` with app ID
-4. **Configure wkg** - Set up wkg config with ECR auth
+4. **Docker login** - Authenticate Docker with ECR credentials
 5. **Push components** - Use `spin deps push` for each component
 6. **Submit deployment** - Send spinc.yaml + component refs to platform
 
