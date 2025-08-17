@@ -361,7 +361,7 @@ func TestRunInit(t *testing.T) {
 			// Create temp directory for test
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
+			defer func() { _ = os.Chdir(oldWd) }()
 			_ = os.Chdir(tmpDir)
 
 			err := runInit(tt.opts)
@@ -390,7 +390,7 @@ func TestRunInit(t *testing.T) {
 func TestRunInit_ExistingDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
 	// Create existing directory

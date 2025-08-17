@@ -9,12 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -215,9 +217,12 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		return fmt.Errorf("failed to get ECR token: %w", err)
 	}
 
-	// Authenticate Docker with ECR for spin deps publish
-	if err := dockerLoginToECR(ctx, ecrToken); err != nil {
-		return fmt.Errorf("failed to authenticate with ECR: %w", err)
+	// Configure authentication for both Docker and wkg
+	// This is necessary due to platform inconsistencies:
+	// - On macOS: spin deps uses Docker credentials, ignores wkg config
+	// - On Linux: spin deps uses wkg config, ignores Docker credentials
+	if err := configureMultiPlatformAuth(ctx, ecrToken); err != nil {
+		return fmt.Errorf("failed to configure authentication: %w", err)
 	}
 	Success("Configured registry authentication")
 
@@ -484,6 +489,130 @@ func dockerLoginToECR(ctx context.Context, ecrToken *api.CreateEcrTokenResponseB
 	return nil
 }
 
+// configureMultiPlatformAuth configures authentication for both Docker and wkg to handle platform inconsistencies
+func configureMultiPlatformAuth(ctx context.Context, ecrToken *api.CreateEcrTokenResponseBody) error {
+	// Parse ECR credentials for use in both auth methods
+	ecrAuth, err := ftl.ParseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
+	if err != nil {
+		return fmt.Errorf("failed to parse ECR token: %w", err)
+	}
+
+	Debug("Configuring multi-platform authentication for registry: %s", ecrAuth.Registry)
+
+	// Always try to configure Docker authentication
+	dockerErr := dockerLoginToECR(ctx, ecrToken)
+	if dockerErr != nil {
+		Debug("Docker login failed: %v", dockerErr)
+	} else {
+		Debug("Docker login successful")
+	}
+
+	// Always try to configure wkg authentication
+	wkgErr := configureWkgAuth(ecrAuth)
+	if wkgErr != nil {
+		Debug("WKG config failed: %v", wkgErr)
+	} else {
+		Debug("WKG config successful")
+	}
+
+	// Determine if we have at least one working auth method based on platform
+	if runtime.GOOS == "darwin" {
+		// On macOS, Docker auth is required
+		if dockerErr != nil {
+			return fmt.Errorf("Docker authentication failed (required on macOS): %w", dockerErr)
+		}
+		if wkgErr != nil {
+			Debug("WKG config failed on macOS (this is expected and won't affect operation)")
+		}
+	} else {
+		// On Linux/others, wkg config is required
+		if wkgErr != nil {
+			return fmt.Errorf("WKG configuration failed (required on Linux): %w", wkgErr)
+		}
+		if dockerErr != nil {
+			Debug("Docker authentication failed on Linux (this may not affect operation if wkg config succeeded)")
+		}
+	}
+
+	return nil
+}
+
+// configureWkgAuth updates the wkg config file with ECR credentials
+func configureWkgAuth(ecrAuth *ftl.ECRAuth) error {
+	// Get wkg config path
+	configDir := filepath.Join(getConfigHome(), "wasm-pkg")
+	configPath := filepath.Join(configDir, "config.toml")
+
+	Debug("Configuring wkg auth at: %s", configPath)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create wkg config directory: %w", err)
+	}
+
+	// Read existing config or create new one
+	configData := make(map[string]interface{})
+	if existingData, err := os.ReadFile(configPath); err == nil {
+		// Parse existing TOML
+		if err := toml.Unmarshal(existingData, &configData); err != nil {
+			Debug("Failed to parse existing wkg config, will create new: %v", err)
+			configData = make(map[string]interface{})
+		}
+	}
+
+	// Ensure default_registry is set if not present
+	if _, exists := configData["default_registry"]; !exists {
+		configData["default_registry"] = "ghcr.io"
+	}
+
+	// Ensure registry map exists
+	if _, exists := configData["registry"]; !exists {
+		configData["registry"] = make(map[string]interface{})
+	}
+	registry := configData["registry"].(map[string]interface{})
+
+	// Update or create the ECR registry entry
+	// Structure: registry.REGISTRY.oci.auth
+	registry[ecrAuth.Registry] = map[string]interface{}{
+		"oci": map[string]interface{}{
+			"auth": map[string]interface{}{
+				"username": ecrAuth.Username,
+				"password": ecrAuth.Password,
+			},
+		},
+	}
+
+	// Marshal back to TOML
+	updatedConfig, err := toml.Marshal(configData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal wkg config: %w", err)
+	}
+
+	// Write config file with secure permissions (0600)
+	if err := os.WriteFile(configPath, updatedConfig, 0600); err != nil {
+		return fmt.Errorf("failed to write wkg config: %w", err)
+	}
+
+	Debug("Successfully updated wkg config file")
+	return nil
+}
+
+// getConfigHome returns the XDG config directory
+func getConfigHome() string {
+	// XDG_CONFIG_HOME or default
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return xdg
+	}
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".config")
+	}
+	// Fallback for Windows
+	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
+		return filepath.Join(userProfile, ".config")
+	}
+	return ".config"
+}
+
 type PushedComponent struct {
 	ID             string
 	RegistrySource ftl.ComponentSource
@@ -491,6 +620,8 @@ type PushedComponent struct {
 
 func pushComponentsToRegistry(ctx context.Context, app *ftl.Application, components []ftl.Component, registryURI string, namespace string) ([]PushedComponent, error) {
 	var pushed []PushedComponent
+
+	Debug("Pushing %d components to registry %s", len(components), registryURI)
 
 	for _, comp := range components {
 		// Get the local source path
@@ -522,6 +653,7 @@ func pushComponentsToRegistry(ctx context.Context, app *ftl.Application, compone
 		cmd.Stderr = &stderr
 
 		if err := cmd.Run(); err != nil {
+			Debug("Failed to push component %s: %s", comp.ID, stderr.String())
 			return nil, fmt.Errorf("failed to push component %s: %s", comp.ID, stderr.String())
 		}
 

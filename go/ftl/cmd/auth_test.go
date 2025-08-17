@@ -187,7 +187,7 @@ func BenchmarkAuthCommand(b *testing.B) {
 		cmd := newAuthCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetArgs([]string{"--help"})
-		cmd.Execute()
+		_ = cmd.Execute()
 	}
 }
 
@@ -196,6 +196,6 @@ func BenchmarkAuthLogin(b *testing.B) {
 		authCmd := newAuthCmd()
 		authCmd.SetOut(&bytes.Buffer{})
 		authCmd.SetArgs([]string{"login", "--help"})
-		authCmd.Execute()
+		_ = authCmd.Execute()
 	}
 }

@@ -48,8 +48,8 @@ func TestBuildCommand_WithYAMLConfig(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -79,8 +79,8 @@ func TestBuildCommand_WithJSONConfig(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.json
 	jsonContent := `{
@@ -112,8 +112,8 @@ func TestBuildCommand_NoConfig(t *testing.T) {
 	// Create test environment without config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Test build command without config
 	cmd := newBuildCmd()
@@ -132,8 +132,8 @@ func TestBuildCommand_WithCUEConfig(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create app.cue
 	cueContent := `package app
@@ -165,8 +165,8 @@ func TestBuildCommand_WithGoConfig(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create main.go with CDK
 	goContent := `package main
@@ -204,8 +204,8 @@ func TestBuildCommand_SkipSynth(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -238,8 +238,8 @@ func TestBuildCommand_OutputFlag(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -268,8 +268,8 @@ func TestBuildCommand_ComponentWithMakefile(t *testing.T) {
 	// Create test environment with component
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml with component
 	yamlContent := `application:
@@ -319,8 +319,8 @@ func BenchmarkBuildCommand(b *testing.B) {
 	// Create test environment
 	tmpDir := b.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -334,7 +334,7 @@ components: []`
 		cmd := newBuildCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetArgs([]string{"--help"})
-		cmd.Execute()
+		_ = cmd.Execute()
 	}
 }
 

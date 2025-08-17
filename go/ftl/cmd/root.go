@@ -131,6 +131,13 @@ func Warn(format string, args ...interface{}) {
 	fmt.Fprintln(os.Stderr, warnColor.Sprintf("⚠ "+format, args...))
 }
 
+// Debug prints a debug message if verbose mode is enabled
+func Debug(format string, args ...interface{}) {
+	if IsVerbose() {
+		fmt.Fprintln(os.Stderr, color.New(color.FgMagenta).Sprintf("» "+format, args...))
+	}
+}
+
 // Fatal prints an error and exits
 func Fatal(format string, args ...interface{}) {
 	Error(format, args...)

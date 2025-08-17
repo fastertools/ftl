@@ -55,8 +55,8 @@ func TestDeployCommand_NoConfig(t *testing.T) {
 	// Create test environment without config
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	cmd := newDeployCmd()
 	var buf bytes.Buffer
@@ -73,8 +73,8 @@ func TestDeployCommand_WithEnvironment(t *testing.T) {
 	// Create test environment
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	yamlContent := `application:
@@ -143,6 +143,6 @@ func BenchmarkDeployCommand(b *testing.B) {
 		cmd := newDeployCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetArgs([]string{"--help"})
-		cmd.Execute()
+		_ = cmd.Execute()
 	}
 }
