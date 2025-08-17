@@ -560,12 +560,7 @@ func configureWkgAuth(ecrAuth *ftl.ECRAuth) error {
 		}
 	}
 
-	// Ensure default_registry is set if not present
-	if _, exists := configData["default_registry"]; !exists {
-		configData["default_registry"] = "ghcr.io"
-	}
-
-	// Ensure registry map exists
+	// Ensure registry map exists (but don't touch default_registry or any other settings)
 	if _, exists := configData["registry"]; !exists {
 		configData["registry"] = make(map[string]interface{})
 	}
