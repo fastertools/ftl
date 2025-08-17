@@ -80,28 +80,28 @@ func runListImpl(ctx context.Context, format string, verbose bool) error {
 
 func displayAppsTable(apps []struct {
 	AccessControl *api.ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
-	AllowedRoles  *[]string                                   `json:"allowedRoles,omitempty"`
-	AppId         openapi_types.UUID                          `json:"appId"`
-	AppName       string                                      `json:"appName"`
-	CreatedAt     string                                      `json:"createdAt"`
+	AllowedRoles  *[]string                                  `json:"allowedRoles,omitempty"`
+	AppId         openapi_types.UUID                         `json:"appId"`
+	AppName       string                                     `json:"appName"`
+	CreatedAt     string                                     `json:"createdAt"`
 	CustomAuth    *struct {
 		Audience string `json:"audience"`
 		Issuer   string `json:"issuer"`
 	} `json:"customAuth,omitempty"`
 	LatestDeployment *struct {
-		CreatedAt          *float32                                         `json:"createdAt,omitempty"`
-		DeployedAt         *float32                                         `json:"deployedAt,omitempty"`
-		DeploymentDuration *float32                                         `json:"deploymentDuration,omitempty"`
-		DeploymentId       string                                           `json:"deploymentId"`
-		Environment        *string                                          `json:"environment,omitempty"`
+		CreatedAt          *float32                                           `json:"createdAt,omitempty"`
+		DeployedAt         *float32                                           `json:"deployedAt,omitempty"`
+		DeploymentDuration *float32                                           `json:"deploymentDuration,omitempty"`
+		DeploymentId       string                                             `json:"deploymentId"`
+		Environment        *string                                            `json:"environment,omitempty"`
 		Status             api.ListAppsResponseBodyAppsLatestDeploymentStatus `json:"status"`
-		StatusMessage      *string                                          `json:"statusMessage,omitempty"`
+		StatusMessage      *string                                            `json:"statusMessage,omitempty"`
 	} `json:"latestDeployment"`
-	OrgId         *string                             `json:"orgId,omitempty"`
-	ProviderError *string                             `json:"providerError,omitempty"`
-	ProviderUrl   *string                             `json:"providerUrl,omitempty"`
+	OrgId         *string                            `json:"orgId,omitempty"`
+	ProviderError *string                            `json:"providerError,omitempty"`
+	ProviderUrl   *string                            `json:"providerUrl,omitempty"`
 	Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
-	UpdatedAt     string                              `json:"updatedAt"`
+	UpdatedAt     string                             `json:"updatedAt"`
 }, verbose bool, dw *DataWriter) error {
 	// Build headers
 	var headers []string

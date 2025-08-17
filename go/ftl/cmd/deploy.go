@@ -3,11 +3,13 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -213,10 +215,9 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		return fmt.Errorf("failed to get ECR token: %w", err)
 	}
 
-	// Update wkg config with ECR credentials for spin deps
-	// Use the shared ftl package utility that the backend can also use
-	if err := ftl.UpdateWkgAuthForECR("", ecrToken.RegistryUri, ecrToken.AuthorizationToken); err != nil {
-		return fmt.Errorf("failed to configure wkg auth: %w", err)
+	// Authenticate Docker with ECR for spin deps publish
+	if err := dockerLoginToECR(ctx, ecrToken); err != nil {
+		return fmt.Errorf("failed to authenticate with ECR: %w", err)
 	}
 	Success("Configured registry authentication")
 
@@ -276,10 +277,6 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		fmt.Printf("  MCP URL: %s\n", *deployed.ProviderUrl)
 		fmt.Println()
 	}
-
-	// Optional: Clean up ECR auth from wkg config
-	// (ECR tokens expire after 12 hours anyway, so this is optional)
-	// removeWkgAuthForECR(ecrToken.RegistryUri)
 
 	return nil
 }
@@ -450,9 +447,11 @@ func buildLocalComponents(ctx context.Context, components []ftl.Component) error
 	return nil
 }
 
-// dockerLoginToECR is no longer used - we update wkg config instead
-// Keeping for reference in case we need Docker operations in the future
-/*
+// dockerLoginToECR authenticates Docker with ECR using the docker CLI.
+// We use the CLI instead of the Docker SDK because:
+// 1. The SDK's RegistryLogin only validates credentials but doesn't persist them
+// 2. spin deps publish needs credentials stored in Docker's credential helper
+// 3. docker login CLI properly stores credentials where external tools can access them
 func dockerLoginToECR(ctx context.Context, ecrToken *api.CreateEcrTokenResponseBody) error {
 	// Decode the authorization token
 	decoded, err := base64.StdEncoding.DecodeString(ecrToken.AuthorizationToken)
@@ -484,7 +483,6 @@ func dockerLoginToECR(ctx context.Context, ecrToken *api.CreateEcrTokenResponseB
 
 	return nil
 }
-*/
 
 type PushedComponent struct {
 	ID             string
