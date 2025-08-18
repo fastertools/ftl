@@ -5,11 +5,26 @@
 
 # Rust build artifacts
 target/
+Cargo.lock.bak
+**/*.rs.bk
 
 # FTL specific
 .ftl/
 *.wasm
 *.opt.wasm
+*.wasm.gz
+
+# Go build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
 
 # IDE and editor files
 .vscode/
@@ -27,6 +42,12 @@ target/
 # Test coverage
 tarpaulin-report.html
 cobertura.xml
+coverage.out
+coverage.html
+coverage-*.html
+*.profraw
+*.profdata
+lcov.info
 
 # Documentation
 docs/book/

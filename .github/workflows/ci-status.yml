@@ -22,32 +22,15 @@ jobs:
       needs.changes.outputs.typescript-sdk == 'true' ||
       needs.changes.outputs.go-sdk == 'true' ||
       needs.changes.outputs.python-sdk == 'true' ||
-      needs.changes.outputs.core-crates == 'true' || 
       needs.changes.outputs.components == 'true' || 
       needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/ci.yml
-    with:
-      cli-changed: ${{ needs.changes.outputs.cli }}
-      rust-sdk-changed: ${{ needs.changes.outputs.rust-sdk }}
-      typescript-sdk-changed: ${{ needs.changes.outputs.typescript-sdk }}
-      go-sdk-changed: ${{ needs.changes.outputs.go-sdk }}
-      python-sdk-changed: ${{ needs.changes.outputs.python-sdk }}
-      core-crates-changed: ${{ needs.changes.outputs.core-crates }}
-      components-changed: ${{ needs.changes.outputs.components }}
-      ci-changed: ${{ needs.changes.outputs.ci }}
-  
-  # Run CLI tests if needed
-  cli-tests:
-    name: Run CLI Tests
-    needs: changes
-    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.core-crates == 'true'
-    uses: ./.github/workflows/test-cli.yml
   
   # The single required status check
   status:
     name: CI Status
     runs-on: ubuntu-latest
-    needs: [changes, ci, cli-tests]
+    needs: [changes, ci]
     if: always()
     steps:
       - name: Check All Jobs
@@ -62,7 +45,6 @@ jobs:
              [ "${{ needs.changes.outputs.typescript-sdk }}" == "true" ] || \
              [ "${{ needs.changes.outputs.go-sdk }}" == "true" ] || \
              [ "${{ needs.changes.outputs.python-sdk }}" == "true" ] || \
-             [ "${{ needs.changes.outputs.core-crates }}" == "true" ] || \
              [ "${{ needs.changes.outputs.components }}" == "true" ] || \
              [ "${{ needs.changes.outputs.ci }}" == "true" ]; then
             CI_SHOULD_RUN="true"
@@ -79,32 +61,10 @@ jobs:
             echo "⏭️  CI: skipped (no relevant changes)"
           fi
           
-          # Check CLI tests status (when CLI or core-crates change)
-          CLI_TESTS_SHOULD_RUN=false
-          if [ "${{ needs.changes.outputs.cli }}" == "true" ] || [ "${{ needs.changes.outputs.core-crates }}" == "true" ]; then
-            CLI_TESTS_SHOULD_RUN=true
-          fi
-          
-          if [ "$CLI_TESTS_SHOULD_RUN" == "true" ]; then
-            if [ "${{ needs.cli-tests.result }}" == "success" ]; then
-              echo "✅ CLI Tests: passed"
-            else
-              echo "❌ CLI Tests: ${{ needs.cli-tests.result }}"
-            fi
-          else
-            echo "⏭️  CLI Tests: skipped (no CLI or core crate changes)"
-          fi
-          
           # Overall status - only fail if a job that should have run failed
           if [ "$CI_SHOULD_RUN" == "true" ] && [ "${{ needs.ci.result }}" != "success" ]; then
             echo ""
             echo "❌ CI checks failed"
-            exit 1
-          fi
-          
-          if [ "$CLI_TESTS_SHOULD_RUN" == "true" ] && [ "${{ needs.cli-tests.result }}" != "success" ]; then
-            echo ""
-            echo "❌ CLI tests failed"
             exit 1
           fi
           

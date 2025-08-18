@@ -93,7 +93,13 @@ jobs:
           }
           
           # Check each category
-          cli_patterns="^cli/"
+          # Go CLI patterns - includes cmd, internal, pkg, and shared directories
+          cli_patterns="^cmd/ftl/
+          ^internal/
+          ^pkg/
+          ^go/
+          ^go\.mod$
+          ^go\.sum$"
           CLI_CHANGED=$(check_changes "$cli_patterns")
           echo "cli=$CLI_CHANGED" >> $GITHUB_OUTPUT
           
@@ -107,7 +113,9 @@ jobs:
           echo "typescript-sdk=$TYPESCRIPT_SDK_CHANGED" >> $GITHUB_OUTPUT
           
           components_patterns="^components/
-          ^\.cargo/config\.toml$"
+          ^\.cargo/config\.toml$
+          ^Cargo\.toml$
+          ^Cargo\.lock$"
           COMPONENTS_CHANGED=$(check_changes "$components_patterns")
           echo "components=$COMPONENTS_CHANGED" >> $GITHUB_OUTPUT
           
@@ -119,8 +127,8 @@ jobs:
           MCP_GW_CHANGED=$(check_changes "$mcp_gw_patterns")
           echo "mcp-gateway=$MCP_GW_CHANGED" >> $GITHUB_OUTPUT
           
-          core_patterns="^crates/"
-          CORE_CHANGED=$(check_changes "$core_patterns")
+          # No more crates directory - set to false
+          CORE_CHANGED="false"
           echo "core-crates=$CORE_CHANGED" >> $GITHUB_OUTPUT
           
           go_sdk_patterns="^sdk/go/"
