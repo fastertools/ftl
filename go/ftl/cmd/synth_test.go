@@ -69,7 +69,7 @@ components:
 	assert.NoError(t, err)
 	assert.Contains(t, result, "spin_manifest_version")
 	assert.Contains(t, result, "test-app")
-	assert.Contains(t, result, "ftl-mcp-gateway")
+	assert.Contains(t, result, "mcp-gateway")
 }
 
 func TestSynthesizeFromJSON(t *testing.T) {

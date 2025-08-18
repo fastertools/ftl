@@ -1,5 +1,16 @@
 // Package config defines the FTL configuration schema
 // This is used both locally and for deployments
+//
+// NOTE: This package includes fields that are NOT exposed to end users:
+// - KeyValueStores, SQLiteDatabases, AIModels in ComponentConfig
+// These fields exist for:
+// 1. Future platform features (not yet implemented)
+// 2. API compatibility with potential backend services
+// 3. Internal platform use only
+//
+// User-facing configuration is defined in the ftl package types,
+// which intentionally excludes these fields to prevent misuse.
+// The CUE synthesis patterns only copy allowed fields from user config.
 package config
 
 import (

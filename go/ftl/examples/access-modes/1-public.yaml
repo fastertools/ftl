@@ -1,0 +1,28 @@
+# PUBLIC ACCESS MODE
+# No authentication required - anyone can access
+
+application:
+  name: public-demo
+  version: "1.0.0"
+  description: "Public tools - no authentication"
+
+# Public access - no auth needed
+access: public
+
+components:
+  - id: weather-tool
+    source:
+      registry: ghcr.io
+      package: "demo:weather"
+      version: "1.0.0"
+      
+  - id: calculator
+    source:
+      registry: ghcr.io
+      package: "demo:calculator"  
+      version: "1.0.0"
+
+# Result:
+# - NO mcp-authorizer component
+# - Direct public routing to MCP gateway
+# - Anyone can access without authentication

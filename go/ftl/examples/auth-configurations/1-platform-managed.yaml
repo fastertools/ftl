@@ -1,0 +1,30 @@
+# Platform-Managed Authentication
+# The simplest option - FTL handles everything
+
+application:
+  name: my-secure-app
+  version: "1.0.0"
+  description: "App using FTL's built-in authentication"
+
+# Just set private - no auth config needed!
+# FTL automatically uses its WorkOS setup
+access: private
+
+components:
+  - id: database-tool
+    source:
+      registry: ghcr.io
+      package: "example:database"
+      version: "1.0.0"
+      
+  - id: analytics-tool
+    source:
+      registry: ghcr.io
+      package: "example:analytics"
+      version: "1.0.0"
+
+# When synthesized, this creates:
+# - mcp-authorizer component
+# - JWT issuer: https://divine-lion-50-staging.authkit.app/
+# - JWT audience: client_01JZM53FW3WYV08AFC4QWQ3BNB (FTL's client)
+# - Users auth through FTL's WorkOS organization

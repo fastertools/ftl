@@ -1,0 +1,36 @@
+{
+  "application": {
+    "name": "secure-tools",
+    "version": "1.0.0",
+    "description": "Secure MCP tools with WorkOS authentication"
+  },
+  "access": "private",
+  "auth": {
+    "provider": "workos",
+    "org_id": "org_01HZQR3GNFQ6N1X8Q3ZKJP8QWS"
+  },
+  "components": [
+    {
+      "id": "database-admin",
+      "source": {
+        "registry": "ghcr.io",
+        "package": "example:db-admin",
+        "version": "2.0.0"
+      },
+      "variables": {
+        "LOG_LEVEL": "info"
+      }
+    },
+    {
+      "id": "secrets-manager",
+      "source": {
+        "registry": "ghcr.io",
+        "package": "example:secrets",
+        "version": "1.5.0"
+      },
+      "variables": {
+        "VAULT_ENDPOINT": "https://vault.internal"
+      }
+    }
+  ]
+}

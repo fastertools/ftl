@@ -1,0 +1,41 @@
+# ORG ACCESS MODE
+# FTL platform auth - organization-level access
+
+application:
+  name: team-tools
+  version: "1.0.0"
+  description: "Team tools - org-level access"
+
+# Org access - FTL handles auth, org-level access
+access: org
+
+# No auth config needed - FTL platform manages it
+# Platform will validate user's org membership
+# Future: Will support M2M tokens scoped to org
+
+components:
+  - id: team-dashboard
+    source:
+      registry: ghcr.io
+      package: "enterprise:dashboard"
+      version: "2.0.0"
+      
+  - id: org-resources
+    source:
+      registry: ghcr.io
+      package: "enterprise:resources"
+      version: "2.0.0"
+      
+  - id: shared-knowledge
+    source:
+      registry: ghcr.io
+      package: "enterprise:knowledge"
+      version: "2.0.0"
+
+# Result:
+# - Adds mcp-authorizer component
+# - JWT issuer: https://divine-lion-50-staging.authkit.app/
+# - JWT audience: client_01JZM53FW3WYV08AFC4QWQ3BNB
+# - Platform validates user belongs to the org
+# - All org members can access these tools
+# - Future: M2M tokens with org scope will work

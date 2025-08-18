@@ -29,8 +29,8 @@ func Example_simpleApp() {
 		FromLocal("./tools/translator.wasm").
 		Build()
 
-	// Enable authentication
-	app.EnableWorkOSAuth("org_123456")
+	// Enable organization-level authentication
+	app.SetOrgAccess()
 
 	// Build the application
 	builtCDK := app.Build()
@@ -71,7 +71,7 @@ func Example_customAuth() {
 		Build()
 
 	// Enable custom auth
-	app.EnableCustomAuth(
+	app.SetCustomAuth(
 		"https://auth.company.com",
 		"mcp-platform",
 	)

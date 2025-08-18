@@ -21,7 +21,7 @@ func TestDisplayAppsTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		apps     []testApp
-		verbose  bool
+		detailed bool
 		expected []string
 		notWant  []string
 	}{
@@ -51,7 +51,7 @@ func TestDisplayAppsTable(t *testing.T) {
 					updatedAt: "2024-01-01T00:00:00Z",
 				},
 			},
-			verbose: false,
+			detailed: false,
 			expected: []string{
 				"NAME", "STATUS", "ACCESS", "URL", "CREATED",
 				"active-app", "ACTIVE", "https://example.com",
@@ -71,7 +71,7 @@ func TestDisplayAppsTable(t *testing.T) {
 					updatedAt: "2024-01-01T00:00:00Z",
 				},
 			},
-			verbose: false,
+			detailed: false,
 			expected: []string{
 				"NAME", "STATUS", "ACCESS", "URL", "CREATED",
 				"solo-app", "ACTIVE",
@@ -84,11 +84,11 @@ func TestDisplayAppsTable(t *testing.T) {
 		{
 			name:     "empty list",
 			apps:     []testApp{},
-			verbose:  false,
+			detailed: false,
 			expected: []string{},
 		},
 		{
-			name: "verbose mode with deployment",
+			name: "detailed mode with deployment",
 			apps: []testApp{
 				{
 					id:            "123e4567-e89b-12d3-a456-426614174000",
@@ -103,7 +103,7 @@ func TestDisplayAppsTable(t *testing.T) {
 					environment:   ptr("production"),
 				},
 			},
-			verbose: true,
+			detailed: true,
 			expected: []string{
 				"verbose-app",
 				"ACTIVE",
@@ -126,7 +126,7 @@ func TestDisplayAppsTable(t *testing.T) {
 			apps := convertToAPIApps(tt.apps)
 
 			dw := NewDataWriter(&buf, "table")
-			err := displayAppsTable(apps, tt.verbose, dw)
+			err := displayAppsTable(apps, tt.detailed, dw)
 			require.NoError(t, err)
 
 			output := buf.String()

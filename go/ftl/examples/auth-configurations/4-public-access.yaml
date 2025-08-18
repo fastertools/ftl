@@ -1,0 +1,36 @@
+# Public Access
+# No authentication required - use with caution!
+
+application:
+  name: demo-app
+  version: "1.0.0"
+  description: "Public demo application"
+
+# Public access - no authentication needed
+access: public
+
+# No auth configuration needed for public access
+
+components:
+  - id: weather-tool
+    source:
+      registry: ghcr.io
+      package: "demo:weather"
+      version: "1.0.0"
+      
+  - id: calculator-tool
+    source:
+      registry: ghcr.io
+      package: "demo:calculator"
+      version: "1.0.0"
+
+# When synthesized, this creates:
+# - NO mcp-authorizer component
+# - Direct public routing to MCP gateway
+# - Anyone can access without authentication
+#
+# ⚠️ WARNING: Only use for:
+# - Public demos
+# - Development/testing
+# - Tools with no sensitive data
+# - Truly public services

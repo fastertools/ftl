@@ -25,11 +25,26 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
         return Ok(create_cors_response());
     }
 
-    // Load configuration
-    let config = Config::load()?;
+    // Load configuration and handle errors properly
+    let config = match Config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("ERROR: Configuration failed: {}", e);
+            // Return configuration error as a proper HTTP response
+            let error = AuthError::Configuration(format!("Configuration error: {}", e));
+            return Ok(create_config_error_response(&error));
+        }
+    };
 
     // Extract trace ID for request tracking
     let trace_id = extract_trace_id(&req, &config.trace_header);
+
+    // Log request details for debugging
+    if let Some(ref id) = trace_id {
+        eprintln!("[{}] {} {}", id, req.method(), req.path());
+    } else {
+        eprintln!("{} {}", req.method(), req.path());
+    }
 
     // Handle OAuth discovery endpoints (no auth required)
     if let Some(response) = handle_discovery(&req, &config, trace_id.as_ref()) {
@@ -50,6 +65,12 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
             }
         }
         Err(auth_error) => {
+            // Log auth failures for debugging
+            if let Some(ref id) = trace_id {
+                eprintln!("[{}] Auth failed: {}", id, auth_error);
+            } else {
+                eprintln!("Auth failed: {}", auth_error);
+            }
             // Return authentication error
             Ok(create_error_response(&auth_error, &req, &config, trace_id))
         }
@@ -71,7 +92,11 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
         config::Provider::Jwt(jwt_provider) => {
             // Open KV store for JWKS caching
             let store = Store::open_default()
-                .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {e}")))?;
+                .map_err(|e| {
+                    eprintln!("ERROR: Failed to open KV store: {e}");
+                    eprintln!("HINT: Ensure the mcp-authorizer component has 'key_value_stores = [\"default\"]' in spin.toml");
+                    AuthError::Internal(format!("KV store access denied. Ensure component has key_value_stores permission in spin.toml"))
+                })?;
 
             // Verify JWT token (signature, expiry, issuer, audience)
             token::verify(token, jwt_provider, &store).await?
@@ -280,4 +305,27 @@ fn extract_host(req: &Request) -> Option<String> {
                 .and_then(|(_, value)| value.as_str())
                 .map(String::from)
         })
+}
+
+/// Create configuration error response (simpler version without request context)
+fn create_config_error_response(error: &AuthError) -> Response {
+    let body = serde_json::json!({
+        "error": "server_error",
+        "error_description": error.to_string()
+    });
+
+    Response::builder()
+        .status(500)
+        .header("content-type", "application/json")
+        .header("access-control-allow-origin", "*")
+        .header(
+            "access-control-allow-methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        )
+        .header(
+            "access-control-allow-headers",
+            "Content-Type, Authorization",
+        )
+        .body(body.to_string())
+        .build()
 }
