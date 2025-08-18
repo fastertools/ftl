@@ -14,7 +14,7 @@ import (
 
 func newListCmd() *cobra.Command {
 	var format string
-	var verbose bool
+	var detailed bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -22,12 +22,12 @@ func newListCmd() *cobra.Command {
 		Long:  `List all FTL applications deployed on the platform.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			return runList(ctx, format, verbose)
+			return runList(ctx, format, detailed)
 		},
 	}
 
 	cmd.Flags().StringVarP(&format, "output", "o", "table", "Output format (table, json)")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details (app ID)")
+	cmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show additional details (app ID, deployment info)")
 
 	return cmd
 }
@@ -35,7 +35,7 @@ func newListCmd() *cobra.Command {
 // Allow overriding for tests
 var runList = runListImpl
 
-func runListImpl(ctx context.Context, format string, verbose bool) error {
+func runListImpl(ctx context.Context, format string, detailed bool) error {
 	// Initialize auth manager
 	store, err := auth.NewKeyringStore()
 	if err != nil {
@@ -54,12 +54,15 @@ func runListImpl(ctx context.Context, format string, verbose bool) error {
 		return fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	// List all apps
-	response, err := apiClient.ListApps(ctx, nil)
+	// List all apps - use empty params instead of nil
+	// (some backends may filter differently with nil vs empty params)
+	Debug("Calling ListApps with empty params")
+	response, err := apiClient.ListApps(ctx, &api.ListAppsParams{})
 	if err != nil {
 		return fmt.Errorf("failed to list apps: %w", err)
 	}
 
+	Debug("ListApps returned %d apps", len(response.Apps))
 	if len(response.Apps) == 0 {
 		fmt.Fprintln(colorOutput, "No applications found.")
 		return nil
@@ -72,7 +75,7 @@ func runListImpl(ctx context.Context, format string, verbose bool) error {
 	case "json":
 		return dw.WriteStruct(response.Apps)
 	case "table":
-		return displayAppsTable(response.Apps, verbose, dw)
+		return displayAppsTable(response.Apps, detailed, dw)
 	default:
 		return fmt.Errorf("invalid output format: %s (use 'table' or 'json')", format)
 	}
@@ -102,10 +105,10 @@ func displayAppsTable(apps []struct {
 	ProviderUrl   *string                            `json:"providerUrl,omitempty"`
 	Status        api.ListAppsResponseBodyAppsStatus `json:"status"`
 	UpdatedAt     string                             `json:"updatedAt"`
-}, verbose bool, dw *DataWriter) error {
+}, detailed bool, dw *DataWriter) error {
 	// Build headers
 	var headers []string
-	if verbose {
+	if detailed {
 		headers = []string{"NAME", "ID", "STATUS", "ACCESS", "URL", "DEPLOYMENT", "ENVIRONMENT", "CREATED"}
 	} else {
 		headers = []string{"NAME", "STATUS", "ACCESS", "URL", "CREATED"}
@@ -144,8 +147,8 @@ func displayAppsTable(apps []struct {
 			created = created[:10] // Just YYYY-MM-DD
 		}
 
-		// Add row based on verbose mode
-		if verbose {
+		// Add row based on detailed mode
+		if detailed {
 			// Get deployment info if available
 			deploymentId := "-"
 			environment := "-"

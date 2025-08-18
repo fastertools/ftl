@@ -12,8 +12,7 @@ import (
 func TestCDK_SetAccess(t *testing.T) {
 	cdk := NewCDK()
 	app := cdk.NewApp("test-app").
-		SetAccess("private").
-		EnableWorkOSAuth("org_123")
+		SetOrgAccess()
 
 	app.AddComponent("comp1").FromLocal("./comp1.wasm").Build()
 
@@ -29,12 +28,12 @@ func TestCDK_SetAccess(t *testing.T) {
 	}
 }
 
-func TestCDK_EnableCustomAuth(t *testing.T) {
+func TestCDK_SetCustomAuth(t *testing.T) {
 	cdk := NewCDK()
 	app := cdk.NewApp("custom-auth-app")
 
 	app.AddComponent("comp1").FromLocal("./comp1.wasm").Build()
-	app.EnableCustomAuth("https://auth.example.com", "my-audience")
+	app.SetCustomAuth("https://auth.example.com", "my-audience")
 
 	builtCDK := app.Build()
 	manifest, err := builtCDK.Synthesize()
@@ -291,7 +290,7 @@ func TestCDK_ComplexScenario(t *testing.T) {
 		Build()
 
 	// Enable authentication
-	app.EnableWorkOSAuth("org_complex123")
+	app.SetOrgAccess()
 
 	builtCDK := app.Build()
 
@@ -312,7 +311,7 @@ func TestCDK_ComplexScenario(t *testing.T) {
 	}
 
 	// Verify all components are present
-	components := []string{"rust-service", "auth-service", "frontend", "ftl-mcp-gateway", "mcp-authorizer"}
+	components := []string{"rust-service", "auth-service", "frontend", "mcp-gateway", "mcp-authorizer"}
 	for _, comp := range components {
 		if !strings.Contains(manifest, "[component."+comp+"]") {
 			t.Errorf("Missing component: %s", comp)

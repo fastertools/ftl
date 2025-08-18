@@ -79,7 +79,7 @@ impl Config {
     /// Load configuration from Spin variables
     pub fn load() -> Result<Self> {
         let gateway_url = variables::get("mcp_gateway_url")
-            .unwrap_or_else(|_| "https://mcp-gateway.spin.internal".to_string());
+            .unwrap_or_else(|_| "http://mcp-gateway.spin.internal".to_string());
 
         let trace_header = variables::get("mcp_trace_header")
             .unwrap_or_else(|_| "x-trace-id".to_string())

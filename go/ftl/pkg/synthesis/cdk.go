@@ -46,12 +46,11 @@ type CDKBuildConfig struct {
 	Watch   []string `json:"watch,omitempty"`
 }
 
-// CDKAuth represents authentication configuration
+// CDKAuth represents authentication configuration for custom access mode
 type CDKAuth struct {
-	Provider    string `json:"provider"`
-	OrgID       string `json:"org_id,omitempty"`
-	JWTIssuer   string `json:"jwt_issuer,omitempty"`
-	JWTAudience string `json:"jwt_audience,omitempty"`
+	JWTIssuer         string   `json:"jwt_issuer"`
+	JWTAudience       string   `json:"jwt_audience"`
+	JWTRequiredScopes []string `json:"jwt_required_scopes,omitempty"`
 }
 
 // AppBuilder provides a fluent interface for building applications
@@ -93,25 +92,29 @@ func (ab *AppBuilder) SetAccess(access string) *AppBuilder {
 	return ab
 }
 
-// EnableWorkOSAuth enables WorkOS authentication
-func (ab *AppBuilder) EnableWorkOSAuth(orgID string) *AppBuilder {
-	ab.app.Auth = &CDKAuth{
-		Provider:  "workos",
-		OrgID:     orgID,
-		JWTIssuer: "https://api.workos.com",
-	}
+// SetPrivateAccess enables FTL platform authentication (user-only access)
+func (ab *AppBuilder) SetPrivateAccess() *AppBuilder {
 	ab.app.Access = "private"
+	// No auth config needed - FTL handles it
+	ab.app.Auth = nil
 	return ab
 }
 
-// EnableCustomAuth enables custom JWT authentication
-func (ab *AppBuilder) EnableCustomAuth(issuer, audience string) *AppBuilder {
+// SetOrgAccess enables FTL platform authentication (org-level access)
+func (ab *AppBuilder) SetOrgAccess() *AppBuilder {
+	ab.app.Access = "org"
+	// No auth config needed - FTL handles it
+	ab.app.Auth = nil
+	return ab
+}
+
+// SetCustomAuth enables custom JWT authentication
+func (ab *AppBuilder) SetCustomAuth(issuer, audience string) *AppBuilder {
 	ab.app.Auth = &CDKAuth{
-		Provider:    "custom",
 		JWTIssuer:   issuer,
 		JWTAudience: audience,
 	}
-	ab.app.Access = "private"
+	ab.app.Access = "custom"
 	return ab
 }
 

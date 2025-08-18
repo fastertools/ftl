@@ -1,0 +1,31 @@
+# PRIVATE ACCESS MODE
+# FTL platform auth - only the authenticated user can access
+
+application:
+  name: my-private-tools
+  version: "1.0.0"
+  description: "Personal tools - user-only access"
+
+# Private access - FTL handles auth, user-only
+access: private
+
+# No auth config needed - FTL platform manages it
+
+components:
+  - id: personal-notes
+    source:
+      registry: ghcr.io
+      package: "tools:notes"
+      version: "1.0.0"
+      
+  - id: private-assistant
+    source:
+      registry: ghcr.io
+      package: "tools:assistant"
+      version: "1.0.0"
+
+# Result:
+# - Adds mcp-authorizer component
+# - JWT issuer: https://divine-lion-50-staging.authkit.app/
+# - JWT audience: client_01JZM53FW3WYV08AFC4QWQ3BNB
+# - Only the authenticated user can access their tools

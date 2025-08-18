@@ -14,8 +14,13 @@ import (
 	version:      string | *"0.1.0"
 	description:  string | *""
 	components:   [...#Component] | *[]
-	access:       "public" | "private" | *"public"
-	auth:         #AuthConfig | *{provider: "workos", org_id: "", jwt_issuer: "https://api.workos.com", jwt_audience: ""}
+	// Access modes:
+	// - public: No authentication required
+	// - private: FTL auth, user-only access
+	// - org: FTL auth, org-level access (or M2M tokens scoped to org)
+	// - custom: User provides all auth configuration
+	access:       "public" | "private" | "org" | "custom" | *"public"
+	auth?:        #AuthConfig  // Required only for "custom" access
 }
 
 #Component: {
@@ -40,18 +45,11 @@ import (
 }
 
 #AuthConfig: {
-	provider!: "workos" | "custom"
-	
-	if provider == "workos" {
-		org_id!: string
-		jwt_issuer: *"https://api.workos.com" | string
-		jwt_audience?: string
-	}
-	
-	if provider == "custom" {
-		jwt_issuer!: string
-		jwt_audience!: string
-	}
+	// For custom access mode - provide your JWT configuration
+	jwt_issuer!: string
+	jwt_audience!: string
+	// Optional: Required scopes for token validation
+	jwt_required_scopes?: [...string]
 }
 
 // ===========================================================================
@@ -62,7 +60,7 @@ import (
 	input: #FTLApplication
 	
 	// Helper to determine if we need auth
-	_needsAuth: input.access == "private"
+	_needsAuth: input.access == "private" || input.access == "org" || input.access == "custom"
 	
 	output: {
 		spin_manifest_version: 2
@@ -77,7 +75,13 @@ import (
 		
 		// Build components map
 		component: {
-			// User components  
+			// User components
+			// IMPORTANT: User components are intentionally restricted from accessing:
+			// - key_value_stores: KV access is only granted to platform components
+			// - sqlite_databases: Database access is not exposed to users
+			// - ai_models: AI model access is not exposed to users
+			// This ensures proper isolation and prevents resource abuse.
+			// Only the following fields are copied from user configuration:
 			for comp in input.components {
 				"\(comp.id)": {
 					source: comp.source
@@ -88,11 +92,12 @@ import (
 					if comp.variables != _|_ {
 						variables: comp.variables
 					}
+					// NOTE: No key_value_stores, sqlite_databases, or ai_models
 				}
 			}
 			
 			// MCP Gateway (always present)
-			"ftl-mcp-gateway": {
+			"mcp-gateway": {
 				source: {
 					registry: "ghcr.io"
 					package:  "fastertools:mcp-gateway"
@@ -121,10 +126,44 @@ import (
 						"https://*.authkit.app",
 						"https://*.workos.com",
 					]
+					key_value_stores: ["default"]
 					variables: {
-						mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal"
-						mcp_jwt_issuer: input.auth.jwt_issuer | *"https://api.workos.com"
-						mcp_jwt_audience: input.auth.jwt_audience | *input.name
+						mcp_gateway_url: "http://mcp-gateway.spin.internal"
+						
+						// JWT configuration based on access mode
+						
+						// For "private" and "org" modes - use FTL platform auth
+						if input.access == "private" || input.access == "org" {
+							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
+							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
+							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
+							
+							// For org mode, might add org validation in future
+							// For now, org validation happens at the platform level
+							if input.access == "org" {
+								// TODO: Add org-level scope requirements when M2M tokens are implemented
+								// mcp_jwt_required_scopes: "org:access"
+							}
+						}
+						
+						// For "custom" mode - user must provide auth config
+						if input.access == "custom" {
+							if input.auth != _|_ && input.auth.jwt_issuer != _|_ {
+								mcp_jwt_issuer: input.auth.jwt_issuer
+							}
+							if input.auth == _|_ || input.auth.jwt_issuer == _|_ {
+								// Default to WorkOS for backwards compatibility
+								mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
+							}
+							
+							if input.auth != _|_ && input.auth.jwt_audience != _|_ {
+								mcp_jwt_audience: input.auth.jwt_audience
+							}
+							if input.auth == _|_ || input.auth.jwt_audience == _|_ {
+								// Default audience to app name for custom providers
+								mcp_jwt_audience: input.name
+							}
+						}
 					}
 				}
 			}
@@ -135,7 +174,7 @@ import (
 			// Base routes
 			_publicRoutes: [{
 				route: "/..."
-				component: "ftl-mcp-gateway"
+				component: "mcp-gateway"
 			}]
 			
 			_privateRoutes: [
@@ -145,7 +184,7 @@ import (
 				},
 				{
 					route: {private: true}
-					component: "ftl-mcp-gateway"
+					component: "mcp-gateway"
 				}
 			]
 			

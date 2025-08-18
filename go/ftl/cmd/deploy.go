@@ -954,7 +954,7 @@ func displayMCPUrls(baseURL string, components []ftl.Component) {
 	tb := NewTableBuilder("COMPONENT", "URL")
 
 	// Add the main application MCP URL
-	tb.AddRow("all", mcpBaseURL)
+	tb.AddRow("*all", mcpBaseURL)
 
 	// Add component-specific MCP URLs
 	for _, comp := range components {
@@ -966,12 +966,12 @@ func displayMCPUrls(baseURL string, components []ftl.Component) {
 	fmt.Println()
 	if err := tb.Write(dw); err != nil {
 		// Fallback to simple display if table fails
-		fmt.Printf("Application MCP: %s\n", mcpBaseURL)
+		fmt.Printf("URL: %s\n", mcpBaseURL)
 		for _, comp := range components {
 			fmt.Printf("%s: %s/x/%s\n", comp.ID, mcpBaseURL, comp.ID)
 		}
 	}
 
 	// Add summary line after table
-	fmt.Fprintf(colorOutput, "Use these URLs to connect from MCP clients.\n")
+	fmt.Fprintf(colorOutput, "Connect to MCP clients with the URLs above.\n")
 }

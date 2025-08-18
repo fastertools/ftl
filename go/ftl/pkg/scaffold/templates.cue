@@ -35,6 +35,58 @@ package scaffold
 	}
 	
 	files: {
+		"README.md": """
+			# \(name)
+			
+			MCP component authored in Rust.
+			
+			## Development
+			
+			### Build the component
+			```bash
+			make build
+			```
+			
+			### Run tests
+			```bash
+			make test
+			```
+			
+			### Clean build artifacts
+			```bash
+			make clean
+			```
+			
+			## Integration with FTL
+			
+			This component has been automatically added to your `ftl.yaml` configuration.
+			
+			To synthesize and run:
+			```bash
+			# From the project root
+			ftl synth    # Generates spin.toml
+			ftl up       # Runs the application
+			```
+			
+			## Configuration
+			
+			The component configuration in `ftl.yaml`:
+			- `source`: Path to the compiled WASM file
+			- `build.command`: Build command (make build)
+			- `build.watch`: Files to watch for auto-rebuild
+			
+			## Adding Tools
+			
+			Edit `src/lib.rs` and add new tools in the `tools!` macro:
+			```rust
+			tools! {
+			    fn your_tool(input: YourInput) -> ToolResponse {
+			        // Tool implementation
+			    }
+			}
+			```
+			"""
+		
 		"Cargo.toml": """
 			[package]
 			name = "\(name)"
@@ -128,6 +180,58 @@ package scaffold
 	}
 	
 	files: {
+		"README.md": """
+			# \(name)
+			
+			MCP component authored in TypeScript.
+			
+			## Development
+			
+			### Install dependencies
+			```bash
+			npm install
+			```
+			
+			### Build the component
+			```bash
+			make build
+			# or
+			npm run build
+			```
+			
+			### Type checking
+			```bash
+			npm run typecheck
+			```
+			
+			## Integration with FTL
+			
+			This component has been automatically added to your `ftl.yaml` configuration.
+			
+			To synthesize and run:
+			```bash
+			# From the project root
+			ftl synth    # Generates spin.toml
+			ftl up       # Runs the application
+			```
+			
+			## Adding Tools
+			
+			Edit `src/index.ts` and add new tools in the `createTools` call:
+			```typescript
+			const handle = createTools({
+			  yourTool: {
+			    description: 'Tool description',
+			    inputSchema: z.toJSONSchema(YourSchema),
+			    handler: async (input) => {
+			      // Tool implementation
+			      return ToolResponse.text('Response')
+			    }
+			  }
+			})
+			```
+			"""
+		
 		"package.json": """
 			{
 			  "name": "\(name)",
@@ -255,6 +359,62 @@ package scaffold
 	}
 	
 	files: {
+		"README.md": """
+			# \(name)
+			
+			MCP component authored in Python.
+			
+			## Development
+			
+			### Setup development environment
+			```bash
+			make install-dev
+			# or
+			pip install -e ".[dev]"
+			```
+			
+			### Build the component
+			```bash
+			make build
+			```
+			
+			### Run tests
+			```bash
+			make test
+			```
+			
+			### Code quality
+			```bash
+			make format    # Format with black
+			make lint      # Lint with ruff
+			make type-check # Type check with mypy
+			```
+			
+			## Integration with FTL
+			
+			This component has been automatically added to your `ftl.yaml` configuration.
+			
+			To synthesize and run:
+			```bash
+			# From the project root
+			ftl synth    # Generates spin.toml
+			ftl up       # Runs the application
+			```
+			
+			## Adding Tools
+			
+			Edit `src/main.py` and add new tools in the `create_tools` call:
+			```python
+			handle = create_tools({
+			    "yourTool": {
+			        "description": "Tool description",
+			        "input_schema": YourInput.model_json_schema(),
+			        "handler": your_tool_function
+			    }
+			})
+			```
+			"""
+		
 		"pyproject.toml": """
 			[project]
 			name = "\(name)"
@@ -497,6 +657,65 @@ package scaffold
 	}
 	
 	files: {
+		"README.md": """
+			# \(name)
+			
+			MCP component authored in Go.
+			
+			## Development
+			
+			### Setup development environment
+			```bash
+			make dev-setup
+			```
+			
+			### Build the component
+			```bash
+			make build
+			```
+			
+			### Run tests
+			```bash
+			make test
+			```
+			
+			### Code quality
+			```bash
+			make fmt     # Format code
+			make lint    # Run linter
+			make quality # Run all quality checks
+			```
+			
+			## Integration with FTL
+			
+			This component has been automatically added to your `ftl.yaml` configuration.
+			
+			To synthesize and run:
+			```bash
+			# From the project root
+			ftl synth    # Generates spin.toml
+			ftl up       # Runs the application
+			```
+			
+			## TinyGo Requirements
+			
+			This component requires TinyGo for WebAssembly compilation.
+			Install from: https://tinygo.org
+			
+			## Adding Tools
+			
+			Edit `main.go` and add new tools in the `ftl.Handle` call:
+			```go
+			ftl.Handle(ftl.Tools{
+			    "yourTool": {
+			        Description: "Tool description",
+			        InputSchema: YourInput{},
+			        Handler:     YourToolFunction,
+			    },
+			})
+			```
+			"""
+		
 		"go.mod": """
 			module github.com/example/\(name)
 

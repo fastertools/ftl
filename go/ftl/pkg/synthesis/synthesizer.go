@@ -82,14 +82,18 @@ func (s *Synthesizer) encodeToTOML(value cue.Value) (string, error) {
 
 // synthesizeFromValue takes a CUE value and transforms it to a Spin manifest
 func (s *Synthesizer) synthesizeFromValue(inputValue cue.Value) (string, error) {
+	// Debug: print the input value
+	// fmt.Fprintf(os.Stderr, "DEBUG: Input value: %v\n", inputValue)
+
 	// Create the complete transformation program
+	// Note: We build the app directly from inputData without intermediate schema
 	program := fmt.Sprintf(`
 %s
 
 inputData: _
 
-// Transform to FTL application format
-app: #FTLApplication & {
+// Build the FTL app structure directly from input
+_ftlApp: {
 	name:        inputData.application.name
 	version:     inputData.application.version | *"0.1.0"
 	description: inputData.application.description | *""
@@ -105,9 +109,22 @@ app: #FTLApplication & {
 		}
 	}]
 	
-	// Default to public access, no auth
-	access: "public"
+	// Pass through access mode, default to public
+	if inputData.access != _|_ {
+		access: inputData.access
+	}
+	if inputData.access == _|_ {
+		access: "public"
+	}
+	
+	// Pass through auth configuration if present
+	if inputData.auth != _|_ {
+		auth: inputData.auth
+	}
 }
+
+// Validate against schema
+app: #FTLApplication & _ftlApp
 
 // Apply transformation
 _transform: #TransformToSpin & {

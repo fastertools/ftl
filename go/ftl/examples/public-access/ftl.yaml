@@ -1,0 +1,20 @@
+application:
+  name: public-tools
+  version: "1.0.0"
+  description: "Public MCP tools - no authentication required"
+
+# Public access mode - anyone can access the tools
+access: public
+
+components:
+  - id: calculator
+    source:
+      registry: ghcr.io
+      package: "example:calculator"
+      version: "1.0.0"
+    
+  - id: converter
+    source:
+      registry: ghcr.io
+      package: "example:converter"
+      version: "1.0.0"

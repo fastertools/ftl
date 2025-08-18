@@ -36,7 +36,7 @@ func TestCDK_SimpleApp(t *testing.T) {
 		t.Error("Missing calculator component")
 	}
 
-	if !strings.Contains(manifest, "[component.ftl-mcp-gateway]") {
+	if !strings.Contains(manifest, "[component.mcp-gateway]") {
 		t.Error("Missing MCP gateway component")
 	}
 
@@ -57,7 +57,7 @@ func TestCDK_WithAuth(t *testing.T) {
 	app.AddComponent("tool1").FromLocal("./tool1.wasm").Build()
 	app.AddComponent("tool2").FromLocal("./tool2.wasm").Build()
 
-	app.EnableWorkOSAuth("org_123")
+	app.SetOrgAccess()
 
 	// Build and synthesize
 	builtCDK := app.Build()

@@ -682,8 +682,8 @@ pub async fn handle_mcp_request(req: Request) -> Response {
 
     let config = GatewayConfig {
         server_info: ServerInfo {
-            name: "ftl-mcp-gateway".to_string(),
-            version: "0.0.4".to_string(),
+            name: "mcp-gateway".to_string(),
+            version: "0.0.1".to_string(),
         },
         validate_arguments,
     };

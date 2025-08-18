@@ -24,10 +24,10 @@ func newSynthCmd() *cobra.Command {
 Supports Go, YAML, JSON, and CUE input formats.
 
 Examples:
-  # Synthesize from Go file
-  ftl synth platform.go
+  # Auto-detect config file (looks for ftl.yaml, ftl.json, etc.)
+  ftl synth
 
-  # Synthesize from YAML
+  # Synthesize from specific file
   ftl synth platform.yaml
 
   # Write to file
@@ -38,18 +38,32 @@ Examples:
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var input []byte
+			var filename string
 			var err error
 
-			// Read input
-			if len(args) == 0 || args[0] == "-" {
-				// Read from stdin
+			// Determine input source
+			if len(args) == 0 {
+				// No args - look for default config files
+				filename, err = findConfigFile()
+				if err != nil {
+					return err
+				}
+				input, err = os.ReadFile(filename)
+				if err != nil {
+					return fmt.Errorf("failed to read file %s: %w", filename, err)
+				}
+				// Set args so synthesizeFromInput knows the filename
+				args = []string{filename}
+			} else if args[0] == "-" {
+				// Read from stdin explicitly
 				input, err = io.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("failed to read from stdin: %w", err)
 				}
 			} else {
-				// Read from file
-				input, err = os.ReadFile(args[0])
+				// Read from specified file
+				filename = args[0]
+				input, err = os.ReadFile(filename)
 				if err != nil {
 					return fmt.Errorf("failed to read file: %w", err)
 				}
@@ -192,4 +206,30 @@ func synthesizeFromCUE(input []byte) (string, error) {
 	// Use CUE-first synthesizer
 	synth := synthesis.NewSynthesizer()
 	return synth.SynthesizeCUE(string(input))
+}
+
+// findConfigFile looks for FTL configuration files in priority order
+func findConfigFile() (string, error) {
+	// Define the search order for config files
+	configFiles := []string{
+		"ftl.yaml",
+		"ftl.yml",
+		"ftl.json",
+		"main.go",     // Common Go entry point
+		"platform.go", // Alternative Go name
+		"ftl.cue",
+		"app.cue", // Alternative CUE name
+	}
+
+	// Check each file in order
+	for _, file := range configFiles {
+		if _, err := os.Stat(file); err == nil {
+			// File exists
+			fmt.Fprintf(os.Stderr, "Using config file: %s\n", file)
+			return file, nil
+		}
+	}
+
+	// No config file found
+	return "", fmt.Errorf("no FTL configuration file found. Looked for: %v\n\nCreate one of these files or specify a file explicitly", configFiles)
 }
