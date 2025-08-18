@@ -77,6 +77,7 @@ func init() {
 		newAddCmd(),
 		newBuildCmd(),
 		newTestCmd(),
+		newComponentCmd(),
 		newDeployCmd(),
 		newAuthCmd(),
 		newUpCmd(),

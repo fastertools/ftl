@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/go/shared/config"
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
 func newComponentCmd() *cobra.Command {
@@ -38,8 +40,8 @@ func newComponentListCmd() *cobra.Command {
 }
 
 func listComponents() error {
-	// Load config
-	cfg, err := loadSpinConfig("ftl.yaml")
+	// Load manifest
+	manifest, err := loadComponentManifest("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
@@ -47,114 +49,153 @@ func listComponents() error {
 		return err
 	}
 
-	if len(cfg.Components) == 0 {
+	if len(manifest.Components) == 0 {
 		fmt.Println("No components found.")
-		fmt.Println("\nAdd a component with: ftl component add <type> ...")
+		fmt.Println()
+		fmt.Println("Add a component with:")
+		color.Cyan("  ftl component add")
 		return nil
 	}
 
-	// Display components using shared DataWriter
-	dw := NewDataWriter(colorOutput, "table")
-	tb := NewTableBuilder("ID", "SOURCE", "ROUTE", "DESCRIPTION")
+	// Print header
+	color.Cyan("Components:")
+	fmt.Println()
 
-	for _, comp := range cfg.Components {
-		// Format source
-		var source string
-		switch src := comp.Source.(type) {
-		case string:
-			source = src
-		case map[string]interface{}:
-			if url, ok := src["url"]; ok {
-				source = fmt.Sprintf("%s (URL)", url)
-			} else if registry, ok := src["registry"]; ok {
-				pkg := src["package"]
-				version := src["version"]
-				source = fmt.Sprintf("%s/%s:%s", registry, pkg, version)
-			}
+	// List components
+	for _, comp := range manifest.Components {
+		fmt.Printf("  • %s\n", comp.ID)
+
+		// Show source info
+		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
+			fmt.Printf("    Source: %s\n", localPath)
+		} else if registrySource != nil {
+			fmt.Printf("    Source: %s/%s:%s\n",
+				registrySource.Registry,
+				registrySource.Package,
+				registrySource.Version)
 		}
 
-		// Find route from triggers
-		route := "-"
-		for _, trigger := range cfg.Triggers {
-			if trigger.Component == comp.ID {
-				if trigger.Type == config.TriggerTypeHTTP && trigger.Route != "" {
-					route = trigger.Route
-				}
-			}
+		// Show build info if present
+		if comp.Build != nil && comp.Build.Command != "" {
+			fmt.Printf("    Build: %s\n", comp.Build.Command)
 		}
 
-		// Format description (truncate if too long)
-		description := comp.Description
-		if len(description) > 40 {
-			description = description[:37] + "..."
-		}
-		if description == "" {
-			description = "-"
+		// Show variables if present
+		if len(comp.Variables) > 0 {
+			fmt.Printf("    Variables: %d configured\n", len(comp.Variables))
 		}
 
-		tb.AddRow(comp.ID, source, route, description)
+		fmt.Println()
 	}
 
-	fmt.Printf("\nComponents in %s:\n", cfg.Application.Name)
-	return tb.Write(dw)
+	return nil
 }
 
 func newComponentRemoveCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <name>",
+		Use:   "remove [name]",
 		Short: "Remove a component",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
+			var name string
+			if len(args) > 0 {
+				name = args[0]
+			}
 			return removeComponent(name)
 		},
 	}
 }
 
 func removeComponent(name string) error {
-	// Color helpers
-	green := color.New(color.FgGreen).SprintFunc()
-
-	// Load config
-	cfg, err := loadSpinConfig("ftl.yaml")
+	// Load manifest
+	manifest, err := loadComponentManifest("ftl.yaml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
+			return fmt.Errorf("ftl.yaml not found")
 		}
 		return err
 	}
 
+	if len(manifest.Components) == 0 {
+		return fmt.Errorf("no components to remove")
+	}
+
+	// If no name provided, show interactive selection
+	if name == "" {
+		var options []string
+		for _, comp := range manifest.Components {
+			options = append(options, comp.ID)
+		}
+
+		prompt := &survey.Select{
+			Message: "Select component to remove:",
+			Options: options,
+		}
+		if err := survey.AskOne(prompt, &name); err != nil {
+			return err
+		}
+	}
+
 	// Find and remove component
 	found := false
-	newComponents := []config.ComponentConfig{}
-	for _, comp := range cfg.Components {
-		if comp.ID != name {
-			newComponents = append(newComponents, comp)
-		} else {
+	newComponents := []types.Component{}
+	for _, comp := range manifest.Components {
+		if comp.ID == name {
 			found = true
+			continue
 		}
+		newComponents = append(newComponents, comp)
 	}
 
 	if !found {
 		return fmt.Errorf("component '%s' not found", name)
 	}
 
-	cfg.Components = newComponents
-
-	// Also remove associated triggers
-	newTriggers := []config.TriggerConfig{}
-	for _, trigger := range cfg.Triggers {
-		if trigger.Component != name {
-			newTriggers = append(newTriggers, trigger)
-		}
+	// Confirm removal
+	confirm := false
+	prompt := &survey.Confirm{
+		Message: fmt.Sprintf("Remove component '%s'?", name),
+		Default: false,
 	}
-	cfg.Triggers = newTriggers
-
-	// Save updated config
-	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+	if err := survey.AskOne(prompt, &confirm); err != nil {
+		return err
 	}
 
-	fmt.Printf("%s Component '%s' removed\n", green("✓"), name)
+	if !confirm {
+		fmt.Println("Cancelled")
+		return nil
+	}
+
+	// Update manifest
+	manifest.Components = newComponents
+
+	// Save manifest
+	if err := saveComponentManifest("ftl.yaml", manifest); err != nil {
+		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	color.Green("✓ Component '%s' removed", name)
 	return nil
+}
+
+func loadComponentManifest(path string) (*types.Manifest, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest types.Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+	}
+
+	return &manifest, nil
+}
+
+func saveComponentManifest(path string, manifest *types.Manifest) error {
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
 }

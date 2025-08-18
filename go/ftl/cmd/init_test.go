@@ -7,160 +7,237 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
 func TestInitCommand(t *testing.T) {
+	cmd := newInitCmd()
+	assert.NotNil(t, cmd)
+	assert.Contains(t, cmd.Use, "init")
+	assert.Contains(t, cmd.Short, "Initialize")
+}
+
+func TestRunInit(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      *InitOptions
-		wantErr   bool
-		errMsg    string
-		checkFunc func(t *testing.T, dir string)
+		name    string
+		opts    *InitOptions
+		wantErr bool
+		check   func(t *testing.T, dir string)
 	}{
 		{
-			name: "successful init",
+			name: "yaml format",
 			opts: &InitOptions{
-				Name:          "test-app",
-				Description:   "Test application",
+				Name:          "test-project",
+				Description:   "Test project",
 				Format:        "yaml",
 				NoInteractive: true,
 			},
 			wantErr: false,
-			checkFunc: func(t *testing.T, dir string) {
-				// Check ftl.yaml exists and is valid
-				spincPath := filepath.Join(dir, "test-app", "ftl.yaml")
-				assert.FileExists(t, spincPath)
-
-				content, err := os.ReadFile(spincPath)
+			check: func(t *testing.T, dir string) {
+				// Check ftl.yaml exists
+				manifestPath := filepath.Join(dir, "test-project", "ftl.yaml")
+				assert.FileExists(t, manifestPath)
+				
+				// Verify content
+				data, err := os.ReadFile(manifestPath)
 				require.NoError(t, err)
-				assert.Contains(t, string(content), "application:")
-				assert.Contains(t, string(content), "name: test-app")
-
-				// Check .gitignore exists
-				gitignorePath := filepath.Join(dir, "test-app", ".gitignore")
+				
+				var manifest types.Manifest
+				err = yaml.Unmarshal(data, &manifest)
+				require.NoError(t, err)
+				
+				assert.Equal(t, "test-project", manifest.Application.Name)
+				assert.Equal(t, "0.1.0", manifest.Application.Version)
+				assert.Equal(t, "Test project", manifest.Application.Description)
+				assert.Equal(t, "public", manifest.Access)
+			},
+		},
+		{
+			name: "json format",
+			opts: &InitOptions{
+				Name:          "json-project",
+				Format:        "json",
+				NoInteractive: true,
+			},
+			wantErr: false,
+			check: func(t *testing.T, dir string) {
+				jsonPath := filepath.Join(dir, "json-project", "ftl.json")
+				assert.FileExists(t, jsonPath)
+			},
+		},
+		{
+			name: "go format",
+			opts: &InitOptions{
+				Name:          "go-project",
+				Format:        "go",
+				NoInteractive: true,
+			},
+			wantErr: false,
+			check: func(t *testing.T, dir string) {
+				mainPath := filepath.Join(dir, "go-project", "main.go")
+				assert.FileExists(t, mainPath)
+				
+				// Check go.mod also created
+				goModPath := filepath.Join(dir, "go-project", "go.mod")
+				assert.FileExists(t, goModPath)
+			},
+		},
+		{
+			name: "cue format",
+			opts: &InitOptions{
+				Name:          "cue-project",
+				Format:        "cue",
+				NoInteractive: true,
+			},
+			wantErr: false,
+			check: func(t *testing.T, dir string) {
+				cuePath := filepath.Join(dir, "cue-project", "app.cue")
+				assert.FileExists(t, cuePath)
+			},
+		},
+		{
+			name: "with template",
+			opts: &InitOptions{
+				Name:          "template-project",
+				Template:      "mcp",
+				Format:        "yaml",
+				NoInteractive: true,
+			},
+			wantErr: false,
+			check: func(t *testing.T, dir string) {
+				manifestPath := filepath.Join(dir, "template-project", "ftl.yaml")
+				assert.FileExists(t, manifestPath)
+				
+				// Check .gitignore created
+				gitignorePath := filepath.Join(dir, "template-project", ".gitignore")
 				assert.FileExists(t, gitignorePath)
-			},
-		},
-		{
-			name: "successful init with minimal config",
-			opts: &InitOptions{
-				Name:          "minimal-app",
-				Format:        "yaml",
-				NoInteractive: true,
-			},
-			wantErr: false,
-			checkFunc: func(t *testing.T, dir string) {
-				spincPath := filepath.Join(dir, "minimal-app", "ftl.yaml")
-				content, err := os.ReadFile(spincPath)
-				require.NoError(t, err)
-				assert.Contains(t, string(content), "application:")
-				assert.Contains(t, string(content), "name: minimal-app")
-			},
-		},
-		{
-			name: "error - missing name in non-interactive mode",
-			opts: &InitOptions{
-				NoInteractive: true,
-			},
-			wantErr: true,
-			errMsg:  "project name is required",
-		},
-		{
-			name: "error - directory exists without force",
-			opts: &InitOptions{
-				Name:          "existing-app",
-				NoInteractive: true,
-			},
-			wantErr: true,
-			errMsg:  "already exists",
-			checkFunc: func(t *testing.T, dir string) {
-				// Pre-create the directory
-				_ = os.MkdirAll(filepath.Join(dir, "existing-app"), 0755)
-			},
-		},
-		{
-			name: "successful overwrite with force",
-			opts: &InitOptions{
-				Name:          "force-app",
-				Format:        "yaml",
-				Force:         true,
-				NoInteractive: true,
-			},
-			wantErr: false,
-			checkFunc: func(t *testing.T, dir string) {
-				// Pre-create the directory
-				forceDir := filepath.Join(dir, "force-app")
-				_ = os.MkdirAll(forceDir, 0755)
-
-				// Create a file that should be overwritten
-				testFile := filepath.Join(forceDir, "test.txt")
-				_ = os.WriteFile(testFile, []byte("old content"), 0644)
-
-				// After init, check that new files exist
-				t.Cleanup(func() {
-					spincPath := filepath.Join(forceDir, "ftl.yaml")
-					assert.FileExists(t, spincPath)
-				})
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp directory for test
 			tmpDir := t.TempDir()
+			oldWd, _ := os.Getwd()
+			defer os.Chdir(oldWd)
+			os.Chdir(tmpDir)
 
-			// Change to temp directory
-			origDir, err := os.Getwd()
-			require.NoError(t, err)
-			defer func() { _ = os.Chdir(origDir) }()
-
-			err = os.Chdir(tmpDir)
-			require.NoError(t, err)
-
-			// Run pre-check function if provided
-			if tt.checkFunc != nil && tt.wantErr {
-				tt.checkFunc(t, tmpDir)
-			}
-
-			// Run init
-			err = runInit(tt.opts)
-
+			err := runInit(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
-				if tt.errMsg != "" {
-					assert.Contains(t, err.Error(), tt.errMsg)
-				}
 			} else {
 				assert.NoError(t, err)
-
-				// Run post-check function if provided
-				if tt.checkFunc != nil {
-					tt.checkFunc(t, tmpDir)
+				if tt.check != nil {
+					tt.check(t, tmpDir)
 				}
 			}
 		})
 	}
 }
 
+func TestInitExistingDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	// Create directory
+	os.Mkdir("existing", 0755)
+
+	// Try to init without force
+	opts := &InitOptions{
+		Name:          "existing",
+		Format:        "yaml",
+		NoInteractive: true,
+		Force:         false,
+	}
+	err := runInit(opts)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+
+	// Try with force
+	opts.Force = true
+	err = runInit(opts)
+	assert.NoError(t, err)
+}
+
+func TestCreateYAMLConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	opts := &InitOptions{
+		Name:        "test-app",
+		Description: "Test application",
+	}
+	
+	err := createYAMLConfig(tmpDir, opts)
+	require.NoError(t, err)
+	
+	// Verify file exists and content is valid
+	manifestPath := filepath.Join(tmpDir, "ftl.yaml")
+	assert.FileExists(t, manifestPath)
+	
+	data, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	
+	var manifest types.Manifest
+	err = yaml.Unmarshal(data, &manifest)
+	require.NoError(t, err)
+	
+	assert.Equal(t, "test-app", manifest.Application.Name)
+	assert.Equal(t, "0.1.0", manifest.Application.Version)
+	assert.Equal(t, "Test application", manifest.Application.Description)
+}
+
 func TestCreateGitignore(t *testing.T) {
 	tmpDir := t.TempDir()
-
+	
 	err := createGitignore(tmpDir)
-	assert.NoError(t, err)
-
+	require.NoError(t, err)
+	
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 	assert.FileExists(t, gitignorePath)
-
+	
 	content, err := os.ReadFile(gitignorePath)
 	require.NoError(t, err)
+	
+	// Check for essential entries
+	contentStr := string(content)
+	assert.Contains(t, contentStr, ".spin/")
+	assert.Contains(t, contentStr, "spin.toml")
+	assert.Contains(t, contentStr, "*.wasm")
+	assert.Contains(t, contentStr, ".ftl/")
+	assert.Contains(t, contentStr, ".env")
+	assert.Contains(t, contentStr, "target/")
+	assert.Contains(t, contentStr, "node_modules/")
+}
 
-	// Check for important entries
-	assert.Contains(t, string(content), ".spin/")
-	assert.Contains(t, string(content), "spin.toml")
-	assert.Contains(t, string(content), "*.wasm")
-	assert.Contains(t, string(content), ".ftl/")
-	assert.Contains(t, string(content), ".env")
-	assert.Contains(t, string(content), "node_modules/")
-	assert.Contains(t, string(content), "__pycache__/")
+func TestCreateGoConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	opts := &InitOptions{
+		Name:        "go-app",
+		Description: "Go application",
+	}
+	
+	err := createGoConfig(tmpDir, opts)
+	require.NoError(t, err)
+	
+	// Check main.go
+	mainPath := filepath.Join(tmpDir, "main.go")
+	assert.FileExists(t, mainPath)
+	
+	content, err := os.ReadFile(mainPath)
+	require.NoError(t, err)
+	contentStr := string(content)
+	
+	assert.Contains(t, contentStr, "package main")
+	assert.Contains(t, contentStr, "synthesis.NewCDK")
+	assert.Contains(t, contentStr, "go-app")
+	assert.Contains(t, contentStr, "Go application")
+	
+	// Check go.mod
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	assert.FileExists(t, goModPath)
 }

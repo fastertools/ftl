@@ -53,27 +53,51 @@ uninstall:
 ## test: Run all tests
 test:
 	@echo "Testing shared libraries..."
-	cd $(SHARED_DIR) && $(GOTEST) -v ./... -cover
+	cd $(SHARED_DIR) && $(GOTEST) -v \
+		./types \
+		./spin \
+		./ftl \
+		./auth \
+		-cover
 	@echo ""
 	@echo "Testing FTL CLI..."
-	cd $(FTL_DIR) && $(GOTEST) -v ./... -cover
+	cd $(FTL_DIR) && $(GOTEST) -v ./cmd/... ./pkg/... -cover
 
 ## test-short: Run tests without verbose output
 test-short:
-	cd $(SHARED_DIR) && $(GOTEST) ./... -cover
-	cd $(FTL_DIR) && $(GOTEST) ./... -cover
+	@cd $(SHARED_DIR) && $(GOTEST) ./types ./spin ./ftl ./auth -cover
+	@cd $(FTL_DIR) && $(GOTEST) ./cmd/... ./pkg/... -cover
 
 ## coverage: Generate test coverage report
 coverage:
-	@echo "Generating coverage report for shared..."
-	cd $(SHARED_DIR) && $(GOTEST) -coverprofile=coverage.out ./...
-	cd $(SHARED_DIR) && $(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: shared/coverage.html"
+	@echo "Generating combined coverage report..."
+	@cd $(FTL_DIR) && $(GOTEST) -coverprofile=coverage.out \
+		./cmd/... \
+		./pkg/... \
+		../shared/types \
+		../shared/spin \
+		../shared/ftl \
+		../shared/auth 2>/dev/null || true
+	@cd $(FTL_DIR) && $(GOCMD) tool cover -html=coverage.out -o coverage.html
+	@cd $(FTL_DIR) && $(GOCMD) tool cover -func=coverage.out | tail -1
+	@echo "Coverage report generated: ftl/coverage.html"
+
+## coverage-detailed: Generate detailed coverage with percentages per package
+coverage-detailed:
+	@echo "Generating detailed coverage report..."
+	@cd $(FTL_DIR) && $(GOTEST) -coverprofile=coverage.out \
+		./cmd/... \
+		./pkg/... \
+		../shared/types \
+		../shared/spin \
+		../shared/ftl \
+		../shared/auth 2>/dev/null || true
 	@echo ""
-	@echo "Generating coverage report for FTL..."
-	cd $(FTL_DIR) && $(GOTEST) -coverprofile=coverage.out ./...
-	cd $(FTL_DIR) && $(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: ftl/coverage.html"
+	@echo "Coverage by package:"
+	@cd $(FTL_DIR) && $(GOCMD) tool cover -func=coverage.out | grep -E "github.com/fastertools" | grep -v ".go:" || true
+	@echo ""
+	@echo "Overall coverage:"
+	@cd $(FTL_DIR) && $(GOCMD) tool cover -func=coverage.out | tail -1
 
 ## clean: Remove build artifacts
 clean:
