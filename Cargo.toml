@@ -1,19 +1,16 @@
 [workspace]
-resolver = "3"
+resolver = "2"
 members = [
-    "crates/*",
     "components/*",
+    "components/*/tests",
     "sdk/rust",
     "sdk/rust-macros",
-    "cli",
 ]
 # Exclude WebAssembly components from default builds since they require
 # cargo-component and must be built with: cargo component build --target wasm32-wasip1
 default-members = [
-    "crates/*",
     "sdk/rust",
     "sdk/rust-macros",
-    "cli",
 ]
 # Exclude examples and templates
 exclude = [

@@ -1,19 +1,28 @@
-# Building FTL CLI
+# Building FTL
 
-This monorepo contains both Rust and Go components that work together to provide the complete FTL experience.
+This monorepo embraces a polyglot philosophy, using the best tool for each job:
+- **Go** for the CLI (excellent for command-line tools, great ecosystem)
+- **Rust** for WebAssembly components (performance, safety, WASM support)
+- **Multiple languages** for SDKs (meet developers where they are)
 
 ## Prerequisites
 
 ### Required
-- **Rust** 1.75+ with cargo
-- **Go** 1.21+ for spin-compose
+- **Go** 1.21+ for the FTL CLI
+- **Rust** 1.75+ with cargo for WebAssembly components
 - **Make** for build automation
 
-### Optional
+### Optional but Recommended
 - **cargo-component** for building WebAssembly components
-- **spin** CLI for local testing
+  ```bash
+  cargo install cargo-component
+  ```
+- **Spin** CLI for testing WebAssembly applications
+  ```bash
+  curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+  ```
 
-## Quick Build
+## Quick Start
 
 Build everything:
 ```bash
@@ -21,134 +30,181 @@ make all
 ```
 
 This will:
-1. Build the FTL CLI (Rust)
-2. Build spin-compose (Go)  
-3. Build MCP components (WebAssembly)
+1. Build the FTL CLI (Go)
+2. Build WebAssembly components (Rust)
 
-## Individual Builds
+## Development Workflow
 
-### FTL CLI (Rust)
+### Quick development cycle:
 ```bash
-cargo build --release
-# Binary at: target/release/ftl
+make dev
+```
+This runs formatting, builds the CLI, and runs tests.
+
+### Run tests:
+```bash
+make test
 ```
 
-### spin-compose (Go)
+### Format code:
 ```bash
-cd go/spin-compose
-go build -o ../../target/release/spin-compose
-# Or use make:
+make fmt
+```
+
+### Check code quality:
+```bash
+make lint
+```
+
+## Individual Component Builds
+
+### FTL CLI (Go)
+```bash
+# Using make (recommended)
 make build
+
+# Or directly with Go
+go build -o bin/ftl ./cmd/ftl
 ```
 
-### MCP Components (WebAssembly)
+The CLI binary will be at `bin/ftl`
+
+### WebAssembly Components
 ```bash
+# Using make
+make build-components
+
+# Or directly with cargo-component
 cargo component build --workspace --release --target wasm32-wasip1
+```
+
+Components will be in `target/wasm32-wasip1/release/`
+
+### SDKs
+
+Each SDK can be built/tested independently:
+
+**Rust SDK:**
+```bash
+cd sdk/rust
+cargo build
+cargo test
+```
+
+**Python SDK:**
+```bash
+cd sdk/python
+pip install -e .
+pytest
+```
+
+**TypeScript SDK:**
+```bash
+cd sdk/typescript
+npm install
+npm run build
+npm test
+```
+
+**Go SDK:**
+```bash
+cd sdk/go
+go build ./...
+go test ./...
 ```
 
 ## Installation
 
-Install to system:
+Install the FTL CLI to your system:
+
 ```bash
+# Install to ~/.local/bin (user installation)
 make install
+
+# Install to /usr/local/bin (system-wide, requires sudo)
+make install-system
 ```
 
-This installs:
-- `ftl` to `/usr/local/bin/ftl`
-- `spin-compose` to `/usr/local/bin/spin-compose`
+## Testing
 
-## Development
-
-### Running Tests
+Run all tests:
 ```bash
-# Rust tests
-cargo test
-
-# Go tests  
-cd go/spin-compose && go test ./...
-
-# Integration tests
-make test-integration
+make test
 ```
 
-### Code Quality
+Run specific test suites:
 ```bash
-# Rust
-cargo clippy
-cargo fmt --check
+# Test Go CLI only
+make test-cli
 
-# Go
-cd go/spin-compose
-go fmt ./...
-go vet ./...
-golangci-lint run
+# Test Rust SDKs only
+make test-sdk
+
+# Test WebAssembly components
+make test-components
 ```
 
-## Cross-Compilation
-
-### spin-compose for multiple platforms
+Generate coverage reports:
 ```bash
-cd go/spin-compose
-make build-all  # Builds for linux, darwin, windows
+make coverage
+# Open coverage-go.html in your browser
 ```
-
-### FTL for multiple platforms
-```bash
-# Linux
-cargo build --release --target x86_64-unknown-linux-gnu
-
-# macOS
-cargo build --release --target x86_64-apple-darwin
-cargo build --release --target aarch64-apple-darwin
-
-# Windows
-cargo build --release --target x86_64-pc-windows-msvc
-```
-
-## Docker Build
-
-Build everything in Docker:
-```bash
-docker build -t ftl-cli .
-docker run --rm ftl-cli ftl --version
-docker run --rm ftl-cli spin-compose --version
-```
-
-## Release Build
-
-Create release artifacts:
-```bash
-make release VERSION=v1.0.0
-```
-
-This creates:
-- `dist/ftl-v1.0.0-linux-amd64.tar.gz`
-- `dist/ftl-v1.0.0-darwin-amd64.tar.gz`
-- `dist/ftl-v1.0.0-darwin-arm64.tar.gz`
-- `dist/ftl-v1.0.0-windows-amd64.zip`
-- `dist/spin-compose-v1.0.0-linux-amd64.tar.gz`
-- `dist/spin-compose-v1.0.0-darwin-amd64.tar.gz`
-- `dist/spin-compose-v1.0.0-darwin-arm64.tar.gz`
-- `dist/spin-compose-v1.0.0-windows-amd64.zip`
 
 ## Troubleshooting
 
-### Go module issues
+### Missing cargo-component
+If you see warnings about cargo-component not being installed:
 ```bash
-cd go/spin-compose
+cargo install cargo-component
+```
+
+### Missing Spin CLI
+If you see warnings about spin not being installed:
+```bash
+curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+```
+
+### Go module issues
+If you encounter Go module problems:
+```bash
 go mod tidy
 go mod download
 ```
 
-### Rust build issues
+### Rust toolchain issues
+Ensure you have the correct Rust toolchain:
 ```bash
-cargo clean
-cargo update
-cargo build
+rustup update
+rustup target add wasm32-wasip1
 ```
 
-### Missing wasm32-wasip1 target
+## Release Builds
+
+For optimized release builds:
+
 ```bash
-rustup target add wasm32-wasip1
-cargo install cargo-component
+# Build everything in release mode
+make all
+
+# The CLI will have version information embedded:
+./bin/ftl --version
 ```
+
+## Cross-Platform Building
+
+The project supports cross-platform builds:
+
+### macOS (Apple Silicon or Intel)
+All components build natively on macOS.
+
+### Linux (x86_64 or ARM64)
+All components build natively on Linux.
+
+### Windows
+- Go CLI builds natively
+- Rust components require WSL2 or Windows-native Rust toolchain
+- Use Git Bash or WSL2 for make commands
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and contribution process.

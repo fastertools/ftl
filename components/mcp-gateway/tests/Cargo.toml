@@ -1,5 +1,5 @@
 [package]
-name = "tests"
+name = "mcp-gateway-tests"
 version = "0.1.0"
 edition = "2021"
 description = "Test suite for ftl-mcp-gateway"
@@ -20,4 +20,5 @@ futures = "0.3"
 tokio = { version = "1", features = ["macros", "rt"] }
 ftl-sdk = { path = "../../../sdk/rust" }
 
-[workspace]
+# This test suite is part of the root workspace
+# Tests are run with: spin test
