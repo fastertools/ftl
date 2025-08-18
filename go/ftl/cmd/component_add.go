@@ -3,609 +3,359 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/go/shared/config"
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
-// newComponentAddCmd creates the parent 'component add' command
+// AddComponentOptions holds options for adding a component
+type AddComponentOptions struct {
+	Name        string
+	Source      string
+	Registry    string
+	Description string
+	Template    string
+	Build       string
+}
+
 func newComponentAddCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Add components to the application",
-		Long: `Add components to the application from various sources.
-
-Use subcommands to specify the source type:
-  - local: Add from a local path
-  - url: Add from an HTTP/HTTPS URL
-  - registry: Add from a Warg/Spin registry
-  - oci: Add from an OCI/Docker registry`,
-	}
-
-	// Add subcommands for each source type
-	cmd.AddCommand(
-		newComponentAddLocalCmd(),
-		newComponentAddURLCmd(),
-		newComponentAddRegistryCmd(),
-		newComponentAddOCICmd(),
-	)
-
-	return cmd
-}
-
-// newComponentAddLocalCmd adds a component from a local path
-func newComponentAddLocalCmd() *cobra.Command {
-	var (
-		name         string
-		description  string
-		allowedHosts []string
-	)
+	opts := &AddComponentOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "local <path>",
-		Short: "Add a component from a local path",
-		Long: `Add a component from a local file or directory.
+		Use:   "add [name]",
+		Short: "Add a component to the application",
+		Long:  `Add a new component to your FTL application`,
+		Args:  cobra.MaximumNArgs(1),
+		Example: `  # Add a component interactively
+  ftl component add
 
-Examples:
-  # From compiled WASM file
-  ftl component add local ./build/component.wasm --name my-component
-  
-  # From source directory (will need to be built)
-  ftl component add local ./src/my-component --name my-component`,
-		Args: cobra.ExactArgs(1),
+  # Add a component from a local path
+  ftl component add my-component --source ./my-component
+
+  # Add a component from a registry
+  ftl component add my-component --registry ghcr.io/user:package:version
+
+  # Add a component from a template
+  ftl component add my-component --template go-http`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := args[0]
-
-			if name == "" {
-				return fmt.Errorf("--name is required")
+			if len(args) > 0 {
+				opts.Name = args[0]
 			}
-
-			return addComponentLocal(name, path, description, allowedHosts)
+			return runComponentAdd(opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
-	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
-	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	_ = cmd.MarkFlagRequired("name")
+	cmd.Flags().StringVarP(&opts.Source, "source", "s", "", "Path to component source")
+	cmd.Flags().StringVarP(&opts.Registry, "registry", "r", "", "Registry source (format: registry/package:version)")
+	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Component description")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Use a template (go-http, rust-wasm, js-http, python-http)")
+	cmd.Flags().StringVarP(&opts.Build, "build", "b", "", "Build command")
 
 	return cmd
 }
 
-// newComponentAddURLCmd adds a component from an HTTP URL
-func newComponentAddURLCmd() *cobra.Command {
-	var (
-		name         string
-		digest       string
-		description  string
-		allowedHosts []string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "url <url>",
-		Short: "Add a component from an HTTP/HTTPS URL",
-		Long: `Add a component from an HTTP/HTTPS URL.
-
-Examples:
-  # Download from URL with digest verification
-  ftl component add url https://example.com/component.wasm \
-    --name my-component \
-    --digest sha256:abc123...`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			url := args[0]
-
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-
-			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-				return fmt.Errorf("URL must start with http:// or https://")
-			}
-
-			if digest == "" {
-				return fmt.Errorf("--digest is required for security. Format: sha256:hexdigest")
-			}
-
-			return addComponentURL(name, url, digest, description, allowedHosts)
-		},
-	}
-
-	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
-	cmd.Flags().StringVar(&digest, "digest", "", "SHA256 digest (required, format: sha256:...)")
-	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
-	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	_ = cmd.MarkFlagRequired("name")
-	_ = cmd.MarkFlagRequired("digest")
-
-	return cmd
-}
-
-// newComponentAddRegistryCmd adds a component from a Warg/Spin registry
-func newComponentAddRegistryCmd() *cobra.Command {
-	var (
-		name         string
-		registry     string
-		pkg          string
-		version      string
-		description  string
-		allowedHosts []string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "registry",
-		Short: "Add a component from a Warg/Spin registry",
-		Long: `Add a component from a Warg/Spin registry.
-
-Examples:
-  # From a Spin registry
-  ftl component add registry \
-    --name my-component \
-    --registry registrytest.fermyon.app \
-    --package component:hello-world \
-    --version 0.0.1
-    
-  # From ttl.sh
-  ftl component add registry \
-    --name my-component \
-    --registry ttl.sh \
-    --package user:mypackage \
-    --version 1.0.0`,
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-			if registry == "" {
-				return fmt.Errorf("--registry is required")
-			}
-			if pkg == "" {
-				return fmt.Errorf("--package is required")
-			}
-			if version == "" {
-				return fmt.Errorf("--version is required")
-			}
-
-			return addComponentRegistry(name, registry, pkg, version, description, allowedHosts)
-		},
-	}
-
-	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
-	cmd.Flags().StringVar(&registry, "registry", "", "Registry domain (required)")
-	cmd.Flags().StringVar(&pkg, "package", "", "Package name (required)")
-	cmd.Flags().StringVar(&version, "version", "", "Package version (required)")
-	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
-	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	_ = cmd.MarkFlagRequired("name")
-	_ = cmd.MarkFlagRequired("registry")
-	_ = cmd.MarkFlagRequired("package")
-	_ = cmd.MarkFlagRequired("version")
-
-	return cmd
-}
-
-// newComponentAddOCICmd adds a component from an OCI/Docker registry
-func newComponentAddOCICmd() *cobra.Command {
-	var (
-		name         string
-		description  string
-		allowedHosts []string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "oci <reference>",
-		Short: "Add a component from an OCI/Docker registry",
-		Long: `Add a component from an OCI/Docker registry. This converts OCI references
-to Spin's registry format.
-
-Examples:
-  # From GitHub Container Registry
-  ftl component add oci ghcr.io/fermyon/spin-hello:latest --name hello
-  
-  # From Docker Hub
-  ftl component add oci myorg/mycomponent:v1.0.0 --name my-component
-  
-  # From Amazon ECR
-  ftl component add oci 123456789.dkr.ecr.us-east-1.amazonaws.com/my-app:latest --name my-app`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			reference := args[0]
-
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
-
-			return addComponentOCI(name, reference, description, allowedHosts)
-		},
-	}
-
-	cmd.Flags().StringVar(&name, "name", "", "Component name (required)")
-	cmd.Flags().StringVar(&description, "description", "", "Description of the component")
-	cmd.Flags().StringSliceVar(&allowedHosts, "allowed-hosts", nil, "Allowed outbound hosts")
-	_ = cmd.MarkFlagRequired("name")
-
-	return cmd
-}
-
-// Implementation functions
-
-func addComponentLocal(name, path, description string, allowedHosts []string) error {
-	blue := color.New(color.FgBlue).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
-	fmt.Printf("%s Adding component '%s' from local path\n", blue("→"), name)
-	fmt.Printf("  Path: %s\n", path)
-
-	// Validate component name
-	if err := validateComponentName(name); err != nil {
-		return err
-	}
-
-	// Check if path exists
-	info, err := os.Stat(path)
+func runComponentAdd(opts *AddComponentOptions) error {
+	// Load existing manifest
+	manifest, err := loadManifest("ftl.yaml")
 	if err != nil {
-		return fmt.Errorf("local path not found: %s", path)
+		return fmt.Errorf("failed to load ftl.yaml: %w", err)
 	}
 
-	// Load existing config
-	cfg, err := loadSpinConfig("ftl.yaml")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
+	// Get component name if not provided
+	if opts.Name == "" {
+		prompt := &survey.Input{
+			Message: "Component name:",
 		}
-		return err
-	}
-
-	// Check for duplicate
-	for _, comp := range cfg.Components {
-		if comp.ID == name {
-			return fmt.Errorf("component '%s' already exists", name)
+		if err := survey.AskOne(prompt, &opts.Name, survey.WithValidator(survey.Required)); err != nil {
+			return err
 		}
 	}
 
-	// Create component with string source (local path)
-	newComp := config.ComponentConfig{
-		ID:                   name,
-		Source:               path, // Simple string for local path
-		Description:          description,
-		AllowedOutboundHosts: allowedHosts,
+	// Validate name doesn't already exist
+	for _, comp := range manifest.Components {
+		if comp.ID == opts.Name {
+			return fmt.Errorf("component '%s' already exists", opts.Name)
+		}
 	}
 
-	// If it's a source directory (not .wasm), add build config
-	if info.IsDir() || !strings.HasSuffix(path, ".wasm") {
-		fmt.Printf("%s This is a source directory. You'll need to configure build settings.\n", blue("ℹ"))
-	}
-
-	// Always add a private trigger for FTL components
-	trigger := config.TriggerConfig{
-		Type:      config.TriggerTypeHTTP,
-		Component: name,
-		Route:     "private",
-	}
-	cfg.Triggers = append(cfg.Triggers, trigger)
-
-	cfg.Components = append(cfg.Components, newComp)
-
-	// Save config
-	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
-
-	if info.IsDir() || !strings.HasSuffix(path, ".wasm") {
-		fmt.Println("\nNext steps:")
-		fmt.Println("  1. Configure build settings in ftl.yaml")
-		fmt.Println("  2. Run 'ftl build' to compile")
-		fmt.Println("  3. Run 'ftl up' to test locally")
+	// Determine source type
+	var component types.Component
+	if opts.Template != "" {
+		component = createFromTemplate(opts)
+	} else if opts.Registry != "" {
+		component = createFromRegistry(opts)
+	} else if opts.Source != "" {
+		component = createFromLocal(opts)
 	} else {
-		fmt.Println("\nNext steps:")
-		fmt.Println("  1. Run 'ftl build' to prepare the application")
-		fmt.Println("  2. Run 'ftl up' to test locally")
+		// Interactive mode
+		component, err = createInteractive(opts)
+		if err != nil {
+			return err
+		}
 	}
+
+	// Add to manifest
+	manifest.Components = append(manifest.Components, component)
+
+	// Save manifest
+	if err := saveManifest("ftl.yaml", manifest); err != nil {
+		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	color.Green("✓ Component '%s' added successfully", opts.Name)
+	fmt.Println()
+	color.Blue("→ Next steps:")
+	fmt.Println("  1. Run 'ftl synth' to generate spin.toml")
+	fmt.Println("  2. Run 'ftl up' to start development")
 
 	return nil
 }
 
-func addComponentURL(name, url, digest, description string, allowedHosts []string) error {
-	blue := color.New(color.FgBlue).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
-	fmt.Printf("%s Adding component '%s' from URL\n", blue("→"), name)
-	fmt.Printf("  URL: %s\n", url)
-	fmt.Printf("  Digest: %s\n", digest)
-
-	// Validate component name
-	if err := validateComponentName(name); err != nil {
-		return err
+func createFromTemplate(opts *AddComponentOptions) types.Component {
+	comp := types.Component{
+		ID: opts.Name,
 	}
 
-	// Load existing config
-	cfg, err := loadSpinConfig("ftl.yaml")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
+	// Set source based on template
+	templateDir := fmt.Sprintf("components/%s", opts.Name)
+	comp.Source = templateDir
+
+	// Set build command based on template type
+	switch opts.Template {
+	case "go-http":
+		comp.Build = &types.Build{
+			Command: "tinygo build -target=wasip2 -o " + opts.Name + ".wasm main.go",
+			Watch:   []string{"**/*.go", "go.mod"},
 		}
-		return err
-	}
-
-	// Check for duplicate
-	for _, comp := range cfg.Components {
-		if comp.ID == name {
-			return fmt.Errorf("component '%s' already exists", name)
+	case "rust-wasm":
+		comp.Build = &types.Build{
+			Command: "cargo build --target wasm32-wasip2 --release",
+			Workdir: templateDir,
+			Watch:   []string{"src/**/*.rs", "Cargo.toml"},
+		}
+	case "js-http":
+		comp.Build = &types.Build{
+			Command: "npm run build",
+			Workdir: templateDir,
+			Watch:   []string{"src/**/*.js", "package.json"},
+		}
+	case "python-http":
+		comp.Build = &types.Build{
+			Command: "componentize-py -w spin-http componentize -o " + opts.Name + ".wasm app",
+			Workdir: templateDir,
+			Watch:   []string{"**/*.py"},
 		}
 	}
 
-	// Create component with URL source (table format)
-	// Source needs to be a map for URL type
-	sourceMap := map[string]interface{}{
-		"url":    url,
-		"digest": digest,
-	}
+	// Create the template directory and files
+	createTemplateFiles(templateDir, opts.Template, opts.Name)
 
-	newComp := config.ComponentConfig{
-		ID:                   name,
-		Source:               sourceMap, // Table format for URL source
-		Description:          description,
-		AllowedOutboundHosts: allowedHosts,
-	}
-
-	// Always add a private trigger for FTL components
-	trigger := config.TriggerConfig{
-		Type:      config.TriggerTypeHTTP,
-		Component: name,
-		Route:     "private",
-	}
-	cfg.Triggers = append(cfg.Triggers, trigger)
-
-	cfg.Components = append(cfg.Components, newComp)
-
-	// Save config
-	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
-	fmt.Printf("\n%s Component will be downloaded during build/deployment\n", blue("ℹ"))
-
-	fmt.Println("\nNext steps:")
-	fmt.Println("  1. Run 'ftl build' to prepare the application")
-	fmt.Println("  2. Run 'ftl up' to test locally")
-
-	return nil
+	return comp
 }
 
-func addComponentRegistry(name, registry, pkg, version, description string, allowedHosts []string) error {
-	blue := color.New(color.FgBlue).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
-	fmt.Printf("%s Adding component '%s' from registry\n", blue("→"), name)
-	fmt.Printf("  Registry: %s\n", registry)
-	fmt.Printf("  Package: %s\n", pkg)
-	fmt.Printf("  Version: %s\n", version)
-
-	// Validate component name
-	if err := validateComponentName(name); err != nil {
-		return err
-	}
-
-	// Load existing config
-	cfg, err := loadSpinConfig("ftl.yaml")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
-		}
-		return err
-	}
-
-	// Check for duplicate
-	for _, comp := range cfg.Components {
-		if comp.ID == name {
-			return fmt.Errorf("component '%s' already exists", name)
+func createFromRegistry(opts *AddComponentOptions) types.Component {
+	// Parse registry string (format: registry/package:version)
+	parts := strings.Split(opts.Registry, "/")
+	if len(parts) != 2 {
+		color.Yellow("⚠ Invalid registry format. Using as-is.")
+		return types.Component{
+			ID:     opts.Name,
+			Source: opts.Registry,
 		}
 	}
 
-	// Create component with registry source (table format)
-	sourceMap := map[string]interface{}{
-		"registry": registry,
-		"package":  pkg,
-		"version":  version,
+	registry := parts[0]
+	remainder := parts[1]
+
+	// Split package:version
+	packageParts := strings.Split(remainder, ":")
+	if len(packageParts) != 2 {
+		color.Yellow("⚠ Invalid package format. Using as-is.")
+		return types.Component{
+			ID:     opts.Name,
+			Source: opts.Registry,
+		}
 	}
 
-	newComp := config.ComponentConfig{
-		ID:                   name,
-		Source:               sourceMap, // Table format for registry source
-		Description:          description,
-		AllowedOutboundHosts: allowedHosts,
+	return types.Component{
+		ID: opts.Name,
+		Source: map[string]interface{}{
+			"registry": registry,
+			"package":  packageParts[0],
+			"version":  packageParts[1],
+		},
 	}
-
-	// Always add a private trigger for FTL components
-	trigger := config.TriggerConfig{
-		Type:      config.TriggerTypeHTTP,
-		Component: name,
-		Route:     "private",
-	}
-	cfg.Triggers = append(cfg.Triggers, trigger)
-
-	cfg.Components = append(cfg.Components, newComp)
-
-	// Save config
-	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
-	fmt.Printf("\n%s Registry components will be pulled during deployment\n", blue("ℹ"))
-
-	fmt.Println("\nNext steps:")
-	fmt.Println("  1. Run 'ftl build' to prepare the application")
-	fmt.Println("  2. Run 'ftl up' to test locally")
-
-	return nil
 }
 
-func addComponentOCI(name, reference, description string, allowedHosts []string) error {
-	blue := color.New(color.FgBlue).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
+func createFromLocal(opts *AddComponentOptions) types.Component {
+	comp := types.Component{
+		ID:     opts.Name,
+		Source: opts.Source,
+	}
 
-	fmt.Printf("%s Adding component '%s' from OCI registry\n", blue("→"), name)
-	fmt.Printf("  Reference: %s\n", reference)
-
-	// Parse OCI reference to extract registry, package, and version
-	// Format: [registry/]namespace/image[:tag|@digest]
-
-	var registry, pkg, version string
-
-	// Handle different OCI formats
-	parts := strings.Split(reference, "/")
-
-	if len(parts) >= 3 {
-		// Full format: registry.io/namespace/image:tag
-		registry = parts[0]
-		imageParts := strings.Split(parts[len(parts)-1], ":")
-		if len(imageParts) == 2 {
-			// namespace/image:tag format
-			pkg = strings.Join(parts[1:len(parts)-1], "/") + "/" + imageParts[0]
-			version = imageParts[1]
-		} else {
-			// No tag specified, use latest
-			pkg = strings.Join(parts[1:], "/")
-			version = "latest"
-		}
-	} else if len(parts) == 2 {
-		// Docker Hub shorthand: namespace/image:tag
-		registry = "docker.io"
-		imageParts := strings.Split(parts[1], ":")
-		if len(imageParts) == 2 {
-			pkg = parts[0] + "/" + imageParts[0]
-			version = imageParts[1]
-		} else {
-			pkg = reference
-			version = "latest"
-		}
-	} else {
-		// Single name, assume Docker Hub official image
-		registry = "docker.io"
-		imageParts := strings.Split(reference, ":")
-		if len(imageParts) == 2 {
-			pkg = "library/" + imageParts[0]
-			version = imageParts[1]
-		} else {
-			pkg = "library/" + reference
-			version = "latest"
+	// Check if it needs build config
+	info, err := os.Stat(opts.Source)
+	if err == nil && (info.IsDir() || !strings.HasSuffix(opts.Source, ".wasm")) {
+		// It's source code, needs build
+		if opts.Build != "" {
+			comp.Build = &types.Build{
+				Command: opts.Build,
+			}
 		}
 	}
 
-	fmt.Printf("  → Registry: %s\n", registry)
-	fmt.Printf("  → Package: %s\n", pkg)
-	fmt.Printf("  → Version: %s\n", version)
-
-	// Validate component name
-	if err := validateComponentName(name); err != nil {
-		return err
-	}
-
-	// Load existing config
-	cfg, err := loadSpinConfig("ftl.yaml")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
-		}
-		return err
-	}
-
-	// Check for duplicate
-	for _, comp := range cfg.Components {
-		if comp.ID == name {
-			return fmt.Errorf("component '%s' already exists", name)
-		}
-	}
-
-	// Create component with registry source (table format)
-	// OCI references get converted to Spin's registry format
-	sourceMap := map[string]interface{}{
-		"registry": registry,
-		"package":  pkg,
-		"version":  version,
-	}
-
-	newComp := config.ComponentConfig{
-		ID:                   name,
-		Source:               sourceMap, // Table format for registry source
-		Description:          description,
-		AllowedOutboundHosts: allowedHosts,
-	}
-
-	// Always add a private trigger for FTL components
-	trigger := config.TriggerConfig{
-		Type:      config.TriggerTypeHTTP,
-		Component: name,
-		Route:     "private",
-	}
-	cfg.Triggers = append(cfg.Triggers, trigger)
-
-	cfg.Components = append(cfg.Components, newComp)
-
-	// Save config
-	if err := saveSpinConfig("ftl.yaml", cfg); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	fmt.Printf("%s Component '%s' added successfully\n", green("✓"), name)
-	fmt.Printf("\n%s OCI registry components will be pulled during deployment\n", blue("ℹ"))
-
-	fmt.Println("\nNext steps:")
-	fmt.Println("  1. Run 'ftl build' to prepare the application")
-	fmt.Println("  2. Run 'ftl up' to test locally")
-
-	return nil
+	return comp
 }
 
-func validateComponentName(name string) error {
-	if name == "" {
-		return fmt.Errorf("component name cannot be empty")
+func createInteractive(opts *AddComponentOptions) (types.Component, error) {
+	// Ask for source type
+	sourceType := ""
+	sourcePrompt := &survey.Select{
+		Message: "Component source:",
+		Options: []string{"Local path", "Registry", "Create from template"},
+	}
+	if err := survey.AskOne(sourcePrompt, &sourceType); err != nil {
+		return types.Component{}, err
 	}
 
-	// Check for valid characters (lowercase, numbers, hyphens, underscores)
-	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
-			return fmt.Errorf("component name must contain only lowercase letters, numbers, hyphens, and underscores")
+	switch sourceType {
+	case "Local path":
+		pathPrompt := &survey.Input{
+			Message: "Path to component:",
+			Default: fmt.Sprintf("./components/%s", opts.Name),
 		}
+		if err := survey.AskOne(pathPrompt, &opts.Source); err != nil {
+			return types.Component{}, err
+		}
+		return createFromLocal(opts), nil
+
+	case "Registry":
+		regPrompt := &survey.Input{
+			Message: "Registry source (registry/package:version):",
+		}
+		if err := survey.AskOne(regPrompt, &opts.Registry); err != nil {
+			return types.Component{}, err
+		}
+		return createFromRegistry(opts), nil
+
+	case "Create from template":
+		templatePrompt := &survey.Select{
+			Message: "Select template:",
+			Options: []string{"go-http", "rust-wasm", "js-http", "python-http"},
+		}
+		if err := survey.AskOne(templatePrompt, &opts.Template); err != nil {
+			return types.Component{}, err
+		}
+		return createFromTemplate(opts), nil
 	}
 
-	// Check for leading/trailing or double special characters
-	if strings.HasPrefix(name, "-") || strings.HasPrefix(name, "_") ||
-		strings.HasSuffix(name, "-") || strings.HasSuffix(name, "_") ||
-		strings.Contains(name, "--") || strings.Contains(name, "__") {
-		return fmt.Errorf("component name cannot start/end with or contain double hyphens/underscores")
-	}
-
-	return nil
+	return types.Component{}, fmt.Errorf("invalid source type")
 }
 
-func loadSpinConfig(path string) (*config.FTLConfig, error) {
+func createTemplateFiles(dir, template, name string) {
+	// Create directory
+	os.MkdirAll(dir, 0755)
+
+	switch template {
+	case "go-http":
+		// Create main.go
+		mainGo := fmt.Sprintf(`package main
+
+import (
+	"net/http"
+	spinhttp "github.com/fermyon/spin-go-sdk/http"
+)
+
+func init() {
+	spinhttp.Handle(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello from %s!"))
+	})
+}
+
+func main() {}
+`, name)
+		os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644)
+
+		// Create go.mod
+		goMod := fmt.Sprintf(`module github.com/example/%s
+
+go 1.22
+
+require github.com/fermyon/spin-go-sdk v0.2.0
+`, name)
+		os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+
+	case "rust-wasm":
+		// Create Cargo.toml
+		cargoToml := fmt.Sprintf(`[package]
+name = "%s"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin-sdk = "3.0"
+
+[lib]
+crate-type = ["cdylib"]
+`, name)
+		os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(cargoToml), 0644)
+
+		// Create src/lib.rs
+		os.MkdirAll(filepath.Join(dir, "src"), 0755)
+		libRs := `use spin_sdk::http::{IntoResponse, Request, Response};
+
+#[spin_sdk::http_component]
+fn handle_request(_req: Request) -> anyhow::Result<impl IntoResponse> {
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "text/plain")
+        .body("Hello from Rust!")
+        .build())
+}
+`
+		os.WriteFile(filepath.Join(dir, "src", "lib.rs"), []byte(libRs), 0644)
+
+		// Add other templates as needed
+	}
+}
+
+func loadManifest(path string) (*types.Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Create a new manifest if it doesn't exist
+			return &types.Manifest{
+				Application: types.Application{
+					Name:    "app",
+					Version: "0.1.0",
+				},
+				Components: []types.Component{},
+				Access:     "public",
+			}, nil
+		}
 		return nil, err
 	}
 
-	var cfg config.FTLConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
+	var manifest types.Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
 
-	return &cfg, nil
+	return &manifest, nil
 }
 
-func saveSpinConfig(path string, cfg *config.FTLConfig) error {
-	data, err := yaml.Marshal(cfg)
+func saveManifest(path string, manifest *types.Manifest) error {
+	data, err := yaml.Marshal(manifest)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-
 	return os.WriteFile(path, data, 0644)
 }

@@ -1,29 +1,32 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
-	"github.com/pelletier/go-toml/v2"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/fastertools/ftl-cli/go/shared/api"
 	"github.com/fastertools/ftl-cli/go/shared/auth"
-	"github.com/fastertools/ftl-cli/go/shared/config"
-	"github.com/fastertools/ftl-cli/go/shared/ftl"
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
 // DeployOptions holds options for the deploy command
@@ -95,34 +98,43 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		}
 	}
 
+	// First synthesize spin.toml from the FTL configuration
+	Info("Synthesizing Spin manifest from %s", opts.ConfigFile)
+	if err := runSynth(ctx, opts.ConfigFile); err != nil {
+		return fmt.Errorf("failed to synthesize spin.toml: %w", err)
+	}
+	Success("Generated spin.toml")
+
 	// Load and parse configuration
-	Info("Loading configuration from %s", opts.ConfigFile)
-	ftlApp, err := loadFTLApplication(opts.ConfigFile)
+	manifest, err := loadDeployManifest(opts.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// Apply command-line overrides
 	if opts.AccessControl != "" {
-		ftlApp.Access = ftl.AccessMode(opts.AccessControl)
+		manifest.Access = opts.AccessControl
 	}
 	if opts.JWTIssuer != "" {
-		ftlApp.Auth.Provider = ftl.AuthProviderCustom
-		ftlApp.Auth.JWTIssuer = opts.JWTIssuer
+		if manifest.Auth == nil {
+			manifest.Auth = &types.Auth{}
+		}
+		manifest.Auth.JWTIssuer = opts.JWTIssuer
 		if opts.JWTAudience != "" {
-			ftlApp.Auth.JWTAudience = opts.JWTAudience
+			manifest.Auth.JWTAudience = opts.JWTAudience
 		}
 	}
 
-	// Find local components that need building
-	localComponents := findLocalComponents(ftlApp)
-
-	if len(localComponents) > 0 && !opts.DryRun {
-		Info("Building %d local component(s)", len(localComponents))
-		if err := buildLocalComponents(ctx, localComponents); err != nil {
+	// Run spin build to build all local components
+	if !opts.DryRun {
+		Info("Building local components with 'spin build'")
+		cmd := exec.CommandContext(ctx, "spin", "build")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to build components: %w", err)
 		}
-		Success("All components built successfully")
+		Success("All local components built successfully")
 		fmt.Println()
 	}
 
@@ -145,7 +157,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 
 	// Check if app exists
-	appName := ftlApp.Name
+	appName := manifest.Application.Name
 	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
 		Name: &appName,
 	})
@@ -174,7 +186,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 
 	if opts.DryRun {
-		displayDryRunSummary(ftlApp, localComponents, appExists)
+		displayDryRunSummary(manifest, appExists)
 		return nil
 	}
 
@@ -183,7 +195,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		Info("Creating app on FTL platform...")
 
 		accessControl := api.CreateAppRequestAccessControlPublic
-		switch ftlApp.Access {
+		switch manifest.Access {
 		case "private":
 			accessControl = api.CreateAppRequestAccessControlPrivate
 		case "org":
@@ -208,8 +220,8 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Get ECR credentials
 	Info("Getting registry credentials...")
 	// Extract component names to pass to ECR token creation
-	componentNames := make([]string, 0, len(localComponents))
-	for _, comp := range localComponents {
+	componentNames := make([]string, 0, len(manifest.Components))
+	for _, comp := range manifest.Components {
 		componentNames = append(componentNames, comp.ID)
 	}
 	ecrToken, err := apiClient.CreateECRToken(ctx, appID, componentNames)
@@ -217,45 +229,30 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		return fmt.Errorf("failed to get ECR token: %w", err)
 	}
 
-	// Configure authentication for both Docker and wkg
-	// This is necessary due to platform inconsistencies:
-	// - On macOS: spin deps uses Docker credentials, ignores wkg config
-	// - On Linux: spin deps uses wkg config, ignores Docker credentials
-	if err := configureMultiPlatformAuth(ctx, ecrToken); err != nil {
-		return fmt.Errorf("failed to configure authentication: %w", err)
-	}
-	Success("Configured registry authentication")
-
-	// Push local components to registry
-	if len(localComponents) > 0 {
-		Info("Pushing %d component(s) to registry", len(localComponents))
-		// Use the sanitized packageNamespace from the ECR token
-		if ecrToken.PackageNamespace == nil || *ecrToken.PackageNamespace == "" {
-			return fmt.Errorf("ECR token response missing required packageNamespace field - backend may need updating")
-		}
-		namespace := *ecrToken.PackageNamespace
-		pushedComponents, err := pushComponentsToRegistry(ctx, ftlApp, localComponents, ecrToken.RegistryUri, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to push components: %w", err)
-		}
-
-		// Update ftlApp with registry references for pushed components
-		for _, pushed := range pushedComponents {
-			for i, comp := range ftlApp.Components {
-				if comp.ID == pushed.ID {
-					ftlApp.Components[i].Source = pushed.RegistrySource
-					break
-				}
-			}
-		}
-		Success("All components pushed to registry")
-		fmt.Println()
+	// Parse ECR credentials
+	ecrAuth, err := parseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
+	if err != nil {
+		return fmt.Errorf("failed to parse ECR token: %w", err)
 	}
 
-	// Create deployment request with the FTL configuration
+	// Process components: pull registry components and push everything to ECR
+	if ecrToken.PackageNamespace == nil || *ecrToken.PackageNamespace == "" {
+		return fmt.Errorf("ECR token response missing required packageNamespace field")
+	}
+	namespace := *ecrToken.PackageNamespace
+
+	Info("Processing components...")
+	processedManifest, err := processComponents(ctx, manifest, ecrAuth, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to process components: %w", err)
+	}
+	Success("All components processed and pushed to ECR")
+	fmt.Println()
+
+	// Create deployment request with the processed manifest
 	Info("Creating deployment...")
 
-	deploymentReq := createDeploymentRequest(ftlApp, opts)
+	deploymentReq := createDeploymentRequest(processedManifest, opts)
 
 	// Send deployment request
 	deployment, err := apiClient.CreateDeployment(ctx, appID, deploymentReq)
@@ -279,413 +276,353 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	if deployed.ProviderUrl != nil && *deployed.ProviderUrl != "" {
 		// Display MCP URLs for the deployed application
-		displayMCPUrls(*deployed.ProviderUrl, ftlApp.Components)
+		displayMCPUrls(*deployed.ProviderUrl, processedManifest.Components)
 	}
 
 	return nil
 }
 
-// loadFTLApplication loads the FTL application configuration from various formats
-func loadFTLApplication(configFile string) (*ftl.Application, error) {
-	ext := filepath.Ext(configFile)
-
-	switch ext {
-	case ".yaml", ".yml":
-		return loadYAMLConfig(configFile)
-	case ".json":
-		return loadJSONConfig(configFile)
-	case ".cue":
-		return loadCUEConfig(configFile)
-	default:
-		return nil, fmt.Errorf("unsupported config format: %s", ext)
-	}
-}
-
-func loadYAMLConfig(configFile string) (*ftl.Application, error) {
+// loadDeployManifest loads the FTL manifest configuration for deployment
+func loadDeployManifest(configFile string) (*types.Manifest, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// First parse as generic config to extract application info
-	var cfg config.FTLConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	var manifest types.Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
 
-	// Convert to ftl.Application format
-	app := &ftl.Application{
-		Name:        cfg.Application.Name,
-		Version:     cfg.Application.Version,
-		Description: cfg.Application.Description,
-		Components:  make([]ftl.Component, 0, len(cfg.Components)),
-		Access:      ftl.AccessPublic,
-		Auth: ftl.AuthConfig{
-			Provider: ftl.AuthProviderWorkOS,
-		},
-	}
-
-	// Convert MCP config to access/auth settings
-	if cfg.MCP != nil && cfg.MCP.Authorizer != nil {
-		if cfg.MCP.Authorizer.AccessControl != "" {
-			app.Access = ftl.AccessMode(cfg.MCP.Authorizer.AccessControl)
-		}
-		if cfg.MCP.Authorizer.JWTIssuer != "" {
-			app.Auth.JWTIssuer = cfg.MCP.Authorizer.JWTIssuer
-		}
-		if cfg.MCP.Authorizer.JWTAudience != "" {
-			app.Auth.JWTAudience = cfg.MCP.Authorizer.JWTAudience
-		}
-		if cfg.MCP.Authorizer.OrgID != "" {
-			app.Auth.OrgID = cfg.MCP.Authorizer.OrgID
-		}
-	}
-
-	// Convert components
-	for _, comp := range cfg.Components {
-		// Determine source type
-		var source ftl.ComponentSource
-		if srcStr, ok := comp.Source.(string); ok {
-			source = ftl.LocalSource(srcStr)
-		} else if srcMap, ok := comp.Source.(map[string]interface{}); ok {
-			// Registry source
-			source = &ftl.RegistrySource{
-				Registry: srcMap["registry"].(string),
-				Package:  srcMap["package"].(string),
-				Version:  srcMap["version"].(string),
-			}
-		}
-
-		ftlComp := ftl.Component{
-			ID:        comp.ID,
-			Source:    source,
-			Variables: comp.Variables,
-		}
-
-		if comp.Build != nil {
-			ftlComp.Build = &ftl.BuildConfig{
-				Command: comp.Build.Command,
-				Workdir: comp.Build.Workdir,
-				Watch:   comp.Build.Watch,
-			}
-		}
-
-		app.Components = append(app.Components, ftlComp)
-	}
-
-	// Set defaults using the shared package method
-	app.SetDefaults()
-
-	return app, nil
+	return &manifest, nil
 }
 
-func loadJSONConfig(configFile string) (*ftl.Application, error) {
-	data, err := os.ReadFile(configFile)
+// runSynth runs the synth command to generate spin.toml
+func runSynth(ctx context.Context, configFile string) error {
+	cmd := exec.CommandContext(ctx, "ftl", "synth")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// ECRAuth holds parsed ECR authentication details
+type ECRAuth struct {
+	Registry string
+	Username string
+	Password string
+}
+
+// parseECRToken parses the ECR authorization token
+func parseECRToken(registryURI, authToken string) (*ECRAuth, error) {
+	decoded, err := base64.StdEncoding.DecodeString(authToken)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode ECR token: %w", err)
 	}
 
-	var app ftl.Application
-	if err := json.Unmarshal(data, &app); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 || parts[0] != "AWS" {
+		return nil, fmt.Errorf("invalid ECR token format")
 	}
 
-	// Set defaults
-	app.SetDefaults()
-
-	return &app, nil
-}
-
-func loadCUEConfig(configFile string) (*ftl.Application, error) {
-	// TODO: Properly extract from CUE
-	// For now, return a minimal config
-	return &ftl.Application{
-		Name:    "app",
-		Version: "0.1.0",
-		Access:  ftl.AccessPublic,
-		Auth: ftl.AuthConfig{
-			Provider: ftl.AuthProviderWorkOS,
-		},
-		Components: []ftl.Component{},
+	return &ECRAuth{
+		Registry: registryURI,
+		Username: parts[0],
+		Password: parts[1],
 	}, nil
 }
 
-func findLocalComponents(app *ftl.Application) []ftl.Component {
-	var local []ftl.Component
-
-	for _, comp := range app.Components {
-		// Use the helper to check if it's local
-		if comp.Source != nil && comp.Source.IsLocal() {
-			local = append(local, comp)
-		}
+// processComponents handles pulling registry components and pushing everything to ECR
+func processComponents(ctx context.Context, manifest *types.Manifest, ecrAuth *ECRAuth, namespace string) (*types.Manifest, error) {
+	// Create output manifest with ECR references
+	processedManifest := &types.Manifest{
+		Application: manifest.Application,
+		Access:      manifest.Access,
+		Auth:        manifest.Auth,
+		Variables:   manifest.Variables,
+		Components:  make([]types.Component, 0, len(manifest.Components)),
 	}
 
-	return local
-}
+	// Create a WASMPuller for pulling registry components
+	puller := NewWASMPuller()
 
-func buildLocalComponents(ctx context.Context, components []ftl.Component) error {
-	for _, comp := range components {
-		if comp.Build == nil || comp.Build.Command == "" {
-			continue
-		}
+	// Create a WASMPusher for pushing to ECR
+	pusher := NewWASMPusher(ecrAuth)
 
-		Info("Building component '%s'", comp.ID)
+	// Process each component
+	for _, comp := range manifest.Components {
+		var wasmPath string
+		var err error
 
-		// Determine working directory
-		workdir := "."
-		if comp.Build.Workdir != "" {
-			workdir = comp.Build.Workdir
-		}
-
-		// Execute build command
-		cmd := exec.CommandContext(ctx, "sh", "-c", comp.Build.Command)
-		cmd.Dir = workdir
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to build component %s: %w", comp.ID, err)
-		}
-	}
-
-	return nil
-}
-
-// dockerLoginToECR authenticates Docker with ECR using the docker CLI.
-// We use the CLI instead of the Docker SDK because:
-// 1. The SDK's RegistryLogin only validates credentials but doesn't persist them
-// 2. spin deps publish needs credentials stored in Docker's credential helper
-// 3. docker login CLI properly stores credentials where external tools can access them
-func dockerLoginToECR(ctx context.Context, ecrToken *api.CreateEcrTokenResponseBody) error {
-	// Decode the authorization token
-	decoded, err := base64.StdEncoding.DecodeString(ecrToken.AuthorizationToken)
-	if err != nil {
-		return fmt.Errorf("failed to decode ECR token: %w", err)
-	}
-
-	// Extract password (format is "AWS:password")
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 || parts[0] != "AWS" {
-		return fmt.Errorf("invalid ECR token format")
-	}
-	password := parts[1]
-
-	// Run docker login
-	cmd := exec.CommandContext(ctx, "docker", "login",
-		"--username", "AWS",
-		"--password-stdin",
-		ecrToken.RegistryUri)
-
-	cmd.Stdin = strings.NewReader(password)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker login failed: %s", stderr.String())
-	}
-
-	return nil
-}
-
-// configureMultiPlatformAuth configures authentication for both Docker and wkg to handle platform inconsistencies
-func configureMultiPlatformAuth(ctx context.Context, ecrToken *api.CreateEcrTokenResponseBody) error {
-	// Parse ECR credentials for use in both auth methods
-	ecrAuth, err := ftl.ParseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
-	if err != nil {
-		return fmt.Errorf("failed to parse ECR token: %w", err)
-	}
-
-	Debug("Configuring multi-platform authentication for registry: %s", ecrAuth.Registry)
-
-	// Always try to configure Docker authentication
-	dockerErr := dockerLoginToECR(ctx, ecrToken)
-	if dockerErr != nil {
-		Debug("Docker login failed: %v", dockerErr)
-	} else {
-		Debug("Docker login successful")
-	}
-
-	// Always try to configure wkg authentication
-	wkgErr := configureWkgAuth(ecrAuth)
-	if wkgErr != nil {
-		Debug("WKG config failed: %v", wkgErr)
-	} else {
-		Debug("WKG config successful")
-	}
-
-	// Determine if we have at least one working auth method based on platform
-	if runtime.GOOS == "darwin" {
-		// On macOS, Docker auth is required
-		if dockerErr != nil {
-			return fmt.Errorf("Docker authentication failed (required on macOS): %w", dockerErr)
-		}
-		if wkgErr != nil {
-			Debug("WKG config failed on macOS (this is expected and won't affect operation)")
-		}
-	} else {
-		// On Linux/others, wkg config is required
-		if wkgErr != nil {
-			return fmt.Errorf("WKG configuration failed (required on Linux): %w", wkgErr)
-		}
-		if dockerErr != nil {
-			Debug("Docker authentication failed on Linux (this may not affect operation if wkg config succeeded)")
-		}
-	}
-
-	return nil
-}
-
-// configureWkgAuth updates the wkg config file with ECR credentials
-func configureWkgAuth(ecrAuth *ftl.ECRAuth) error {
-	// Get wkg config path
-	configDir := filepath.Join(getConfigHome(), "wasm-pkg")
-	configPath := filepath.Join(configDir, "config.toml")
-
-	Debug("Configuring wkg auth at: %s", configPath)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create wkg config directory: %w", err)
-	}
-
-	// Read existing config or create new one
-	configData := make(map[string]interface{})
-	if existingData, err := os.ReadFile(configPath); err == nil {
-		// Parse existing TOML
-		if err := toml.Unmarshal(existingData, &configData); err != nil {
-			Debug("Failed to parse existing wkg config, will create new: %v", err)
-			configData = make(map[string]interface{})
-		}
-	}
-
-	// Ensure registry map exists (but don't touch default_registry or any other settings)
-	if _, exists := configData["registry"]; !exists {
-		configData["registry"] = make(map[string]interface{})
-	}
-	registry := configData["registry"].(map[string]interface{})
-
-	// Update or create the ECR registry entry
-	// Structure: registry.REGISTRY.oci.auth
-	registry[ecrAuth.Registry] = map[string]interface{}{
-		"oci": map[string]interface{}{
-			"auth": map[string]interface{}{
-				"username": ecrAuth.Username,
-				"password": ecrAuth.Password,
-			},
-		},
-	}
-
-	// Marshal back to TOML
-	updatedConfig, err := toml.Marshal(configData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal wkg config: %w", err)
-	}
-
-	// Write config file with secure permissions (0600)
-	if err := os.WriteFile(configPath, updatedConfig, 0600); err != nil {
-		return fmt.Errorf("failed to write wkg config: %w", err)
-	}
-
-	Debug("Successfully updated wkg config file")
-	return nil
-}
-
-// getConfigHome returns the XDG config directory
-func getConfigHome() string {
-	// XDG_CONFIG_HOME or default
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return xdg
-	}
-	if home := os.Getenv("HOME"); home != "" {
-		return filepath.Join(home, ".config")
-	}
-	// Fallback for Windows
-	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
-		return filepath.Join(userProfile, ".config")
-	}
-	return ".config"
-}
-
-type PushedComponent struct {
-	ID             string
-	RegistrySource ftl.ComponentSource
-}
-
-func pushComponentsToRegistry(ctx context.Context, app *ftl.Application, components []ftl.Component, registryURI string, namespace string) ([]PushedComponent, error) {
-	var pushed []PushedComponent
-
-	Debug("Pushing %d components to registry %s", len(components), registryURI)
-
-	for _, comp := range components {
-		// Get the local source path
-		sourcePath, ok := ftl.AsLocal(comp.Source)
-		if !ok {
-			continue
+		// Check if it's a local or registry source
+		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
+			// Local component - find the built WASM file
+			wasmPath, err = findBuiltWASM(localPath, comp.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find built WASM for %s: %w", comp.ID, err)
+			}
+			Info("Found local component %s at %s", comp.ID, wasmPath)
+		} else if registrySource != nil {
+			// Registry component - pull it
+			Info("Pulling component %s from %s", comp.ID, registrySource.Registry)
+			wasmPath, err = puller.Pull(ctx, registrySource)
+			if err != nil {
+				return nil, fmt.Errorf("failed to pull component %s: %w", comp.ID, err)
+			}
+			Success("Pulled %s", comp.ID)
+		} else {
+			return nil, fmt.Errorf("invalid source for component %s", comp.ID)
 		}
 
-		// Determine version (default to app version)
-		version := app.Version
+		// Push to ECR
+		packageName := fmt.Sprintf("%s:%s", namespace, comp.ID)
+		version := manifest.Application.Version
 
-		// Construct the registry reference
-		// Format: registry/namespace:package@version
-		registryRef := fmt.Sprintf("%s/%s:%s@%s",
-			registryURI,
-			namespace,
-			comp.ID,
-			version)
-
-		Info("Pushing component '%s' to %s", comp.ID, registryRef)
-
-		// Use spin deps publish to push the component
-		cmd := exec.CommandContext(ctx, "spin", "deps", "publish",
-			"--registry", registryURI,
-			"--package", fmt.Sprintf("%s:%s@%s", namespace, comp.ID, version),
-			sourcePath)
-
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-
-		if err := cmd.Run(); err != nil {
-			Debug("Failed to push component %s: %s", comp.ID, stderr.String())
-			return nil, fmt.Errorf("failed to push component %s: %s", comp.ID, stderr.String())
+		Info("Pushing %s to ECR", comp.ID)
+		if err := pusher.Push(ctx, wasmPath, packageName, version); err != nil {
+			return nil, fmt.Errorf("failed to push component %s: %w", comp.ID, err)
 		}
+		Success("Pushed %s", comp.ID)
 
-		// Create registry source reference
-		pushed = append(pushed, PushedComponent{
+		// Create processed component with ECR reference
+		processedComp := types.Component{
 			ID: comp.ID,
-			RegistrySource: &ftl.RegistrySource{
-				Registry: registryURI,
-				Package:  fmt.Sprintf("%s:%s", namespace, comp.ID),
-				Version:  version,
+			Source: map[string]interface{}{
+				"registry": ecrAuth.Registry,
+				"package":  packageName,
+				"version":  version,
 			},
-		})
+			Build:     comp.Build,
+			Variables: comp.Variables,
+		}
+		processedManifest.Components = append(processedManifest.Components, processedComp)
 	}
 
-	return pushed, nil
+	return processedManifest, nil
 }
 
-func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.CreateDeploymentRequest {
+// findBuiltWASM locates the built WASM file for a local component
+func findBuiltWASM(sourcePath, componentID string) (string, error) {
+	// Check if sourcePath is already a .wasm file
+	if strings.HasSuffix(sourcePath, ".wasm") {
+		if _, err := os.Stat(sourcePath); err == nil {
+			return sourcePath, nil
+		}
+	}
+
+	// Look in common build output locations
+	possiblePaths := []string{
+		filepath.Join(sourcePath, componentID+".wasm"),
+		filepath.Join(sourcePath, "target", "wasm32-wasip2", "release", componentID+".wasm"),
+		filepath.Join(sourcePath, "target", "wasm32-wasi", "release", componentID+".wasm"),
+		filepath.Join(sourcePath, "build", componentID+".wasm"),
+		filepath.Join(sourcePath, "dist", componentID+".wasm"),
+		componentID + ".wasm",
+	}
+
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find built WASM file for component %s", componentID)
+}
+
+// WASMPuller handles pulling WASM components from OCI registries
+type WASMPuller struct {
+	cacheDir string
+	mu       sync.Mutex
+}
+
+// NewWASMPuller creates a new WASM component puller
+func NewWASMPuller() *WASMPuller {
+	home := os.Getenv("HOME")
+	if home == "" {
+		home = os.Getenv("USERPROFILE") // Windows fallback
+	}
+	cacheDir := filepath.Join(home, ".cache", "ftl", "wasm")
+	os.MkdirAll(cacheDir, 0755)
+
+	return &WASMPuller{
+		cacheDir: cacheDir,
+	}
+}
+
+// Pull downloads a WASM component from a registry
+func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (string, error) {
+	// Construct the OCI reference
+	ref := fmt.Sprintf("%s/%s:%s", source.Registry, source.Package, source.Version)
+
+	// Parse the reference
+	tag, err := name.ParseReference(ref)
+	if err != nil {
+		return "", fmt.Errorf("invalid reference %s: %w", ref, err)
+	}
+
+	// Pull the image
+	img, err := remote.Image(tag, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	if err != nil {
+		return "", fmt.Errorf("failed to pull %s: %w", ref, err)
+	}
+
+	// Get the manifest to find the WASM layer
+	manifest, err := img.Manifest()
+	if err != nil {
+		return "", fmt.Errorf("failed to get manifest: %w", err)
+	}
+
+	// Find the WASM layer (usually the first/only layer)
+	if len(manifest.Layers) == 0 {
+		return "", fmt.Errorf("no layers found in image")
+	}
+
+	// Get the first layer
+	layers, err := img.Layers()
+	if err != nil {
+		return "", fmt.Errorf("failed to get layers: %w", err)
+	}
+
+	if len(layers) == 0 {
+		return "", fmt.Errorf("no layers available")
+	}
+
+	layer := layers[0]
+
+	// Get layer content
+	reader, err := layer.Uncompressed()
+	if err != nil {
+		return "", fmt.Errorf("failed to get layer content: %w", err)
+	}
+	defer reader.Close()
+
+	// Calculate hash for cache filename
+	hash, err := layer.Digest()
+	if err != nil {
+		return "", fmt.Errorf("failed to get layer digest: %w", err)
+	}
+
+	// Create cache file path
+	cachePath := filepath.Join(p.cacheDir, hash.Hex+".wasm")
+
+	// Check if already cached
+	if _, err := os.Stat(cachePath); err == nil {
+		Debug("Using cached WASM at %s", cachePath)
+		return cachePath, nil
+	}
+
+	// Write to cache
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	tmpFile := cachePath + ".tmp"
+	file, err := os.Create(tmpFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cache file: %w", err)
+	}
+
+	_, err = io.Copy(file, reader)
+	file.Close()
+	if err != nil {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("failed to write WASM content: %w", err)
+	}
+
+	// Atomic rename
+	if err := os.Rename(tmpFile, cachePath); err != nil {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("failed to finalize cache file: %w", err)
+	}
+
+	return cachePath, nil
+}
+
+// WASMPusher handles pushing WASM components to ECR
+type WASMPusher struct {
+	auth *ECRAuth
+}
+
+// NewWASMPusher creates a new WASM component pusher
+func NewWASMPusher(auth *ECRAuth) *WASMPusher {
+	return &WASMPusher{auth: auth}
+}
+
+// Push uploads a WASM component to ECR
+func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version string) error {
+	// Read the WASM file
+	wasmContent, err := os.ReadFile(wasmPath)
+	if err != nil {
+		return fmt.Errorf("failed to read WASM file: %w", err)
+	}
+
+	// Calculate SHA256 for content addressability
+	hash := sha256.Sum256(wasmContent)
+	hashStr := hex.EncodeToString(hash[:])
+
+	// Create a temporary tar file containing the WASM
+	tmpDir, err := os.MkdirTemp("", "ftl-push-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Write WASM to temp location
+	tmpWASM := filepath.Join(tmpDir, "component.wasm")
+	if err := os.WriteFile(tmpWASM, wasmContent, 0644); err != nil {
+		return fmt.Errorf("failed to write temp WASM: %w", err)
+	}
+
+	// Create OCI image from the WASM file
+	img, err := tarball.ImageFromPath(tmpWASM, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI image: %w", err)
+	}
+
+	// Construct the ECR reference
+	ref := fmt.Sprintf("%s/%s:%s", p.auth.Registry, packageName, version)
+
+	// Parse the reference
+	tag, err := name.ParseReference(ref)
+	if err != nil {
+		return fmt.Errorf("invalid reference %s: %w", ref, err)
+	}
+
+	// Create authenticator
+	authConfig := authn.AuthConfig{
+		Username: p.auth.Username,
+		Password: p.auth.Password,
+	}
+	authenticator := authn.FromConfig(authConfig)
+
+	// Push the image
+	if err := remote.Write(tag, img, remote.WithAuth(authenticator)); err != nil {
+		return fmt.Errorf("failed to push to ECR: %w", err)
+	}
+
+	Debug("Pushed WASM to %s (sha256:%s)", ref, hashStr)
+	return nil
+}
+
+func createDeploymentRequest(manifest *types.Manifest, opts *DeployOptions) api.CreateDeploymentRequest {
 	req := api.CreateDeploymentRequest{
 		Variables: &opts.Variables,
 	}
 
 	// Set the application details
-	req.Application.Name = app.Name
-	req.Application.Version = &app.Version
-	if app.Description != "" {
-		req.Application.Description = &app.Description
+	req.Application.Name = manifest.Application.Name
+	req.Application.Version = &manifest.Application.Version
+	if manifest.Application.Description != "" {
+		req.Application.Description = &manifest.Application.Description
 	}
 
 	// Set access control
-	switch app.Access {
-	case ftl.AccessPrivate:
+	switch manifest.Access {
+	case "private":
 		ac := api.CreateDeploymentRequestApplicationAccessPrivate
 		req.Application.Access = &ac
-	case ftl.AccessOrg:
+	case "org":
 		ac := api.CreateDeploymentRequestApplicationAccessOrg
 		req.Application.Access = &ac
-	case ftl.AccessCustom:
+	case "custom":
 		ac := api.CreateDeploymentRequestApplicationAccessCustom
 		req.Application.Access = &ac
 	default:
@@ -694,7 +631,7 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 	}
 
 	// Set auth configuration if needed
-	if app.Access == ftl.AccessOrg || app.Access == ftl.AccessCustom {
+	if manifest.Auth != nil && (manifest.Access == "org" || manifest.Access == "custom") {
 		req.Application.Auth = &struct {
 			JwtAudience *string                                             `json:"jwt_audience,omitempty"`
 			JwtIssuer   *string                                             `json:"jwt_issuer,omitempty"`
@@ -702,22 +639,14 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 			Provider    *api.CreateDeploymentRequestApplicationAuthProvider `json:"provider,omitempty"`
 		}{}
 
-		if app.Auth.Provider == ftl.AuthProviderWorkOS {
-			provider := api.CreateDeploymentRequestApplicationAuthProviderWorkos
-			req.Application.Auth.Provider = &provider
-		} else if app.Auth.Provider == ftl.AuthProviderCustom {
+		// Default to custom provider when JWT settings are present
+		if manifest.Auth.JWTIssuer != "" {
 			provider := api.CreateDeploymentRequestApplicationAuthProviderCustom
 			req.Application.Auth.Provider = &provider
+			req.Application.Auth.JwtIssuer = &manifest.Auth.JWTIssuer
 		}
-
-		if app.Auth.OrgID != "" {
-			req.Application.Auth.OrgId = &app.Auth.OrgID
-		}
-		if app.Auth.JWTIssuer != "" {
-			req.Application.Auth.JwtIssuer = &app.Auth.JWTIssuer
-		}
-		if app.Auth.JWTAudience != "" {
-			req.Application.Auth.JwtAudience = &app.Auth.JWTAudience
+		if manifest.Auth.JWTAudience != "" {
+			req.Application.Auth.JwtAudience = &manifest.Auth.JWTAudience
 		}
 	}
 
@@ -730,9 +659,9 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 			Version  string `json:"version"`
 		} `json:"source"`
 		Variables *map[string]string `json:"variables,omitempty"`
-	}, 0, len(app.Components))
+	}, 0, len(manifest.Components))
 
-	for _, comp := range app.Components {
+	for _, comp := range manifest.Components {
 		deployComp := struct {
 			Id     string `json:"id"`
 			Source struct {
@@ -745,16 +674,15 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 			Id: comp.ID,
 		}
 
-		// Convert component source to API format - only registry sources are allowed
-		if regSource, ok := ftl.AsRegistry(comp.Source); ok {
-			// Set the structured registry reference
-			deployComp.Source.Registry = regSource.Registry
-			deployComp.Source.Package = regSource.Package
-			deployComp.Source.Version = regSource.Version
-		} else if _, ok := ftl.AsLocal(comp.Source); ok {
-			// Local sources should have been replaced with registry sources after pushing
-			// This shouldn't happen at deployment time
-			return api.CreateDeploymentRequest{} // Return empty request to fail early
+		// Parse component source - should be registry at this point
+		if _, registrySource := types.ParseComponentSource(comp.Source); registrySource != nil {
+			deployComp.Source.Registry = registrySource.Registry
+			deployComp.Source.Package = registrySource.Package
+			deployComp.Source.Version = registrySource.Version
+		} else {
+			// This shouldn't happen after processing
+			Error("Component %s has non-registry source after processing", comp.ID)
+			continue
 		}
 
 		// Add component variables if any
@@ -770,8 +698,8 @@ func createDeploymentRequest(app *ftl.Application, opts *DeployOptions) api.Crea
 	}
 
 	// Add application variables if any
-	if len(app.Variables) > 0 {
-		req.Application.Variables = &app.Variables
+	if len(manifest.Variables) > 0 {
+		req.Application.Variables = &manifest.Variables
 	}
 
 	// Set environment based on options
@@ -856,50 +784,47 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 	return nil, fmt.Errorf("deployment timeout after 3 minutes")
 }
 
-func displayDryRunSummary(app *ftl.Application, localComponents []ftl.Component, appExists bool) {
+func displayDryRunSummary(manifest *types.Manifest, appExists bool) {
 	fmt.Println()
 	fmt.Println("🔍 DRY RUN MODE - No changes will be made")
 	fmt.Println()
 
 	color.Cyan("Application Configuration:")
-	fmt.Printf("  Name: %s\n", app.Name)
-	fmt.Printf("  Version: %s\n", app.Version)
-	if app.Description != "" {
-		fmt.Printf("  Description: %s\n", app.Description)
+	fmt.Printf("  Name: %s\n", manifest.Application.Name)
+	fmt.Printf("  Version: %s\n", manifest.Application.Version)
+	if manifest.Application.Description != "" {
+		fmt.Printf("  Description: %s\n", manifest.Application.Description)
 	}
-	fmt.Printf("  Access Control: %s\n", app.Access)
+	fmt.Printf("  Access Control: %s\n", manifest.Access)
 
-	if app.Auth.Provider == "custom" {
-		fmt.Printf("  Auth Provider: Custom\n")
-		fmt.Printf("  JWT Issuer: %s\n", app.Auth.JWTIssuer)
-		if app.Auth.JWTAudience != "" {
-			fmt.Printf("  JWT Audience: %s\n", app.Auth.JWTAudience)
-		}
-	} else if app.Access == "private" || app.Access == "org" {
-		fmt.Printf("  Auth Provider: WorkOS\n")
-		if app.Auth.OrgID != "" {
-			fmt.Printf("  Organization ID: %s\n", app.Auth.OrgID)
+	if manifest.Auth != nil {
+		if manifest.Auth.JWTIssuer != "" {
+			fmt.Printf("  Auth Provider: Custom\n")
+			fmt.Printf("  JWT Issuer: %s\n", manifest.Auth.JWTIssuer)
+			if manifest.Auth.JWTAudience != "" {
+				fmt.Printf("  JWT Audience: %s\n", manifest.Auth.JWTAudience)
+			}
 		}
 	}
 
 	fmt.Println()
 	color.Cyan("Components:")
-	for _, comp := range app.Components {
+	for _, comp := range manifest.Components {
 		fmt.Printf("  • %s\n", comp.ID)
 
 		// Show source type
-		if sourcePath, ok := ftl.AsLocal(comp.Source); ok {
-			fmt.Printf("    Source: %s (local)\n", sourcePath)
+		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
+			fmt.Printf("    Source: %s (local)\n", localPath)
 			if comp.Build != nil && comp.Build.Command != "" {
 				fmt.Printf("    Build: %s\n", comp.Build.Command)
 			}
-		} else if regSource, ok := ftl.AsRegistry(comp.Source); ok {
-			fmt.Printf("    Source: %s (registry)\n", regSource.Registry)
-			if regSource.Package != "" {
-				fmt.Printf("    Package: %s\n", regSource.Package)
+		} else if registrySource != nil {
+			fmt.Printf("    Source: %s (registry)\n", registrySource.Registry)
+			if registrySource.Package != "" {
+				fmt.Printf("    Package: %s\n", registrySource.Package)
 			}
-			if regSource.Version != "" {
-				fmt.Printf("    Version: %s\n", regSource.Version)
+			if registrySource.Version != "" {
+				fmt.Printf("    Version: %s\n", registrySource.Version)
 			}
 		}
 	}
@@ -907,9 +832,8 @@ func displayDryRunSummary(app *ftl.Application, localComponents []ftl.Component,
 	fmt.Println()
 	color.Cyan("Actions that would be performed:")
 
-	if len(localComponents) > 0 {
-		fmt.Printf("  ✓ Build %d local component(s)\n", len(localComponents))
-	}
+	fmt.Printf("  ✓ Synthesize spin.toml from configuration\n")
+	fmt.Printf("  ✓ Build local components with 'spin build'\n")
 
 	if appExists {
 		fmt.Printf("  ✓ Update existing app\n")
@@ -917,12 +841,9 @@ func displayDryRunSummary(app *ftl.Application, localComponents []ftl.Component,
 		fmt.Printf("  ✓ Create new app\n")
 	}
 
-	if len(localComponents) > 0 {
-		fmt.Printf("  ✓ Push %d component(s) to registry\n", len(localComponents))
-	}
-
-	fmt.Printf("  ✓ Create deployment with FTL configuration\n")
-	fmt.Printf("  ✓ Platform will synthesize Spin manifest and deploy\n")
+	fmt.Printf("  ✓ Pull registry components and push all to ECR\n")
+	fmt.Printf("  ✓ Create deployment with processed manifest\n")
+	fmt.Printf("  ✓ Platform will deploy from ECR\n")
 
 	fmt.Println()
 	fmt.Println("To perform the actual deployment, run without --dry-run")
@@ -943,7 +864,7 @@ func promptConfirm(message string, defaultYes bool) bool {
 }
 
 // displayMCPUrls displays a table showing MCP URLs for the application and its components
-func displayMCPUrls(baseURL string, components []ftl.Component) {
+func displayMCPUrls(baseURL string, components []types.Component) {
 	// Ensure the base URL ends with /mcp
 	mcpBaseURL := strings.TrimRight(baseURL, "/") + "/mcp"
 

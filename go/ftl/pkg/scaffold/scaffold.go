@@ -13,7 +13,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/go/shared/config"
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
 //go:embed templates.cue
@@ -234,16 +234,16 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		return fmt.Errorf("failed to read %s: %w", configPath, err)
 	}
 
-	var cfg config.FTLConfig
+	var manifest types.Manifest
 
 	// Parse based on format
 	switch format {
 	case "yaml":
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
+		if err := yaml.Unmarshal(data, &manifest); err != nil {
 			return fmt.Errorf("failed to parse %s: %w", configPath, err)
 		}
 	case "json":
-		if err := json.Unmarshal(data, &cfg); err != nil {
+		if err := json.Unmarshal(data, &manifest); err != nil {
 			return fmt.Errorf("failed to parse %s: %w", configPath, err)
 		}
 	default:
@@ -268,10 +268,10 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	wasmPath := s.getWasmPath(name, language)
 
 	// Create new component config
-	newComponent := config.ComponentConfig{
+	newComponent := types.Component{
 		ID:     name,
 		Source: wasmPath,
-		Build: &config.BuildConfig{
+		Build: &types.Build{
 			Command: command,
 			Workdir: name,
 			Watch:   watchPatterns,
@@ -279,14 +279,14 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	}
 
 	// Check for duplicate
-	for _, comp := range cfg.Components {
+	for _, comp := range manifest.Components {
 		if comp.ID == name {
 			return fmt.Errorf("component '%s' already exists", name)
 		}
 	}
 
 	// Add component
-	cfg.Components = append(cfg.Components, newComponent)
+	manifest.Components = append(manifest.Components, newComponent)
 
 	// Write back based on format
 	var output []byte
@@ -295,13 +295,13 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		var buf bytes.Buffer
 		encoder := yaml.NewEncoder(&buf)
 		encoder.SetIndent(2)
-		if err := encoder.Encode(&cfg); err != nil {
+		if err := encoder.Encode(&manifest); err != nil {
 			return fmt.Errorf("failed to encode config: %w", err)
 		}
 		output = buf.Bytes()
 	case "json":
 		var err error
-		output, err = json.MarshalIndent(&cfg, "", "  ")
+		output, err = json.MarshalIndent(&manifest, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to encode config: %w", err)
 		}

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/go/shared/config"
+	"github.com/fastertools/ftl-cli/go/shared/types"
 )
 
 // InitOptions holds options for the init command
@@ -186,16 +186,18 @@ func createYAMLConfig(dir string, opts *InitOptions) error {
 		description = fmt.Sprintf("%s - An FTL application", opts.Name)
 	}
 
-	cfg := &config.FTLConfig{
-		Application: config.ApplicationConfig{
+	manifest := &types.Manifest{
+		Application: types.Application{
 			Name:        opts.Name,
 			Version:     "0.1.0",
 			Description: description,
 		},
+		Components: []types.Component{},
+		Access:     "public",
 	}
 
 	configPath := filepath.Join(dir, "ftl.yaml")
-	data, err := yaml.Marshal(cfg)
+	data, err := yaml.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
