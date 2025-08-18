@@ -127,9 +127,6 @@ jobs:
           echo "SUCCESS: Version $new is newer than $current"
         fi
 
-    # Note: Go SDK tests (including TinyGo compatibility) are handled by CI workflow
-    # This release workflow focuses on publishing and template updates
-
   release:
     name: Create Release
     needs: [verify-tag, validate-and-test]

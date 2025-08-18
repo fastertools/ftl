@@ -68,7 +68,7 @@ curl -o- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh |
 wget -qO- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
 ```
 
-### Create a new project and scaafold a tool
+### Create a new project and scaffold a tool
 ```bash
 ftl init fast-project 
 
