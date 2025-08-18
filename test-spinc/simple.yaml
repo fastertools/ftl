@@ -1,4 +1,0 @@
-name: simple-test
-template: mcp
-auth:
-  enabled: false
