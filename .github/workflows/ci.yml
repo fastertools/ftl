@@ -171,6 +171,9 @@ jobs:
         with:
           cache-version: ${{ env.RUST_CACHE_VERSION }}
           
+      - name: Add wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
+          
       - name: Check formatting
         run: cargo fmt --all -- --check
         
@@ -193,6 +196,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-version: ${{ env.RUST_CACHE_VERSION }}
+          
+      - name: Add wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
           
       - name: Run Rust SDK tests
         run: |
@@ -235,6 +241,9 @@ jobs:
         with:
           cache-version: ${{ env.RUST_CACHE_VERSION }}
           
+      - name: Add wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
+          
       - name: Build all WASM components
         run: |
           cargo build --workspace --release --target wasm32-wasip1
@@ -276,6 +285,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-version: ${{ env.RUST_CACHE_VERSION }}
+          
+      - name: Add wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
           
       - name: Install Spin
         run: |
