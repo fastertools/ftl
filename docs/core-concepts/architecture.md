@@ -15,7 +15,7 @@ FTL's architecture is designed around security, performance, and polyglot compos
 
 FTL represents a sophisticated, WebAssembly-based framework for building and deploying polyglot Model Context Protocol (MCP) servers. The architecture demonstrates several key innovations:
 
-- **Dynamic Configuration Transpilation**: Simple `ftl.toml` configs expand into complex `spin.toml` runtime configurations
+- **Dynamic Configuration Transpilation**: Simple FTL configs expand into complex `spin.toml` runtime configurations
 - **Component-Based Security**: WebAssembly sandboxing with OAuth 2.0/JWT authentication
 - **Polyglot Tool Composition**: Multiple languages (Rust, Python, Go, TypeScript) unified through WASM Component Model  
 - **Edge-Optimized Deployment**: Sub-millisecond cold starts with global distribution capabilities
@@ -29,7 +29,7 @@ FTL represents a sophisticated, WebAssembly-based framework for building and dep
 
 ```mermaid
 graph TB
-    Client[MCP Client<br/>Claude, etc] 
+    Client[MCP Client<br/>Claude, etc]
     Gateway[FTL Gateway<br/>mcp-gateway]
     Auth[FTL Authorizer<br/>mcp-authorizer]
     Tools[Tool Components<br/>WASM]

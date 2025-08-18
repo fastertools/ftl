@@ -15,6 +15,7 @@ Cargo.lock.bak
 *.wasm.gz
 
 # Go build artifacts
+ftl
 bin/
 *.exe
 *.exe~
