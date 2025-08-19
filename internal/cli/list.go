@@ -130,7 +130,7 @@ func displayAppsTable(apps []struct {
 		}
 
 		// If failed, show error in URL column
-		if app.Status == api.ListAppsResponseBodyAppsStatusFAILED {
+		if app.Status == api.FAILED {
 			if app.ProviderError != nil && *app.ProviderError != "" {
 				// Truncate long errors for table display
 				errMsg := *app.ProviderError
