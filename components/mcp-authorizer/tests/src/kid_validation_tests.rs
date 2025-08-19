@@ -226,15 +226,11 @@ fn test_jwks_token_validation_with_multiple_keys_and_no_kid_in_token() {
     let (_private_key2, public_key2) = generate_test_key_pair();
 
     // Create JWKS with multiple keys
-    let n1 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.n().to_bytes_be());
-    let e1 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.e().to_bytes_be());
+    let n1 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.n().to_bytes_be());
+    let e1 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.e().to_bytes_be());
 
-    let n2 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.n().to_bytes_be());
-    let e2 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.e().to_bytes_be());
+    let n2 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.n().to_bytes_be());
+    let e2 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [
