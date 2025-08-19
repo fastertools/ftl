@@ -40,7 +40,7 @@ jobs:
       - name: Install golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-          sh -s -- -b $(go env GOPATH)/bin v1.62.2
+          sh -s -- -b $(go env GOPATH)/bin latest
           
       - name: Run golangci-lint
         run: golangci-lint run --timeout 5m ./...
@@ -65,6 +65,38 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          
+      - name: Install Spin (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          spin --version
+          
+      - name: Install Spin (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          iwr -useb https://developer.fermyon.com/downloads/install.ps1 | iex
+          spin --version
+        shell: powershell
+          
+      - name: Build ftl binary
+        run: go build -o ftl${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./cmd/ftl
+          
+      - name: Add ftl to PATH (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p $HOME/bin
+          mv ftl $HOME/bin/
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
+      - name: Add ftl to PATH (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir $env:USERPROFILE\bin
+          mv ftl.exe $env:USERPROFILE\bin\
+          echo "$env:USERPROFILE\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: powershell
           
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
@@ -299,7 +331,7 @@ jobs:
           
       - name: Install spin-test plugin
         run: |
-          spin plugin install -u https://github.com/spinframework/spin-test/releases/download/canary/spin-test.json
+          spin plugin install --yes -u https://github.com/spinframework/spin-test/releases/download/canary/spin-test.json
           
       - name: Run MCP Authorizer tests
         run: |

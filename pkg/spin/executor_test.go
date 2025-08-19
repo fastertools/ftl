@@ -479,18 +479,18 @@ func TestEnsureInstalledIntegration(t *testing.T) {
 }
 
 func TestExecutor_VersionIntegration(t *testing.T) {
-	// Test Version with /bin/echo which has --version support
-	// but outputs in a different format than expected
-	e := NewExecutor(WithBinary("/bin/echo"))
+	// Test Version with a mock command that doesn't support --version properly
+	// This test ensures error handling works correctly
+	e := NewExecutor(WithBinary("echo"))
 	version, err := e.Version()
 
-	// /bin/echo outputs "echo (GNU coreutils) X.Y"
+	// echo doesn't support --version flag properly,
+	// it just echoes "--version" as output
 	// The Version function expects "spin X.Y.Z" format
-	// So it will parse "(GNU" as the version, which is not what we want
-	// but it won't error
-	assert.NoError(t, err)
-	// The version will be "(GNU" which is not a valid version format
-	assert.Equal(t, "(GNU", version)
+	// So this should return an error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected version output")
+	assert.Empty(t, version)
 }
 
 // Benchmark tests
