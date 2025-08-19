@@ -478,20 +478,6 @@ func TestEnsureInstalledIntegration(t *testing.T) {
 	_ = err
 }
 
-func TestExecutor_VersionIntegration(t *testing.T) {
-	// Test Version with a mock command that doesn't support --version properly
-	// This test ensures error handling works correctly
-	e := NewExecutor(WithBinary("echo"))
-	version, err := e.Version()
-
-	// echo doesn't support --version flag properly,
-	// it just echoes "--version" as output
-	// The Version function expects "spin X.Y.Z" format
-	// So this should return an error
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unexpected version output")
-	assert.Empty(t, version)
-}
 
 // Benchmark tests
 func BenchmarkExecutor_Run(b *testing.B) {

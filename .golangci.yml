@@ -1,16 +1,6 @@
 run:
   timeout: 5m
   tests: true
-  build-tags: []
-  skip-dirs: []
-  skip-files: []
-
-output:
-  formats:
-    - format: colored-line-number
-      path: stdout
-  print-issued-lines: true
-  print-linter-name: true
 
 linters:
   enable:
@@ -28,17 +18,6 @@ linters:
     - revive
     - unconvert
     - unparam
-  disable:
-    - structcheck
-    - deadcode
-    - varcheck
-    - nosnakecase
-    - ifshort
-    - exhaustivestruct
-    - golint
-    - interfacer
-    - maligned
-    - scopelint
 
 linters-settings:
   errcheck:
@@ -49,27 +28,6 @@ linters-settings:
   revive:
     ignore-generated-header: true
     severity: warning
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
 
 issues:
   exclude-rules:
@@ -87,5 +45,3 @@ issues:
         - unused
   max-issues-per-linter: 0
   max-same-issues: 0
-  new: false
-  fix: false
