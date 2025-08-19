@@ -1,5 +1,5 @@
-// Package oci provides functionality for working with OCI (Open Container Initiative) 
-// registries and WASM (WebAssembly) artifacts according to the CNCF TAG Runtime 
+// Package oci provides functionality for working with OCI (Open Container Initiative)
+// registries and WASM (WebAssembly) artifacts according to the CNCF TAG Runtime
 // WASM OCI Artifact specification.
 //
 // This package implements:

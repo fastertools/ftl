@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -223,7 +222,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 
 	// Parse ECR credentials
-	ecrAuth, err := parseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
+	ecrAuth, err := oci.ParseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
 	if err != nil {
 		return fmt.Errorf("failed to parse ECR token: %w", err)
 	}
@@ -300,24 +299,6 @@ func runSynth(ctx context.Context, configFile string) error {
 	return cmd.Run()
 }
 
-// parseECRToken parses the ECR authorization token
-func parseECRToken(registryURI, authToken string) (*oci.ECRAuth, error) {
-	decoded, err := base64.StdEncoding.DecodeString(authToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode ECR token: %w", err)
-	}
-
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 || parts[0] != "AWS" {
-		return nil, fmt.Errorf("invalid ECR token format")
-	}
-
-	return &oci.ECRAuth{
-		Registry: registryURI,
-		Username: parts[0],
-		Password: parts[1],
-	}, nil
-}
 
 // processComponents handles pulling registry components and pushing everything to ECR
 func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth *oci.ECRAuth, namespace string) (*ftltypes.Manifest, error) {

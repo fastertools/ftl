@@ -21,13 +21,6 @@ import (
 	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
-// ECRAuth holds parsed ECR authentication details
-type ECRAuth struct {
-	Registry string
-	Username string
-	Password string
-}
-
 // WASMPuller handles pulling WASM components from OCI registries
 type WASMPuller struct {
 	cacheDir string
@@ -159,7 +152,7 @@ func NewWASMPusher(auth *ECRAuth) *WASMPusher {
 func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version string) error {
 	// Clean the WASM file path
 	wasmPath = filepath.Clean(wasmPath)
-	
+
 	// Read the WASM file
 	wasmContent, err := os.ReadFile(wasmPath)
 	if err != nil {

@@ -32,7 +32,6 @@ type wasmOCIImage struct {
 	annotations map[string]string
 }
 
-
 // Layers returns the layers of the image
 func (w *wasmOCIImage) Layers() ([]v1.Layer, error) {
 	return []v1.Layer{w.wasmLayer}, nil
@@ -88,12 +87,12 @@ func (w *wasmOCIImage) Digest() (v1.Hash, error) {
 	if err != nil {
 		return v1.Hash{}, err
 	}
-	
+
 	manifestJSON, err := json.Marshal(manifest)
 	if err != nil {
 		return v1.Hash{}, err
 	}
-	
+
 	h := sha256.Sum256(manifestJSON)
 	return v1.Hash{
 		Algorithm: "sha256",
@@ -104,30 +103,30 @@ func (w *wasmOCIImage) Digest() (v1.Hash, error) {
 // Manifest returns the manifest of the image
 func (w *wasmOCIImage) Manifest() (*v1.Manifest, error) {
 	layers := []v1.Descriptor{}
-	
+
 	// Add WASM layer descriptor
 	layerDigest, err := w.wasmLayer.Digest()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	layerSize, err := w.wasmLayer.Size()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	layers = append(layers, v1.Descriptor{
 		MediaType: WASMLayerMediaType,
 		Size:      layerSize,
 		Digest:    layerDigest,
 	})
-	
+
 	// Create config descriptor
 	configHash, err := w.ConfigName()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &v1.Manifest{
 		SchemaVersion: 2,
 		MediaType:     types.OCIManifestSchema1,
@@ -156,11 +155,11 @@ func (w *wasmOCIImage) LayerByDigest(h v1.Hash) (v1.Layer, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if layerDigest.String() == h.String() {
 		return w.wasmLayer, nil
 	}
-	
+
 	return nil, fmt.Errorf("layer not found: %s", h)
 }
 
@@ -170,10 +169,10 @@ func (w *wasmOCIImage) LayerByDiffID(h v1.Hash) (v1.Layer, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if diffID.String() == h.String() {
 		return w.wasmLayer, nil
 	}
-	
+
 	return nil, fmt.Errorf("layer not found: %s", h)
 }

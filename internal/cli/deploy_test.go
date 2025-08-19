@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http/httptest"
@@ -69,49 +68,7 @@ func TestLoadDeployManifest(t *testing.T) {
 	assert.Len(t, loaded.Components, 1)
 }
 
-func TestParseECRToken(t *testing.T) {
-	tests := []struct {
-		name     string
-		registry string
-		token    string
-		wantErr  bool
-		wantUser string
-	}{
-		{
-			name:     "valid token",
-			registry: "123456789.dkr.ecr.us-east-1.amazonaws.com",
-			token:    base64.StdEncoding.EncodeToString([]byte("AWS:password123")),
-			wantErr:  false,
-			wantUser: "AWS",
-		},
-		{
-			name:     "invalid base64",
-			registry: "test.registry.com",
-			token:    "not-valid-base64!@#",
-			wantErr:  true,
-		},
-		{
-			name:     "invalid format",
-			registry: "test.registry.com",
-			token:    base64.StdEncoding.EncodeToString([]byte("invalid-format")),
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			auth, err := parseECRToken(tt.registry, tt.token)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.registry, auth.Registry)
-				assert.Equal(t, tt.wantUser, auth.Username)
-				assert.Equal(t, "password123", auth.Password)
-			}
-		})
-	}
-}
+// TestParseECRToken tests are now in pkg/oci/ecr_auth_test.go
 
 func TestWASMPuller(t *testing.T) {
 	// Create a test registry

@@ -1,4 +1,4 @@
-package cli
+package oci
 
 import (
 	"encoding/base64"
@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestParseECRCredentials tests the ECR token parsing logic
-func TestParseECRCredentials(t *testing.T) {
+// TestParseECRToken tests the ECR token parsing logic
+func TestParseECRToken(t *testing.T) {
 	tests := []struct {
 		name          string
+		registryURI   string
 		authToken     string
 		expectError   bool
 		expectedUser  string
@@ -20,52 +21,60 @@ func TestParseECRCredentials(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:         "valid_aws_token",
+			name:         "valid aws token",
+			registryURI:  "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:    base64.StdEncoding.EncodeToString([]byte("AWS:mypassword123")),
 			expectError:  false,
 			expectedUser: "AWS",
 			expectedPass: "mypassword123",
 		},
 		{
-			name:         "valid_aws_token_with_special_chars",
+			name:         "valid aws token with special chars",
+			registryURI:  "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:    base64.StdEncoding.EncodeToString([]byte("AWS:pass@word!123#$%")),
 			expectError:  false,
 			expectedUser: "AWS",
 			expectedPass: "pass@word!123#$%",
 		},
 		{
-			name:         "valid_aws_token_empty_password",
+			name:         "valid aws token empty password",
+			registryURI:  "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:    base64.StdEncoding.EncodeToString([]byte("AWS:")),
 			expectError:  false,
 			expectedUser: "AWS",
 			expectedPass: "",
 		},
 		{
-			name:          "invalid_base64",
+			name:          "invalid base64",
+			registryURI:   "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:     "not-valid-base64!@#$%",
 			expectError:   true,
-			errorContains: "illegal base64",
+			errorContains: "failed to decode ECR token",
 		},
 		{
-			name:          "invalid_format_no_colon",
+			name:          "invalid format no colon",
+			registryURI:   "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:     base64.StdEncoding.EncodeToString([]byte("NoColonInToken")),
 			expectError:   true,
 			errorContains: "invalid ECR token format",
 		},
 		{
-			name:          "invalid_format_wrong_username",
+			name:          "invalid format wrong username",
+			registryURI:   "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:     base64.StdEncoding.EncodeToString([]byte("NOTAWS:password")),
 			expectError:   true,
 			errorContains: "invalid ECR token format",
 		},
 		{
-			name:          "invalid_format_lowercase_aws",
+			name:          "invalid format lowercase aws",
+			registryURI:   "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:     base64.StdEncoding.EncodeToString([]byte("aws:password")),
 			expectError:   true,
 			errorContains: "invalid ECR token format",
 		},
 		{
-			name:         "token_with_multiple_colons",
+			name:         "token with multiple colons",
+			registryURI:  "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			authToken:    base64.StdEncoding.EncodeToString([]byte("AWS:pass:word:with:colons")),
 			expectError:  false,
 			expectedUser: "AWS",
@@ -75,34 +84,16 @@ func TestParseECRCredentials(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Decode the token
-			decoded, err := base64.StdEncoding.DecodeString(tt.authToken)
-
-			if tt.expectError && tt.errorContains == "illegal base64" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorContains)
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("Unexpected decode error: %v", err)
-			}
-
-			// Parse username and password
-			parts := strings.SplitN(string(decoded), ":", 2)
+			auth, err := ParseECRToken(tt.registryURI, tt.authToken)
 
 			if tt.expectError {
-				// Check for invalid token format
-				if len(parts) != 2 || parts[0] != "AWS" {
-					// This is expected for error cases
-					return
-				}
-				t.Errorf("Expected error but got valid parse: user=%s", parts[0])
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
 			} else {
-				// Valid case
-				require.Equal(t, 2, len(parts), "Token should split into exactly 2 parts")
-				assert.Equal(t, tt.expectedUser, parts[0], "Username mismatch")
-				assert.Equal(t, tt.expectedPass, parts[1], "Password mismatch")
+				require.NoError(t, err)
+				assert.Equal(t, tt.registryURI, auth.Registry)
+				assert.Equal(t, tt.expectedUser, auth.Username)
+				assert.Equal(t, tt.expectedPass, auth.Password)
 			}
 		})
 	}
@@ -116,27 +107,27 @@ func TestCleanRegistryURI(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "https_prefix",
+			name:     "https prefix",
 			input:    "https://123456789.dkr.ecr.us-west-2.amazonaws.com",
 			expected: "123456789.dkr.ecr.us-west-2.amazonaws.com",
 		},
 		{
-			name:     "http_prefix",
+			name:     "http prefix",
 			input:    "http://123456789.dkr.ecr.us-west-2.amazonaws.com",
 			expected: "123456789.dkr.ecr.us-west-2.amazonaws.com",
 		},
 		{
-			name:     "no_prefix",
+			name:     "no prefix",
 			input:    "123456789.dkr.ecr.us-west-2.amazonaws.com",
 			expected: "123456789.dkr.ecr.us-west-2.amazonaws.com",
 		},
 		{
-			name:     "https_with_port",
+			name:     "https with port",
 			input:    "https://123456789.dkr.ecr.us-west-2.amazonaws.com:443",
 			expected: "123456789.dkr.ecr.us-west-2.amazonaws.com:443",
 		},
 		{
-			name:     "https_with_path",
+			name:     "https with path",
 			input:    "https://123456789.dkr.ecr.us-west-2.amazonaws.com/v2/",
 			expected: "123456789.dkr.ecr.us-west-2.amazonaws.com/v2/",
 		},
@@ -144,10 +135,9 @@ func TestCleanRegistryURI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clean up registry URI (remove protocol if present)
+			// This tests the pattern that would be used
 			result := strings.TrimPrefix(tt.input, "https://")
 			result = strings.TrimPrefix(result, "http://")
-
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -155,25 +145,14 @@ func TestCleanRegistryURI(t *testing.T) {
 
 // BenchmarkParseECRToken benchmarks the ECR token parsing
 func BenchmarkParseECRToken(b *testing.B) {
+	registry := "123456789.dkr.ecr.us-west-2.amazonaws.com"
 	token := base64.StdEncoding.EncodeToString([]byte("AWS:benchmarkpassword123"))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		decoded, _ := base64.StdEncoding.DecodeString(token)
-		parts := strings.SplitN(string(decoded), ":", 2)
-		if len(parts) != 2 || parts[0] != "AWS" {
-			b.Fatal("Invalid token in benchmark")
+		_, err := ParseECRToken(registry, token)
+		if err != nil {
+			b.Fatal(err)
 		}
-	}
-}
-
-// BenchmarkCleanRegistryURI benchmarks the registry URI cleaning
-func BenchmarkCleanRegistryURI(b *testing.B) {
-	uri := "https://123456789.dkr.ecr.us-west-2.amazonaws.com"
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		result := strings.TrimPrefix(uri, "https://")
-		_ = strings.TrimPrefix(result, "http://")
 	}
 }

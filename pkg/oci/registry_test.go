@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,13 +35,13 @@ func TestNewWASMPullerWithCache(t *testing.T) {
 
 func TestWASMPuller_CacheManagement(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	// Create a fake cached WASM file
 	wasmContent := []byte("test wasm content")
 	hash := sha256.Sum256(wasmContent)
 	hashHex := hex.EncodeToString(hash[:])
 	cachePath := filepath.Join(tempDir, hashHex+".wasm")
-	
+
 	err := os.WriteFile(cachePath, wasmContent, 0644)
 	require.NoError(t, err)
 
@@ -53,7 +55,7 @@ func TestNewWASMPusher(t *testing.T) {
 		Username: "testuser",
 		Password: "testpass",
 	}
-	
+
 	pusher := NewWASMPusher(auth)
 	assert.NotNil(t, pusher)
 	assert.Equal(t, auth, pusher.auth)
@@ -118,20 +120,20 @@ func TestWASMPusher_CreateWASMImageConsistency(t *testing.T) {
 	// Get config
 	config, err := img.RawConfigFile()
 	require.NoError(t, err)
-	
+
 	// Parse config
 	var cfg WASMConfig
 	err = json.Unmarshal(config, &cfg)
 	require.NoError(t, err)
-	
+
 	// Verify consistent layer digests for same content
 	expectedHash := sha256.Sum256(wasmContent)
 	expectedHashStr := hex.EncodeToString(expectedHash[:])
 	expectedLayerDigest := fmt.Sprintf("sha256:%s", expectedHashStr)
-	
+
 	assert.Len(t, cfg.LayerDigests, 1)
 	assert.Equal(t, expectedLayerDigest, cfg.LayerDigests[0])
-	
+
 	// Verify timestamp is set
 	assert.NotEmpty(t, cfg.Created)
 	_, err = time.Parse(time.RFC3339, cfg.Created)
@@ -307,11 +309,105 @@ func TestCachePathSafety(t *testing.T) {
 	// Test that cache paths are properly cleaned
 	hash := "abc123def456"
 	expectedPath := filepath.Clean(filepath.Join(tempDir, hash+".wasm"))
-	
+
 	// Create the cache file path as the puller would
 	cachePath := filepath.Clean(filepath.Join(puller.cacheDir, hash+".wasm"))
-	
+
 	assert.Equal(t, expectedPath, cachePath)
 	assert.NotContains(t, cachePath, "..")
 	assert.NotContains(t, cachePath, "~")
+}
+
+// TestWASMPuller_Pull_InvalidReference tests error handling for invalid references
+func TestWASMPuller_Pull_InvalidReference(t *testing.T) {
+	puller := NewWASMPuller()
+	ctx := context.Background()
+
+	testCases := []struct {
+		name   string
+		source *ftltypes.RegistrySource
+		errMsg string
+	}{
+		{
+			name: "invalid registry format",
+			source: &ftltypes.RegistrySource{
+				Registry: "not a valid registry!!!",
+				Package:  "package",
+				Version:  "1.0.0",
+			},
+			errMsg: "invalid reference",
+		},
+		{
+			name: "empty package name",
+			source: &ftltypes.RegistrySource{
+				Registry: "registry.example.com",
+				Package:  "",
+				Version:  "1.0.0",
+			},
+			errMsg: "invalid reference",
+		},
+		{
+			name: "invalid version format",
+			source: &ftltypes.RegistrySource{
+				Registry: "registry.example.com",
+				Package:  "package",
+				Version:  "not!valid!version",
+			},
+			errMsg: "invalid reference",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := puller.Pull(ctx, tc.source)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errMsg)
+		})
+	}
+}
+
+// TestWASMPuller_Pull_EmptyManifest tests the error handling when a manifest has no layers
+func TestWASMPuller_Pull_EmptyManifest(t *testing.T) {
+	// Create a mock server that returns a valid manifest with no layers
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case "/v2/test/empty/manifests/1.0.0":
+			// Return a valid but empty manifest
+			manifest := `{
+				"schemaVersion": 2,
+				"mediaType": "application/vnd.oci.image.manifest.v1+json",
+				"config": {
+					"mediaType": "application/vnd.wasm.config.v0+json",
+					"size": 2,
+					"digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+				},
+				"layers": []
+			}`
+			w.Header().Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+			w.Write([]byte(manifest))
+		case "/v2/test/empty/blobs/sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a":
+			w.Write([]byte("{}"))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	puller := NewWASMPuller()
+	ctx := context.Background()
+
+	// Remove the http:// prefix from server URL
+	registryURL := server.URL[7:] // Remove "http://"
+
+	source := &ftltypes.RegistrySource{
+		Registry: registryURL,
+		Package:  "test/empty",
+		Version:  "1.0.0",
+	}
+
+	_, err := puller.Pull(ctx, source)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no layers found in image")
 }
