@@ -27,7 +27,7 @@ package scaffold
 // Rust component template
 #RustComponent: #Component & {
 	language: "rust"
-	name: string  // Explicitly declare name as a string field
+	name: string
 	
 	build: {
 		command: "make build"
@@ -97,7 +97,7 @@ package scaffold
 			description = "MCP component authored in Rust"
 
 			[dependencies]
-			ftl-sdk = { version = "0.2.10", features = ["macros"] }
+			ftl-sdk = { version = "\(_versions.rust)", features = ["macros"] }
 			serde = { version = "1.0", features = ["derive"] }
 			serde_json = "1.0"
 			schemars = "1.0.4"
@@ -172,7 +172,7 @@ package scaffold
 // TypeScript component template
 #TypeScriptComponent: #Component & {
 	language: "typescript"
-	name: string  // Explicitly declare name as a string field
+	name: string
 	
 	build: {
 		command: "make build"
@@ -251,7 +251,7 @@ package scaffold
 			  "dependencies": {
 			    "@spinframework/build-tools": "^1.0.1",
 			    "@spinframework/wasi-http-proxy": "^1.0.0",
-			    "ftl-sdk": "^0.2.8",
+			    "ftl-sdk": "^\(_versions.typescript)",
 			    "zod": "^4.0.3"
 			  }
 			}
@@ -351,7 +351,7 @@ package scaffold
 // Python component template
 #PythonComponent: #Component & {
 	language: "python"
-	name: string  // Explicitly declare name as a string field
+	name: string
 	
 	build: {
 		command: "make build"
@@ -423,7 +423,7 @@ package scaffold
 			readme = "README.md"
 			requires-python = ">=3.10"
 			dependencies = [
-			    "ftl-sdk==0.1.0",
+			    "ftl-sdk==\(_versions.python)",
 			    # Add your project dependencies here
 			]
 
@@ -649,7 +649,7 @@ package scaffold
 // Go component template
 #GoComponent: #Component & {
 	language: "go"
-	name: string  // Explicitly declare name as a string field
+	name: string
 	
 	build: {
 		command: "make build"
@@ -722,7 +722,7 @@ package scaffold
 			go 1.23
 
 			require (
-			\tgithub.com/fastertools/ftl-cli/sdk/go v0.1.0
+			\tgithub.com/fastertools/ftl-cli/sdk/go v\(_versions.go)
 			)
 			"""
 		

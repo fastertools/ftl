@@ -19,18 +19,46 @@ import (
 //go:embed templates.cue
 var templatesCUE string
 
+//go:embed versions.json
+var versionsJSON string
+
+// SDKVersions represents the versions of SDKs used in templates
+type SDKVersions struct {
+	Go         string `json:"go"`
+	Rust       string `json:"rust"`
+	Python     string `json:"python"`
+	TypeScript string `json:"typescript"`
+}
+
 // Scaffolder handles component generation using CUE templates
 type Scaffolder struct {
 	ctx       *cue.Context
 	templates cue.Value
+	versions  SDKVersions
 }
 
 // NewScaffolder creates a new scaffolder with embedded templates
 func NewScaffolder() (*Scaffolder, error) {
 	ctx := cuecontext.New()
 
-	// Compile the embedded CUE templates
-	templates := ctx.CompileString(templatesCUE)
+	var versions SDKVersions
+	if err := json.Unmarshal([]byte(versionsJSON), &versions); err != nil {
+		return nil, fmt.Errorf("failed to parse versions: %w", err)
+	}
+
+	// Create templates with versions
+	templateWithVersions := fmt.Sprintf(`
+%s
+
+_versions: {
+	go:         %q
+	rust:       %q
+	python:     %q
+	typescript: %q
+}
+`, templatesCUE, versions.Go, versions.Rust, versions.Python, versions.TypeScript)
+
+	templates := ctx.CompileString(templateWithVersions)
 	if templates.Err() != nil {
 		return nil, fmt.Errorf("failed to compile templates: %w", templates.Err())
 	}
@@ -38,6 +66,7 @@ func NewScaffolder() (*Scaffolder, error) {
 	return &Scaffolder{
 		ctx:       ctx,
 		templates: templates,
+		versions:  versions,
 	}, nil
 }
 
@@ -99,16 +128,21 @@ func (s *Scaffolder) validateInputs(name, language string) error {
 
 // createComponentInstance creates a CUE value for the component
 func (s *Scaffolder) createComponentInstance(name, language string) (cue.Value, error) {
-	// Create the component configuration with the templates
 	componentDef := fmt.Sprintf(`
-		%s
-		
-		component: #Templates[%q] & {
-			name: %q
-		}
-	`, templatesCUE, language, name)
+%s
 
-	// Compile the full definition
+_versions: {
+	go:         %q
+	rust:       %q
+	python:     %q
+	typescript: %q
+}
+
+component: #Templates[%q] & {
+	name: %q
+}
+`, templatesCUE, s.versions.Go, s.versions.Rust, s.versions.Python, s.versions.TypeScript, language, name)
+
 	instance := s.ctx.CompileString(componentDef)
 	unified := instance
 

@@ -19,28 +19,17 @@ This directory contains the CI/CD workflows for the FTL project.
 
 ### Quality Checks
 
-- **[test-templates.yml](./test-templates.yml)** - Tests the project templates
-  - Creates projects with `ftl init`
-  - Adds components with `ftl add` for all languages
-  - Builds and tests each component type
-
 - **[test-e2e.yml](./test-e2e.yml)** - End-to-end tests for each language
   - Tests full ftl workflow: init, add, build, test
-  - Runs for Rust, TypeScript, and JavaScript
-  - Ensures templates work with actual ftl commands
-
-- **[check-sdk-versions.yml](./check-sdk-versions.yml)** - Ensures SDK versions match templates
-  - Verifies Rust SDK version in Rust template
-  - Verifies TypeScript SDK version in TypeScript/JavaScript templates
+  - Runs for Rust, TypeScript, Python, and Go
+  - Ensures component scaffolding works correctly
 
 - **[check-versions.yml](./check-versions.yml)** - Checks version consistency
   - Ensures workspace and CLI versions match
-  - Warns about SDK version mismatches in templates
 
 - **[check-docs.yml](./check-docs.yml)** - Documentation checks
   - Verifies README links are valid
   - Ensures CLI help matches documentation
-  - Checks template READMEs exist
 
 ## Dependabot
 

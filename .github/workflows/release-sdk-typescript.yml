@@ -179,17 +179,11 @@ jobs:
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          # Update TypeScript templates
-          find templates -name "package.json" -type f | while read -r file; do
-            if grep -q '"ftl-sdk"' "$file"; then
-              # Use jq to update the version properly
-              jq --arg v "^$VERSION" '.dependencies["ftl-sdk"] = $v' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-              echo "✅ Updated $file"
-            fi
-          done
+          # Update TypeScript SDK version in versions.json
+          jq --arg v "$VERSION" '.typescript = $v' internal/scaffold/versions.json > versions.tmp
+          mv versions.tmp internal/scaffold/versions.json
           
-          # Note: TypeScript examples use local file references during development
-          # They get the published version when users install them
+          echo "✅ Updated TypeScript SDK to v$VERSION in versions.json"
       
       - name: Commit changes
         run: |
@@ -217,7 +211,7 @@ jobs:
           This PR updates project templates to use the newly published ftl-sdk version.
           
           ### Changes
-          - Updated TypeScript project templates to use ftl-sdk v${VERSION}
+          - Updated TypeScript SDK version to v${VERSION} in internal/scaffold/versions.json
           
           ### Context
           This is an automated PR created after the successful release of ftl-sdk v${VERSION} to NPM.
