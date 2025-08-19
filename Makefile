@@ -45,11 +45,8 @@ test-cli:
 # Test Rust SDKs
 test-sdk:
 	@echo "🧪 Testing Rust SDKs..."
-	@cd sdk/rust && cargo test
-	@cd sdk/rust-macros && cargo test
-
-# Run all tests
-test: test-cli test-sdk
+	@cd sdk/rust && cargo test --target $(shell rustc -vV | sed -n 's/host: //p')
+	@cd sdk/rust-macros && cargo test --target $(shell rustc -vV | sed -n 's/host: //p')
 
 # Build WebAssembly components
 build-components:
@@ -68,6 +65,9 @@ test-components:
 		echo "⚠️  spin not installed"; \
 		echo "   Install from: https://developer.fermyon.com/spin/install"; \
 	fi
+
+# Run all tests
+test: test-cli test-sdk test-components
 
 # Format all code
 fmt:
