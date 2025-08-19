@@ -32,7 +32,7 @@ fn test_initialize_protocol_v1() {
     assert_eq!(result["protocolVersion"], "2025-06-18");
     assert!(result["capabilities"].is_object());
     assert!(result["serverInfo"].is_object());
-    assert_eq!(result["serverInfo"]["name"], "ftl-mcp-gateway");
+    assert_eq!(result["serverInfo"]["name"], "mcp-gateway");
     assert!(result["serverInfo"]["version"].is_string());
 }
 
