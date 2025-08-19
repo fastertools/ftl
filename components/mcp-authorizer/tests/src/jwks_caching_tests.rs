@@ -70,8 +70,8 @@ fn create_tracked_jwks_response(public_key: &RsaPublicKey, kid: &str) -> serde_j
     }
 
     // Create JWKS JSON
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     json!({
         "keys": [{
@@ -248,8 +248,8 @@ fn test_jwks_cache_ttl() {
     kv.delete("jwks:https://test.authkit.app/.well-known/jwks.json");
 
     // Create JWKS response
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [{
@@ -389,8 +389,8 @@ fn test_jwks_cache_per_issuer() {
 
 // Helper to create JWKS JSON
 fn create_jwks_json(public_key: &RsaPublicKey, kid: &str) -> serde_json::Value {
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     json!({
         "keys": [{

@@ -57,8 +57,8 @@ fn create_token_with_kid(
 
 /// Create JWKS with KID
 fn create_jwks_with_kid(public_key: &RsaPublicKey, kid: &str) -> serde_json::Value {
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     json!({
         "keys": [{
@@ -227,14 +227,14 @@ fn test_jwks_token_validation_with_multiple_keys_and_no_kid_in_token() {
 
     // Create JWKS with multiple keys
     let n1 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key1.n().to_bytes_be());
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.n().to_bytes_be());
     let e1 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key1.e().to_bytes_be());
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key1.e().to_bytes_be());
 
     let n2 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key2.n().to_bytes_be());
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.n().to_bytes_be());
     let e2 =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key2.e().to_bytes_be());
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key2.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [
@@ -295,8 +295,8 @@ fn test_jwks_token_validation_with_no_kid_and_kid_in_jwks() {
     let (private_key, public_key) = generate_test_key_pair();
 
     // Create JWKS WITH KID
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [{

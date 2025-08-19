@@ -29,9 +29,9 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     let config = match Config::load() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("ERROR: Configuration failed: {}", e);
+            eprintln!("ERROR: Configuration failed: {e}");
             // Return configuration error as a proper HTTP response
-            let error = AuthError::Configuration(format!("Configuration error: {}", e));
+            let error = AuthError::Configuration(format!("Configuration error: {e}"));
             return Ok(create_config_error_response(&error));
         }
     };
@@ -67,9 +67,9 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
         Err(auth_error) => {
             // Log auth failures for debugging
             if let Some(ref id) = trace_id {
-                eprintln!("[{}] Auth failed: {}", id, auth_error);
+                eprintln!("[{id}] Auth failed: {auth_error}");
             } else {
-                eprintln!("Auth failed: {}", auth_error);
+                eprintln!("Auth failed: {auth_error}");
             }
             // Return authentication error
             Ok(create_error_response(&auth_error, &req, &config, trace_id))
@@ -95,7 +95,7 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
                 .map_err(|e| {
                     eprintln!("ERROR: Failed to open KV store: {e}");
                     eprintln!("HINT: Ensure the mcp-authorizer component has 'key_value_stores = [\"default\"]' in spin.toml");
-                    AuthError::Internal(format!("KV store access denied. Ensure component has key_value_stores permission in spin.toml"))
+                    AuthError::Internal("KV store access denied. Ensure component has key_value_stores permission in spin.toml".to_string())
                 })?;
 
             // Verify JWT token (signature, expiry, issuer, audience)

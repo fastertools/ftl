@@ -88,8 +88,8 @@ pub fn create_test_token(private_key: &RsaPrivateKey, claims: Claims, kid: Optio
 /// Helper to create a JWKS response with the public key
 pub fn create_jwks_response(public_key: &RsaPublicKey, kid: &str) -> serde_json::Value {
     // Create proper JWK format
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     json!({
         "keys": [{

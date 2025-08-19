@@ -496,7 +496,7 @@ fn test_toolsets_header_filters_components() {
 
     // Should only return calc tools due to X-MCP-Toolsets header
     assert!(
-        tools.len() >= 1,
+        !tools.is_empty(),
         "Should have at least calc component tools"
     );
 

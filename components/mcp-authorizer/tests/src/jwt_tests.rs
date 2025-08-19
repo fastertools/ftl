@@ -56,8 +56,8 @@ fn generate_rsa_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
 
 /// Mock JWKS endpoint
 fn mock_jwks_endpoint(public_key: &RsaPublicKey, url: &str) {
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [{
@@ -162,8 +162,8 @@ fn mock_jwks_response(public_key: &RsaPublicKey, kid: Option<&str>) -> Value {
             "use": "sig",
             "alg": "RS256",
             "kid": kid.unwrap_or("test-key-1"),
-            "n": base64::engine::general_purpose::STANDARD.encode(&public_key.n().to_bytes_be()),
-            "e": base64::engine::general_purpose::STANDARD.encode(&public_key.e().to_bytes_be())
+            "n": base64::engine::general_purpose::STANDARD.encode(public_key.n().to_bytes_be()),
+            "e": base64::engine::general_purpose::STANDARD.encode(public_key.e().to_bytes_be())
         }]
     })
 }

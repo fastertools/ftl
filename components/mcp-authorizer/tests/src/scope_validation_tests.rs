@@ -58,8 +58,8 @@ fn create_token_with_scopes(
 
 /// Mock JWKS endpoint
 fn mock_jwks_endpoint(public_key: &RsaPublicKey) {
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&public_key.e().to_bytes_be());
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
 
     let jwks = json!({
         "keys": [{
