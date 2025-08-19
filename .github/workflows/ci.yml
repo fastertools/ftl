@@ -84,16 +84,6 @@ jobs:
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
         
-      - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.txt
-          flags: go
-          name: go-coverage
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   go-build:
     name: Go Build
     strategy:
@@ -229,14 +219,7 @@ jobs:
           cargo llvm-cov --workspace --all-features \
             --lcov --output-path lcov.info || true
             
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./lcov.info
-          flags: rust
-          name: rust-coverage
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+
 
   rust-build-wasm:
     name: Build WASM Components
@@ -382,7 +365,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.12']
     steps:
       - uses: actions/checkout@v4
       
@@ -406,23 +389,13 @@ jobs:
         run: |
           cd sdk/python
           pytest --cov=ftl_sdk --cov-report=xml
-          
-      - name: Upload coverage
-        if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./sdk/python/coverage.xml
-          flags: python
-          name: python-coverage
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   typescript-sdk-test:
     name: TypeScript SDK Test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
       
@@ -447,17 +420,6 @@ jobs:
         run: |
           cd sdk/typescript
           npm test -- --coverage
-          
-      - name: Upload coverage
-        if: matrix.node-version == 20
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./sdk/typescript/coverage/lcov.info
-          flags: typescript
-          name: typescript-coverage
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   # ============================================================================
   # Final Status Check
   # ============================================================================

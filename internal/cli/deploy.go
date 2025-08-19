@@ -138,6 +138,12 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		fmt.Println()
 	}
 
+	// Dry-run mode: validate configuration without authentication
+	if opts.DryRun {
+		displayDryRunSummary(manifest, false)
+		return nil
+	}
+
 	// Initialize auth manager
 	store, err := auth.NewKeyringStore()
 	if err != nil {
@@ -170,24 +176,19 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	if appExists {
 		appID = apps.Apps[0].AppId.String()
-		if !opts.Yes && !opts.DryRun {
+		if !opts.Yes {
 			Info("Found existing app '%s'", appName)
 			if !promptConfirm("Update existing app?", true) {
 				return fmt.Errorf("deployment cancelled")
 			}
 		}
 	} else {
-		if !opts.Yes && !opts.DryRun {
+		if !opts.Yes {
 			Info("Creating new app '%s'", appName)
 			if !promptConfirm("Continue?", true) {
 				return fmt.Errorf("deployment cancelled")
 			}
 		}
-	}
-
-	if opts.DryRun {
-		displayDryRunSummary(manifest, appExists)
-		return nil
 	}
 
 	// Create app if it doesn't exist
