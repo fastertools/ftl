@@ -93,7 +93,7 @@ import (
 			}
 			
 			// MCP Gateway (always present)
-			"ftl-mcp-gateway": {
+			"mcp-gateway": {
 				source: {
 					registry: "ghcr.io"
 					package:  "fastertools:mcp-gateway"
@@ -123,7 +123,7 @@ import (
 						"https://*.workos.com",
 					]
 					variables: {
-						mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal"
+						mcp_gateway_url: "http://mcp-gateway.spin.internal"
 						mcp_jwt_issuer: input.auth.jwt_issuer | *"https://api.workos.com"
 						mcp_jwt_audience: input.auth.jwt_audience | *input.name
 						// org_id is always included but may be empty
@@ -140,7 +140,7 @@ import (
 			// Base routes
 			_publicRoutes: [{
 				route: "/..."
-				component: "ftl-mcp-gateway"
+				component: "mcp-gateway"
 			}]
 			
 			_privateRoutes: [
@@ -150,7 +150,7 @@ import (
 				},
 				{
 					route: {private: true}
-					component: "ftl-mcp-gateway"
+					component: "mcp-gateway"
 				}
 			]
 			
