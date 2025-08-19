@@ -64,7 +64,7 @@ func runListImpl(ctx context.Context, format string, detailed bool) error {
 
 	Debug("ListApps returned %d apps", len(response.Apps))
 	if len(response.Apps) == 0 {
-		fmt.Fprintln(colorOutput, "No applications found.")
+		_, _ = fmt.Fprintln(colorOutput, "No applications found.")
 		return nil
 	}
 
@@ -174,7 +174,7 @@ func displayAppsTable(apps []struct {
 	if count != 1 {
 		plural = "s"
 	}
-	fmt.Fprintf(colorOutput, "Total: %d application%s\n", count, plural)
+	_, _ = fmt.Fprintf(colorOutput, "Total: %d application%s\n", count, plural)
 
 	return nil
 }

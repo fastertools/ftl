@@ -56,7 +56,7 @@ func (c *OAuthClient) StartDeviceFlow(ctx context.Context) (*DeviceAuthResponse,
 	if err != nil {
 		return nil, fmt.Errorf("failed to request device authorization: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -141,7 +141,7 @@ func (c *OAuthClient) requestToken(ctx context.Context, endpoint, deviceCode str
 	if err != nil {
 		return nil, fmt.Errorf("failed to request token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -189,7 +189,7 @@ func (c *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*T
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

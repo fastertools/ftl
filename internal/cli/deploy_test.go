@@ -228,7 +228,7 @@ func TestFindBuiltWASM(t *testing.T) {
 
 			// Cleanup
 			for _, file := range tt.setupFiles {
-				os.RemoveAll(filepath.Join(tmpDir, strings.Split(file, "/")[0]))
+				_ = os.RemoveAll(filepath.Join(tmpDir, strings.Split(file, "/")[0]))
 			}
 		})
 	}
@@ -358,7 +358,7 @@ func TestDisplayDryRunSummary(t *testing.T) {
 
 	displayDryRunSummary(manifest, true)
 
-	w.Close()
+	_ = w.Close()
 	out, _ := io.ReadAll(r)
 	os.Stdout = oldStdout
 

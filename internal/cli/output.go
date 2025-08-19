@@ -92,8 +92,8 @@ func (dw *DataWriter) writeJSON(data interface{}) error {
 // writeKeyValueTable writes key-value pairs as an aligned table
 func (dw *DataWriter) writeKeyValueTable(title string, data map[string]interface{}) error {
 	if title != "" {
-		fmt.Fprintln(dw.output)
-		fmt.Fprintln(dw.output, title)
+		_, _ = fmt.Fprintln(dw.output)
+		_, _ = fmt.Fprintln(dw.output, title)
 	}
 
 	// Use tabwriter for consistent alignment
@@ -105,7 +105,7 @@ func (dw *DataWriter) writeKeyValueTable(title string, data map[string]interface
 	// Print known keys in order first
 	for _, key := range orderedKeys {
 		if value, exists := data[key]; exists && value != nil && value != "" {
-			fmt.Fprintf(w, "  %s:\t%v\t\n", key, value)
+			_, _ = fmt.Fprintf(w, "  %s:\t%v\t\n", key, value)
 		}
 	}
 
@@ -119,44 +119,44 @@ func (dw *DataWriter) writeKeyValueTable(title string, data map[string]interface
 			}
 		}
 		if !found && value != nil && value != "" {
-			fmt.Fprintf(w, "  %s:\t%v\t\n", key, value)
+			_, _ = fmt.Fprintf(w, "  %s:\t%v\t\n", key, value)
 		}
 	}
 
-	w.Flush()
-	fmt.Fprintln(dw.output)
+	_ = w.Flush()
+	_, _ = fmt.Fprintln(dw.output)
 	return nil
 }
 
 // writeTabularData writes headers and rows as a table
 func (dw *DataWriter) writeTabularData(headers []string, rows [][]string) error {
-	fmt.Fprintln(dw.output)
+	_, _ = fmt.Fprintln(dw.output)
 
 	// Use tabwriter for consistent alignment
 	w := tabwriter.NewWriter(dw.output, 0, 0, 2, ' ', 0)
 
 	// Write headers
 	for i, header := range headers {
-		fmt.Fprint(w, header)
+		_, _ = fmt.Fprint(w, header)
 		if i < len(headers)-1 {
-			fmt.Fprint(w, "\t")
+			_, _ = fmt.Fprint(w, "\t")
 		}
 	}
-	fmt.Fprintln(w, "\t") // Trailing tab for proper termination
+	_, _ = fmt.Fprintln(w, "\t") // Trailing tab for proper termination
 
 	// Write rows
 	for _, row := range rows {
 		for i, cell := range row {
-			fmt.Fprint(w, cell)
+			_, _ = fmt.Fprint(w, cell)
 			if i < len(row)-1 {
-				fmt.Fprint(w, "\t")
+				_, _ = fmt.Fprint(w, "\t")
 			}
 		}
-		fmt.Fprintln(w, "\t") // Trailing tab for proper termination
+		_, _ = fmt.Fprintln(w, "\t") // Trailing tab for proper termination
 	}
 
-	w.Flush()
-	fmt.Fprintln(dw.output)
+	_ = w.Flush()
+	_, _ = fmt.Fprintln(dw.output)
 	return nil
 }
 

@@ -82,7 +82,7 @@ func TestPrintSuccessMessage(t *testing.T) {
 	printSuccessMessage("test-component", "rust")
 
 	// Restore stdout and read output
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	out, _ := io.ReadAll(r)
 	output := string(out)
@@ -184,7 +184,7 @@ components: []
 	err := runAdd(opts)
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	out, _ := io.ReadAll(r)
 	output := string(out)
@@ -413,7 +413,7 @@ func TestPrintSuccessMessageFormatting(t *testing.T) {
 
 			printSuccessMessage("test-comp", lang)
 
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 			out, _ := io.ReadAll(r)
 

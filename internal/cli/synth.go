@@ -195,7 +195,7 @@ func synthesizeFromGo(filename string) (string, error) {
 
 	// Basic validation - check if it looks like a manifest
 	if !strings.Contains(manifest, "spin_manifest_version") {
-		return "", fmt.Errorf("Go program did not output a valid spin.toml manifest")
+		return "", fmt.Errorf("go program did not output a valid spin.toml manifest")
 	}
 
 	return manifest, nil

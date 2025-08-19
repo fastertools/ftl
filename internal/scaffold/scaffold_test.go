@@ -438,14 +438,14 @@ func TestUpdateFTLConfig_UnsupportedFormats(t *testing.T) {
 			format:    "go",
 			setupFile: "main.go",
 			content:   `package main; import "github.com/fastertools/ftl-cli/internal/synthesis"; func main() { synthesis.NewCDK() }`,
-			errMsg:    "Go-based configurations require manual",
+			errMsg:    "go-based configurations require manual",
 		},
 		{
 			name:      "cue config",
 			format:    "cue",
 			setupFile: "app.cue",
 			content:   `package app`,
-			errMsg:    "CUE configurations require manual",
+			errMsg:    "cue configurations require manual",
 		},
 	}
 

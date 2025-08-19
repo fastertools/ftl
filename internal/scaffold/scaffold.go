@@ -207,25 +207,18 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		language, _ := component.LookupPath(cue.ParsePath("language")).String()
 		wasmPath := s.getWasmPath(name, language)
 
-		return fmt.Errorf("Go-based configurations require manual component registration.\n"+
-			"Add this to your main.go:\n\n"+
-			"    app.AddComponent(\"%s\").\n"+
-			"        FromLocal(\"./%s\").\n"+
-			"        WithBuild(\"cd %s && make build\").\n"+
-			"        Build()\n", name, wasmPath, name)
+		return fmt.Errorf("go-based configurations require manual component registration - "+
+			"add this to your main.go: "+
+			"app.AddComponent(\"%s\")."+
+			"FromLocal(\"./%s\")."+
+			"WithBuild(\"cd %s && make build\")."+
+			"Build()", name, wasmPath, name)
 	}
 
 	if format == "cue" {
-		return fmt.Errorf("CUE configurations require manual component registration.\n"+
-			"Add this to your app.cue components array:\n\n"+
-			"    {\n"+
-			"        id: \"%s\"\n"+
-			"        source: \"./%s/%s.wasm\"\n"+
-			"        build: {\n"+
-			"            command: \"make build\"\n"+
-			"            workdir: \"%s\"\n"+
-			"        }\n"+
-			"    }\n", name, name, name, name)
+		return fmt.Errorf("cue configurations require manual component registration - "+
+			"add component with id=%s source=./%s/%s.wasm build.command='make build' build.workdir=%s to your app.cue components array",
+			name, name, name, name)
 	}
 
 	// Read existing config
@@ -377,12 +370,12 @@ func ValidateComponentName(name string) error {
 
 	// Check for valid characters (lowercase, numbers, hyphens)
 	for i, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
 			return fmt.Errorf("component name must contain only lowercase letters, numbers, and hyphens")
 		}
 
 		// First character must be a letter
-		if i == 0 && !(c >= 'a' && c <= 'z') {
+		if i == 0 && (c < 'a' || c > 'z') {
 			return fmt.Errorf("component name must start with a lowercase letter")
 		}
 	}

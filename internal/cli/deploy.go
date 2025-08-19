@@ -494,7 +494,7 @@ func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (st
 	if err != nil {
 		return "", fmt.Errorf("failed to get layer content: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Calculate hash for cache filename
 	hash, err := layer.Digest()
@@ -522,15 +522,15 @@ func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (st
 	}
 
 	_, err = io.Copy(file, reader)
-	file.Close()
+	_ = file.Close()
 	if err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return "", fmt.Errorf("failed to write WASM content: %w", err)
 	}
 
 	// Atomic rename
 	if err := os.Rename(tmpFile, cachePath); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return "", fmt.Errorf("failed to finalize cache file: %w", err)
 	}
 
@@ -564,7 +564,7 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write WASM to temp location
 	tmpWASM := filepath.Join(tmpDir, "component.wasm")
@@ -895,5 +895,5 @@ func displayMCPUrls(baseURL string, components []types.Component) {
 	}
 
 	// Add summary line after table
-	fmt.Fprintf(colorOutput, "Connect to MCP clients with the URLs above.\n")
+	_, _ = fmt.Fprintf(colorOutput, "Connect to MCP clients with the URLs above.\n")
 }

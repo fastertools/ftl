@@ -201,7 +201,7 @@ func isValidName(name string) bool {
 		if i == 0 && (ch < 'a' || ch > 'z') {
 			return false // Must start with lowercase letter
 		}
-		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-') {
+		if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '-' {
 			return false
 		}
 	}

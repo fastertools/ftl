@@ -106,7 +106,7 @@ func runDeleteImpl(ctx context.Context, appIdentifier string, force bool) error 
 			return fmt.Errorf("deletion requires confirmation. Use --force to skip confirmation in non-interactive mode")
 		}
 
-		color.New(color.FgRed, color.Bold).Println("⚠️  This action cannot be undone!")
+		_, _ = color.New(color.FgRed, color.Bold).Println("⚠️  This action cannot be undone!")
 
 		// Ask user to type the app name to confirm
 		prompt := &survey.Input{
