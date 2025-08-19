@@ -71,8 +71,12 @@ func TestParseComponentSource(t *testing.T) {
 			source: map[string]interface{}{
 				"registry": "ghcr.io",
 			},
-			expectedLocal:    "",
-			expectedRegistry: nil,
+			expectedLocal: "",
+			expectedRegistry: &RegistrySource{
+				Registry: "ghcr.io",
+				Package:  "",
+				Version:  "",
+			},
 		},
 	}
 

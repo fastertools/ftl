@@ -50,50 +50,41 @@ type RegistrySource struct {
 	Version  string `json:"version" yaml:"version"`
 }
 
-// ParseComponentSource converts the generic source field to a specific type
 func ParseComponentSource(source interface{}) (string, *RegistrySource) {
-	// Try string first (local path)
-	if str, ok := source.(string); ok {
-		return str, nil
-	}
-
-	// Try map (registry source)
-	if m, ok := source.(map[string]interface{}); ok {
+	switch s := source.(type) {
+	case string:
+		return s, nil
+	case map[string]interface{}:
 		reg := &RegistrySource{}
-		if r, ok := m["registry"].(string); ok {
+		if r, ok := s["registry"].(string); ok {
 			reg.Registry = r
 		}
-		if p, ok := m["package"].(string); ok {
+		if p, ok := s["package"].(string); ok {
 			reg.Package = p
 		}
-		if v, ok := m["version"].(string); ok {
+		if v, ok := s["version"].(string); ok {
 			reg.Version = v
 		}
-		// Only return if all required fields are present
-		if reg.Registry != "" && reg.Package != "" && reg.Version != "" {
+		if reg.Registry != "" || reg.Package != "" {
 			return "", reg
 		}
 		return "", nil
-	}
-
-	// Try map[interface{}]interface{} (from YAML unmarshaling)
-	if m, ok := source.(map[interface{}]interface{}); ok {
+	case map[interface{}]interface{}:
 		reg := &RegistrySource{}
-		if r, ok := m["registry"].(string); ok {
+		if r, ok := s["registry"].(string); ok {
 			reg.Registry = r
 		}
-		if p, ok := m["package"].(string); ok {
+		if p, ok := s["package"].(string); ok {
 			reg.Package = p
 		}
-		if v, ok := m["version"].(string); ok {
+		if v, ok := s["version"].(string); ok {
 			reg.Version = v
 		}
-		// Only return if all required fields are present
-		if reg.Registry != "" && reg.Package != "" && reg.Version != "" {
+		if reg.Registry != "" || reg.Package != "" {
 			return "", reg
 		}
 		return "", nil
+	default:
+		return "", nil
 	}
-
-	return "", nil
 }
