@@ -213,8 +213,8 @@ func TestFindBuiltWASM(t *testing.T) {
 			// Setup files
 			for _, file := range tt.setupFiles {
 				fullPath := filepath.Join(tmpDir, file)
-				os.MkdirAll(filepath.Dir(fullPath), 0755)
-				os.WriteFile(fullPath, []byte("wasm"), 0644)
+				_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
+				_ = os.WriteFile(fullPath, []byte("wasm"), 0644)
 			}
 
 			// Test

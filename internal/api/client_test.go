@@ -124,7 +124,7 @@ func TestFTLClient_ListApps(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -153,7 +153,7 @@ func TestFTLClient_CreateApp(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 
 		var req CreateAppRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 		assert.NotEmpty(t, req.AppName)
 
 		response := CreateAppResponseBody{
@@ -166,7 +166,7 @@ func TestFTLClient_CreateApp(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -210,7 +210,7 @@ func TestFTLClient_GetApp(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -263,7 +263,7 @@ func TestFTLClient_ErrorHandling(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error": "internal server error",
 		})
 	}))
@@ -330,11 +330,6 @@ func TestAuthHTTPClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
-}
-
-// Helper function for string pointers
-func strPtr(s string) *string {
-	return &s
 }
 
 // Helper function for time pointers

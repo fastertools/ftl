@@ -121,8 +121,10 @@ func TestRunInit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			defer func() { _ = os.Chdir(oldWd) }()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatal(err)
+			}
 
 			err := runInit(tt.opts)
 			if tt.wantErr {
@@ -140,11 +142,15 @@ func TestRunInit(t *testing.T) {
 func TestInitExistingDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create directory
-	os.Mkdir("existing", 0755)
+	if err := os.Mkdir("existing", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Try to init without force
 	opts := &InitOptions{

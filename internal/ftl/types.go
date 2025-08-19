@@ -295,8 +295,6 @@ func (c *Component) UnmarshalYAML(value *yaml.Node) error {
 
 // MarshalYAML implements custom YAML marshalling for Component
 func (c Component) MarshalYAML() (interface{}, error) {
-	type Alias Component
-
 	var source interface{}
 	if c.Source != nil {
 		if c.Source.IsLocal() {

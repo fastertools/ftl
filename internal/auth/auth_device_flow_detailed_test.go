@@ -85,7 +85,7 @@ func TestManager_StartDeviceFlow_DetailedCoverage(t *testing.T) {
 		}
 
 		if resp == nil {
-			t.Error("StartDeviceFlow() returned nil")
+			t.Fatal("StartDeviceFlow() returned nil")
 		}
 
 		// Browser should have been called
@@ -93,7 +93,7 @@ func TestManager_StartDeviceFlow_DetailedCoverage(t *testing.T) {
 			t.Errorf("Browser OpenURL called %d times, want 1", len(browser.OpenURLCalls))
 		}
 
-		if browser.OpenURLCalls[0].URL != resp.VerificationURIComplete {
+		if len(browser.OpenURLCalls) > 0 && browser.OpenURLCalls[0].URL != resp.VerificationURIComplete {
 			t.Errorf("Browser opened %v, want %v",
 				browser.OpenURLCalls[0].URL, resp.VerificationURIComplete)
 		}

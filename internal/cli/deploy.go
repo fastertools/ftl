@@ -437,11 +437,12 @@ type WASMPuller struct {
 // NewWASMPuller creates a new WASM component puller
 func NewWASMPuller() *WASMPuller {
 	home := os.Getenv("HOME")
-	if home == "" {
-		home = os.Getenv("USERPROFILE") // Windows fallback
-	}
 	cacheDir := filepath.Join(home, ".cache", "ftl", "wasm")
-	os.MkdirAll(cacheDir, 0755)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		// Use temp dir as fallback if cache dir can't be created
+		cacheDir = filepath.Join(os.TempDir(), "ftl-wasm-cache")
+		_ = os.MkdirAll(cacheDir, 0755) // Best effort
+	}
 
 	return &WASMPuller{
 		cacheDir: cacheDir,

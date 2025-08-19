@@ -154,7 +154,10 @@ func createFromTemplate(opts *AddComponentOptions) types.Component {
 	}
 
 	// Create the template directory and files
-	createTemplateFiles(templateDir, opts.Template, opts.Name)
+	if err := createTemplateFiles(templateDir, opts.Template, opts.Name); err != nil {
+		// Log error but continue - the component can still be added to manifest
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
 
 	return comp
 }
@@ -258,9 +261,11 @@ func createInteractive(opts *AddComponentOptions) (types.Component, error) {
 	return types.Component{}, fmt.Errorf("invalid source type")
 }
 
-func createTemplateFiles(dir, template, name string) {
+func createTemplateFiles(dir, template, name string) error {
 	// Create directory
-	os.MkdirAll(dir, 0755)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
 
 	switch template {
 	case "go-http":
@@ -282,7 +287,9 @@ func init() {
 
 func main() {}
 `, name)
-		os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644)
+		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644); err != nil {
+			return fmt.Errorf("failed to write main.go: %w", err)
+		}
 
 		// Create go.mod
 		goMod := fmt.Sprintf(`module github.com/example/%s
@@ -291,7 +298,9 @@ go 1.22
 
 require github.com/fermyon/spin-go-sdk v0.2.0
 `, name)
-		os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+		if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644); err != nil {
+			return fmt.Errorf("failed to write go.mod: %w", err)
+		}
 
 	case "rust-wasm":
 		// Create Cargo.toml
@@ -306,10 +315,14 @@ spin-sdk = "3.0"
 [lib]
 crate-type = ["cdylib"]
 `, name)
-		os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(cargoToml), 0644)
+		if err := os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(cargoToml), 0644); err != nil {
+			return fmt.Errorf("failed to write Cargo.toml: %w", err)
+		}
 
 		// Create src/lib.rs
-		os.MkdirAll(filepath.Join(dir, "src"), 0755)
+		if err := os.MkdirAll(filepath.Join(dir, "src"), 0755); err != nil {
+			return fmt.Errorf("failed to create src directory: %w", err)
+		}
 		libRs := `use spin_sdk::http::{IntoResponse, Request, Response};
 
 #[spin_sdk::http_component]
@@ -321,10 +334,13 @@ fn handle_request(_req: Request) -> anyhow::Result<impl IntoResponse> {
         .build())
 }
 `
-		os.WriteFile(filepath.Join(dir, "src", "lib.rs"), []byte(libRs), 0644)
+		if err := os.WriteFile(filepath.Join(dir, "src", "lib.rs"), []byte(libRs), 0644); err != nil {
+			return fmt.Errorf("failed to write lib.rs: %w", err)
+		}
 
 		// Add other templates as needed
 	}
+	return nil
 }
 
 func loadManifest(path string) (*types.Manifest, error) {

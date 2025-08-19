@@ -109,8 +109,10 @@ func TestAddComponentValidation(t *testing.T) {
 			// Create temp directory with manifest
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			defer func() { _ = os.Chdir(oldWd) }()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatal(err)
+			}
 
 			manifest := &types.Manifest{
 				Application: types.Application{
@@ -121,7 +123,7 @@ func TestAddComponentValidation(t *testing.T) {
 				Access:     "public",
 			}
 			data, _ := yaml.Marshal(manifest)
-			os.WriteFile("ftl.yaml", data, 0644)
+			_ = os.WriteFile("ftl.yaml", data, 0644)
 
 			// Test add component
 			err := runComponentAdd(tt.opts)
@@ -178,7 +180,7 @@ func TestRemoveComponentDirect(t *testing.T) {
 
 	// Save and verify
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile(manifestPath, data, 0644)
+	_ = os.WriteFile(manifestPath, data, 0644)
 
 	// Load and check
 	loaded, err := loadComponentManifest(manifestPath)

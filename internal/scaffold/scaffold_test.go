@@ -144,8 +144,10 @@ func main() {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			defer func() { _ = os.Chdir(oldWd) }()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatal(err)
+			}
 
 			// Create test files
 			for name, content := range tt.files {
@@ -199,8 +201,8 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create initial ftl.yaml
 	manifest := &types.Manifest{
@@ -212,7 +214,7 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Generate a Rust component
 	err = scaffolder.GenerateComponent("test-tool", "rust")
@@ -231,7 +233,7 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 	// Check ftl.yaml was updated
 	updatedData, _ := os.ReadFile("ftl.yaml")
 	var updatedManifest types.Manifest
-	yaml.Unmarshal(updatedData, &updatedManifest)
+	_ = yaml.Unmarshal(updatedData, &updatedManifest)
 	assert.Len(t, updatedManifest.Components, 1)
 	assert.Equal(t, "test-tool", updatedManifest.Components[0].ID)
 	assert.Equal(t, "test-tool/test_tool.wasm", updatedManifest.Components[0].Source)
@@ -242,8 +244,8 @@ func TestGenerateComponent_TypeScript(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create initial ftl.yaml
 	manifest := &types.Manifest{
@@ -255,7 +257,7 @@ func TestGenerateComponent_TypeScript(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Generate TypeScript component
 	err := scaffolder.GenerateComponent("ts-tool", "typescript")
@@ -277,8 +279,8 @@ func TestGenerateComponent_Python(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create initial ftl.yaml
 	manifest := &types.Manifest{
@@ -290,7 +292,7 @@ func TestGenerateComponent_Python(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Generate Python component
 	err := scaffolder.GenerateComponent("py-tool", "python")
@@ -307,8 +309,8 @@ func TestGenerateComponent_Go(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create initial ftl.yaml
 	manifest := &types.Manifest{
@@ -320,7 +322,7 @@ func TestGenerateComponent_Go(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Generate Go component
 	err := scaffolder.GenerateComponent("go-tool", "go")
@@ -341,8 +343,8 @@ func TestGenerateComponent_DuplicateName(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml with existing component
 	manifest := &types.Manifest{
@@ -356,7 +358,7 @@ func TestGenerateComponent_DuplicateName(t *testing.T) {
 		Access: "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Try to generate component with duplicate name
 	err := scaffolder.GenerateComponent("existing", "rust")
@@ -369,8 +371,8 @@ func TestGenerateComponent_InvalidInputs(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	manifest := &types.Manifest{
@@ -380,7 +382,7 @@ func TestGenerateComponent_InvalidInputs(t *testing.T) {
 		},
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Test invalid component name
 	err := scaffolder.GenerateComponent("123-invalid", "rust")
@@ -398,8 +400,8 @@ func TestGenerateComponent_JSONConfig(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.json instead of yaml
 	jsonContent := `{
@@ -410,7 +412,7 @@ func TestGenerateComponent_JSONConfig(t *testing.T) {
 		"components": [],
 		"access": "public"
 	}`
-	os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	_ = os.WriteFile("ftl.json", []byte(jsonContent), 0644)
 
 	// Generate component
 	err := scaffolder.GenerateComponent("json-comp", "rust")
@@ -451,11 +453,13 @@ func TestUpdateFTLConfig_UnsupportedFormats(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			defer func() { _ = os.Chdir(oldWd) }()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatal(err)
+			}
 
 			// Create config file
-			os.WriteFile(tt.setupFile, []byte(tt.content), 0644)
+			_ = os.WriteFile(tt.setupFile, []byte(tt.content), 0644)
 
 			// Try to generate component
 			err := scaffolder.GenerateComponent("test-comp", "rust")
@@ -470,8 +474,8 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
+	_ = os.Chdir(tmpDir)
 
 	// Create ftl.yaml
 	manifest := &types.Manifest{
@@ -481,7 +485,7 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 		},
 	}
 	data, _ := yaml.Marshal(manifest)
-	os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0644)
 
 	// Generate Rust component with hyphens
 	err := scaffolder.GenerateComponent("my-cool-tool", "rust")
@@ -500,7 +504,7 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 	// Check ftl.yaml has correct WASM path
 	updatedData, _ := os.ReadFile("ftl.yaml")
 	var updatedManifest types.Manifest
-	yaml.Unmarshal(updatedData, &updatedManifest)
+	_ = yaml.Unmarshal(updatedData, &updatedManifest)
 	assert.Equal(t, "my-cool-tool/my_cool_tool.wasm", updatedManifest.Components[0].Source)
 }
 
@@ -558,8 +562,10 @@ func TestGenerateComponent_CreatesCorrectStructure(t *testing.T) {
 		t.Run(tt.language, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			defer func() { _ = os.Chdir(oldWd) }()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatal(err)
+			}
 
 			// Create ftl.yaml
 			manifest := &types.Manifest{
@@ -569,7 +575,7 @@ func TestGenerateComponent_CreatesCorrectStructure(t *testing.T) {
 				},
 			}
 			data, _ := yaml.Marshal(manifest)
-			os.WriteFile("ftl.yaml", data, 0644)
+			_ = os.WriteFile("ftl.yaml", data, 0644)
 
 			// Generate component
 			compName := tt.language + "-comp"
