@@ -148,8 +148,7 @@ jobs:
           
       - name: Run go mod audit
         run: |
-          go list -json -m all | \
-          go run golang.org/x/vuln/cmd/govulncheck@latest -json -
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   # ============================================================================
   # Rust Components & SDK Jobs
