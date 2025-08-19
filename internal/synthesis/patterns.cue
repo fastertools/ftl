@@ -21,6 +21,8 @@ import (
 	// - custom: User provides all auth configuration
 	access:       "public" | "private" | "org" | "custom" | *"public"
 	auth?:        #AuthConfig  // Required only for "custom" access
+	// For org access mode - list of allowed user subjects (injected by platform)
+	allowed_subjects?: [...string]
 }
 
 #Component: {
@@ -140,11 +142,12 @@ import (
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
 							
-							// For org mode, might add org validation in future
-							// For now, org validation happens at the platform level
+							// For org mode, inject allowed subjects if provided
 							if input.access == "org" {
-								// TODO: Add org-level scope requirements when M2M tokens are implemented
-								// mcp_jwt_required_scopes: "org:access"
+								// If platform provided allowed subjects, configure the authorizer
+								if input.allowed_subjects != _|_ && len(input.allowed_subjects) > 0 {
+									mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
+								}
 							}
 						}
 						

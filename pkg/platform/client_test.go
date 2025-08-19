@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -199,6 +200,52 @@ func TestProcessDeployment(t *testing.T) {
 			},
 		},
 		{
+			name:   "org access with allowed subjects",
+			config: DefaultConfig(),
+			request: &DeploymentRequest{
+				Application: &Application{
+					Name:    "org-app",
+					Version: "1.0.0",
+					Access:  "org",
+					Auth: &Auth{
+						OrgID:     "org_123456",
+						JWTIssuer: "https://api.workos.com",
+					},
+					Components: []Component{
+						{
+							ID: "org-component",
+							Source: map[string]interface{}{
+								"registry": "ghcr.io",
+								"package":  "test/org",
+								"version":  "1.0.0",
+							},
+						},
+					},
+				},
+				AllowedSubjects: []string{"user_01234", "user_56789", "user_abcde"},
+				AllowedRoles:    []string{"admin", "developer"},
+			},
+			wantErr: false,
+			checks: func(t *testing.T, result *DeploymentResult) {
+				if !result.Metadata.InjectedAuthorizer {
+					t.Error("authorizer should be injected for org access")
+				}
+				if result.Metadata.AccessMode != "org" {
+					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
+				}
+				
+				// Verify the allowed subjects were injected into the authorizer variables
+				if result.SpinTOML == "" {
+					t.Error("SpinTOML should not be empty")
+				}
+				// Check that the TOML contains the allowed subjects variable
+				expectedSubjects := "mcp_auth_allowed_subjects = 'user_01234,user_56789,user_abcde'"
+				if !strings.Contains(result.SpinTOML, expectedSubjects) {
+					t.Errorf("SpinTOML should contain allowed subjects variable: %s", expectedSubjects)
+				}
+			},
+		},
+		{
 			name:   "deployment variables applied",
 			config: DefaultConfig(),
 			request: &DeploymentRequest{
@@ -346,7 +393,11 @@ func TestPlatformComponentInjection(t *testing.T) {
 		},
 	}
 	
-	client.injectPlatformComponents(app)
+	// Create a dummy request for testing
+	req := &DeploymentRequest{
+		Application: app,
+	}
+	client.injectPlatformComponents(app, req)
 	
 	// Should have 3 components: gateway, authorizer, user component
 	if len(app.Components) != 3 {
@@ -381,7 +432,11 @@ func TestPlatformComponentInjection(t *testing.T) {
 		},
 	}
 	
-	client.injectPlatformComponents(publicApp)
+	// Create a dummy request for testing public app
+	publicReq := &DeploymentRequest{
+		Application: publicApp,
+	}
+	client.injectPlatformComponents(publicApp, publicReq)
 	
 	// Should have 2 components: gateway, user component
 	if len(publicApp.Components) != 2 {

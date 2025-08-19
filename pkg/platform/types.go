@@ -47,6 +47,7 @@ type BuildConfig struct {
 
 // Auth represents authentication configuration.
 type Auth struct {
+	OrgID       string `json:"org_id,omitempty" yaml:"org_id,omitempty"`
 	JWTIssuer   string `json:"jwt_issuer,omitempty" yaml:"jwt_issuer,omitempty"`
 	JWTAudience string `json:"jwt_audience,omitempty" yaml:"jwt_audience,omitempty"`
 }

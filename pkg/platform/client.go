@@ -76,6 +76,9 @@ type DeploymentRequest struct {
 	AccessMode   *string  `json:"access_mode,omitempty"`
 	AllowedRoles []string `json:"allowed_roles,omitempty"`
 	
+	// Org access configuration
+	AllowedSubjects []string `json:"allowed_subjects,omitempty"` // User IDs allowed for org access
+	
 	// Custom auth configuration (for custom access mode)
 	CustomAuth *CustomAuthConfig `json:"custom_auth,omitempty"`
 }
@@ -125,10 +128,10 @@ func (c *Client) ProcessDeployment(req *DeploymentRequest) (*DeploymentResult, e
 	}
 	
 	// Inject platform components based on configuration
-	c.injectPlatformComponents(app)
+	c.injectPlatformComponents(app, req)
 	
 	// Convert to internal format for synthesis
-	internalApp := c.toInternalApplication(app)
+	internalApp := c.toInternalApplication(app, req)
 	
 	// Generate Spin manifest
 	manifest, err := c.synth.SynthesizeToSpin(internalApp)
@@ -180,7 +183,9 @@ func (c *Client) ValidateComponents(components []Component) error {
 // GenerateTOML generates Spin TOML from an application.
 // Use this if you need to regenerate TOML from a modified application.
 func (c *Client) GenerateTOML(app *Application) (string, error) {
-	internalApp := c.toInternalApplication(app)
+	// Create a minimal request for conversion
+	req := &DeploymentRequest{Application: app}
+	internalApp := c.toInternalApplication(app, req)
 	return c.synth.SynthesizeToTOML(internalApp)
 }
 
@@ -273,7 +278,7 @@ func (c *Client) prepareApplication(req *DeploymentRequest) *Application {
 }
 
 // injectPlatformComponents adds mcp-gateway and mcp-authorizer as configured.
-func (c *Client) injectPlatformComponents(app *Application) {
+func (c *Client) injectPlatformComponents(app *Application, req *DeploymentRequest) {
 	// Always inject gateway if configured
 	if c.config.InjectGateway {
 		gateway := Component{
@@ -298,15 +303,8 @@ func (c *Client) injectPlatformComponents(app *Application) {
 			},
 		}
 		
-		// Configure based on access mode
-		if app.Auth != nil {
-			authorizer.Variables = map[string]string{
-				"JWT_ISSUER": app.Auth.JWTIssuer,
-			}
-			if app.Auth.JWTAudience != "" {
-				authorizer.Variables["JWT_AUDIENCE"] = app.Auth.JWTAudience
-			}
-		}
+		// Variables are now handled by CUE patterns based on access mode
+		// No need to inject them here
 		
 		// Insert after gateway but before user components
 		if c.config.InjectGateway {
@@ -328,19 +326,27 @@ func (c *Client) getEnvironment(req *DeploymentRequest) string {
 }
 
 // toInternalApplication converts public Application to internal format.
-func (c *Client) toInternalApplication(app *Application) *ftl.Application {
+func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest) *ftl.Application {
 	internal := &ftl.Application{
-		Name:        app.Name,
-		Version:     app.Version,
-		Description: app.Description,
-		Access:      ftl.AccessMode(app.Access),
-		Components:  make([]ftl.Component, len(app.Components)),
-		Variables:   app.Variables,
+		Name:            app.Name,
+		Version:         app.Version,
+		Description:     app.Description,
+		Access:          ftl.AccessMode(app.Access),
+		Components:      make([]ftl.Component, len(app.Components)),
+		Variables:       app.Variables,
+		AllowedSubjects: req.AllowedSubjects,
 	}
 	
 	if app.Auth != nil {
+		// For org access, use WorkOS provider
+		provider := ftl.AuthProviderCustom
+		if app.Access == "org" {
+			provider = ftl.AuthProviderWorkOS
+		}
+		
 		internal.Auth = ftl.AuthConfig{
-			Provider:    ftl.AuthProviderCustom,
+			Provider:    provider,
+			OrgID:       app.Auth.OrgID,
 			JWTIssuer:   app.Auth.JWTIssuer,
 			JWTAudience: app.Auth.JWTAudience,
 		}

@@ -17,6 +17,7 @@ import (
 	access:       "public" | "private" | "org" | "custom" | *"public"
 	auth:         #AuthConfig | *{provider: "workos", org_id: "", jwt_issuer: "https://api.workos.com", jwt_audience: ""}
 	variables?:   {[string]: string}  // Application-level variables
+	allowed_subjects?: [...string]  // For org access - list of allowed user IDs
 }
 
 #Component: {
@@ -130,6 +131,10 @@ import (
 						mcp_org_id: input.auth.org_id | *""
 						// auth_provider defaults to workos
 						mcp_auth_provider: input.auth.provider | *"workos"
+						// For org access, pass through allowed subjects if provided
+						if input.allowed_subjects != _|_ {
+							mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
+						}
 					}
 				}
 			}

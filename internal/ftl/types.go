@@ -12,13 +12,14 @@ import (
 // Application represents the FTL application configuration
 // This is the canonical schema that both CLI and platform use
 type Application struct {
-	Name        string            `json:"name" yaml:"name" cue:"name!"`
-	Version     string            `json:"version,omitempty" yaml:"version,omitempty" cue:"version"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty" cue:"description"`
-	Components  []Component       `json:"components,omitempty" yaml:"components,omitempty" cue:"components"`
-	Access      AccessMode        `json:"access,omitempty" yaml:"access,omitempty" cue:"access"`
-	Auth        AuthConfig        `json:"auth,omitempty" yaml:"auth,omitempty" cue:"auth"`
-	Variables   map[string]string `json:"variables,omitempty" yaml:"variables,omitempty" cue:"variables?"`
+	Name            string            `json:"name" yaml:"name" cue:"name!"`
+	Version         string            `json:"version,omitempty" yaml:"version,omitempty" cue:"version"`
+	Description     string            `json:"description,omitempty" yaml:"description,omitempty" cue:"description"`
+	Components      []Component       `json:"components,omitempty" yaml:"components,omitempty" cue:"components"`
+	Access          AccessMode        `json:"access,omitempty" yaml:"access,omitempty" cue:"access"`
+	Auth            AuthConfig        `json:"auth,omitempty" yaml:"auth,omitempty" cue:"auth"`
+	Variables       map[string]string `json:"variables,omitempty" yaml:"variables,omitempty" cue:"variables?"`
+	AllowedSubjects []string          `json:"allowed_subjects,omitempty" yaml:"allowed_subjects,omitempty" cue:"allowed_subjects?"`
 }
 
 // Component represents a component in the FTL application
