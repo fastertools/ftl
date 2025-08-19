@@ -16,8 +16,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
 func TestWASMPuller_Pull_Integration(t *testing.T) {
@@ -55,14 +53,8 @@ func TestWASMPuller_Pull_Integration(t *testing.T) {
 	tempCacheDir := t.TempDir()
 	puller := NewWASMPullerWithCache(tempCacheDir)
 
-	source := &ftltypes.RegistrySource{
-		Registry: regURL,
-		Package:  "test/component",
-		Version:  "1.0.0",
-	}
-
 	// First pull - should download
-	wasmPath, err := puller.Pull(ctx, source)
+	wasmPath, err := puller.Pull(ctx, regURL, "test/component", "1.0.0")
 	require.NoError(t, err)
 	assert.FileExists(t, wasmPath)
 	assert.Contains(t, wasmPath, ".wasm")
@@ -73,7 +65,7 @@ func TestWASMPuller_Pull_Integration(t *testing.T) {
 	assert.Equal(t, wasmContent, pulledContent)
 
 	// Second pull - should use cache
-	wasmPath2, err := puller.Pull(ctx, source)
+	wasmPath2, err := puller.Pull(ctx, regURL, "test/component", "1.0.0")
 	require.NoError(t, err)
 	assert.Equal(t, wasmPath, wasmPath2)
 
@@ -93,13 +85,7 @@ func TestWASMPuller_Pull_ManifestError(t *testing.T) {
 	ctx := context.Background()
 
 	// Use an invalid registry that will fail
-	source := &ftltypes.RegistrySource{
-		Registry: "invalid.registry.test",
-		Package:  "test/component",
-		Version:  "1.0.0",
-	}
-
-	_, err := puller.Pull(ctx, source)
+	_, err := puller.Pull(ctx, "invalid.registry.test", "test/component", "1.0.0")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to pull")
 }
@@ -111,13 +97,7 @@ func TestWASMPuller_Pull_LayerReadError(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with malformed registry URL that will fail during pull
-	source := &ftltypes.RegistrySource{
-		Registry: "notaregistry.invalid",
-		Package:  "test/component",
-		Version:  "1.0.0",
-	}
-
-	_, err := puller.Pull(ctx, source)
+	_, err := puller.Pull(ctx, "notaregistry.invalid", "test/component", "1.0.0")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to pull")
 }
@@ -237,13 +217,7 @@ func TestWASMPuller_Pull_CacheCorruption(t *testing.T) {
 
 	// Create puller and pull once to populate cache
 	puller := NewWASMPullerWithCache(tempCacheDir)
-	source := &ftltypes.RegistrySource{
-		Registry: regURL,
-		Package:  "test/cache",
-		Version:  "1.0.0",
-	}
-
-	wasmPath1, err := puller.Pull(ctx, source)
+	wasmPath1, err := puller.Pull(ctx, regURL, "test/cache", "1.0.0")
 	require.NoError(t, err)
 
 	// Corrupt the cache file
@@ -251,7 +225,7 @@ func TestWASMPuller_Pull_CacheCorruption(t *testing.T) {
 	require.NoError(t, err)
 
 	// Pull again - should still use corrupted cache since we check existence only
-	wasmPath2, err := puller.Pull(ctx, source)
+	wasmPath2, err := puller.Pull(ctx, regURL, "test/cache", "1.0.0")
 	require.NoError(t, err)
 	assert.Equal(t, wasmPath1, wasmPath2)
 
@@ -292,17 +266,11 @@ func TestWASMPuller_Pull_CacheWriteError(t *testing.T) {
 	// Make cache dir read-only
 	err = os.Chmod(tempCacheDir, 0555)
 	require.NoError(t, err)
-	defer os.Chmod(tempCacheDir, 0755) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(tempCacheDir, 0755) }() // Restore permissions for cleanup
 
 	// Try to pull - should fail when trying to write to cache
 	puller := NewWASMPullerWithCache(tempCacheDir)
-	source := &ftltypes.RegistrySource{
-		Registry: regURL,
-		Package:  "test/readonly",
-		Version:  "1.0.0",
-	}
-
-	_, err = puller.Pull(ctx, source)
+	_, err = puller.Pull(ctx, regURL, "test/readonly", "1.0.0")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create cache file")
 }

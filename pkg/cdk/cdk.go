@@ -1,23 +1,26 @@
-package synthesis
+package cdk
 
 import (
 	"fmt"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"github.com/fastertools/ftl-cli/pkg/synthesis"
 )
 
 // CDK provides a Go-based Cloud Development Kit for FTL/Spin applications.
-// It follows idiomatic CUE patterns: build configuration in Go, validate and transform with CUE.
+// This is the public API for programmatically defining FTL applications.
 type CDK struct {
-	ctx *cue.Context
-	app *CDKApp
+	ctx         *cue.Context
+	app         *CDKApp
+	synthesizer *synthesis.Synthesizer
 }
 
-// NewCDK creates a new CDK instance
-func NewCDK() *CDK {
+// New creates a new CDK instance for building FTL applications
+func New() *CDK {
 	return &CDK{
-		ctx: cuecontext.New(),
+		ctx:         cuecontext.New(),
+		synthesizer: synthesis.NewSynthesizer(),
 	}
 }
 
@@ -196,57 +199,8 @@ func (cdk *CDK) Synthesize() (string, error) {
 		return "", fmt.Errorf("no application defined - call Build() first")
 	}
 
-	// Convert the Go struct to a CUE value using idiomatic patterns
-	appValue := cdk.ctx.Encode(cdk.app)
-	if appValue.Err() != nil {
-		return "", fmt.Errorf("failed to encode app to CUE: %w", appValue.Err())
-	}
-
-	// Load our patterns as a CUE schema
-	schema := cdk.ctx.CompileString(ftlPatterns)
-	if schema.Err() != nil {
-		return "", fmt.Errorf("failed to compile patterns: %w", schema.Err())
-	}
-
-	// Create the complete CUE program that transforms our app
-	program := fmt.Sprintf(`
-%s
-
-// Import the app data
-_appData: %v
-
-// Wrap it in the FTL application structure
-app: #FTLApplication & _appData
-
-// Transform through the pipeline
-_transform: #TransformToSpin & {
-	input: app
-}
-
-// Extract the final manifest
-manifest: _transform.output
-`, ftlPatterns, appValue)
-
-	// Compile and evaluate
-	result := cdk.ctx.CompileString(program)
-	if result.Err() != nil {
-		return "", fmt.Errorf("failed to compile transformation: %w", result.Err())
-	}
-
-	// Extract the manifest
-	manifestValue := result.LookupPath(cue.ParsePath("manifest"))
-	if manifestValue.Err() != nil {
-		return "", fmt.Errorf("failed to extract manifest: %w", manifestValue.Err())
-	}
-
-	// Validate the result
-	if err := manifestValue.Validate(); err != nil {
-		return "", fmt.Errorf("manifest validation failed: %w", err)
-	}
-
-	// Encode to TOML
-	synth := NewSynthesizer()
-	return synth.encodeToTOML(manifestValue)
+	// Use the synthesizer to transform the struct to a Spin manifest
+	return cdk.synthesizer.SynthesizeFromStruct(cdk.app)
 }
 
 // ToCUE exports the current application as CUE source

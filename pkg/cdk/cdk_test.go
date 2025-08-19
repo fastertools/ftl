@@ -1,13 +1,34 @@
-package synthesis
+package cdk
 
 import (
 	"strings"
 	"testing"
 )
 
+// Tests for CDK API methods that aren't covered in synthesizer_test.go
+
+func TestCDK_SetAccess(t *testing.T) {
+	cdk := New()
+	app := cdk.NewApp("test-app").
+		SetOrgAccess()
+
+	app.AddComponent("comp1").FromLocal("./comp1.wasm").Build()
+
+	builtCDK := app.Build()
+	manifest, err := builtCDK.Synthesize()
+	if err != nil {
+		t.Fatalf("Failed to synthesize: %v", err)
+	}
+
+	// Private access should include mcp-authorizer
+	if !strings.Contains(manifest, "[component.mcp-authorizer]") {
+		t.Error("Private access should include mcp-authorizer")
+	}
+}
+
 func TestCDK_SimpleApp(t *testing.T) {
 	// Create a simple app using the CDK
-	cdk := NewCDK()
+	cdk := New()
 	app := cdk.NewApp("test-app").
 		SetDescription("Test application").
 		SetVersion("1.0.0")
@@ -51,7 +72,7 @@ func TestCDK_SimpleApp(t *testing.T) {
 
 func TestCDK_WithAuth(t *testing.T) {
 	// Create app with authentication
-	cdk := NewCDK()
+	cdk := New()
 	app := cdk.NewApp("secure-app")
 
 	app.AddComponent("tool1").FromLocal("./tool1.wasm").Build()
@@ -85,7 +106,7 @@ func TestCDK_WithAuth(t *testing.T) {
 }
 
 func TestCDK_RegistrySource(t *testing.T) {
-	cdk := NewCDK()
+	cdk := New()
 	app := cdk.NewApp("registry-app")
 
 	app.AddComponent("remote-tool").
@@ -111,7 +132,7 @@ func TestCDK_RegistrySource(t *testing.T) {
 }
 
 func TestCDK_BuildConfig(t *testing.T) {
-	cdk := NewCDK()
+	cdk := New()
 	app := cdk.NewApp("build-app")
 
 	app.AddComponent("built-tool").
@@ -142,7 +163,7 @@ func TestCDK_BuildConfig(t *testing.T) {
 }
 
 func TestCDK_ToCUE(t *testing.T) {
-	cdk := NewCDK()
+	cdk := New()
 	app := cdk.NewApp("cue-test").
 		SetDescription("Test CUE generation")
 
@@ -168,100 +189,57 @@ func TestCDK_ToCUE(t *testing.T) {
 	}
 }
 
-func TestSynthesizer_DirectYAML(t *testing.T) {
-	yamlInput := `
-application:
-  name: yaml-app
-  version: 1.0.0
-  description: Test YAML app
-components:
-  - id: tool1
-    source: ./tool1.wasm
-    variables:
-      LOG_LEVEL: debug
-`
+func TestCDK_SetCustomAuth(t *testing.T) {
+	cdk := New()
+	app := cdk.NewApp("custom-auth-app")
 
-	synth := NewSynthesizer()
-	manifest, err := synth.SynthesizeYAML([]byte(yamlInput))
+	app.AddComponent("comp1").FromLocal("./comp1.wasm").Build()
+	app.SetCustomAuth("https://auth.example.com", "my-audience")
+
+	builtCDK := app.Build()
+	manifest, err := builtCDK.Synthesize()
 	if err != nil {
-		t.Fatalf("Failed to synthesize from YAML: %v", err)
+		t.Fatalf("Failed to synthesize: %v", err)
 	}
 
-	// Debug
-	t.Logf("Generated manifest:\n%s", manifest)
-
-	// Verify the manifest contains expected elements
-	if !strings.Contains(manifest, "spin_manifest_version = 2") {
-		t.Error("Missing spin manifest version")
+	// Should have custom auth configuration
+	if !strings.Contains(manifest, "[component.mcp-authorizer]") {
+		t.Error("Custom auth should include mcp-authorizer")
 	}
 
-	if !strings.Contains(manifest, "yaml-app") {
-		t.Error("Missing application name from YAML")
+	// Check that auth is enabled (authorizer is present)
+	// Note: The actual issuer/audience values may be overridden by CUE patterns
+	if !strings.Contains(manifest, "mcp_jwt_issuer") {
+		t.Error("JWT issuer config not found")
 	}
 
-	if !strings.Contains(manifest, "[component.tool1]") {
-		t.Error("Missing tool1 component")
+	if !strings.Contains(manifest, "mcp_jwt_audience") {
+		t.Error("JWT audience config not found")
 	}
 }
 
-func TestSynthesizer_DirectJSON(t *testing.T) {
-	jsonInput := `{
-		"application": {
-			"name": "json-app",
-			"version": "2.0.0",
-			"description": "Test JSON app"
-		},
-		"components": [
-			{
-				"id": "tool2",
-				"source": "./tool2.wasm",
-				"variables": {
-					"API_KEY": "secret"
-				}
-			}
-		]
-	}`
+func TestCDK_WithEnv(t *testing.T) {
+	cdk := New()
+	app := cdk.NewApp("env-test")
 
-	synth := NewSynthesizer()
-	manifest, err := synth.SynthesizeJSON([]byte(jsonInput))
+	app.AddComponent("env-comp").
+		FromLocal("./comp.wasm").
+		WithEnv("API_KEY", "secret123").
+		WithEnv("LOG_LEVEL", "debug").
+		Build()
+
+	builtCDK := app.Build()
+	manifest, err := builtCDK.Synthesize()
 	if err != nil {
-		t.Fatalf("Failed to synthesize from JSON: %v", err)
+		t.Fatalf("Failed to synthesize: %v", err)
 	}
 
-	// Verify the manifest contains expected elements
-	if !strings.Contains(manifest, "json-app") {
-		t.Error("Missing application name from JSON")
+	// Check environment variables are present
+	if !strings.Contains(manifest, "API_KEY = 'secret123'") && !strings.Contains(manifest, `API_KEY = "secret123"`) {
+		t.Error("API_KEY environment variable not found")
 	}
 
-	if !strings.Contains(manifest, "[component.tool2]") {
-		t.Error("Missing tool2 component")
-	}
-}
-
-func TestSynthesizer_DirectCUE(t *testing.T) {
-	cueSource := `
-application: {
-	name: "cue-app"
-	version: "1.0.0"
-}
-components: [{
-	id: "cue-component"
-	source: "./component.wasm"
-}]
-`
-
-	synth := NewSynthesizer()
-	manifest, err := synth.SynthesizeCUE(cueSource)
-	if err != nil {
-		t.Fatalf("Failed to synthesize from CUE: %v", err)
-	}
-
-	// Verify the manifest contains expected elements
-	if !strings.Contains(manifest, "cue-app") {
-		t.Error("Missing application name from CUE")
-	}
-
-	if !strings.Contains(manifest, "[component.cue-component]") {
-		t.Error("Missing component from CUE")
+	if !strings.Contains(manifest, "LOG_LEVEL = 'debug'") && !strings.Contains(manifest, `LOG_LEVEL = "debug"`) {
+		t.Error("LOG_LEVEL environment variable not found")
 	}
 }

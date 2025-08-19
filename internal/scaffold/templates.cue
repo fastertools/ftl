@@ -862,3 +862,194 @@ package scaffold
 	python:     #PythonComponent
 	go:         #GoComponent
 }
+
+// ===========================================================================
+// Project Initialization Templates
+// ===========================================================================
+
+// Project configuration format types
+#ConfigFormat: "yaml" | "json" | "cue" | "go"
+
+// Project initialization structure
+#ProjectInit: {
+	name:        string | *"_"
+	description: string | *"_"
+	format:      #ConfigFormat
+	
+	// Files to generate
+	files: [string]: string
+}
+
+// Common gitignore for all projects
+#CommonGitignore: """
+	.spin/
+	spin.toml
+	*.wasm
+	.ftl/
+	.env
+	.env.local
+	target/
+	dist/
+	node_modules/
+	__pycache__/
+	*.pyc
+	.DS_Store
+	"""
+
+// YAML configuration template generator
+#YAMLProject: {
+	name:        string
+	description: string
+	format:      "yaml"
+	
+	files: {
+		"ftl.yaml": """
+			name: \(name)
+			version: "0.1.0"
+			description: \(description)
+			components: []
+			access: public
+			"""
+		
+		".gitignore": #CommonGitignore
+	}
+}
+
+// JSON configuration template generator
+#JSONProject: {
+	name:        string
+	description: string
+	format:      "json"
+	
+	files: {
+		"ftl.json": """
+			{
+			  "name": "\(name)",
+			  "version": "0.1.0",
+			  "description": "\(description)",
+			  "components": [],
+			  "access": "public"
+			}
+			"""
+		
+		".gitignore": #CommonGitignore
+	}
+}
+
+// CUE configuration template generator
+#CUEProject: {
+	name:        string
+	description: string
+	format:      "cue"
+	
+	files: {
+		"app.cue": """
+			package app
+			
+			import "github.com/fastertools/ftl-cli/patterns"
+			
+			// Define your FTL application
+			app: #FTLApplication & {
+				name:        "\(name)"
+				version:     "0.1.0"
+				description: "\(description)"
+				
+				// Add your components here
+				components: [
+					// {
+					//     id: "my-component"
+					//     source: "./build/component.wasm"
+					//     build: {
+					//         command: "cargo build --release"
+					//         watch: ["src/**/*.rs", "Cargo.toml"]
+					//     }
+					//     variables: {
+					//         LOG_LEVEL: "info"
+					//     }
+					// },
+				]
+				
+				// Configure access (public or private)
+				access: "public"
+				
+				// Configure authentication (optional)
+				// auth: {
+				//     provider: "workos"
+				//     org_id: "org_123456"
+				// }
+			}
+			"""
+		
+		".gitignore": #CommonGitignore
+	}
+}
+
+// Go SDK configuration template generator
+#GoProject: {
+	name:        string
+	description: string
+	format:      "go"
+	
+	files: {
+		"main.go": """
+			package main
+			
+			import (
+				"fmt"
+				"log"
+			
+				"github.com/fastertools/ftl-cli/pkg/cdk"
+			)
+			
+			func main() {
+				// Create your FTL application using the CDK
+				ftl := cdk.New()
+				app := ftl.NewApp("\(name)").
+					SetDescription("\(description)").
+					SetVersion("0.1.0")
+			
+				// Add your components here
+				// Example:
+				// app.AddComponent("my-component").
+				//     FromLocal("./build/component.wasm").
+				//     WithBuild("cargo build --release").
+				//     WithEnv("LOG_LEVEL", "info").
+				//     Build()
+			
+				// Enable authentication (optional)
+				// app.EnableWorkOSAuth("org_123456")
+			
+				// Build and synthesize to spin.toml
+				builtCDK := app.Build()
+				manifest, err := builtCDK.Synthesize()
+				if err != nil {
+					log.Fatalf("Failed to synthesize: %v", err)
+				}
+			
+				// Output the manifest
+				fmt.Print(manifest)
+			}
+			"""
+		
+		"go.mod": """
+			module \(name)
+			
+			go 1.21
+			
+			require github.com/fastertools/ftl-cli v0.1.0
+			
+			// For local development, uncomment and adjust the path:
+			// replace github.com/fastertools/ftl-cli => ../path/to/ftl-cli
+			"""
+		
+		".gitignore": #CommonGitignore
+	}
+}
+
+// Project template selector
+#ProjectTemplates: {
+	yaml: #YAMLProject
+	json: #JSONProject
+	cue:  #CUEProject
+	go:   #GoProject
+}

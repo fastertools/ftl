@@ -162,11 +162,11 @@ func TestRunAdd_Success(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.yaml
-	ftlConfig := `application:
-  name: test-app
-  version: "0.1.0"
+	// Create ftl.yaml with flat structure
+	ftlConfig := `name: test-app
+version: "0.1.0"
 components: []
+access: public
 `
 	require.NoError(t, os.WriteFile("ftl.yaml", []byte(ftlConfig), 0600))
 

@@ -55,6 +55,53 @@ import (
 }
 
 // ===========================================================================
+// Input Transformation: Raw Input → FTL Application → Spin Manifest
+// ===========================================================================
+
+// Transform raw input data to a validated FTL application
+#InputTransform: {
+	input: _
+	
+	// Build validated FTL app from raw input
+	app: #FTLApplication & {
+		name:        input.name
+		version:     input.version | *"0.1.0"
+		description: input.description | *""
+		
+		// Components with defaults
+		if input.components != _|_ {
+			components: input.components
+		}
+		if input.components == _|_ {
+			components: []
+		}
+		
+		// Access mode with default
+		if input.access != _|_ {
+			access: input.access
+		}
+		if input.access == _|_ {
+			access: "public"
+		}
+		
+		// Pass through auth if present
+		if input.auth != _|_ {
+			auth: input.auth
+		}
+		
+		// Pass through allowed_subjects if present
+		if input.allowed_subjects != _|_ {
+			allowed_subjects: input.allowed_subjects
+		}
+	}
+	
+	// Transform to Spin manifest
+	manifest: (#TransformToSpin & {
+		input: app
+	}).output
+}
+
+// ===========================================================================
 // Direct Transformation: FTL → Spin Manifest
 // ===========================================================================
 

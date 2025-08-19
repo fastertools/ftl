@@ -7,14 +7,14 @@ type Application struct {
 	Name        string `json:"name" yaml:"name"`
 	Version     string `json:"version" yaml:"version"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	
+
 	// Access control
 	Access string `json:"access,omitempty" yaml:"access,omitempty"` // public, private, org, custom
 	Auth   *Auth  `json:"auth,omitempty" yaml:"auth,omitempty"`
-	
+
 	// Components that make up the application
 	Components []Component `json:"components" yaml:"components"`
-	
+
 	// Global variables
 	Variables map[string]string `json:"variables,omitempty" yaml:"variables,omitempty"`
 }
@@ -23,18 +23,18 @@ type Application struct {
 type Component struct {
 	// Unique identifier for the component
 	ID string `json:"id" yaml:"id"`
-	
+
 	// Source can be either:
 	// - A string for local paths: "./my-component"
 	// - A map for registry sources: {"registry": "ghcr.io", "package": "org/component", "version": "1.0.0"}
 	Source interface{} `json:"source" yaml:"source"`
-	
+
 	// Optional build configuration
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
-	
+
 	// Component-specific configuration
 	Config map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
-	
+
 	// Component-specific variables
 	Variables map[string]string `json:"variables,omitempty" yaml:"variables,omitempty"`
 }
@@ -55,10 +55,10 @@ type Auth struct {
 // Manifest represents a processed Spin manifest.
 // This is what gets deployed to the WebAssembly runtime.
 type Manifest struct {
-	Application interface{}            `json:"application"`
-	Components  interface{}            `json:"components"`
-	Triggers    interface{}            `json:"triggers"`
-	Variables   map[string]Variable    `json:"variables,omitempty"`
+	Application interface{}         `json:"application"`
+	Components  interface{}         `json:"components"`
+	Triggers    interface{}         `json:"triggers"`
+	Variables   map[string]Variable `json:"variables,omitempty"`
 }
 
 // Variable represents a Spin variable configuration.

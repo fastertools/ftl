@@ -152,7 +152,7 @@ components: []`
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl-cli/internal/synthesis"
+	"github.com/fastertools/ftl-cli/pkg/synthesis"
 )
 
 func main() {

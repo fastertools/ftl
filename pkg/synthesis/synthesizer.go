@@ -17,14 +17,30 @@ var ftlPatterns string
 
 // Synthesizer is a pure CUE-based synthesizer
 type Synthesizer struct {
-	ctx *cue.Context
+	ctx    *cue.Context
+	schema cue.Value
 }
 
 // NewSynthesizer creates a new CUE-first synthesizer
 func NewSynthesizer() *Synthesizer {
+	ctx := cuecontext.New()
+	// Compile the FTL patterns schema
+	schema := ctx.CompileString(ftlPatterns, cue.Filename("patterns.cue"))
 	return &Synthesizer{
-		ctx: cuecontext.New(),
+		ctx:    ctx,
+		schema: schema,
 	}
+}
+
+// GetSchema returns the compiled FTL schema for validation
+func (s *Synthesizer) GetSchema() cue.Value {
+	return s.schema.LookupPath(cue.ParsePath("#FTLApplication"))
+}
+
+// GetPatterns returns the raw FTL patterns CUE source
+// This is exported for use by the validation package
+func GetPatterns() string {
+	return ftlPatterns
 }
 
 // SynthesizeYAML takes YAML input and produces a Spin manifest
@@ -70,85 +86,51 @@ func (s *Synthesizer) SynthesizeCUE(cueSource string) (string, error) {
 	return s.synthesizeFromValue(value)
 }
 
-// encodeToTOML encodes a CUE value to TOML
-func (s *Synthesizer) encodeToTOML(value cue.Value) (string, error) {
-	var buf bytes.Buffer
-	encoder := toml.NewEncoder(&buf)
-	if err := encoder.Encode(value); err != nil {
-		return "", fmt.Errorf("failed to encode to TOML: %w", err)
+
+// SynthesizeFromStruct takes a Go struct and produces a Spin manifest
+// This is used by the CDK to transform its structs
+func (s *Synthesizer) SynthesizeFromStruct(data interface{}) (string, error) {
+	// Encode the struct to CUE
+	value := s.ctx.Encode(data)
+	if value.Err() != nil {
+		return "", fmt.Errorf("failed to encode struct to CUE: %w", value.Err())
 	}
-	return buf.String(), nil
+	
+	return s.synthesizeFromValue(value)
 }
 
 // synthesizeFromValue takes a CUE value and transforms it to a Spin manifest
 func (s *Synthesizer) synthesizeFromValue(inputValue cue.Value) (string, error) {
-	// Debug: print the input value
-	// fmt.Fprintf(os.Stderr, "DEBUG: Input value: %v\n", inputValue)
-
-	// Create the complete transformation program
-	// Note: We build the app directly from inputData without intermediate schema
+	// Build a complete program with patterns and bridge
 	program := fmt.Sprintf(`
 %s
 
+// Input data from YAML/JSON/CUE
 inputData: _
 
-// Build the FTL app structure directly from input
-_ftlApp: {
-	name:        inputData.application.name
-	version:     inputData.application.version | *"0.1.0"
-	description: inputData.application.description | *""
-	
-	components: [ for comp in inputData.components if inputData.components != _|_ {
-		id:     comp.id
-		source: comp.source
-		if comp.build != _|_ {
-			build: comp.build
-		}
-		if comp.variables != _|_ {
-			variables: comp.variables
-		}
-	}]
-	
-	// Pass through access mode, default to public
-	if inputData.access != _|_ {
-		access: inputData.access
-	}
-	if inputData.access == _|_ {
-		access: "public"
-	}
-	
-	// Pass through auth configuration if present
-	if inputData.auth != _|_ {
-		auth: inputData.auth
-	}
+// Apply the transformation defined in patterns.cue
+transform: #InputTransform & {
+	input: inputData
 }
 
-// Validate against schema
-app: #FTLApplication & _ftlApp
-
-// Apply transformation
-_transform: #TransformToSpin & {
-	input: app
-}
-
-// Extract the final manifest
-manifest: _transform.output
+// Extract the manifest
+manifest: transform.manifest
 `, ftlPatterns)
 
 	// Compile the complete program
-	value := s.ctx.CompileString(program)
+	value := s.ctx.CompileString(program, cue.Filename("transform.cue"))
 	if value.Err() != nil {
-		return "", fmt.Errorf("failed to compile CUE: %w", value.Err())
+		return "", fmt.Errorf("failed to compile transformation: %w", value.Err())
 	}
 
 	// Fill in the input data
-	value = value.FillPath(cue.ParsePath("inputData"), inputValue)
-	if value.Err() != nil {
-		return "", fmt.Errorf("failed to fill input data: %w", value.Err())
+	filled := value.FillPath(cue.ParsePath("inputData"), inputValue)
+	if filled.Err() != nil {
+		return "", fmt.Errorf("failed to fill input data: %w", filled.Err())
 	}
 
-	// Extract the manifest field
-	manifestValue := value.LookupPath(cue.ParsePath("manifest"))
+	// Extract the manifest
+	manifestValue := filled.LookupPath(cue.ParsePath("manifest"))
 	if manifestValue.Err() != nil {
 		return "", fmt.Errorf("failed to extract manifest: %w", manifestValue.Err())
 	}

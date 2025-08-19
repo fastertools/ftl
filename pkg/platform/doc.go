@@ -11,7 +11,7 @@
 //	config := platform.DefaultConfig()
 //	config.RequireRegistryComponents = true
 //	config.AllowedRegistries = []string{"ghcr.io", "your-ecr.amazonaws.com"}
-//	
+//
 //	client := platform.NewClient(config)
 //
 // Process deployment requests:
@@ -20,7 +20,7 @@
 //	if err != nil {
 //	    return handleError(err)
 //	}
-//	
+//
 //	deployToFermyon(result.SpinTOML)
 //
 // # Platform Components

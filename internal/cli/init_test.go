@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/fastertools/ftl-cli/pkg/types"
 )
 
 func TestInitCommand(t *testing.T) {
@@ -27,11 +25,11 @@ func TestRunInit(t *testing.T) {
 		check   func(t *testing.T, dir string)
 	}{
 		{
-			name: "yaml format",
+			name: "yaml config",
 			opts: &InitOptions{
 				Name:          "test-project",
 				Description:   "Test project",
-				Format:        "yaml",
+				Language:      "yaml",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -44,21 +42,21 @@ func TestRunInit(t *testing.T) {
 				data, err := os.ReadFile(manifestPath)
 				require.NoError(t, err)
 
-				var manifest types.Manifest
+				var manifest map[interface{}]interface{}
 				err = yaml.Unmarshal(data, &manifest)
 				require.NoError(t, err)
 
-				assert.Equal(t, "test-project", manifest.Application.Name)
-				assert.Equal(t, "0.1.0", manifest.Application.Version)
-				assert.Equal(t, "Test project", manifest.Application.Description)
-				assert.Equal(t, "public", manifest.Access)
+				assert.Equal(t, "test-project", manifest["name"])
+				assert.Equal(t, "0.1.0", manifest["version"])
+				assert.Equal(t, "Test project", manifest["description"])
+				assert.Equal(t, "public", manifest["access"])
 			},
 		},
 		{
-			name: "json format",
+			name: "json config",
 			opts: &InitOptions{
 				Name:          "json-project",
-				Format:        "json",
+				Language:      "json",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -68,10 +66,10 @@ func TestRunInit(t *testing.T) {
 			},
 		},
 		{
-			name: "go format",
+			name: "go config",
 			opts: &InitOptions{
 				Name:          "go-project",
-				Format:        "go",
+				Language:      "go",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -85,10 +83,10 @@ func TestRunInit(t *testing.T) {
 			},
 		},
 		{
-			name: "cue format",
+			name: "cue config",
 			opts: &InitOptions{
 				Name:          "cue-project",
-				Format:        "cue",
+				Language:      "cue",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -102,7 +100,7 @@ func TestRunInit(t *testing.T) {
 			opts: &InitOptions{
 				Name:          "template-project",
 				Template:      "mcp",
-				Format:        "yaml",
+				Language:      "yaml",
 				NoInteractive: true,
 			},
 			wantErr: false,
@@ -155,7 +153,7 @@ func TestInitExistingDirectory(t *testing.T) {
 	// Try to init without force
 	opts := &InitOptions{
 		Name:          "existing",
-		Format:        "yaml",
+		Language:      "yaml",
 		NoInteractive: true,
 		Force:         false,
 	}
@@ -169,40 +167,60 @@ func TestInitExistingDirectory(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCreateYAMLConfig(t *testing.T) {
+func TestYAMLProjectGeneration(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := &InitOptions{
-		Name:        "test-app",
-		Description: "Test application",
+		Name:          "test-app",
+		Description:   "Test application",
+		Language:      "yaml",
+		NoInteractive: true,
 	}
 
-	err := createYAMLConfig(tmpDir, opts)
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runInit(opts)
 	require.NoError(t, err)
 
 	// Verify file exists and content is valid
-	manifestPath := filepath.Join(tmpDir, "ftl.yaml")
+	manifestPath := filepath.Join(tmpDir, "test-app", "ftl.yaml")
 	assert.FileExists(t, manifestPath)
 
 	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 
-	var manifest types.Manifest
+	var manifest map[interface{}]interface{}
 	err = yaml.Unmarshal(data, &manifest)
 	require.NoError(t, err)
 
-	assert.Equal(t, "test-app", manifest.Application.Name)
-	assert.Equal(t, "0.1.0", manifest.Application.Version)
-	assert.Equal(t, "Test application", manifest.Application.Description)
+	assert.Equal(t, "test-app", manifest["name"])
+	assert.Equal(t, "0.1.0", manifest["version"])
+	assert.Equal(t, "Test application", manifest["description"])
 }
 
-func TestCreateGitignore(t *testing.T) {
+func TestGitignoreGeneration(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	err := createGitignore(tmpDir)
+	opts := &InitOptions{
+		Name:          "gitignore-test",
+		Language:      "yaml",
+		NoInteractive: true,
+	}
+
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runInit(opts)
 	require.NoError(t, err)
 
-	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+	gitignorePath := filepath.Join(tmpDir, "gitignore-test", ".gitignore")
 	assert.FileExists(t, gitignorePath)
 
 	content, err := os.ReadFile(gitignorePath)
@@ -219,19 +237,27 @@ func TestCreateGitignore(t *testing.T) {
 	assert.Contains(t, contentStr, "node_modules/")
 }
 
-func TestCreateGoConfig(t *testing.T) {
+func TestGoProjectGeneration(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := &InitOptions{
-		Name:        "go-app",
-		Description: "Go application",
+		Name:          "go-app",
+		Description:   "Go application",
+		Language:      "go",
+		NoInteractive: true,
 	}
 
-	err := createGoConfig(tmpDir, opts)
+	oldWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(oldWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runInit(opts)
 	require.NoError(t, err)
 
 	// Check main.go
-	mainPath := filepath.Join(tmpDir, "main.go")
+	mainPath := filepath.Join(tmpDir, "go-app", "main.go")
 	assert.FileExists(t, mainPath)
 
 	content, err := os.ReadFile(mainPath)
@@ -239,11 +265,11 @@ func TestCreateGoConfig(t *testing.T) {
 	contentStr := string(content)
 
 	assert.Contains(t, contentStr, "package main")
-	assert.Contains(t, contentStr, "synthesis.NewCDK")
+	assert.Contains(t, contentStr, "cdk.New")
 	assert.Contains(t, contentStr, "go-app")
 	assert.Contains(t, contentStr, "Go application")
 
 	// Check go.mod
-	goModPath := filepath.Join(tmpDir, "go.mod")
+	goModPath := filepath.Join(tmpDir, "go-app", "go.mod")
 	assert.FileExists(t, goModPath)
 }

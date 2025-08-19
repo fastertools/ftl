@@ -9,11 +9,11 @@ import (
 func TestNewClient(t *testing.T) {
 	config := DefaultConfig()
 	client := NewClient(config)
-	
+
 	if client == nil {
 		t.Fatal("NewClient returned nil")
 	}
-	
+
 	if client.config.GatewayVersion != "0.0.13-alpha.0" {
 		t.Errorf("unexpected gateway version: %s", client.config.GatewayVersion)
 	}
@@ -106,7 +106,7 @@ func TestProcessDeployment(t *testing.T) {
 			name: "reject local sources when configured",
 			config: Config{
 				RequireRegistryComponents: true,
-				MaxComponents:            50,
+				MaxComponents:             50,
 			},
 			request: &DeploymentRequest{
 				Application: &Application{
@@ -126,8 +126,8 @@ func TestProcessDeployment(t *testing.T) {
 			name: "enforce registry whitelist",
 			config: Config{
 				RequireRegistryComponents: true,
-				AllowedRegistries:        []string{"ghcr.io"},
-				MaxComponents:            50,
+				AllowedRegistries:         []string{"ghcr.io"},
+				MaxComponents:             50,
 			},
 			request: &DeploymentRequest{
 				Application: &Application{
@@ -233,7 +233,7 @@ func TestProcessDeployment(t *testing.T) {
 				if result.Metadata.AccessMode != "org" {
 					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
 				}
-				
+
 				// Verify the allowed subjects were injected into the authorizer variables
 				if result.SpinTOML == "" {
 					t.Error("SpinTOML should not be empty")
@@ -264,7 +264,7 @@ func TestProcessDeployment(t *testing.T) {
 					},
 				},
 				Variables: map[string]string{
-					"API_KEY":    "secret123",
+					"API_KEY":     "secret123",
 					"ENVIRONMENT": "production",
 				},
 			},
@@ -282,20 +282,20 @@ func TestProcessDeployment(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewClient(tt.config)
 			result, err := client.ProcessDeployment(tt.request)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ProcessDeployment() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && tt.checks != nil {
 				tt.checks(t, result)
-				
+
 				// Common checks
 				if result.SpinTOML == "" {
 					t.Error("SpinTOML should not be empty")
@@ -350,7 +350,7 @@ func TestValidateComponents(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "component without ID",
+			name:   "component without ID",
 			config: DefaultConfig(),
 			components: []Component{
 				{
@@ -364,7 +364,7 @@ func TestValidateComponents(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewClient(tt.config)
@@ -379,7 +379,7 @@ func TestValidateComponents(t *testing.T) {
 func TestPlatformComponentInjection(t *testing.T) {
 	config := DefaultConfig()
 	client := NewClient(config)
-	
+
 	// Test app that should get both gateway and authorizer
 	app := &Application{
 		Name:    "test-app",
@@ -392,33 +392,33 @@ func TestPlatformComponentInjection(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create a dummy request for testing
 	req := &DeploymentRequest{
 		Application: app,
 	}
 	client.injectPlatformComponents(app, req)
-	
+
 	// Should have 3 components: gateway, authorizer, user component
 	if len(app.Components) != 3 {
 		t.Fatalf("expected 3 components, got %d", len(app.Components))
 	}
-	
+
 	// First should be gateway
 	if app.Components[0].ID != "mcp-gateway" {
 		t.Errorf("first component should be mcp-gateway, got %s", app.Components[0].ID)
 	}
-	
+
 	// Second should be authorizer
 	if app.Components[1].ID != "mcp-authorizer" {
 		t.Errorf("second component should be mcp-authorizer, got %s", app.Components[1].ID)
 	}
-	
+
 	// Third should be user component
 	if app.Components[2].ID != "user-component" {
 		t.Errorf("third component should be user-component, got %s", app.Components[2].ID)
 	}
-	
+
 	// Test public app (should only get gateway)
 	publicApp := &Application{
 		Name:    "public-app",
@@ -431,22 +431,22 @@ func TestPlatformComponentInjection(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create a dummy request for testing public app
 	publicReq := &DeploymentRequest{
 		Application: publicApp,
 	}
 	client.injectPlatformComponents(publicApp, publicReq)
-	
+
 	// Should have 2 components: gateway, user component
 	if len(publicApp.Components) != 2 {
 		t.Fatalf("expected 2 components for public app, got %d", len(publicApp.Components))
 	}
-	
+
 	if publicApp.Components[0].ID != "mcp-gateway" {
 		t.Errorf("first component should be mcp-gateway, got %s", publicApp.Components[0].ID)
 	}
-	
+
 	if publicApp.Components[1].ID != "public-component" {
 		t.Errorf("second component should be public-component, got %s", publicApp.Components[1].ID)
 	}

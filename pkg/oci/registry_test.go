@@ -16,8 +16,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
 func TestNewWASMPuller(t *testing.T) {
@@ -142,36 +140,31 @@ func TestWASMPusher_CreateWASMImageConsistency(t *testing.T) {
 
 func TestRegistrySource_Validation(t *testing.T) {
 	tests := []struct {
-		name    string
-		source  *ftltypes.RegistrySource
-		wantRef string
-		wantErr bool
+		name     string
+		registry string
+		pkg      string
+		version  string
+		wantRef  string
 	}{
 		{
-			name: "valid source",
-			source: &ftltypes.RegistrySource{
-				Registry: "docker.io",
-				Package:  "library/hello-world",
-				Version:  "latest",
-			},
-			wantRef: "docker.io/library/hello-world:latest",
-			wantErr: false,
+			name:     "valid source",
+			registry: "docker.io",
+			pkg:      "library/hello-world",
+			version:  "latest",
+			wantRef:  "docker.io/library/hello-world:latest",
 		},
 		{
-			name: "ECR source",
-			source: &ftltypes.RegistrySource{
-				Registry: "123456789.dkr.ecr.us-west-2.amazonaws.com",
-				Package:  "my-app/component",
-				Version:  "v1.0.0",
-			},
-			wantRef: "123456789.dkr.ecr.us-west-2.amazonaws.com/my-app/component:v1.0.0",
-			wantErr: false,
+			name:     "ECR source",
+			registry: "123456789.dkr.ecr.us-west-2.amazonaws.com",
+			pkg:      "my-app/component",
+			version:  "v1.0.0",
+			wantRef:  "123456789.dkr.ecr.us-west-2.amazonaws.com/my-app/component:v1.0.0",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ref := fmt.Sprintf("%s/%s:%s", tt.source.Registry, tt.source.Package, tt.source.Version)
+			ref := fmt.Sprintf("%s/%s:%s", tt.registry, tt.pkg, tt.version)
 			assert.Equal(t, tt.wantRef, ref)
 		})
 	}
@@ -196,24 +189,24 @@ func TestWASMPuller_Pull_ErrorCases(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name    string
-		source  *ftltypes.RegistrySource
-		wantErr string
+		name     string
+		registry string
+		pkg      string
+		version  string
+		wantErr  string
 	}{
 		{
-			name: "invalid reference",
-			source: &ftltypes.RegistrySource{
-				Registry: "invalid registry",
-				Package:  "package",
-				Version:  "version",
-			},
-			wantErr: "invalid reference",
+			name:     "invalid reference",
+			registry: "invalid registry",
+			pkg:      "package",
+			version:  "version",
+			wantErr:  "invalid reference",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := puller.Pull(ctx, tt.source)
+			_, err := puller.Pull(ctx, tt.registry, tt.pkg, tt.version)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
@@ -324,42 +317,38 @@ func TestWASMPuller_Pull_InvalidReference(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name   string
-		source *ftltypes.RegistrySource
-		errMsg string
+		name     string
+		registry string
+		pkg      string
+		version  string
+		errMsg   string
 	}{
 		{
-			name: "invalid registry format",
-			source: &ftltypes.RegistrySource{
-				Registry: "not a valid registry!!!",
-				Package:  "package",
-				Version:  "1.0.0",
-			},
-			errMsg: "invalid reference",
+			name:     "invalid registry format",
+			registry: "not a valid registry!!!",
+			pkg:      "package",
+			version:  "1.0.0",
+			errMsg:   "invalid reference",
 		},
 		{
-			name: "empty package name",
-			source: &ftltypes.RegistrySource{
-				Registry: "registry.example.com",
-				Package:  "",
-				Version:  "1.0.0",
-			},
-			errMsg: "invalid reference",
+			name:     "empty package name",
+			registry: "registry.example.com",
+			pkg:      "",
+			version:  "1.0.0",
+			errMsg:   "invalid reference",
 		},
 		{
-			name: "invalid version format",
-			source: &ftltypes.RegistrySource{
-				Registry: "registry.example.com",
-				Package:  "package",
-				Version:  "not!valid!version",
-			},
-			errMsg: "invalid reference",
+			name:     "invalid version format",
+			registry: "registry.example.com",
+			pkg:      "package",
+			version:  "not!valid!version",
+			errMsg:   "invalid reference",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := puller.Pull(ctx, tc.source)
+			_, err := puller.Pull(ctx, tc.registry, tc.pkg, tc.version)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.errMsg)
 		})
@@ -386,9 +375,9 @@ func TestWASMPuller_Pull_EmptyManifest(t *testing.T) {
 				"layers": []
 			}`
 			w.Header().Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
-			w.Write([]byte(manifest))
+			_, _ = w.Write([]byte(manifest))
 		case "/v2/test/empty/blobs/sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a":
-			w.Write([]byte("{}"))
+			_, _ = w.Write([]byte("{}"))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -401,13 +390,7 @@ func TestWASMPuller_Pull_EmptyManifest(t *testing.T) {
 	// Remove the http:// prefix from server URL
 	registryURL := server.URL[7:] // Remove "http://"
 
-	source := &ftltypes.RegistrySource{
-		Registry: registryURL,
-		Package:  "test/empty",
-		Version:  "1.0.0",
-	}
-
-	_, err := puller.Pull(ctx, source)
+	_, err := puller.Pull(ctx, registryURL, "test/empty", "1.0.0")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no layers found in image")
 }

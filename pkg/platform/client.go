@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/fastertools/ftl-cli/internal/ftl"
-	"github.com/fastertools/ftl-cli/pkg/types"
 )
 
 // Client provides platform integration capabilities for FTL deployments.
@@ -25,15 +24,15 @@ type Config struct {
 	InjectAuthorizer  bool   // Inject mcp-authorizer for non-public apps
 	GatewayVersion    string // Version of mcp-gateway to use
 	AuthorizerVersion string // Version of mcp-authorizer to use
-	
+
 	// Component registry settings
 	GatewayRegistry    string // Registry for mcp-gateway (default: ghcr.io)
 	AuthorizerRegistry string // Registry for mcp-authorizer (default: ghcr.io)
-	
+
 	// Security settings
-	RequireRegistryComponents bool // Reject local component sources
+	RequireRegistryComponents bool     // Reject local component sources
 	AllowedRegistries         []string // If set, only allow components from these registries
-	
+
 	// Deployment settings
 	DefaultEnvironment string // Default environment if not specified
 	MaxComponents      int    // Maximum number of components allowed (0 = unlimited)
@@ -42,15 +41,15 @@ type Config struct {
 // DefaultConfig returns a Config with sensible defaults for production platforms.
 func DefaultConfig() Config {
 	return Config{
-		InjectGateway:     true,
-		InjectAuthorizer:  true, // Will be conditional based on access mode
-		GatewayVersion:    "0.0.13-alpha.0",
-		AuthorizerVersion: "0.0.15-alpha.0",
-		GatewayRegistry:   "ghcr.io",
-		AuthorizerRegistry: "ghcr.io",
+		InjectGateway:             true,
+		InjectAuthorizer:          true, // Will be conditional based on access mode
+		GatewayVersion:            "0.0.13-alpha.0",
+		AuthorizerVersion:         "0.0.15-alpha.0",
+		GatewayRegistry:           "ghcr.io",
+		AuthorizerRegistry:        "ghcr.io",
 		RequireRegistryComponents: true,
-		DefaultEnvironment: "production",
-		MaxComponents: 50, // Reasonable limit to prevent abuse
+		DefaultEnvironment:        "production",
+		MaxComponents:             50, // Reasonable limit to prevent abuse
 	}
 }
 
@@ -67,18 +66,18 @@ func NewClient(config Config) *Client {
 type DeploymentRequest struct {
 	// Application configuration
 	Application *Application `json:"application"`
-	
+
 	// Deployment-specific settings
 	Environment string            `json:"environment,omitempty"`
 	Variables   map[string]string `json:"variables,omitempty"`
-	
+
 	// Optional overrides
 	AccessMode   *string  `json:"access_mode,omitempty"`
 	AllowedRoles []string `json:"allowed_roles,omitempty"`
-	
+
 	// Org access configuration
 	AllowedSubjects []string `json:"allowed_subjects,omitempty"` // User IDs allowed for org access
-	
+
 	// Custom auth configuration (for custom access mode)
 	CustomAuth *CustomAuthConfig `json:"custom_auth,omitempty"`
 }
@@ -93,22 +92,22 @@ type CustomAuthConfig struct {
 type DeploymentResult struct {
 	// Processed application manifest
 	Manifest *Manifest `json:"manifest"`
-	
+
 	// Generated Spin TOML content
 	SpinTOML string `json:"spin_toml"`
-	
+
 	// Metadata about the deployment
 	Metadata DeploymentMetadata `json:"metadata"`
 }
 
 // DeploymentMetadata provides information about the processed deployment.
 type DeploymentMetadata struct {
-	ProcessedAt       time.Time `json:"processed_at"`
-	ComponentCount    int       `json:"component_count"`
-	InjectedGateway   bool      `json:"injected_gateway"`
-	InjectedAuthorizer bool     `json:"injected_authorizer"`
-	AccessMode        string    `json:"access_mode"`
-	Environment       string    `json:"environment"`
+	ProcessedAt        time.Time `json:"processed_at"`
+	ComponentCount     int       `json:"component_count"`
+	InjectedGateway    bool      `json:"injected_gateway"`
+	InjectedAuthorizer bool      `json:"injected_authorizer"`
+	AccessMode         string    `json:"access_mode"`
+	Environment        string    `json:"environment"`
 }
 
 // ProcessDeployment processes a deployment request according to platform rules.
@@ -118,33 +117,33 @@ func (c *Client) ProcessDeployment(req *DeploymentRequest) (*DeploymentResult, e
 	if err := c.validateRequest(req); err != nil {
 		return nil, fmt.Errorf("invalid deployment request: %w", err)
 	}
-	
+
 	// Apply defaults
 	app := c.prepareApplication(req)
-	
+
 	// Validate components
 	if err := c.validateComponents(app.Components); err != nil {
 		return nil, fmt.Errorf("component validation failed: %w", err)
 	}
-	
+
 	// Inject platform components based on configuration
 	c.injectPlatformComponents(app, req)
-	
+
 	// Convert to internal format for synthesis
 	internalApp := c.toInternalApplication(app, req)
-	
+
 	// Generate Spin manifest
 	manifest, err := c.synth.SynthesizeToSpin(internalApp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to synthesize manifest: %w", err)
 	}
-	
+
 	// Generate TOML
 	toml, err := c.synth.SynthesizeToTOML(internalApp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate TOML: %w", err)
 	}
-	
+
 	// Apply deployment variables
 	if req.Variables != nil {
 		if manifest.Variables == nil {
@@ -156,21 +155,21 @@ func (c *Client) ProcessDeployment(req *DeploymentRequest) (*DeploymentResult, e
 			}
 		}
 	}
-	
+
 	// Build result
 	result := &DeploymentResult{
 		Manifest: c.toPublicManifest(manifest),
 		SpinTOML: toml,
 		Metadata: DeploymentMetadata{
-			ProcessedAt:    time.Now().UTC(),
-			ComponentCount: len(app.Components),
-			InjectedGateway: c.config.InjectGateway,
+			ProcessedAt:        time.Now().UTC(),
+			ComponentCount:     len(app.Components),
+			InjectedGateway:    c.config.InjectGateway,
 			InjectedAuthorizer: c.config.InjectAuthorizer && app.Access != "public",
-			AccessMode:     app.Access,
-			Environment:    c.getEnvironment(req),
+			AccessMode:         app.Access,
+			Environment:        c.getEnvironment(req),
 		},
 	}
-	
+
 	return result, nil
 }
 
@@ -203,13 +202,13 @@ func (c *Client) validateRequest(req *DeploymentRequest) error {
 	if req.Application.Version == "" {
 		return fmt.Errorf("application version is required")
 	}
-	
+
 	// Check component limit
 	if c.config.MaxComponents > 0 && len(req.Application.Components) > c.config.MaxComponents {
-		return fmt.Errorf("too many components: %d (max: %d)", 
+		return fmt.Errorf("too many components: %d (max: %d)",
 			len(req.Application.Components), c.config.MaxComponents)
 	}
-	
+
 	return nil
 }
 
@@ -217,14 +216,14 @@ func (c *Client) validateRequest(req *DeploymentRequest) error {
 func (c *Client) validateComponents(components []Component) error {
 	for _, comp := range components {
 		// Parse component source
-		localPath, registrySource := types.ParseComponentSource(comp.Source)
-		
+		localPath, registrySource := parseComponentSource(comp.Source)
+
 		// Check if local sources are allowed
 		if c.config.RequireRegistryComponents && localPath != "" {
-			return fmt.Errorf("component %s: local sources not allowed (source: %s)", 
+			return fmt.Errorf("component %s: local sources not allowed (source: %s)",
 				comp.ID, localPath)
 		}
-		
+
 		// Check registry whitelist
 		if registrySource != nil && len(c.config.AllowedRegistries) > 0 {
 			allowed := false
@@ -235,34 +234,34 @@ func (c *Client) validateComponents(components []Component) error {
 				}
 			}
 			if !allowed {
-				return fmt.Errorf("component %s: registry %s not in allowed list", 
+				return fmt.Errorf("component %s: registry %s not in allowed list",
 					comp.ID, registrySource.Registry)
 			}
 		}
-		
+
 		// Validate component has an ID
 		if comp.ID == "" {
 			return fmt.Errorf("component missing ID")
 		}
 	}
-	
+
 	return nil
 }
 
 // prepareApplication applies defaults and overrides to the application.
 func (c *Client) prepareApplication(req *DeploymentRequest) *Application {
 	app := req.Application
-	
+
 	// Apply access mode override
 	if req.AccessMode != nil {
 		app.Access = *req.AccessMode
 	}
-	
+
 	// Set default access if not specified
 	if app.Access == "" {
 		app.Access = "public"
 	}
-	
+
 	// Apply custom auth if provided
 	if req.CustomAuth != nil && app.Access == "custom" {
 		if app.Auth == nil {
@@ -273,7 +272,7 @@ func (c *Client) prepareApplication(req *DeploymentRequest) *Application {
 			app.Auth.JWTAudience = req.CustomAuth.Audience[0]
 		}
 	}
-	
+
 	return app
 }
 
@@ -291,7 +290,7 @@ func (c *Client) injectPlatformComponents(app *Application, req *DeploymentReque
 		}
 		app.Components = append([]Component{gateway}, app.Components...)
 	}
-	
+
 	// Inject authorizer for non-public apps
 	if c.config.InjectAuthorizer && app.Access != "public" {
 		authorizer := Component{
@@ -302,10 +301,10 @@ func (c *Client) injectPlatformComponents(app *Application, req *DeploymentReque
 				"version":  c.config.AuthorizerVersion,
 			},
 		}
-		
+
 		// Variables are now handled by CUE patterns based on access mode
 		// No need to inject them here
-		
+
 		// Insert after gateway but before user components
 		if c.config.InjectGateway {
 			components := []Component{app.Components[0], authorizer}
@@ -336,14 +335,14 @@ func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest)
 		Variables:       app.Variables,
 		AllowedSubjects: req.AllowedSubjects,
 	}
-	
+
 	if app.Auth != nil {
 		// For org access, use WorkOS provider
 		provider := ftl.AuthProviderCustom
 		if app.Access == "org" {
 			provider = ftl.AuthProviderWorkOS
 		}
-		
+
 		internal.Auth = ftl.AuthConfig{
 			Provider:    provider,
 			OrgID:       app.Auth.OrgID,
@@ -351,11 +350,11 @@ func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest)
 			JWTAudience: app.Auth.JWTAudience,
 		}
 	}
-	
+
 	for i, comp := range app.Components {
 		// Convert source to internal format
 		var source ftl.ComponentSource
-		localPath, registrySource := types.ParseComponentSource(comp.Source)
+		localPath, registrySource := parseComponentSource(comp.Source)
 		if localPath != "" {
 			source = ftl.LocalSource(localPath)
 		} else if registrySource != nil {
@@ -365,7 +364,7 @@ func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest)
 				Version:  registrySource.Version,
 			}
 		}
-		
+
 		var build *ftl.BuildConfig
 		if comp.Build != nil {
 			build = &ftl.BuildConfig{
@@ -373,7 +372,7 @@ func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest)
 				Workdir: comp.Build.Workdir,
 			}
 		}
-		
+
 		internal.Components[i] = ftl.Component{
 			ID:        comp.ID,
 			Source:    source,
@@ -381,7 +380,7 @@ func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest)
 			Variables: comp.Variables,
 		}
 	}
-	
+
 	return internal
 }
 
@@ -394,11 +393,51 @@ func (c *Client) toPublicManifest(manifest *ftl.SpinManifest) *Manifest {
 			Required: v.Required,
 		}
 	}
-	
+
 	return &Manifest{
 		Application: manifest.Application,
 		Components:  manifest.Component,
 		Triggers:    manifest.Trigger,
 		Variables:   pubVars,
+	}
+}
+
+// parseComponentSource parses a component source and returns either a local path or registry source
+func parseComponentSource(source interface{}) (string, *RegistrySource) {
+	switch s := source.(type) {
+	case string:
+		return s, nil
+	case map[string]interface{}:
+		reg := &RegistrySource{}
+		if r, ok := s["registry"].(string); ok {
+			reg.Registry = r
+		}
+		if p, ok := s["package"].(string); ok {
+			reg.Package = p
+		}
+		if v, ok := s["version"].(string); ok {
+			reg.Version = v
+		}
+		if reg.Registry != "" || reg.Package != "" {
+			return "", reg
+		}
+		return "", nil
+	case map[interface{}]interface{}:
+		reg := &RegistrySource{}
+		if r, ok := s["registry"].(string); ok {
+			reg.Registry = r
+		}
+		if p, ok := s["package"].(string); ok {
+			reg.Package = p
+		}
+		if v, ok := s["version"].(string); ok {
+			reg.Version = v
+		}
+		if reg.Registry != "" || reg.Package != "" {
+			return "", reg
+		}
+		return "", nil
+	default:
+		return "", nil
 	}
 }

@@ -17,8 +17,6 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
-
-	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
 // WASMPuller handles pulling WASM components from OCI registries
@@ -50,9 +48,10 @@ func NewWASMPullerWithCache(cacheDir string) *WASMPuller {
 }
 
 // Pull downloads a WASM component from a registry
-func (p *WASMPuller) Pull(ctx context.Context, source *ftltypes.RegistrySource) (string, error) {
+// Parameters are now explicit instead of using a types package
+func (p *WASMPuller) Pull(ctx context.Context, registry, packageName, version string) (string, error) {
 	// Construct the OCI reference
-	ref := fmt.Sprintf("%s/%s:%s", source.Registry, source.Package, source.Version)
+	ref := fmt.Sprintf("%s/%s:%s", registry, packageName, version)
 
 	// Parse the reference
 	tag, err := name.ParseReference(ref)

@@ -12,12 +12,11 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/fastertools/ftl-cli/internal/auth"
 	"github.com/fastertools/ftl-cli/pkg/oci"
-	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
+	"github.com/fastertools/ftl-cli/pkg/validation"
 )
 
 // DeployOptions holds options for the deploy command
@@ -108,7 +107,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 	if opts.JWTIssuer != "" {
 		if manifest.Auth == nil {
-			manifest.Auth = &ftltypes.Auth{}
+			manifest.Auth = &validation.AuthConfig{}
 		}
 		manifest.Auth.JWTIssuer = opts.JWTIssuer
 		if opts.JWTAudience != "" {
@@ -154,7 +153,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 
 	// Check if app exists
-	appName := manifest.Application.Name
+	appName := manifest.Name
 	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
 		Name: &appName,
 	})
@@ -275,7 +274,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 }
 
 // loadDeployManifest loads the FTL manifest configuration for deployment
-func loadDeployManifest(configFile string) (*ftltypes.Manifest, error) {
+func loadDeployManifest(configFile string) (*validation.Application, error) {
 	// Clean the path to prevent directory traversal
 	configFile = filepath.Clean(configFile)
 	data, err := os.ReadFile(configFile)
@@ -283,12 +282,13 @@ func loadDeployManifest(configFile string) (*ftltypes.Manifest, error) {
 		return nil, err
 	}
 
-	var manifest ftltypes.Manifest
-	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+	v := validation.New()
+	validatedValue, err := v.ValidateYAML(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate manifest: %w", err)
 	}
 
-	return &manifest, nil
+	return validation.ExtractApplication(validatedValue)
 }
 
 // runSynth runs the synth command to generate spin.toml
@@ -299,16 +299,17 @@ func runSynth(ctx context.Context, configFile string) error {
 	return cmd.Run()
 }
 
-
 // processComponents handles pulling registry components and pushing everything to ECR
-func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth *oci.ECRAuth, namespace string) (*ftltypes.Manifest, error) {
+func processComponents(ctx context.Context, manifest *validation.Application, ecrAuth *oci.ECRAuth, namespace string) (*validation.Application, error) {
 	// Create output manifest with ECR references
-	processedManifest := &ftltypes.Manifest{
-		Application: manifest.Application,
+	processedManifest := &validation.Application{
+		Name:        manifest.Name,
+		Version:     manifest.Version,
+		Description: manifest.Description,
 		Access:      manifest.Access,
 		Auth:        manifest.Auth,
 		Variables:   manifest.Variables,
-		Components:  make([]ftltypes.Component, 0, len(manifest.Components)),
+		Components:  make([]*validation.Component, 0, len(manifest.Components)),
 	}
 
 	// Create a WASMPuller for pulling registry components
@@ -323,29 +324,33 @@ func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth
 		var err error
 
 		// Check if it's a local or registry source
-		if localPath, registrySource := ftltypes.ParseComponentSource(comp.Source); localPath != "" {
+		switch src := comp.Source.(type) {
+		case *validation.LocalSource:
 			// Local component - find the built WASM file
-			wasmPath, err = findBuiltWASM(localPath, comp.ID)
+			wasmPath, err = findBuiltWASM(src.Path, comp.ID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find built WASM for %s: %w", comp.ID, err)
 			}
 			Info("Found local component %s at %s", comp.ID, wasmPath)
-		} else if registrySource != nil {
+		case *validation.RegistrySource:
 			// Registry component - pull it
-			Info("Pulling component %s from %s", comp.ID, registrySource.Registry)
-			wasmPath, err = puller.Pull(ctx, registrySource)
+			Info("Pulling component %s from %s", comp.ID, src.Registry)
+			wasmPath, err = puller.Pull(ctx, src.Registry, src.Package, src.Version)
 			if err != nil {
 				return nil, fmt.Errorf("failed to pull component %s: %w", comp.ID, err)
 			}
 			Success("Pulled %s", comp.ID)
-		} else {
+		default:
 			return nil, fmt.Errorf("invalid source for component %s", comp.ID)
 		}
 
 		// Push to ECR
 		// Package name should use / not : for the repository path
 		packageName := fmt.Sprintf("%s/%s", namespace, comp.ID)
-		version := manifest.Application.Version
+		version := manifest.Version
+		if version == "" {
+			version = "0.1.0"
+		}
 
 		Info("Pushing %s to ECR", comp.ID)
 		if err := pusher.Push(ctx, wasmPath, packageName, version); err != nil {
@@ -356,12 +361,12 @@ func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth
 		// Create processed component with ECR reference
 		// Convert package name from namespace/component to namespace:component for Spin compatibility
 		spinPackageName := strings.Replace(packageName, "/", ":", 1)
-		processedComp := ftltypes.Component{
+		processedComp := &validation.Component{
 			ID: comp.ID,
-			Source: map[string]interface{}{
-				"registry": ecrAuth.Registry,
-				"package":  spinPackageName,
-				"version":  version,
+			Source: &validation.RegistrySource{
+				Registry: ecrAuth.Registry,
+				Package:  spinPackageName,
+				Version:  version,
 			},
 			Build:     comp.Build,
 			Variables: comp.Variables,
@@ -400,17 +405,18 @@ func findBuiltWASM(sourcePath, componentID string) (string, error) {
 	return "", fmt.Errorf("could not find built WASM file for component %s", componentID)
 }
 
-
-func createDeploymentRequest(manifest *ftltypes.Manifest, opts *DeployOptions) api.CreateDeploymentRequest {
+func createDeploymentRequest(manifest *validation.Application, opts *DeployOptions) api.CreateDeploymentRequest {
 	req := api.CreateDeploymentRequest{
 		Variables: &opts.Variables,
 	}
 
 	// Set the application details
-	req.Application.Name = manifest.Application.Name
-	req.Application.Version = &manifest.Application.Version
-	if manifest.Application.Description != "" {
-		req.Application.Description = &manifest.Application.Description
+	req.Application.Name = manifest.Name
+	if manifest.Version != "" {
+		req.Application.Version = &manifest.Version
+	}
+	if manifest.Description != "" {
+		req.Application.Description = &manifest.Description
 	}
 
 	// Set access control
@@ -474,10 +480,10 @@ func createDeploymentRequest(manifest *ftltypes.Manifest, opts *DeployOptions) a
 		}
 
 		// Parse component source - should be registry at this point
-		if _, registrySource := ftltypes.ParseComponentSource(comp.Source); registrySource != nil {
-			deployComp.Source.Registry = registrySource.Registry
-			deployComp.Source.Package = registrySource.Package
-			deployComp.Source.Version = registrySource.Version
+		if regSrc, ok := comp.Source.(*validation.RegistrySource); ok {
+			deployComp.Source.Registry = regSrc.Registry
+			deployComp.Source.Package = regSrc.Package
+			deployComp.Source.Version = regSrc.Version
 		} else {
 			// This shouldn't happen after processing
 			Error("Component %s has non-registry source after processing", comp.ID)
@@ -583,16 +589,16 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 	return nil, fmt.Errorf("deployment timeout after 3 minutes")
 }
 
-func displayDryRunSummary(manifest *ftltypes.Manifest, appExists bool) {
+func displayDryRunSummary(manifest *validation.Application, appExists bool) {
 	fmt.Println()
 	fmt.Println("🔍 DRY RUN MODE - No changes will be made")
 	fmt.Println()
 
 	color.Cyan("Application Configuration:")
-	fmt.Printf("  Name: %s\n", manifest.Application.Name)
-	fmt.Printf("  Version: %s\n", manifest.Application.Version)
-	if manifest.Application.Description != "" {
-		fmt.Printf("  Description: %s\n", manifest.Application.Description)
+	fmt.Printf("  Name: %s\n", manifest.Name)
+	fmt.Printf("  Version: %s\n", manifest.Version)
+	if manifest.Description != "" {
+		fmt.Printf("  Description: %s\n", manifest.Description)
 	}
 	fmt.Printf("  Access Control: %s\n", manifest.Access)
 
@@ -612,18 +618,19 @@ func displayDryRunSummary(manifest *ftltypes.Manifest, appExists bool) {
 		fmt.Printf("  • %s\n", comp.ID)
 
 		// Show source type
-		if localPath, registrySource := ftltypes.ParseComponentSource(comp.Source); localPath != "" {
-			fmt.Printf("    Source: %s (local)\n", localPath)
+		switch src := comp.Source.(type) {
+		case *validation.LocalSource:
+			fmt.Printf("    Source: %s (local)\n", src.Path)
 			if comp.Build != nil && comp.Build.Command != "" {
 				fmt.Printf("    Build: %s\n", comp.Build.Command)
 			}
-		} else if registrySource != nil {
-			fmt.Printf("    Source: %s (registry)\n", registrySource.Registry)
-			if registrySource.Package != "" {
-				fmt.Printf("    Package: %s\n", registrySource.Package)
+		case *validation.RegistrySource:
+			fmt.Printf("    Source: %s (registry)\n", src.Registry)
+			if src.Package != "" {
+				fmt.Printf("    Package: %s\n", src.Package)
 			}
-			if registrySource.Version != "" {
-				fmt.Printf("    Version: %s\n", registrySource.Version)
+			if src.Version != "" {
+				fmt.Printf("    Version: %s\n", src.Version)
 			}
 		}
 	}
@@ -663,7 +670,7 @@ func promptConfirm(message string, defaultYes bool) bool {
 }
 
 // displayMCPUrls displays a table showing MCP URLs for the application and its components
-func displayMCPUrls(baseURL string, components []ftltypes.Component) {
+func displayMCPUrls(baseURL string, components []*validation.Component) {
 	// Ensure the base URL ends with /mcp
 	mcpBaseURL := strings.TrimRight(baseURL, "/") + "/mcp"
 

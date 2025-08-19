@@ -9,8 +9,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-
-	"github.com/fastertools/ftl-cli/pkg/types"
 )
 
 func newComponentCmd() *cobra.Command {
@@ -50,7 +48,8 @@ func listComponents() error {
 		return err
 	}
 
-	if len(manifest.Components) == 0 {
+	components, ok := manifest["components"].([]interface{})
+	if !ok || len(components) == 0 {
 		fmt.Println("No components found.")
 		fmt.Println()
 		fmt.Println("Add a component with:")
@@ -63,27 +62,31 @@ func listComponents() error {
 	fmt.Println()
 
 	// List components
-	for _, comp := range manifest.Components {
-		fmt.Printf("  • %s\n", comp.ID)
+	for _, c := range components {
+		comp := c.(map[interface{}]interface{})
+		fmt.Printf("  • %s\n", comp["id"])
 
 		// Show source info
-		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
-			fmt.Printf("    Source: %s\n", localPath)
-		} else if registrySource != nil {
-			fmt.Printf("    Source: %s/%s:%s\n",
-				registrySource.Registry,
-				registrySource.Package,
-				registrySource.Version)
+		switch src := comp["source"].(type) {
+		case string:
+			fmt.Printf("    Source: %s\n", src)
+		case map[interface{}]interface{}:
+			if registry, ok := src["registry"]; ok {
+				fmt.Printf("    Source: %s/%s:%s\n",
+					registry, src["package"], src["version"])
+			}
 		}
 
 		// Show build info if present
-		if comp.Build != nil && comp.Build.Command != "" {
-			fmt.Printf("    Build: %s\n", comp.Build.Command)
+		if build, ok := comp["build"].(map[interface{}]interface{}); ok {
+			if cmd, ok := build["command"]; ok {
+				fmt.Printf("    Build: %s\n", cmd)
+			}
 		}
 
 		// Show variables if present
-		if len(comp.Variables) > 0 {
-			fmt.Printf("    Variables: %d configured\n", len(comp.Variables))
+		if vars, ok := comp["variables"].(map[interface{}]interface{}); ok && len(vars) > 0 {
+			fmt.Printf("    Variables: %d configured\n", len(vars))
 		}
 
 		fmt.Println()
@@ -117,15 +120,17 @@ func removeComponent(name string) error {
 		return err
 	}
 
-	if len(manifest.Components) == 0 {
+	components, ok := manifest["components"].([]interface{})
+	if !ok || len(components) == 0 {
 		return fmt.Errorf("no components to remove")
 	}
 
 	// If no name provided, show interactive selection
 	if name == "" {
 		var options []string
-		for _, comp := range manifest.Components {
-			options = append(options, comp.ID)
+		for _, c := range components {
+			comp := c.(map[interface{}]interface{})
+			options = append(options, comp["id"].(string))
 		}
 
 		prompt := &survey.Select{
@@ -139,13 +144,14 @@ func removeComponent(name string) error {
 
 	// Find and remove component
 	found := false
-	newComponents := []types.Component{}
-	for _, comp := range manifest.Components {
-		if comp.ID == name {
+	newComponents := []interface{}{}
+	for _, c := range components {
+		comp := c.(map[interface{}]interface{})
+		if comp["id"] == name {
 			found = true
 			continue
 		}
-		newComponents = append(newComponents, comp)
+		newComponents = append(newComponents, c)
 	}
 
 	if !found {
@@ -168,7 +174,7 @@ func removeComponent(name string) error {
 	}
 
 	// Update manifest
-	manifest.Components = newComponents
+	manifest["components"] = newComponents
 
 	// Save manifest
 	if err := saveComponentManifest("ftl.yaml", manifest); err != nil {
@@ -179,7 +185,7 @@ func removeComponent(name string) error {
 	return nil
 }
 
-func loadComponentManifest(path string) (*types.Manifest, error) {
+func loadComponentManifest(path string) (map[interface{}]interface{}, error) {
 	// Clean the path to prevent directory traversal
 	path = filepath.Clean(path)
 	data, err := os.ReadFile(path)
@@ -187,15 +193,15 @@ func loadComponentManifest(path string) (*types.Manifest, error) {
 		return nil, err
 	}
 
-	var manifest types.Manifest
+	var manifest map[interface{}]interface{}
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
 
-	return &manifest, nil
+	return manifest, nil
 }
 
-func saveComponentManifest(path string, manifest *types.Manifest) error {
+func saveComponentManifest(path string, manifest map[interface{}]interface{}) error {
 	data, err := yaml.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)

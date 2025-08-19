@@ -10,13 +10,13 @@ import (
 // MockExecutor is a mock implementation of the Executor interface for testing
 type MockExecutor struct {
 	// Configuration for mock behavior
-	RunFunc           func(ctx context.Context, args ...string) error
-	RunWithOutputFunc func(ctx context.Context, args ...string) (string, error)
-	RunWithInputFunc  func(ctx context.Context, input io.Reader, args ...string) error
+	RunFunc            func(ctx context.Context, args ...string) error
+	RunWithOutputFunc  func(ctx context.Context, args ...string) (string, error)
+	RunWithInputFunc   func(ctx context.Context, input io.Reader, args ...string) error
 	RunInteractiveFunc func(ctx context.Context, args ...string) error
-	IsInstalledFunc   func() bool
-	VersionFunc       func() (string, error)
-	
+	IsInstalledFunc    func() bool
+	VersionFunc        func() (string, error)
+
 	// Track calls for assertions
 	Calls []MockCall
 }
@@ -182,7 +182,7 @@ func (m *MockExecutor) SimulateCommandOutput(command string) {
 		if len(args) == 0 {
 			return "", fmt.Errorf("no command provided")
 		}
-		
+
 		// Simulate some common spin commands
 		switch args[0] {
 		case "--version":

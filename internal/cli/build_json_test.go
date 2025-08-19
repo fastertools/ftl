@@ -16,13 +16,12 @@ func TestBuildCommand_AutoDetectJSON(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.json
+	// Create ftl.json with flat structure
 	jsonContent := `{
-  "application": {
-    "name": "test-app",
-    "version": "0.1.0"
-  },
-  "components": []
+  "name": "test-app",
+  "version": "0.1.0",
+  "components": [],
+  "access": "public"
 }`
 	err := os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
@@ -52,11 +51,11 @@ func TestBuildCommand_AutoDetectYAML(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.yaml
-	yamlContent := `application:
-  name: test-app
-  version: "0.1.0"
-components: []`
+	// Create ftl.yaml with flat structure
+	yamlContent := `name: test-app
+version: "0.1.0"
+components: []
+access: public`
 	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
@@ -85,19 +84,18 @@ func TestBuildCommand_PreferYAMLOverJSON(t *testing.T) {
 	_ = os.Chdir(tmpDir)
 
 	// Create both ftl.yaml and ftl.json
-	yamlContent := `application:
-  name: test-app-yaml
-  version: "0.1.0"
-components: []`
+	yamlContent := `name: test-app-yaml
+version: "0.1.0"
+components: []
+access: public`
 	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	jsonContent := `{
-  "application": {
-    "name": "test-app-json",
-    "version": "0.1.0"
-  },
-  "components": []
+  "name": "test-app-json",
+  "version": "0.1.0",
+  "components": [],
+  "access": "public"
 }`
 	err = os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
@@ -131,12 +129,10 @@ func TestDeployCommand_AutoDetectJSON(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.json
+	// Create ftl.json with flat structure
 	jsonContent := `{
-  "application": {
-    "name": "test-app",
-    "version": "0.1.0"
-  },
+  "name": "test-app",
+  "version": "0.1.0",
   "components": []
 }`
 	err := os.WriteFile("ftl.json", []byte(jsonContent), 0600)
@@ -153,6 +149,11 @@ route = "/"
 component = "test"`
 	err = os.WriteFile("spin.toml", []byte(spinContent), 0600)
 	require.NoError(t, err)
+
+	// Mock the ftl synth command
+	oldExecCommand := ExecCommand
+	ExecCommand = MockExecCommandHelper
+	defer func() { ExecCommand = oldExecCommand }()
 
 	cmd := newDeployCmd()
 	var buf bytes.Buffer
@@ -173,13 +174,11 @@ func TestDeployCommand_LoadJSONConfig(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.json
+	// Create ftl.json with flat structure
 	jsonContent := `{
-  "application": {
-    "name": "json-app",
-    "version": "1.0.0",
-    "description": "Test JSON app"
-  },
+  "name": "json-app",
+  "version": "1.0.0",
+  "description": "Test JSON app",
   "components": [
     {
       "id": "test-comp",

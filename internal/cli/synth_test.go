@@ -48,13 +48,13 @@ func TestDetectFormat(t *testing.T) {
 
 func TestSynthesizeFromYAML(t *testing.T) {
 	yamlContent := `
-application:
-  name: test-app
-  version: "1.0.0"
-  description: Test application
+name: test-app
+version: "1.0.0"
+description: Test application
 components:
   - id: test-component
     source: ./test.wasm
+access: public
 `
 
 	tmpDir := t.TempDir()
@@ -74,11 +74,10 @@ components:
 
 func TestSynthesizeFromJSON(t *testing.T) {
 	jsonContent := `{
-  "application": {
-    "name": "json-app",
-    "version": "1.0.0"
-  },
-  "components": []
+  "name": "json-app",
+  "version": "1.0.0",
+  "components": [],
+  "access": "public"
 }`
 
 	tmpDir := t.TempDir()
@@ -97,11 +96,10 @@ func TestSynthesizeFromJSON(t *testing.T) {
 
 func TestSynthesizeFromCUE(t *testing.T) {
 	cueContent := `
-application: {
-	name: "cue-app"
-	version: "1.0.0"
-}
+name: "cue-app"
+version: "1.0.0"
 components: []
+access: "public"
 `
 
 	tmpDir := t.TempDir()
@@ -123,7 +121,7 @@ func TestSynthesizeFromGo(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl-cli/internal/synthesis"
+	"github.com/fastertools/ftl-cli/pkg/synthesis"
 )
 
 func main() {
@@ -163,9 +161,10 @@ func TestSynthesizeFromInput(t *testing.T) {
 			name: "yaml_input",
 			setupFile: func(dir string) string {
 				path := filepath.Join(dir, "ftl.yaml")
-				content := `application:
-  name: test
-components: []`
+				content := `name: test
+version: "1.0.0"
+components: []
+access: public`
 				_ = os.WriteFile(path, []byte(content), 0600)
 				return path
 			},
@@ -175,7 +174,7 @@ components: []`
 			name: "json_input",
 			setupFile: func(dir string) string {
 				path := filepath.Join(dir, "ftl.json")
-				content := `{"application":{"name":"test"},"components":[]}`
+				content := `{"name":"test","version":"1.0.0","components":[],"access":"public"}`
 				_ = os.WriteFile(path, []byte(content), 0600)
 				return path
 			},
@@ -295,9 +294,10 @@ func TestSynthesizeFromInput_WithFormat(t *testing.T) {
 
 	// Create a file with .txt extension but YAML content
 	path := filepath.Join(tmpDir, "config.txt")
-	content := `application:
-  name: test
-components: []`
+	content := `name: test
+version: "1.0.0"
+components: []
+access: public`
 	err := os.WriteFile(path, []byte(content), 0600)
 	require.NoError(t, err)
 
@@ -308,7 +308,7 @@ components: []`
 	assert.Contains(t, result, "spin_manifest_version")
 
 	// Test with JSON content
-	jsonContent := `{"application":{"name":"test"},"components":[]}`
+	jsonContent := `{"name":"test","version":"1.0.0","components":[],"access":"public"}`
 	jsonResult, err := synthesizeFromInput([]byte(jsonContent), []string{})
 	assert.NoError(t, err)
 	assert.Contains(t, jsonResult, "spin_manifest_version")

@@ -13,7 +13,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/pkg/types"
+	"github.com/fastertools/ftl-cli/pkg/validation"
 )
 
 //go:embed templates.cue
@@ -91,6 +91,63 @@ func (s *Scaffolder) GenerateComponent(name, language string) error {
 	// Update ftl.yaml
 	if err := s.updateFTLConfig(name, component); err != nil {
 		return fmt.Errorf("failed to update ftl.yaml: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateProject creates a new FTL project from templates
+func (s *Scaffolder) GenerateProject(projectDir, name, description, format string) error {
+	// Validate format
+	validFormats := []string{"yaml", "json", "cue", "go"}
+	valid := false
+	for _, f := range validFormats {
+		if f == format {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return fmt.Errorf("invalid format: %s", format)
+	}
+
+	// Get project template
+	templatePath := fmt.Sprintf("#ProjectTemplates.%s", format)
+	templateValue := s.templates.LookupPath(cue.ParsePath(templatePath))
+	if templateValue.Err() != nil {
+		return fmt.Errorf("failed to get project template: %w", templateValue.Err())
+	}
+
+	// Fill in template with values
+	filled := templateValue.FillPath(cue.ParsePath("name"), name)
+	filled = filled.FillPath(cue.ParsePath("description"), description)
+	if filled.Err() != nil {
+		return fmt.Errorf("failed to fill template: %w", filled.Err())
+	}
+
+	// Extract files
+	filesValue := filled.LookupPath(cue.ParsePath("files"))
+	if filesValue.Err() != nil {
+		return fmt.Errorf("failed to extract files: %w", filesValue.Err())
+	}
+
+	// Generate each file
+	iter, err := filesValue.Fields()
+	if err != nil {
+		return fmt.Errorf("failed to iterate files: %w", err)
+	}
+
+	for iter.Next() {
+		filename := iter.Selector().Unquoted()
+		content, err := iter.Value().String()
+		if err != nil {
+			return fmt.Errorf("failed to extract content for %s: %w", filename, err)
+		}
+
+		filePath := filepath.Join(projectDir, filename)
+		if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
+			return fmt.Errorf("failed to write %s: %w", filename, err)
+		}
 	}
 
 	return nil
@@ -263,17 +320,30 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		return fmt.Errorf("failed to read %s: %w", configPath, err)
 	}
 
-	var manifest types.Manifest
+	// Parse and validate the config
+	v := validation.New()
+	var validatedValue cue.Value
+	var manifest *validation.Application
 
 	// Parse based on format
 	switch format {
 	case "yaml":
-		if err := yaml.Unmarshal(data, &manifest); err != nil {
-			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		validatedValue, err = v.ValidateYAML(data)
+		if err != nil {
+			return fmt.Errorf("failed to validate %s: %w", configPath, err)
+		}
+		manifest, err = validation.ExtractApplication(validatedValue)
+		if err != nil {
+			return fmt.Errorf("failed to extract application: %w", err)
 		}
 	case "json":
-		if err := json.Unmarshal(data, &manifest); err != nil {
-			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		validatedValue, err = v.ValidateJSON(data)
+		if err != nil {
+			return fmt.Errorf("failed to validate %s: %w", configPath, err)
+		}
+		manifest, err = validation.ExtractApplication(validatedValue)
+		if err != nil {
+			return fmt.Errorf("failed to extract application: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported configuration format: %s", format)
@@ -297,10 +367,10 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	wasmPath := s.getWasmPath(name, language)
 
 	// Create new component config
-	newComponent := types.Component{
+	newComponent := &validation.Component{
 		ID:     name,
-		Source: wasmPath,
-		Build: &types.Build{
+		Source: &validation.LocalSource{Path: wasmPath},
+		Build: &validation.BuildConfig{
 			Command: command,
 			Workdir: name,
 			Watch:   watchPatterns,
@@ -317,6 +387,9 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	// Add component
 	manifest.Components = append(manifest.Components, newComponent)
 
+	// Convert to flat structure for YAML/JSON
+	flatConfig := convertToFlatStructure(manifest)
+
 	// Write back based on format
 	var output []byte
 	switch format {
@@ -324,13 +397,13 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		var buf bytes.Buffer
 		encoder := yaml.NewEncoder(&buf)
 		encoder.SetIndent(2)
-		if err := encoder.Encode(&manifest); err != nil {
+		if err := encoder.Encode(flatConfig); err != nil {
 			return fmt.Errorf("failed to encode config: %w", err)
 		}
 		output = buf.Bytes()
 	case "json":
 		var err error
-		output, err = json.MarshalIndent(&manifest, "", "  ")
+		output, err = json.MarshalIndent(flatConfig, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to encode config: %w", err)
 		}
@@ -391,6 +464,90 @@ func (s *Scaffolder) getWasmPath(name, language string) string {
 	default:
 		return filepath.Join(name, name+".wasm")
 	}
+}
+
+// convertToFlatStructure converts validation types to flat YAML/JSON structure
+func convertToFlatStructure(app *validation.Application) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Add top-level fields
+	result["name"] = app.Name
+	if app.Version != "" {
+		result["version"] = app.Version
+	}
+	if app.Description != "" {
+		result["description"] = app.Description
+	}
+	if app.Access != "" {
+		result["access"] = app.Access
+	}
+
+	// Convert auth config
+	if app.Auth != nil {
+		auth := make(map[string]interface{})
+		if app.Auth.JWTIssuer != "" {
+			auth["jwt_issuer"] = app.Auth.JWTIssuer
+		}
+		if app.Auth.JWTAudience != "" {
+			auth["jwt_audience"] = app.Auth.JWTAudience
+		}
+		if len(auth) > 0 {
+			result["auth"] = auth
+		}
+	}
+
+	// Convert components
+	if len(app.Components) > 0 {
+		components := make([]map[string]interface{}, 0, len(app.Components))
+		for _, comp := range app.Components {
+			c := make(map[string]interface{})
+			c["id"] = comp.ID
+
+			// Convert source
+			switch src := comp.Source.(type) {
+			case *validation.LocalSource:
+				c["source"] = src.Path
+			case *validation.RegistrySource:
+				source := make(map[string]interface{})
+				source["registry"] = src.Registry
+				source["package"] = src.Package
+				source["version"] = src.Version
+				c["source"] = source
+			}
+
+			// Convert build config
+			if comp.Build != nil {
+				build := make(map[string]interface{})
+				if comp.Build.Command != "" {
+					build["command"] = comp.Build.Command
+				}
+				if comp.Build.Workdir != "" {
+					build["workdir"] = comp.Build.Workdir
+				}
+				if len(comp.Build.Watch) > 0 {
+					build["watch"] = comp.Build.Watch
+				}
+				if len(build) > 0 {
+					c["build"] = build
+				}
+			}
+
+			// Add variables
+			if len(comp.Variables) > 0 {
+				c["variables"] = comp.Variables
+			}
+
+			components = append(components, c)
+		}
+		result["components"] = components
+	}
+
+	// Add variables
+	if len(app.Variables) > 0 {
+		result["variables"] = app.Variables
+	}
+
+	return result
 }
 
 // ListLanguages returns the available languages

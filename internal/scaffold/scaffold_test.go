@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/fastertools/ftl-cli/pkg/types"
 )
 
 func TestValidateComponentName(t *testing.T) {
@@ -125,7 +123,7 @@ func TestDetectConfigFormat(t *testing.T) {
 			name: "go config",
 			files: map[string]string{
 				"main.go": `package main
-import "github.com/fastertools/ftl-cli/internal/synthesis"
+import "github.com/fastertools/ftl-cli/pkg/synthesis"
 func main() {
 	cdk := synthesis.NewCDK()
 }`,
@@ -204,16 +202,14 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create initial ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
-		Components: []types.Component{},
-		Access:     "public",
+	// Create initial ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":       "test-app",
+		"version":    "0.1.0",
+		"components": []interface{}{},
+		"access":     "public",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate a Rust component
@@ -232,11 +228,22 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 
 	// Check ftl.yaml was updated
 	updatedData, _ := os.ReadFile("ftl.yaml")
-	var updatedManifest types.Manifest
+	var updatedManifest map[interface{}]interface{}
 	_ = yaml.Unmarshal(updatedData, &updatedManifest)
-	assert.Len(t, updatedManifest.Components, 1)
-	assert.Equal(t, "test-tool", updatedManifest.Components[0].ID)
-	assert.Equal(t, "test-tool/test_tool.wasm", updatedManifest.Components[0].Source)
+	components := updatedManifest["components"].([]interface{})
+	assert.Len(t, components, 1)
+	// Handle both map[string]interface{} and map[interface{}]interface{}
+	var compID, compSource string
+	switch comp := components[0].(type) {
+	case map[string]interface{}:
+		compID = comp["id"].(string)
+		compSource = comp["source"].(string)
+	case map[interface{}]interface{}:
+		compID = comp["id"].(string)
+		compSource = comp["source"].(string)
+	}
+	assert.Equal(t, "test-tool", compID)
+	assert.Equal(t, "test-tool/test_tool.wasm", compSource)
 }
 
 func TestGenerateComponent_TypeScript(t *testing.T) {
@@ -247,16 +254,14 @@ func TestGenerateComponent_TypeScript(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create initial ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
-		Components: []types.Component{},
-		Access:     "public",
+	// Create initial ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":       "test-app",
+		"version":    "0.1.0",
+		"components": []interface{}{},
+		"access":     "public",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate TypeScript component
@@ -282,16 +287,14 @@ func TestGenerateComponent_Python(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create initial ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
-		Components: []types.Component{},
-		Access:     "public",
+	// Create initial ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":       "test-app",
+		"version":    "0.1.0",
+		"components": []interface{}{},
+		"access":     "public",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Python component
@@ -312,16 +315,14 @@ func TestGenerateComponent_Go(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create initial ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
-		Components: []types.Component{},
-		Access:     "public",
+	// Create initial ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":       "test-app",
+		"version":    "0.1.0",
+		"components": []interface{}{},
+		"access":     "public",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Go component
@@ -346,18 +347,16 @@ func TestGenerateComponent_DuplicateName(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.yaml with existing component
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
+	// Create ftl.yaml with existing component (flat structure)
+	manifestData := map[string]interface{}{
+		"name":    "test-app",
+		"version": "0.1.0",
+		"components": []interface{}{
+			map[string]interface{}{"id": "existing", "source": "./existing"},
 		},
-		Components: []types.Component{
-			{ID: "existing", Source: "./existing"},
-		},
-		Access: "public",
+		"access": "public",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Try to generate component with duplicate name
@@ -374,14 +373,12 @@ func TestGenerateComponent_InvalidInputs(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
+	// Create ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":    "test-app",
+		"version": "0.1.0",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Test invalid component name
@@ -403,12 +400,10 @@ func TestGenerateComponent_JSONConfig(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.json instead of yaml
+	// Create ftl.json with flat structure instead of yaml
 	jsonContent := `{
-		"application": {
-			"name": "test-app",
-			"version": "0.1.0"
-		},
+		"name": "test-app",
+		"version": "0.1.0",
 		"components": [],
 		"access": "public"
 	}`
@@ -437,7 +432,7 @@ func TestUpdateFTLConfig_UnsupportedFormats(t *testing.T) {
 			name:      "go config",
 			format:    "go",
 			setupFile: "main.go",
-			content:   `package main; import "github.com/fastertools/ftl-cli/internal/synthesis"; func main() { synthesis.NewCDK() }`,
+			content:   `package main; import "github.com/fastertools/ftl-cli/pkg/synthesis"; func main() { synthesis.NewCDK() }`,
 			errMsg:    "go-based configurations require manual",
 		},
 		{
@@ -477,14 +472,12 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 	defer func() { _ = os.Chdir(oldWd) }()
 	_ = os.Chdir(tmpDir)
 
-	// Create ftl.yaml
-	manifest := &types.Manifest{
-		Application: types.Application{
-			Name:    "test-app",
-			Version: "0.1.0",
-		},
+	// Create ftl.yaml with flat structure
+	manifestData := map[string]interface{}{
+		"name":    "test-app",
+		"version": "0.1.0",
 	}
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(manifestData)
 	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Rust component with hyphens
@@ -503,9 +496,18 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 
 	// Check ftl.yaml has correct WASM path
 	updatedData, _ := os.ReadFile("ftl.yaml")
-	var updatedManifest types.Manifest
+	var updatedManifest map[interface{}]interface{}
 	_ = yaml.Unmarshal(updatedData, &updatedManifest)
-	assert.Equal(t, "my-cool-tool/my_cool_tool.wasm", updatedManifest.Components[0].Source)
+	components := updatedManifest["components"].([]interface{})
+	// Handle both map[string]interface{} and map[interface{}]interface{}
+	var compSource string
+	switch comp := components[0].(type) {
+	case map[string]interface{}:
+		compSource = comp["source"].(string)
+	case map[interface{}]interface{}:
+		compSource = comp["source"].(string)
+	}
+	assert.Equal(t, "my-cool-tool/my_cool_tool.wasm", compSource)
 }
 
 func TestCreateComponentInstance(t *testing.T) {
@@ -567,14 +569,12 @@ func TestGenerateComponent_CreatesCorrectStructure(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Create ftl.yaml
-			manifest := &types.Manifest{
-				Application: types.Application{
-					Name:    "test-app",
-					Version: "0.1.0",
-				},
+			// Create ftl.yaml with flat structure
+			manifestData := map[string]interface{}{
+				"name":    "test-app",
+				"version": "0.1.0",
 			}
-			data, _ := yaml.Marshal(manifest)
+			data, _ := yaml.Marshal(manifestData)
 			_ = os.WriteFile("ftl.yaml", data, 0600)
 
 			// Generate component

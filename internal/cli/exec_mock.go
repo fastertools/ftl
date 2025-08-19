@@ -76,7 +76,6 @@ func MockExecCommandHelper(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-
 func handleSpinCommand(args []string) {
 	if len(args) == 0 {
 		fmt.Println("spin version 2.0.0")
@@ -178,7 +177,7 @@ func handleFTLCommand(args []string) {
 				break
 			}
 		}
-		
+
 		// Generate a mock spin.toml content
 		spinTOML := `spin_manifest_version = 2
 
@@ -199,7 +198,7 @@ version = '0.0.13-alpha.0'
 component = 'mcp-gateway'
 route = '/...'
 `
-		
+
 		if outputFile != "" {
 			// Write to the specified file
 			if err := os.WriteFile(outputFile, []byte(spinTOML), 0644); err != nil {
