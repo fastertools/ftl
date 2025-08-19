@@ -1,7 +1,4 @@
 # Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
 *.so
 *.dylib
 
@@ -27,7 +24,6 @@ vendor/
 
 # OS files
 .DS_Store
-Thumbs.db
 
 # Example build artifacts
 examples/*/*.wasm

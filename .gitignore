@@ -17,9 +17,6 @@ Cargo.lock.bak
 # Go build artifacts
 ftl
 bin/
-*.exe
-*.exe~
-*.dll
 *.so
 *.dylib
 *.test

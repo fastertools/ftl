@@ -42,9 +42,6 @@ detect_platform() {
         Darwin*)
             PLATFORM="darwin"
             ;;
-        MINGW*|MSYS*|CYGWIN*)
-            PLATFORM="windows"
-            ;;
         *)
             error "Unsupported operating system: $OS"
             ;;
@@ -89,17 +86,8 @@ install_ftl() {
     
     info "Installing FTL CLI ${version} for ${platform}..."
     
-    local archive_name="ftl-${version}-${platform}"
+    local archive_name="ftl-${version}-${platform}.tar.gz"
     local download_url="https://github.com/${REPO}/releases/download/${version}/${archive_name}"
-    
-    # Add appropriate extension
-    if [ "$platform" = "windows-amd64" ] || [ "$platform" = "windows-arm64" ]; then
-        archive_name="${archive_name}.zip"
-        download_url="${download_url}.zip"
-    else
-        archive_name="${archive_name}.tar.gz"
-        download_url="${download_url}.tar.gz"
-    fi
     
     # Create temporary directory
     local tmp_dir="$(mktemp -d)"
@@ -117,19 +105,11 @@ install_ftl() {
     
     # Extract the archive
     info "Extracting..."
-    if [[ "$archive_name" == *.zip ]]; then
-        unzip -q "$archive_name" || error "Failed to extract archive"
-    else
-        tar xzf "$archive_name" || error "Failed to extract archive"
-    fi
+    tar xzf "$archive_name" || error "Failed to extract archive"
     
     # Find the binary
-    local binary_path
-    if [ -f "ftl.exe" ]; then
-        binary_path="ftl.exe"
-    elif [ -f "ftl" ]; then
-        binary_path="ftl"
-    else
+    local binary_path="ftl"
+    if [ ! -f "$binary_path" ]; then
         error "Binary not found in archive"
     fi
     

@@ -66,16 +66,6 @@ jobs:
             name: darwin-arm64
             goos: darwin
             goarch: arm64
-          
-          # Windows builds
-          - os: windows-latest
-            name: windows-amd64
-            goos: windows
-            goarch: amd64
-          - os: windows-latest
-            name: windows-arm64
-            goos: windows
-            goarch: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -115,22 +105,14 @@ jobs:
           LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.commit=$COMMIT"
           LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.buildDate=$BUILD_DATE"
           
-          go build -ldflags "$LDFLAGS" -o ftl${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/ftl
+          go build -ldflags "$LDFLAGS" -o ftl ./cmd/ftl
       
       - name: Create archive
         shell: bash
         run: |
           ARCHIVE_NAME="ftl-${{ steps.version.outputs.VERSION }}-${{ matrix.name }}"
-          
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            # Windows: Create zip
-            7z a "${ARCHIVE_NAME}.zip" ftl.exe README.md LICENSE
-            echo "ARCHIVE_PATH=${ARCHIVE_NAME}.zip" >> $GITHUB_ENV
-          else
-            # Unix: Create tar.gz
-            tar czf "${ARCHIVE_NAME}.tar.gz" ftl README.md LICENSE
-            echo "ARCHIVE_PATH=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
-          fi
+          tar czf "${ARCHIVE_NAME}.tar.gz" ftl README.md LICENSE
+          echo "ARCHIVE_PATH=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
