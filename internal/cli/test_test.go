@@ -59,7 +59,7 @@ func TestTestCommand_NoComponents(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newTestCmd()
@@ -91,18 +91,18 @@ func TestTestCommand_WithComponents(t *testing.T) {
 components:
   - id: test-comp
     source: ./test-comp`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Create component directory
-	err = os.MkdirAll("test-comp", 0755)
+	err = os.MkdirAll("test-comp", 0750)
 	require.NoError(t, err)
 
 	// Create Makefile with test target
 	makefileContent := `test:
 	@echo "Running tests..."
 	@echo "PASS"`
-	err = os.WriteFile("test-comp/Makefile", []byte(makefileContent), 0644)
+	err = os.WriteFile("test-comp/Makefile", []byte(makefileContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newTestCmd()
@@ -137,11 +137,11 @@ func TestTestCommand_WithCoverageFlag(t *testing.T) {
 components:
   - id: test-comp
     source: ./test-comp`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Create component
-	err = os.MkdirAll("test-comp", 0755)
+	err = os.MkdirAll("test-comp", 0750)
 	require.NoError(t, err)
 
 	cmd := newTestCmd()
@@ -175,7 +175,7 @@ func TestTestCommand_WithVerboseFlag(t *testing.T) {
 	goModContent := `module test-app
 
 go 1.21`
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
+	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newTestCmd()

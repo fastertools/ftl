@@ -60,7 +60,7 @@ func TestLoadAndSaveComponentManifest(t *testing.T) {
 	// Save manifest
 	data, err := yaml.Marshal(manifest)
 	require.NoError(t, err)
-	err = os.WriteFile(manifestPath, data, 0644)
+	err = os.WriteFile(manifestPath, data, 0600)
 	require.NoError(t, err)
 
 	// Load and verify
@@ -123,7 +123,7 @@ func TestAddComponentValidation(t *testing.T) {
 				Access:     "public",
 			}
 			data, _ := yaml.Marshal(manifest)
-			_ = os.WriteFile("ftl.yaml", data, 0644)
+			_ = os.WriteFile("ftl.yaml", data, 0600)
 
 			// Test add component
 			err := runComponentAdd(tt.opts)
@@ -180,7 +180,7 @@ func TestRemoveComponentDirect(t *testing.T) {
 
 	// Save and verify
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile(manifestPath, data, 0644)
+	_ = os.WriteFile(manifestPath, data, 0600)
 
 	// Load and check
 	loaded, err := loadComponentManifest(manifestPath)

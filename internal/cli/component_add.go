@@ -263,7 +263,7 @@ func createInteractive(opts *AddComponentOptions) (types.Component, error) {
 
 func createTemplateFiles(dir, template, name string) error {
 	// Create directory
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -287,7 +287,7 @@ func init() {
 
 func main() {}
 `, name)
-		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0600); err != nil {
 			return fmt.Errorf("failed to write main.go: %w", err)
 		}
 
@@ -298,7 +298,7 @@ go 1.22
 
 require github.com/fermyon/spin-go-sdk v0.2.0
 `, name)
-		if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0600); err != nil {
 			return fmt.Errorf("failed to write go.mod: %w", err)
 		}
 
@@ -315,12 +315,12 @@ spin-sdk = "3.0"
 [lib]
 crate-type = ["cdylib"]
 `, name)
-		if err := os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(cargoToml), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(cargoToml), 0600); err != nil {
 			return fmt.Errorf("failed to write Cargo.toml: %w", err)
 		}
 
 		// Create src/lib.rs
-		if err := os.MkdirAll(filepath.Join(dir, "src"), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(dir, "src"), 0750); err != nil {
 			return fmt.Errorf("failed to create src directory: %w", err)
 		}
 		libRs := `use spin_sdk::http::{IntoResponse, Request, Response};
@@ -334,7 +334,7 @@ fn handle_request(_req: Request) -> anyhow::Result<impl IntoResponse> {
         .build())
 }
 `
-		if err := os.WriteFile(filepath.Join(dir, "src", "lib.rs"), []byte(libRs), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "src", "lib.rs"), []byte(libRs), 0600); err != nil {
 			return fmt.Errorf("failed to write lib.rs: %w", err)
 		}
 
@@ -344,6 +344,8 @@ fn handle_request(_req: Request) -> anyhow::Result<impl IntoResponse> {
 }
 
 func loadManifest(path string) (*types.Manifest, error) {
+	// Clean the path to prevent directory traversal
+	path = filepath.Clean(path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -373,5 +375,5 @@ func saveManifest(path string, manifest *types.Manifest) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

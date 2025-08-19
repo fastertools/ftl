@@ -1,12 +1,23 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strings"
 	
 	ftl "github.com/fastertools/ftl-cli/sdk/go"
 )
+
+// secureRandomInt generates a cryptographically secure random integer in range [0, max)
+func secureRandomInt(max int) int {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		// Fallback to 0 if crypto/rand fails (should never happen)
+		return 0
+	}
+	return int(n.Int64())
+}
 
 func init() {
 	ftl.CreateTools(map[string]ftl.ToolDefinition{
@@ -62,16 +73,16 @@ func checkWeatherHandler(input map[string]interface{}) ftl.ToolResponse {
 	}
 	
 	// Simulate weather data (in a real implementation, this would call a weather API)
-	temp := rand.Intn(30) + 10 // 10-40 degrees
+	temp := secureRandomInt(30) + 10 // 10-40 degrees
 	if unit == "fahrenheit" {
 		temp = (temp * 9 / 5) + 32
 	}
 	
 	conditions := []string{"Sunny", "Partly Cloudy", "Cloudy", "Rainy", "Stormy"}
-	condition := conditions[rand.Intn(len(conditions))]
+	condition := conditions[secureRandomInt(len(conditions))]
 	
-	humidity := rand.Intn(60) + 30 // 30-90%
-	windSpeed := rand.Intn(20) + 5 // 5-25 km/h
+	humidity := secureRandomInt(60) + 30 // 30-90%
+	windSpeed := secureRandomInt(20) + 5 // 5-25 km/h
 	
 	unitSymbol := "°C"
 	if unit == "fahrenheit" {
@@ -116,9 +127,9 @@ func getForecastHandler(input map[string]interface{}) ftl.ToolResponse {
 	var forecastData []map[string]interface{}
 	
 	for i := 0; i < days; i++ {
-		condition := conditions[rand.Intn(len(conditions))]
-		high := rand.Intn(15) + 20 // 20-35°C
-		low := high - rand.Intn(10) - 5 // 5-15 degrees lower
+		condition := conditions[secureRandomInt(len(conditions))]
+		high := secureRandomInt(15) + 20 // 20-35°C
+		low := high - secureRandomInt(10) - 5 // 5-15 degrees lower
 		
 		dayForecast := fmt.Sprintf("Day %d (%s): %s, High: %d°C, Low: %d°C",
 			i+1, weekdays[i%7], condition, high, low)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -56,6 +57,21 @@ type Option func(*executor)
 // WithBinary sets the Spin binary path
 func WithBinary(binary string) Option {
 	return func(e *executor) {
+		// Clean the path and validate it's actually a spin binary
+		binary = filepath.Clean(binary)
+		// Only allow "spin" or absolute paths to a spin binary
+		if binary != "spin" && !filepath.IsAbs(binary) {
+			// Relative paths other than "spin" are not allowed
+			return
+		}
+		if filepath.IsAbs(binary) {
+			// For absolute paths, ensure the binary name is spin
+			base := filepath.Base(binary)
+			if base != "spin" && base != "spin.exe" {
+				// Only accept spin binaries
+				return
+			}
+		}
 		e.binary = binary
 	}
 }
@@ -131,13 +147,13 @@ func (e *executor) RunInteractive(ctx context.Context, args ...string) error {
 
 // IsInstalled checks if Spin is installed
 func (e *executor) IsInstalled() bool {
-	cmd := exec.Command(e.binary, "--version")
+	cmd := exec.Command(e.binary, "--version") // #nosec G204 -- binary validated in WithBinary to only be "spin" or absolute path to spin/spin.exe
 	return cmd.Run() == nil
 }
 
 // Version returns the Spin version
 func (e *executor) Version() (string, error) {
-	cmd := exec.Command(e.binary, "--version")
+	cmd := exec.Command(e.binary, "--version") // #nosec G204 -- binary validated in WithBinary to only be "spin" or absolute path to spin/spin.exe
 	output, err := cmd.Output()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get Spin version")
@@ -154,7 +170,7 @@ func (e *executor) Version() (string, error) {
 
 // command creates a new command
 func (e *executor) command(ctx context.Context, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, e.binary, args...)
+	cmd := exec.CommandContext(ctx, e.binary, args...) // #nosec G204 -- binary validated in WithBinary to only be "spin" or absolute path to spin/spin.exe
 
 	if e.dir != "" {
 		cmd.Dir = e.dir

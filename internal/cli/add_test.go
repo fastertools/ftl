@@ -115,7 +115,7 @@ func TestRunAdd_ValidationErrors(t *testing.T) {
 			wantErr: "component name must",
 			setupDir: func(t *testing.T) {
 				// Create a basic ftl.yaml
-				_ = os.WriteFile("ftl.yaml", []byte("application:\n  name: test\n"), 0644)
+				_ = os.WriteFile("ftl.yaml", []byte("application:\n  name: test\n"), 0600)
 			},
 		},
 		{
@@ -126,7 +126,7 @@ func TestRunAdd_ValidationErrors(t *testing.T) {
 			},
 			wantErr: "invalid language",
 			setupDir: func(t *testing.T) {
-				_ = os.WriteFile("ftl.yaml", []byte("application:\n  name: test\n"), 0644)
+				_ = os.WriteFile("ftl.yaml", []byte("application:\n  name: test\n"), 0600)
 			},
 		},
 	}
@@ -168,7 +168,7 @@ func TestRunAdd_Success(t *testing.T) {
   version: "0.1.0"
 components: []
 `
-	require.NoError(t, os.WriteFile("ftl.yaml", []byte(ftlConfig), 0644))
+	require.NoError(t, os.WriteFile("ftl.yaml", []byte(ftlConfig), 0600))
 
 	// Test with all parameters provided
 	opts := &AddOptions{

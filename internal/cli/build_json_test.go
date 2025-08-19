@@ -24,7 +24,7 @@ func TestBuildCommand_AutoDetectJSON(t *testing.T) {
   },
   "components": []
 }`
-	err := os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	err := os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newBuildCmd()
@@ -57,7 +57,7 @@ func TestBuildCommand_AutoDetectYAML(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newBuildCmd()
@@ -89,7 +89,7 @@ func TestBuildCommand_PreferYAMLOverJSON(t *testing.T) {
   name: test-app-yaml
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	jsonContent := `{
@@ -99,7 +99,7 @@ components: []`
   },
   "components": []
 }`
-	err = os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	err = os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newBuildCmd()
@@ -139,7 +139,7 @@ func TestDeployCommand_AutoDetectJSON(t *testing.T) {
   },
   "components": []
 }`
-	err := os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	err := os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	// Create a fake spin.toml for deploy to work
@@ -151,7 +151,7 @@ version = "0.1.0"
 [[trigger.http]]
 route = "/"
 component = "test"`
-	err = os.WriteFile("spin.toml", []byte(spinContent), 0644)
+	err = os.WriteFile("spin.toml", []byte(spinContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newDeployCmd()
@@ -187,7 +187,7 @@ func TestDeployCommand_LoadJSONConfig(t *testing.T) {
     }
   ]
 }`
-	err := os.WriteFile("custom.json", []byte(jsonContent), 0644)
+	err := os.WriteFile("custom.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	// TODO: Fix this test when loadConfig is available

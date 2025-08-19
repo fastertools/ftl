@@ -58,7 +58,7 @@ func newBuildCmd() *cobra.Command {
 					}
 
 					// Write spin.toml
-					if err := os.WriteFile("spin.toml", []byte(manifest), 0644); err != nil {
+					if err := os.WriteFile("spin.toml", []byte(manifest), 0600); err != nil {
 						return fmt.Errorf("failed to write spin.toml: %w", err)
 					}
 

@@ -65,7 +65,7 @@ components:
   - id: comp1
     source: ./comp1.wasm
 `
-		if err := os.WriteFile(noExtPath, []byte(yamlContent), 0644); err != nil {
+		if err := os.WriteFile(noExtPath, []byte(yamlContent), 0600); err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
 

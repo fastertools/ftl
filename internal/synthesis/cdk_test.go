@@ -118,7 +118,7 @@ components:
     source: ./comp1.wasm
 `
 
-	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestSynthesizeFromConfig_JSON(t *testing.T) {
 		}]
 	}`
 
-	if err := os.WriteFile(jsonPath, []byte(jsonContent), 0644); err != nil {
+	if err := os.WriteFile(jsonPath, []byte(jsonContent), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -185,7 +185,7 @@ components: [{
 	source: "./cue.wasm"
 }]`
 
-	if err := os.WriteFile(cuePath, []byte(cueContent), 0644); err != nil {
+	if err := os.WriteFile(cuePath, []byte(cueContent), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -209,7 +209,7 @@ func TestSynthesizeFromConfig_UnsupportedFormat(t *testing.T) {
 	txtPath := filepath.Join(tmpDir, "config.txt")
 
 	// Write content that's not valid YAML
-	if err := os.WriteFile(txtPath, []byte("{{invalid"), 0644); err != nil {
+	if err := os.WriteFile(txtPath, []byte("{{invalid"), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 

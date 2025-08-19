@@ -51,7 +51,7 @@ func TestLoadDeployManifest(t *testing.T) {
 
 	data, err := yaml.Marshal(manifest)
 	require.NoError(t, err)
-	err = os.WriteFile(manifestPath, data, 0644)
+	err = os.WriteFile(manifestPath, data, 0600)
 	require.NoError(t, err)
 
 	// Test loading
@@ -213,8 +213,8 @@ func TestFindBuiltWASM(t *testing.T) {
 			// Setup files
 			for _, file := range tt.setupFiles {
 				fullPath := filepath.Join(tmpDir, file)
-				_ = os.MkdirAll(filepath.Dir(fullPath), 0755)
-				_ = os.WriteFile(fullPath, []byte("wasm"), 0644)
+				_ = os.MkdirAll(filepath.Dir(fullPath), 0750)
+				_ = os.WriteFile(fullPath, []byte("wasm"), 0600)
 			}
 
 			// Test

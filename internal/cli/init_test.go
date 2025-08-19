@@ -148,7 +148,7 @@ func TestInitExistingDirectory(t *testing.T) {
 	}
 
 	// Create directory
-	if err := os.Mkdir("existing", 0755); err != nil {
+	if err := os.Mkdir("existing", 0750); err != nil {
 		t.Fatal(err)
 	}
 

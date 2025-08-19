@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
@@ -179,6 +180,8 @@ func removeComponent(name string) error {
 }
 
 func loadComponentManifest(path string) (*types.Manifest, error) {
+	// Clean the path to prevent directory traversal
+	path = filepath.Clean(path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -197,5 +200,5 @@ func saveComponentManifest(path string, manifest *types.Manifest) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

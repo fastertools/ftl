@@ -79,7 +79,7 @@ func runInit(opts *InitOptions) error {
 		}
 	}
 
-	if err := os.MkdirAll(projectDir, 0755); err != nil {
+	if err := os.MkdirAll(projectDir, 0750); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
@@ -201,7 +201,7 @@ func createYAMLConfig(dir string, opts *InitOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	return os.WriteFile(configPath, data, 0644)
+	return os.WriteFile(configPath, data, 0600)
 }
 
 // createSpinComposeConfig is no longer needed as we create ftl.yaml in createFTLConfig
@@ -221,7 +221,7 @@ __pycache__/
 .DS_Store
 `
 	gitignorePath := filepath.Join(dir, ".gitignore")
-	return os.WriteFile(gitignorePath, []byte(content), 0644)
+	return os.WriteFile(gitignorePath, []byte(content), 0600)
 }
 
 // createGoConfig creates a Go-based configuration
@@ -273,7 +273,7 @@ func main() {
 
 	// Write main.go
 	mainPath := filepath.Join(dir, "main.go")
-	if err := os.WriteFile(mainPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(mainPath, []byte(content), 0600); err != nil {
 		return err
 	}
 
@@ -289,7 +289,7 @@ require github.com/fastertools/ftl-cli/go/ftl v0.1.0
 `, opts.Name)
 
 	goModPath := filepath.Join(dir, "go.mod")
-	return os.WriteFile(goModPath, []byte(goMod), 0644)
+	return os.WriteFile(goModPath, []byte(goMod), 0600)
 }
 
 // createCUEConfig creates a CUE-based configuration
@@ -337,7 +337,7 @@ app: #FTLApplication & {
 `, opts.Name, description)
 
 	cuePath := filepath.Join(dir, "app.cue")
-	return os.WriteFile(cuePath, []byte(content), 0644)
+	return os.WriteFile(cuePath, []byte(content), 0600)
 }
 
 // createJSONConfig creates a JSON-based configuration
@@ -364,5 +364,5 @@ func createJSONConfig(dir string, opts *InitOptions) error {
 `, opts.Name, description)
 
 	jsonPath := filepath.Join(dir, "ftl.json")
-	return os.WriteFile(jsonPath, []byte(content), 0644)
+	return os.WriteFile(jsonPath, []byte(content), 0600)
 }

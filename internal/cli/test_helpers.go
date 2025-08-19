@@ -121,7 +121,7 @@ func CreateTestProject(t *testing.T, format string) string {
   version: "0.1.0"
 components: []
 triggers: []`
-		err := os.WriteFile(tmpDir+"/ftl.yaml", []byte(content), 0644)
+		err := os.WriteFile(tmpDir+"/ftl.yaml", []byte(content), 0600)
 		require.NoError(t, err)
 
 	case "json":
@@ -133,7 +133,7 @@ triggers: []`
   "components": [],
   "triggers": []
 }`
-		err := os.WriteFile(tmpDir+"/ftl.json", []byte(content), 0644)
+		err := os.WriteFile(tmpDir+"/ftl.json", []byte(content), 0600)
 		require.NoError(t, err)
 
 	case "cue":
@@ -144,7 +144,7 @@ application: {
 	version: "0.1.0"
 }
 components: []`
-		err := os.WriteFile(tmpDir+"/app.cue", []byte(content), 0644)
+		err := os.WriteFile(tmpDir+"/app.cue", []byte(content), 0600)
 		require.NoError(t, err)
 
 	case "go":
@@ -161,7 +161,7 @@ func main() {
 	manifest, _ := app.Build().Synthesize()
 	fmt.Print(manifest)
 }`
-		err := os.WriteFile(tmpDir+"/main.go", []byte(mainContent), 0644)
+		err := os.WriteFile(tmpDir+"/main.go", []byte(mainContent), 0600)
 		require.NoError(t, err)
 
 		modContent := `module test-app
@@ -169,7 +169,7 @@ func main() {
 go 1.21
 
 require github.com/fastertools/ftl-cli/go/ftl v0.0.0`
-		err = os.WriteFile(tmpDir+"/go.mod", []byte(modContent), 0644)
+		err = os.WriteFile(tmpDir+"/go.mod", []byte(modContent), 0600)
 		require.NoError(t, err)
 	}
 
@@ -177,7 +177,7 @@ require github.com/fastertools/ftl-cli/go/ftl v0.0.0`
 	gitignoreContent := `.spin/
 spin.toml
 *.wasm`
-	err := os.WriteFile(tmpDir+"/.gitignore", []byte(gitignoreContent), 0644)
+	err := os.WriteFile(tmpDir+"/.gitignore", []byte(gitignoreContent), 0600)
 	require.NoError(t, err)
 
 	return tmpDir
@@ -186,38 +186,38 @@ spin.toml
 // CreateTestComponent creates a test component directory structure
 func CreateTestComponent(t *testing.T, dir, name, language string) {
 	componentDir := dir + "/" + name
-	err := os.MkdirAll(componentDir, 0755)
+	err := os.MkdirAll(componentDir, 0750)
 	require.NoError(t, err)
 
 	switch language {
 	case "rust":
-		err = os.MkdirAll(componentDir+"/src", 0755)
+		err = os.MkdirAll(componentDir+"/src", 0750)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/src/lib.rs", []byte("// Rust component"), 0644)
+		err = os.WriteFile(componentDir+"/src/lib.rs", []byte("// Rust component"), 0600)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/Cargo.toml", []byte("[package]\nname = \""+name+"\""), 0644)
+		err = os.WriteFile(componentDir+"/Cargo.toml", []byte("[package]\nname = \""+name+"\""), 0600)
 		require.NoError(t, err)
 
 	case "typescript":
-		err = os.MkdirAll(componentDir+"/src", 0755)
+		err = os.MkdirAll(componentDir+"/src", 0750)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/src/index.ts", []byte("// TypeScript component"), 0644)
+		err = os.WriteFile(componentDir+"/src/index.ts", []byte("// TypeScript component"), 0600)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/package.json", []byte(`{"name": "`+name+`"}`), 0644)
+		err = os.WriteFile(componentDir+"/package.json", []byte(`{"name": "`+name+`"}`), 0600)
 		require.NoError(t, err)
 
 	case "python":
-		err = os.MkdirAll(componentDir+"/src", 0755)
+		err = os.MkdirAll(componentDir+"/src", 0750)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/src/main.py", []byte("# Python component"), 0644)
+		err = os.WriteFile(componentDir+"/src/main.py", []byte("# Python component"), 0600)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/pyproject.toml", []byte("[project]\nname = \""+name+"\""), 0644)
+		err = os.WriteFile(componentDir+"/pyproject.toml", []byte("[project]\nname = \""+name+"\""), 0600)
 		require.NoError(t, err)
 
 	case "go":
-		err = os.WriteFile(componentDir+"/main.go", []byte("package main\n// Go component"), 0644)
+		err = os.WriteFile(componentDir+"/main.go", []byte("package main\n// Go component"), 0600)
 		require.NoError(t, err)
-		err = os.WriteFile(componentDir+"/go.mod", []byte("module "+name), 0644)
+		err = os.WriteFile(componentDir+"/go.mod", []byte("module "+name), 0600)
 		require.NoError(t, err)
 	}
 
@@ -227,7 +227,7 @@ func CreateTestComponent(t *testing.T, dir, name, language string) {
 
 test:
 	@echo "Testing ` + name + `"`
-	err = os.WriteFile(componentDir+"/Makefile", []byte(makefileContent), 0644)
+	err = os.WriteFile(componentDir+"/Makefile", []byte(makefileContent), 0600)
 	require.NoError(t, err)
 }
 

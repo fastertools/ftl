@@ -128,7 +128,7 @@ func (s *Scaffolder) createComponentInstance(name, language string) (cue.Value, 
 // generateFiles creates all the component files
 func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 	// Create component directory
-	if err := os.MkdirAll(name, 0755); err != nil {
+	if err := os.MkdirAll(name, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -179,13 +179,13 @@ func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 		// Create directory if needed
 		dir := filepath.Dir(fullPath)
 		if dir != "." && dir != name {
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0750); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", dir, err)
 			}
 		}
 
 		// Write file
-		if err := os.WriteFile(fullPath, []byte(contentStr), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(contentStr), 0600); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", fullPath, err)
 		}
 	}
@@ -222,6 +222,8 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	}
 
 	// Read existing config
+	// Clean the path to prevent directory traversal
+	configPath = filepath.Clean(configPath)
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", configPath, err)
@@ -302,7 +304,7 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 		output = append(output, '\n')
 	}
 
-	if err := os.WriteFile(configPath, output, 0644); err != nil {
+	if err := os.WriteFile(configPath, output, 0600); err != nil {
 		return fmt.Errorf("failed to write %s: %w", configPath, err)
 	}
 

@@ -88,14 +88,14 @@ func TestUpCommand_WithBuildFlag(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Create fake spin.toml
 	spinContent := `spin_manifest_version = 2
 [application]
 name = "test-app"`
-	err = os.WriteFile("spin.toml", []byte(spinContent), 0644)
+	err = os.WriteFile("spin.toml", []byte(spinContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newUpCmd()
@@ -129,11 +129,11 @@ func TestUpCommand_WithWatchFlag(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	spinContent := `spin_manifest_version = 2`
-	err = os.WriteFile("spin.toml", []byte(spinContent), 0644)
+	err = os.WriteFile("spin.toml", []byte(spinContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newUpCmd()
@@ -166,7 +166,7 @@ func TestUpCommand_WithConfigFlag(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("custom.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("custom.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	cmd := newUpCmd()
@@ -181,7 +181,7 @@ components: []`
 	defer func() { ExecCommand = oldExecCommand }()
 
 	// Create fake spin.toml
-	err = os.WriteFile("spin.toml", []byte("spin_manifest_version = 2"), 0644)
+	err = os.WriteFile("spin.toml", []byte("spin_manifest_version = 2"), 0600)
 	require.NoError(t, err)
 
 	err = cmd.Execute()

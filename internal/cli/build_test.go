@@ -56,7 +56,7 @@ func TestBuildCommand_WithYAMLConfig(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command
@@ -90,7 +90,7 @@ func TestBuildCommand_WithJSONConfig(t *testing.T) {
   },
   "components": []
 }`
-	err := os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	err := os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command
@@ -143,7 +143,7 @@ application: {
 	version: "0.1.0"
 }
 components: []`
-	err := os.WriteFile("app.cue", []byte(cueContent), 0644)
+	err := os.WriteFile("app.cue", []byte(cueContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command
@@ -182,7 +182,7 @@ func main() {
 	manifest, _ := app.Build().Synthesize()
 	fmt.Print(manifest)
 }`
-	err := os.WriteFile("main.go", []byte(goContent), 0644)
+	err := os.WriteFile("main.go", []byte(goContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command
@@ -212,11 +212,11 @@ func TestBuildCommand_SkipSynth(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Create a fake spin.toml to skip synthesis
-	err = os.WriteFile("spin.toml", []byte("# Fake spin.toml"), 0644)
+	err = os.WriteFile("spin.toml", []byte("# Fake spin.toml"), 0600)
 	require.NoError(t, err)
 
 	// Test build command with skip-synth
@@ -246,7 +246,7 @@ func TestBuildCommand_OutputFlag(t *testing.T) {
   name: test-app
   version: "0.1.0"
 components: []`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command with output flag
@@ -278,11 +278,11 @@ func TestBuildCommand_ComponentWithMakefile(t *testing.T) {
 components:
   - id: test-component
     source: ./test-comp`
-	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	err := os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	// Create component directory with Makefile
-	err = os.MkdirAll("test-comp", 0755)
+	err = os.MkdirAll("test-comp", 0750)
 	require.NoError(t, err)
 
 	makefileContent := `build:
@@ -290,7 +290,7 @@ components:
 
 test:
 	@echo "Testing test-component"`
-	err = os.WriteFile(filepath.Join("test-comp", "Makefile"), []byte(makefileContent), 0644)
+	err = os.WriteFile(filepath.Join("test-comp", "Makefile"), []byte(makefileContent), 0600)
 	require.NoError(t, err)
 
 	// Test build command
@@ -301,7 +301,7 @@ test:
 	cmd.SetArgs([]string{"--skip-synth"})
 
 	// Create fake spin.toml
-	err = os.WriteFile("spin.toml", []byte("# Fake"), 0644)
+	err = os.WriteFile("spin.toml", []byte("# Fake"), 0600)
 	require.NoError(t, err)
 
 	err = cmd.Execute()
@@ -327,7 +327,7 @@ func BenchmarkBuildCommand(b *testing.B) {
   name: bench-app
   version: "0.1.0"
 components: []`
-	_ = os.WriteFile("ftl.yaml", []byte(yamlContent), 0644)
+	_ = os.WriteFile("ftl.yaml", []byte(yamlContent), 0600)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

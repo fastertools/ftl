@@ -151,7 +151,7 @@ func main() {
 
 			// Create test files
 			for name, content := range tt.files {
-				err := os.WriteFile(name, []byte(content), 0644)
+				err := os.WriteFile(name, []byte(content), 0600)
 				require.NoError(t, err)
 			}
 
@@ -214,7 +214,7 @@ func TestGenerateComponent_BasicFlow(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate a Rust component
 	err = scaffolder.GenerateComponent("test-tool", "rust")
@@ -257,7 +257,7 @@ func TestGenerateComponent_TypeScript(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate TypeScript component
 	err := scaffolder.GenerateComponent("ts-tool", "typescript")
@@ -292,7 +292,7 @@ func TestGenerateComponent_Python(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Python component
 	err := scaffolder.GenerateComponent("py-tool", "python")
@@ -322,7 +322,7 @@ func TestGenerateComponent_Go(t *testing.T) {
 		Access:     "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Go component
 	err := scaffolder.GenerateComponent("go-tool", "go")
@@ -358,7 +358,7 @@ func TestGenerateComponent_DuplicateName(t *testing.T) {
 		Access: "public",
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Try to generate component with duplicate name
 	err := scaffolder.GenerateComponent("existing", "rust")
@@ -382,7 +382,7 @@ func TestGenerateComponent_InvalidInputs(t *testing.T) {
 		},
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Test invalid component name
 	err := scaffolder.GenerateComponent("123-invalid", "rust")
@@ -412,7 +412,7 @@ func TestGenerateComponent_JSONConfig(t *testing.T) {
 		"components": [],
 		"access": "public"
 	}`
-	_ = os.WriteFile("ftl.json", []byte(jsonContent), 0644)
+	_ = os.WriteFile("ftl.json", []byte(jsonContent), 0600)
 
 	// Generate component
 	err := scaffolder.GenerateComponent("json-comp", "rust")
@@ -459,7 +459,7 @@ func TestUpdateFTLConfig_UnsupportedFormats(t *testing.T) {
 			}
 
 			// Create config file
-			_ = os.WriteFile(tt.setupFile, []byte(tt.content), 0644)
+			_ = os.WriteFile(tt.setupFile, []byte(tt.content), 0600)
 
 			// Try to generate component
 			err := scaffolder.GenerateComponent("test-comp", "rust")
@@ -485,7 +485,7 @@ func TestGenerateFiles_RustNameConversion(t *testing.T) {
 		},
 	}
 	data, _ := yaml.Marshal(manifest)
-	_ = os.WriteFile("ftl.yaml", data, 0644)
+	_ = os.WriteFile("ftl.yaml", data, 0600)
 
 	// Generate Rust component with hyphens
 	err := scaffolder.GenerateComponent("my-cool-tool", "rust")
@@ -575,7 +575,7 @@ func TestGenerateComponent_CreatesCorrectStructure(t *testing.T) {
 				},
 			}
 			data, _ := yaml.Marshal(manifest)
-			_ = os.WriteFile("ftl.yaml", data, 0644)
+			_ = os.WriteFile("ftl.yaml", data, 0600)
 
 			// Generate component
 			compName := tt.language + "-comp"

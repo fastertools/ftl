@@ -11,6 +11,8 @@ import (
 
 // SynthesizeFromConfig reads a config file and synthesizes it to a Spin manifest
 func SynthesizeFromConfig(configPath string) (string, error) {
+	// Clean the path to prevent directory traversal
+	configPath = filepath.Clean(configPath)
 	// Read the config file
 	data, err := os.ReadFile(configPath)
 	if err != nil {

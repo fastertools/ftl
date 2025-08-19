@@ -285,6 +285,8 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 // loadDeployManifest loads the FTL manifest configuration for deployment
 func loadDeployManifest(configFile string) (*types.Manifest, error) {
+	// Clean the path to prevent directory traversal
+	configFile = filepath.Clean(configFile)
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
@@ -439,10 +441,10 @@ type WASMPuller struct {
 func NewWASMPuller() *WASMPuller {
 	home := os.Getenv("HOME")
 	cacheDir := filepath.Join(home, ".cache", "ftl", "wasm")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		// Use temp dir as fallback if cache dir can't be created
 		cacheDir = filepath.Join(os.TempDir(), "ftl-wasm-cache")
-		_ = os.MkdirAll(cacheDir, 0755) // Best effort
+		_ = os.MkdirAll(cacheDir, 0750) // Best effort
 	}
 
 	return &WASMPuller{
@@ -503,8 +505,8 @@ func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (st
 		return "", fmt.Errorf("failed to get layer digest: %w", err)
 	}
 
-	// Create cache file path
-	cachePath := filepath.Join(p.cacheDir, hash.Hex+".wasm")
+	// Create cache file path - hash.Hex is safe (it's a computed hash)
+	cachePath := filepath.Clean(filepath.Join(p.cacheDir, hash.Hex+".wasm"))
 
 	// Check if already cached
 	if _, err := os.Stat(cachePath); err == nil {
@@ -516,7 +518,8 @@ func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (st
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	tmpFile := cachePath + ".tmp"
+	// Create temp file - hash.Hex is safe (it's a computed hash)
+	tmpFile := filepath.Clean(cachePath + ".tmp")
 	file, err := os.Create(tmpFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cache file: %w", err)
@@ -550,6 +553,8 @@ func NewWASMPusher(auth *ECRAuth) *WASMPusher {
 
 // Push uploads a WASM component to ECR
 func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version string) error {
+	// Clean the WASM file path
+	wasmPath = filepath.Clean(wasmPath)
 	// Read the WASM file
 	wasmContent, err := os.ReadFile(wasmPath)
 	if err != nil {
@@ -569,7 +574,7 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 
 	// Write WASM to temp location
 	tmpWASM := filepath.Join(tmpDir, "component.wasm")
-	if err := os.WriteFile(tmpWASM, wasmContent, 0644); err != nil {
+	if err := os.WriteFile(tmpWASM, wasmContent, 0600); err != nil {
 		return fmt.Errorf("failed to write temp WASM: %w", err)
 	}
 

@@ -59,7 +59,7 @@ components:
 
 	tmpDir := t.TempDir()
 	yamlPath := filepath.Join(tmpDir, "ftl.yaml")
-	err := os.WriteFile(yamlPath, []byte(yamlContent), 0644)
+	err := os.WriteFile(yamlPath, []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	yamlData, err := os.ReadFile(yamlPath)
@@ -83,7 +83,7 @@ func TestSynthesizeFromJSON(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	jsonPath := filepath.Join(tmpDir, "ftl.json")
-	err := os.WriteFile(jsonPath, []byte(jsonContent), 0644)
+	err := os.WriteFile(jsonPath, []byte(jsonContent), 0600)
 	require.NoError(t, err)
 
 	jsonData, err := os.ReadFile(jsonPath)
@@ -106,7 +106,7 @@ components: []
 
 	tmpDir := t.TempDir()
 	cuePath := filepath.Join(tmpDir, "app.cue")
-	err := os.WriteFile(cuePath, []byte(cueContent), 0644)
+	err := os.WriteFile(cuePath, []byte(cueContent), 0600)
 	require.NoError(t, err)
 
 	cueData, err := os.ReadFile(cuePath)
@@ -140,7 +140,7 @@ func main() {
 
 	tmpDir := t.TempDir()
 	goPath := filepath.Join(tmpDir, "main.go")
-	err := os.WriteFile(goPath, []byte(goContent), 0644)
+	err := os.WriteFile(goPath, []byte(goContent), 0600)
 	require.NoError(t, err)
 
 	// Note: This test would require Go to be installed and the synthesis package
@@ -166,7 +166,7 @@ func TestSynthesizeFromInput(t *testing.T) {
 				content := `application:
   name: test
 components: []`
-				_ = os.WriteFile(path, []byte(content), 0644)
+				_ = os.WriteFile(path, []byte(content), 0600)
 				return path
 			},
 			wantErr: false,
@@ -176,7 +176,7 @@ components: []`
 			setupFile: func(dir string) string {
 				path := filepath.Join(dir, "ftl.json")
 				content := `{"application":{"name":"test"},"components":[]}`
-				_ = os.WriteFile(path, []byte(content), 0644)
+				_ = os.WriteFile(path, []byte(content), 0600)
 				return path
 			},
 			wantErr: false,
@@ -192,7 +192,7 @@ components: []`
 			name: "invalid_format",
 			setupFile: func(dir string) string {
 				path := filepath.Join(dir, "invalid.xml")
-				_ = os.WriteFile(path, []byte("<xml/>"), 0644)
+				_ = os.WriteFile(path, []byte("<xml/>"), 0600)
 				return path
 			},
 			wantErr: true,
@@ -252,7 +252,7 @@ func TestSynthCmd_OutputToFile(t *testing.T) {
 	yamlContent := `application:
   name: test
 components: []`
-	_ = os.WriteFile(yamlPath, []byte(yamlContent), 0644)
+	_ = os.WriteFile(yamlPath, []byte(yamlContent), 0600)
 
 	// In a real test, we'd execute:
 	// cmd := newSynthCmd()
@@ -298,7 +298,7 @@ func TestSynthesizeFromInput_WithFormat(t *testing.T) {
 	content := `application:
   name: test
 components: []`
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0600)
 	require.NoError(t, err)
 
 	// Without file extension hint, should default to YAML (based on content)

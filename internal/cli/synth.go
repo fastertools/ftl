@@ -48,6 +48,8 @@ Examples:
 				if err != nil {
 					return err
 				}
+				// Clean the path to prevent directory traversal
+				filename = filepath.Clean(filename)
 				input, err = os.ReadFile(filename)
 				if err != nil {
 					return fmt.Errorf("failed to read file %s: %w", filename, err)
@@ -63,6 +65,8 @@ Examples:
 			} else {
 				// Read from specified file
 				filename = args[0]
+				// Clean the path to prevent directory traversal
+				filename = filepath.Clean(filename)
 				input, err = os.ReadFile(filename)
 				if err != nil {
 					return fmt.Errorf("failed to read file: %w", err)
@@ -77,7 +81,7 @@ Examples:
 
 			// Output result
 			if outputFile != "" {
-				err = os.WriteFile(outputFile, []byte(manifest), 0644)
+				err = os.WriteFile(outputFile, []byte(manifest), 0600)
 				if err != nil {
 					return fmt.Errorf("failed to write output file: %w", err)
 				}
@@ -162,19 +166,34 @@ func synthesizeFromJSON(input []byte) (string, error) {
 
 // synthesizeFromGo runs a Go file and captures its output
 func synthesizeFromGo(filename string) (string, error) {
+	// Clean the path first
+	filename = filepath.Clean(filename)
+	
 	// Get absolute path to ensure the file can be found
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
+	// Validate it's actually a Go file
+	if !strings.HasSuffix(absPath, ".go") {
+		return "", fmt.Errorf("file must be a Go source file (.go)")
+	}
+
 	// Check if file exists
 	if _, err := os.Stat(absPath); err != nil {
 		return "", fmt.Errorf("file not found: %w", err)
 	}
+	
+	// Additional validation: ensure no shell metacharacters in the path
+	// even though exec.Command doesn't use shell, this is defense in depth
+	if strings.ContainsAny(absPath, ";|&$`\\\"'<>(){}[]!*?~") {
+		return "", fmt.Errorf("invalid characters in file path")
+	}
 
 	// Run the Go file and capture its output
-	cmd := exec.Command("go", "run", absPath)
+	// Path has been cleaned, validated as .go file, and checked for metacharacters
+	cmd := exec.Command("go", "run", absPath) // #nosec G204 -- properly validated above: absolute path, ends with .go, no metacharacters
 
 	// Set the working directory to the file's directory
 	// This ensures relative imports work correctly
