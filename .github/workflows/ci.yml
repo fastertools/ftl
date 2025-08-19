@@ -272,13 +272,13 @@ jobs:
       - name: Run MCP Authorizer tests
         run: |
           cd components/mcp-authorizer
-          cargo build --target wasm32-wasip1 --release
+          cargo build --target wasm32-wasip1 --release --target-dir ./target
           spin test
           
       - name: Run MCP Gateway tests
         run: |
           cd components/mcp-gateway
-          cargo build --target wasm32-wasip1 --release
+          cargo build --target wasm32-wasip1 --release --target-dir ./target
           spin test
 
   # ============================================================================
