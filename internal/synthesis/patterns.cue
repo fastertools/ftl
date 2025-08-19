@@ -86,8 +86,10 @@ import (
 				"\(comp.id)": {
 					source: comp.source
 					// Only include build for local sources (string type)
-					if (comp.source & string) != _|_ && comp.build != _|_ {
-						build: comp.build  
+					if (comp.source & string) != _|_ {
+						if comp.build.command != "" {
+							build: comp.build  
+						}
 					}
 					if comp.variables != _|_ {
 						variables: comp.variables

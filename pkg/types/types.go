@@ -8,7 +8,7 @@ package types
 // Security note: No KV stores, databases, or AI models - these are platform-only.
 type Manifest struct {
 	Application Application       `yaml:"application" json:"application"`
-	Components  []Component       `yaml:"components,omitempty" json:"components,omitempty"`
+	Components  []Component       `yaml:"components" json:"components"`
 	Access      string            `yaml:"access,omitempty" json:"access,omitempty"`
 	Auth        *Auth             `yaml:"auth,omitempty" json:"auth,omitempty"`
 	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
