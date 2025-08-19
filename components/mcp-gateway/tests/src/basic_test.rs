@@ -1,7 +1,5 @@
-use spin_test_sdk::{
-    spin_test,
-};
-use crate::{ResponseData, test_helpers::*};
+use crate::{test_helpers::*, ResponseData};
+use spin_test_sdk::spin_test;
 
 #[spin_test]
 fn test_ping() {
@@ -10,7 +8,7 @@ fn test_ping() {
     let request = create_mcp_request(request_json);
     let response = spin_test_sdk::perform_request(request);
     let response_data = ResponseData::from_response(response);
-    
+
     assert_eq!(response_data.status, 200);
     let response_json = response_data.body_json().expect("Expected JSON response");
     assert_json_rpc_success(&response_json, Some(serde_json::json!(1)));
