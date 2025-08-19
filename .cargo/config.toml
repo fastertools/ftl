@@ -23,8 +23,8 @@ wasm = "build --target wasm32-wasip1"
 wasm-release = "build --target wasm32-wasip1 --release"
 
 # Component-specific builds
-build-gateway = "build -p ftl-mcp-gateway --target wasm32-wasip1 --release"
-build-authorizer = "build -p ftl-mcp-authorizer --target wasm32-wasip1 --release"
+build-gateway = "build -p mcp-gateway --target wasm32-wasip1 --release"
+build-authorizer = "build -p mcp-authorizer --target wasm32-wasip1 --release"
 build-components = "build --workspace --target wasm32-wasip1 --release"
 
 # Testing (note: most tests need to run on host, not WASM)

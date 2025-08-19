@@ -16,7 +16,7 @@ route = "/..."
 component = "mcp-gateway"
 
 [component.mcp-gateway]
-source = "target/wasm32-wasip1/release/ftl_mcp_gateway.wasm"
+source = "target/wasm32-wasip1/release/mcp_gateway.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal"]
 
 [component.mcp-gateway.build]

@@ -123,7 +123,7 @@ route = "/..."
 component = "mcp-authorizer"
 
 [component.mcp-authorizer]
-source = "ftl_mcp_authorizer.wasm"
+source = "mcp_authorizer.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*"]
 key_value_stores = ["default"]
 

@@ -151,7 +151,7 @@ FTL automatically injects required components:
 Always added to handle component orchestration:
 
 ```cue
-"ftl-mcp-gateway": {
+"mcp-gateway": {
     source: {
         registry: "ghcr.io"
         package: "fastertools:mcp-gateway"

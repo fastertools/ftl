@@ -324,7 +324,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ftl-mcp-authorizer"
+name = "mcp-authorizer"
 version = "0.0.15-alpha.0"
 dependencies = [
  "anyhow",
@@ -338,7 +338,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ftl-mcp-gateway"
+name = "mcp-gateway"
 version = "0.0.13-alpha.0"
 dependencies = [
  "anyhow",

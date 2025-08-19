@@ -1,5 +1,5 @@
 [package]
-name = "ftl-mcp-authorizer"
+name = "mcp-authorizer"
 authors.workspace = true
 description = "MCP authorization component for FTL servers using AuthKit"
 version = "0.0.15-alpha.0"
@@ -13,7 +13,7 @@ categories = ["web-programming", "wasm", "authentication"]
 publish = false
 
 [lib]
-name = "ftl_mcp_authorizer"
+name = "mcp_authorizer"
 crate-type = ["cdylib"]
 
 [package.metadata.component]

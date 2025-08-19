@@ -310,7 +310,7 @@ mcp_jwt_issuer = { default = "https://divine-lion-50-staging.authkit.app" }
 mcp_jwt_audience = { default = "https://mcp-server" }
 mcp_jwt_jwks_uri = { default = "https://divine-lion-50-staging.authkit.app/.well-known/jwks.json" }
 mcp_authorization_header_name = { default = "Authorization" }
-mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
+mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
 # ... 10+ more variables
 ```
 
@@ -426,7 +426,7 @@ Add Context Headers:
 - x-auth-scopes: mcp:read mcp:write
 - x-auth-org-id: org-789 (if tenant isolation enabled)
     ↓
-Forward to Gateway: POST http://ftl-mcp-gateway.spin.internal/mcp
+Forward to Gateway: POST http://mcp-gateway.spin.internal/mcp
 ```
 
 ### 3. Gateway Processing  

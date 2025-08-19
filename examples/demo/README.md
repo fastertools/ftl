@@ -36,7 +36,7 @@ Authentication is now controlled via the `auth_config` variable. By default, aut
 ```bash
 # Example with AuthKit
 export SPIN_VARIABLE_AUTH_CONFIG='{
-  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
+  "mcp_gateway_url": "http://mcp-gateway.spin.internal/mcp-internal",
   "trace_id_header": "X-Trace-Id",
   "enabled": true,
   "providers": [{
