@@ -5,10 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,12 +19,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
-	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -132,7 +128,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Run spin build to build all local components
 	if !opts.DryRun {
 		Info("Building local components with 'spin build'")
-		cmd := exec.CommandContext(ctx, "spin", "build")
+		cmd := ExecCommand("spin", "build")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -306,7 +302,7 @@ func loadDeployManifest(configFile string) (*ftltypes.Manifest, error) {
 
 // runSynth runs the synth command to generate spin.toml
 func runSynth(ctx context.Context, configFile string) error {
-	cmd := exec.CommandContext(ctx, "ftl", "synth")
+	cmd := ExecCommand("ftl", "synth", "-o", "spin.toml", configFile)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -392,11 +388,13 @@ func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth
 		Success("Pushed %s", comp.ID)
 
 		// Create processed component with ECR reference
+		// Convert package name from namespace/component to namespace:component for Spin compatibility
+		spinPackageName := strings.Replace(packageName, "/", ":", 1)
 		processedComp := ftltypes.Component{
 			ID: comp.ID,
 			Source: map[string]interface{}{
 				"registry": ecrAuth.Registry,
-				"package":  packageName,
+				"package":  spinPackageName,
 				"version":  version,
 			},
 			Build:     comp.Build,
@@ -567,66 +565,37 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 		return fmt.Errorf("failed to read WASM file: %w", err)
 	}
 
-	// Calculate SHA256 for content addressability
-	hash := sha256.Sum256(wasmContent)
-	hashStr := hex.EncodeToString(hash[:])
+	// Calculate SHA256 for the WASM content
+	wasmHash := sha256.Sum256(wasmContent)
+	wasmHashStr := hex.EncodeToString(wasmHash[:])
 
-	// Create WASM layer with proper media type (compatible with wkg)
+	// Create WASM layer with proper media type
 	wasmLayer := static.NewLayer(wasmContent, "application/wasm")
 
-	// Create a minimal config file for the image
-	// This follows the CNCF WASM OCI spec
-	cfg := &v1.ConfigFile{
+	// Create the config JSON with layerDigests field (critical for Spin)
+	configData := WASMConfig{
+		Created:      time.Now().UTC().Format(time.RFC3339),
 		Architecture: "wasm",
-		OS:           "wasip2", // Default to wasip2 for components
-		RootFS: v1.RootFS{
-			Type:    "layers",
-			DiffIDs: []v1.Hash{{Algorithm: "sha256", Hex: hashStr}},
-		},
-		Config: v1.Config{
-			// Empty config for WASM artifacts
-		},
-		History: []v1.History{{
-			Created:   v1.Time{Time: time.Now().UTC()},
-			CreatedBy: "ftl-cli",
-			Comment:   "WASM component layer",
-		}},
+		OS:           "wasip2",
+		LayerDigests: []string{fmt.Sprintf("sha256:%s", wasmHashStr)},
 	}
-
-	// Build the image from scratch
-	img := empty.Image
-
-	// Add the WASM layer
-	img, err = mutate.Append(img, mutate.Addendum{
-		Layer:     wasmLayer,
-		MediaType: "application/wasm",
-		History: v1.History{
-			Created:   v1.Time{Time: time.Now().UTC()},
-			CreatedBy: "ftl-cli",
-			Comment:   "WASM component layer",
-		},
-	})
+	configData.RootFS.Type = "layers"
+	configData.RootFS.DiffIDs = []string{fmt.Sprintf("sha256:%s", wasmHashStr)}
+	
+	configJSON, err := json.Marshal(configData)
 	if err != nil {
-		return fmt.Errorf("failed to add WASM layer: %w", err)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Set the config file
-	img, err = mutate.ConfigFile(img, cfg)
-	if err != nil {
-		return fmt.Errorf("failed to set config: %w", err)
-	}
+	// Debug: Log the config JSON to verify it has layer_digests
+	Debug("WASM Config JSON: %s", string(configJSON))
 
-	// Set the appropriate media types for WASM OCI artifacts
-	// This ensures compatibility with wkg and other WASM tools
-	img = mutate.ConfigMediaType(img, "application/vnd.wasm.config.v0+json")
-	img = mutate.MediaType(img, types.OCIManifestSchema1)
-
-	// Add standard OCI annotations (matching wkg behavior)
-	annotations := map[string]string{
-		"org.opencontainers.image.version": version,
-		"org.opencontainers.image.created": time.Now().UTC().Format(time.RFC3339),
+	// Create a custom WASM OCI image
+	img := &wasmOCIImage{
+		wasmLayer: wasmLayer,
+		config:    configJSON,
+		hashStr:   wasmHashStr,
 	}
-	img = mutate.Annotations(img, annotations).(v1.Image)
 
 	// Construct the ECR reference
 	ref := fmt.Sprintf("%s/%s:%s", p.auth.Registry, packageName, version)
@@ -644,12 +613,12 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 	}
 	authenticator := authn.FromConfig(authConfig)
 
-	// Push the image
+	// Push the image using our custom implementation
 	if err := remote.Write(tag, img, remote.WithAuth(authenticator)); err != nil {
 		return fmt.Errorf("failed to push to ECR: %w", err)
 	}
 
-	Debug("Pushed WASM to %s (sha256:%s)", ref, hashStr)
+	Debug("Pushed WASM to %s", ref)
 	return nil
 }
 

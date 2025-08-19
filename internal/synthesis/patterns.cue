@@ -135,39 +135,29 @@ import (
 						mcp_gateway_url: "http://mcp-gateway.spin.internal"
 						
 						// JWT configuration based on access mode
+						if input.access == "private" {
+							// For "private" mode - use FTL platform auth
+							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
+							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
+							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
+						}
 						
-						// For "private" and "org" modes - use FTL platform auth
-						if input.access == "private" || input.access == "org" {
+						if input.access == "org" {
+							// For "org" mode - use FTL platform auth
 							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
 							
 							// For org mode, inject allowed subjects if provided
-							if input.access == "org" {
-								// If platform provided allowed subjects, configure the authorizer
-								if input.allowed_subjects != _|_ && len(input.allowed_subjects) > 0 {
-									mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
-								}
+							if input.allowed_subjects != _|_ {
+								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
 							}
 						}
 						
-						// For "custom" mode - user must provide auth config
 						if input.access == "custom" {
-							if input.auth != _|_ && input.auth.jwt_issuer != _|_ {
-								mcp_jwt_issuer: input.auth.jwt_issuer
-							}
-							if input.auth == _|_ || input.auth.jwt_issuer == _|_ {
-								// Default to WorkOS for backwards compatibility
-								mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
-							}
-							
-							if input.auth != _|_ && input.auth.jwt_audience != _|_ {
-								mcp_jwt_audience: input.auth.jwt_audience
-							}
-							if input.auth == _|_ || input.auth.jwt_audience == _|_ {
-								// Default audience to app name for custom providers
-								mcp_jwt_audience: input.name
-							}
+							// For "custom" mode - user must provide auth config
+							mcp_jwt_issuer: input.auth.jwt_issuer | *"https://divine-lion-50-staging.authkit.app"
+							mcp_jwt_audience: input.auth.jwt_audience | *input.name
 						}
 					}
 				}

@@ -76,45 +76,6 @@ func MockExecCommandHelper(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// TestHelperProcess is not a real test. It's used to mock exec.Command
-func TestHelperProcess() {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-
-	args := os.Args
-	for i, arg := range args {
-		if arg == "--" {
-			args = args[i+1:]
-			break
-		}
-	}
-
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "No command specified")
-		os.Exit(1)
-	}
-
-	cmd := args[0]
-	cmdArgs := args[1:]
-
-	// Mock different commands
-	switch cmd {
-	case "spin":
-		handleSpinCommand(cmdArgs)
-	case "docker":
-		handleDockerCommand(cmdArgs)
-	case "make":
-		handleMakeCommand(cmdArgs)
-	case "go":
-		handleGoCommand(cmdArgs)
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s", cmd)
-		os.Exit(1)
-	}
-
-	os.Exit(0)
-}
 
 func handleSpinCommand(args []string) {
 	if len(args) == 0 {
@@ -198,5 +159,66 @@ version = "0.1.0"`)
 		}
 	default:
 		fmt.Printf("Unknown go command: %s\n", args[0])
+	}
+}
+
+func handleFTLCommand(args []string) {
+	if len(args) == 0 {
+		fmt.Println("ftl version 0.6.0")
+		return
+	}
+
+	switch args[0] {
+	case "synth":
+		// Look for -o flag to determine output file
+		outputFile := ""
+		for i := 0; i < len(args); i++ {
+			if args[i] == "-o" && i+1 < len(args) {
+				outputFile = args[i+1]
+				break
+			}
+		}
+		
+		// Generate a mock spin.toml content
+		spinTOML := `spin_manifest_version = 2
+
+[application]
+name = 'test-app'
+version = '0.1.0'
+
+[component.mcp-gateway]
+allowed_outbound_hosts = ['http://*.spin.internal']
+
+[component.mcp-gateway.source]
+package = 'fastertools:mcp-gateway'
+registry = 'ghcr.io'
+version = '0.0.13-alpha.0'
+
+[trigger]
+[[trigger.http]]
+component = 'mcp-gateway'
+route = '/...'
+`
+		
+		if outputFile != "" {
+			// Write to the specified file
+			if err := os.WriteFile(outputFile, []byte(spinTOML), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Generated %s\n", outputFile)
+		} else {
+			// Output to stdout
+			fmt.Print(spinTOML)
+		}
+	case "build":
+		fmt.Println("Building FTL application...")
+		fmt.Println("✓ Built successfully")
+	case "deploy":
+		fmt.Println("Deploying FTL application...")
+		fmt.Println("✓ Deployed successfully")
+	default:
+		fmt.Printf("Unknown ftl command: %s\n", args[0])
+		os.Exit(1)
 	}
 }

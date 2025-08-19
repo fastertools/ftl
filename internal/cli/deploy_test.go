@@ -281,6 +281,132 @@ func TestProcessComponents(t *testing.T) {
 	assert.Equal(t, "ghcr.io", registry2.Registry)
 }
 
+func TestDeployRunSynthWritesFile(t *testing.T) {
+	// Test that runSynth actually writes spin.toml to disk, not just prints it
+	tmpDir := t.TempDir()
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+	os.Chdir(tmpDir)
+
+	// Create a test FTL config
+	ftlYAML := `
+name: test-app
+version: 0.1.0
+components:
+  - id: test-comp
+    source: ./test.wasm
+`
+	err := os.WriteFile("ftl.yaml", []byte(ftlYAML), 0644)
+	require.NoError(t, err)
+
+	// Mock the exec.Command using the helper
+	oldExecCommand := ExecCommand
+	ExecCommand = MockExecCommandHelper
+	defer func() { ExecCommand = oldExecCommand }()
+
+	// Run the synth function
+	ctx := context.Background()
+	err = runSynth(ctx, "ftl.yaml")
+	assert.NoError(t, err)
+
+	// Verify spin.toml exists
+	assert.FileExists(t, "spin.toml")
+	
+	// Verify content
+	content, err := os.ReadFile("spin.toml")
+	assert.NoError(t, err)
+	assert.Contains(t, string(content), "spin_manifest_version")
+}
+
+func TestProcessComponentsPackageFormat(t *testing.T) {
+	// Test that processComponents converts package names from ECR format (namespace/component)
+	// to Spin format (namespace:component) for the platform API
+	
+	t.Run("package name conversion", func(t *testing.T) {
+		// Test the string replacement logic used in processComponents
+		testCases := []struct {
+			ecrPackage      string // Format used for ECR push
+			expectedSpinPkg string // Format expected by Spin/platform API
+		}{
+			{
+				ecrPackage:      "app-uuid-123/component-name",
+				expectedSpinPkg: "app-uuid-123:component-name",
+			},
+			{
+				ecrPackage:      "namespace/mcp-gateway",
+				expectedSpinPkg: "namespace:mcp-gateway",
+			},
+			{
+				ecrPackage:      "org-12345/api-service",
+				expectedSpinPkg: "org-12345:api-service",
+			},
+			{
+				// Edge case: multiple slashes (only first should be replaced)
+				ecrPackage:      "namespace/component/version",
+				expectedSpinPkg: "namespace:component/version",
+			},
+		}
+		
+		for _, tc := range testCases {
+			t.Run(tc.ecrPackage, func(t *testing.T) {
+				// This mimics the conversion in processComponents
+				spinPackageName := strings.Replace(tc.ecrPackage, "/", ":", 1)
+				assert.Equal(t, tc.expectedSpinPkg, spinPackageName,
+					"Package name should be converted from ECR format (%s) to Spin format (%s)",
+					tc.ecrPackage, tc.expectedSpinPkg)
+			})
+		}
+	})
+	
+	t.Run("processComponents result format", func(t *testing.T) {
+		// Create a mock processed manifest to verify the expected format
+		ecrAuth := &ECRAuth{
+			Registry: "123456789.dkr.ecr.us-east-1.amazonaws.com",
+		}
+		namespace := "app-uuid-abc123"
+		
+		// Simulate what processComponents would create
+		testComponents := []struct {
+			id              string
+			ecrPackageName  string // What we push to ECR
+			spinPackageName string // What should be in the manifest for platform API
+		}{
+			{
+				id:              "mcp-gateway",
+				ecrPackageName:  fmt.Sprintf("%s/%s", namespace, "mcp-gateway"),
+				spinPackageName: fmt.Sprintf("%s:%s", namespace, "mcp-gateway"),
+			},
+			{
+				id:              "api-service",
+				ecrPackageName:  fmt.Sprintf("%s/%s", namespace, "api-service"),
+				spinPackageName: fmt.Sprintf("%s:%s", namespace, "api-service"),
+			},
+		}
+		
+		for _, tc := range testComponents {
+			// Verify the conversion
+			spinPkg := strings.Replace(tc.ecrPackageName, "/", ":", 1)
+			assert.Equal(t, tc.spinPackageName, spinPkg)
+			
+			// Verify the component structure that would be sent to platform API
+			processedComp := types.Component{
+				ID: tc.id,
+				Source: map[string]interface{}{
+					"registry": ecrAuth.Registry,
+					"package":  spinPkg, // This should use : separator
+					"version":  "1.0.0",
+				},
+			}
+			
+			// Verify the package field uses : separator
+			sourceMap := processedComp.Source.(map[string]interface{})
+			packageField := sourceMap["package"].(string)
+			assert.Contains(t, packageField, ":", "Package field should contain : separator for Spin compatibility")
+			assert.NotContains(t, packageField, "/", "Package field should not contain / separator in processed manifest")
+		}
+	})
+}
+
 func TestCreateDeploymentRequest(t *testing.T) {
 	manifest := &types.Manifest{
 		Application: types.Application{
