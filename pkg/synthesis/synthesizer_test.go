@@ -100,3 +100,48 @@ access: "public"
 		t.Error("Missing component from CUE")
 	}
 }
+
+func TestSynthesizer_WithOverrides(t *testing.T) {
+	synth := NewSynthesizer()
+
+	// Test data with private access (requires authorizer)
+	app := map[string]interface{}{
+		"name":   "override-app",
+		"access": "private",
+		"components": []interface{}{
+			map[string]interface{}{
+				"id": "api",
+				"source": map[string]interface{}{
+					"registry": "ghcr.io",
+					"package":  "test/api",
+					"version":  "v2.0.0",
+				},
+			},
+		},
+	}
+
+	// Platform overrides for component versions
+	overrides := map[string]interface{}{
+		"gateway_version":    "0.0.14-beta.1",
+		"authorizer_version": "0.0.16-beta.2",
+	}
+
+	result, err := synth.SynthesizeWithOverrides(app, overrides)
+	if err != nil {
+		t.Fatalf("SynthesizeWithOverrides failed: %v", err)
+	}
+
+	// Check that overridden versions are used
+	if !strings.Contains(result, "0.0.14-beta.1") {
+		t.Error("Result should contain overridden gateway version")
+	}
+	if !strings.Contains(result, "0.0.16-beta.2") {
+		t.Error("Result should contain overridden authorizer version")
+	}
+	if !strings.Contains(result, "mcp-gateway") {
+		t.Error("Result should contain gateway")
+	}
+	if !strings.Contains(result, "mcp-authorizer") {
+		t.Error("Result should contain authorizer for private app")
+	}
+}

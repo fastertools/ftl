@@ -1,6 +1,9 @@
 {
-  "go": "0.1.0",
-  "rust": "0.2.10",
-  "python": "0.1.0",
-  "typescript": "0.2.8"
+  "ftlCli": "0.7.0-alpha.1",
+  "sdk": {
+    "go": "0.1.0",
+    "rust": "0.2.10",
+    "python": "0.1.0",
+    "typescript": "0.2.8"
+  }
 }

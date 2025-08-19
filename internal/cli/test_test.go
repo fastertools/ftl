@@ -174,7 +174,7 @@ func TestTestCommand_WithVerboseFlag(t *testing.T) {
 	// Create go.mod
 	goModContent := `module test-app
 
-go 1.21`
+go 1.24`
 	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
 	require.NoError(t, err)
 

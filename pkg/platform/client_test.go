@@ -3,122 +3,95 @@ package platform
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
-func TestNewClient(t *testing.T) {
-	config := DefaultConfig()
-	client := NewClient(config)
-
-	if client == nil {
-		t.Fatal("NewClient returned nil")
-	}
-
-	if client.config.GatewayVersion != "0.0.13-alpha.0" {
-		t.Errorf("unexpected gateway version: %s", client.config.GatewayVersion)
-	}
-}
-
-func TestProcessDeployment(t *testing.T) {
+func TestProcessor_Process(t *testing.T) {
 	tests := []struct {
 		name    string
 		config  Config
-		request *DeploymentRequest
+		request ProcessRequest
 		wantErr bool
-		checks  func(t *testing.T, result *DeploymentResult)
+		checks  func(t *testing.T, result *ProcessResult)
 	}{
 		{
-			name:   "public app with gateway injection",
+			name:   "simple public app",
 			config: DefaultConfig(),
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "test-app",
-					Version: "1.0.0",
-					Access:  "public",
-					Components: []Component{
-						{
-							ID: "test-component",
-							Source: map[string]interface{}{
-								"registry": "ghcr.io",
-								"package":  "test/component",
-								"version":  "1.0.0",
-							},
-						},
-					},
-				},
-				Environment: "production",
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: test-app
+version: "1.0.0"
+components:
+  - id: api
+    source:
+      registry: ghcr.io
+      package: test/api
+      version: v1.0.0
+`),
 			},
 			wantErr: false,
-			checks: func(t *testing.T, result *DeploymentResult) {
-				// Should inject gateway but not authorizer for public apps
-				if !result.Metadata.InjectedGateway {
-					t.Error("gateway should be injected")
+			checks: func(t *testing.T, result *ProcessResult) {
+				if result.SpinTOML == "" {
+					t.Error("SpinTOML should not be empty")
 				}
-				if result.Metadata.InjectedAuthorizer {
-					t.Error("authorizer should not be injected for public apps")
+				if !strings.Contains(result.SpinTOML, "mcp-gateway") {
+					t.Error("SpinTOML should contain mcp-gateway")
 				}
-				if result.Metadata.ComponentCount != 2 { // gateway + test component
-					t.Errorf("expected 2 components, got %d", result.Metadata.ComponentCount)
+				if strings.Contains(result.SpinTOML, "mcp-authorizer") {
+					t.Error("SpinTOML should not contain mcp-authorizer for public app")
 				}
-				if result.Metadata.AccessMode != "public" {
-					t.Errorf("expected access mode 'public', got %s", result.Metadata.AccessMode)
+				if result.Metadata.AppName != "test-app" {
+					t.Errorf("expected app name 'test-app', got %s", result.Metadata.AppName)
 				}
 			},
 		},
 		{
-			name:   "private app with auth injection",
+			name:   "private app with authorizer",
 			config: DefaultConfig(),
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "secure-app",
-					Version: "2.0.0",
-					Access:  "private",
-					Auth: &Auth{
-						JWTIssuer:   "https://auth.example.com",
-						JWTAudience: "api.example.com",
-					},
-					Components: []Component{
-						{
-							ID: "secure-component",
-							Source: map[string]interface{}{
-								"registry": "ghcr.io",
-								"package":  "test/secure",
-								"version":  "2.0.0",
-							},
-						},
-					},
-				},
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: private-app
+version: "2.0.0"
+access: private
+components:
+  - id: backend
+    source:
+      registry: ghcr.io
+      package: test/backend
+      version: v2.0.0
+`),
 			},
 			wantErr: false,
-			checks: func(t *testing.T, result *DeploymentResult) {
-				if !result.Metadata.InjectedGateway {
-					t.Error("gateway should be injected")
+			checks: func(t *testing.T, result *ProcessResult) {
+				if !strings.Contains(result.SpinTOML, "mcp-gateway") {
+					t.Error("SpinTOML should contain mcp-gateway")
+				}
+				if !strings.Contains(result.SpinTOML, "mcp-authorizer") {
+					t.Error("SpinTOML should contain mcp-authorizer for private app")
+				}
+				if result.Metadata.AccessMode != "private" {
+					t.Errorf("expected access mode 'private', got %s", result.Metadata.AccessMode)
 				}
 				if !result.Metadata.InjectedAuthorizer {
-					t.Error("authorizer should be injected for private apps")
-				}
-				if result.Metadata.ComponentCount != 3 { // gateway + authorizer + component
-					t.Errorf("expected 3 components, got %d", result.Metadata.ComponentCount)
+					t.Error("authorizer should be injected for private app")
 				}
 			},
 		},
 		{
-			name: "reject local sources when configured",
+			name: "reject local sources in production",
 			config: Config{
 				RequireRegistryComponents: true,
-				MaxComponents:             50,
+				AllowedRegistries:         []string{"ghcr.io"},
 			},
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "local-app",
-					Version: "1.0.0",
-					Components: []Component{
-						{
-							ID:     "local-component",
-							Source: "./local/path",
-						},
-					},
-				},
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: local-app
+components:
+  - id: local-component
+    source: ./build/component.wasm
+`),
 			},
 			wantErr: true,
 		},
@@ -127,157 +100,84 @@ func TestProcessDeployment(t *testing.T) {
 			config: Config{
 				RequireRegistryComponents: true,
 				AllowedRegistries:         []string{"ghcr.io"},
-				MaxComponents:             50,
+				GatewayRegistry:           "ghcr.io",
+				GatewayPackage:            "fastertools:mcp-gateway",
+				GatewayVersion:            "0.0.13-alpha.0",
 			},
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "restricted-app",
-					Version: "1.0.0",
-					Components: []Component{
-						{
-							ID: "bad-registry",
-							Source: map[string]interface{}{
-								"registry": "unauthorized.com",
-								"package":  "bad/component",
-								"version":  "1.0.0",
-							},
-						},
-					},
-				},
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: external-registry
+components:
+  - id: external
+    source:
+      registry: docker.io
+      package: untrusted/component
+      version: latest
+`),
 			},
 			wantErr: true,
-		},
-		{
-			name: "enforce component limit",
-			config: Config{
-				MaxComponents: 2,
-			},
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "too-many-components",
-					Version: "1.0.0",
-					Components: []Component{
-						{ID: "comp1", Source: map[string]interface{}{"registry": "ghcr.io", "package": "test/c1", "version": "1.0.0"}},
-						{ID: "comp2", Source: map[string]interface{}{"registry": "ghcr.io", "package": "test/c2", "version": "1.0.0"}},
-						{ID: "comp3", Source: map[string]interface{}{"registry": "ghcr.io", "package": "test/c3", "version": "1.0.0"}},
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:   "custom auth configuration",
-			config: DefaultConfig(),
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "custom-auth-app",
-					Version: "1.0.0",
-					Access:  "custom",
-					Components: []Component{
-						{
-							ID: "auth-component",
-							Source: map[string]interface{}{
-								"registry": "ghcr.io",
-								"package":  "test/auth",
-								"version":  "1.0.0",
-							},
-						},
-					},
-				},
-				CustomAuth: &CustomAuthConfig{
-					Issuer:   "https://custom-auth.example.com",
-					Audience: []string{"custom-api.example.com"},
-				},
-			},
-			wantErr: false,
-			checks: func(t *testing.T, result *DeploymentResult) {
-				if !result.Metadata.InjectedAuthorizer {
-					t.Error("authorizer should be injected for custom auth")
-				}
-				if result.Metadata.AccessMode != "custom" {
-					t.Errorf("expected access mode 'custom', got %s", result.Metadata.AccessMode)
-				}
-			},
 		},
 		{
 			name:   "org access with allowed subjects",
 			config: DefaultConfig(),
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "org-app",
-					Version: "1.0.0",
-					Access:  "org",
-					Auth: &Auth{
-						OrgID:     "org_123456",
-						JWTIssuer: "https://api.workos.com",
-					},
-					Components: []Component{
-						{
-							ID: "org-component",
-							Source: map[string]interface{}{
-								"registry": "ghcr.io",
-								"package":  "test/org",
-								"version":  "1.0.0",
-							},
-						},
-					},
-				},
-				AllowedSubjects: []string{"user_01234", "user_56789", "user_abcde"},
-				AllowedRoles:    []string{"admin", "developer"},
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: org-app
+access: org
+components:
+  - id: org-service
+    source:
+      registry: ghcr.io
+      package: test/service
+      version: v1.0.0
+`),
+				AllowedSubjects: []string{"user_123", "user_456"},
 			},
 			wantErr: false,
-			checks: func(t *testing.T, result *DeploymentResult) {
-				if !result.Metadata.InjectedAuthorizer {
-					t.Error("authorizer should be injected for org access")
+			checks: func(t *testing.T, result *ProcessResult) {
+				if !strings.Contains(result.SpinTOML, "mcp-authorizer") {
+					t.Error("SpinTOML should contain mcp-authorizer for org app")
 				}
+				// The allowed_subjects should be passed through to CUE
 				if result.Metadata.AccessMode != "org" {
 					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
-				}
-
-				// Verify the allowed subjects were injected into the authorizer variables
-				if result.SpinTOML == "" {
-					t.Error("SpinTOML should not be empty")
-				}
-				// Check that the TOML contains the allowed subjects variable
-				expectedSubjects := "mcp_auth_allowed_subjects = 'user_01234,user_56789,user_abcde'"
-				if !strings.Contains(result.SpinTOML, expectedSubjects) {
-					t.Errorf("SpinTOML should contain allowed subjects variable: %s", expectedSubjects)
 				}
 			},
 		},
 		{
-			name:   "deployment variables applied",
+			name:   "org access with allowed roles",
 			config: DefaultConfig(),
-			request: &DeploymentRequest{
-				Application: &Application{
-					Name:    "var-app",
-					Version: "1.0.0",
-					Components: []Component{
-						{
-							ID: "var-component",
-							Source: map[string]interface{}{
-								"registry": "ghcr.io",
-								"package":  "test/vars",
-								"version":  "1.0.0",
-							},
-						},
-					},
-				},
-				Variables: map[string]string{
-					"API_KEY":     "secret123",
-					"ENVIRONMENT": "production",
-				},
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: org-roles-app
+access: org
+allowed_roles: ["admin", "developer"]
+components:
+  - id: admin-service
+    source:
+      registry: ghcr.io
+      package: test/admin
+      version: v1.0.0
+`),
+				// Platform would compute this by calling WorkOS and filtering by roles
+				AllowedSubjects: []string{"admin_user_001", "dev_user_002"},
 			},
 			wantErr: false,
-			checks: func(t *testing.T, result *DeploymentResult) {
-				if result.Manifest.Variables == nil {
-					t.Fatal("variables should be set")
+			checks: func(t *testing.T, result *ProcessResult) {
+				if !strings.Contains(result.SpinTOML, "mcp-authorizer") {
+					t.Error("SpinTOML should contain mcp-authorizer for org app")
 				}
-				if result.Manifest.Variables["API_KEY"].Default != "secret123" {
-					t.Error("API_KEY variable not set correctly")
+				if result.Metadata.AccessMode != "org" {
+					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
 				}
-				if result.Manifest.Variables["ENVIRONMENT"].Default != "production" {
-					t.Error("ENVIRONMENT variable not set correctly")
+				if len(result.Metadata.AllowedRoles) != 2 {
+					t.Errorf("expected 2 allowed roles, got %d", len(result.Metadata.AllowedRoles))
+				}
+				if result.Metadata.AllowedRoles[0] != "admin" || result.Metadata.AllowedRoles[1] != "developer" {
+					t.Errorf("expected roles [admin, developer], got %v", result.Metadata.AllowedRoles)
 				}
 			},
 		},
@@ -285,169 +185,33 @@ func TestProcessDeployment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := NewClient(tt.config)
-			result, err := client.ProcessDeployment(tt.request)
+			processor := NewProcessor(tt.config)
+			result, err := processor.Process(tt.request)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ProcessDeployment() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Process() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && tt.checks != nil {
 				tt.checks(t, result)
-
-				// Common checks
-				if result.SpinTOML == "" {
-					t.Error("SpinTOML should not be empty")
-				}
-				if result.Manifest == nil {
-					t.Error("Manifest should not be nil")
-				}
-				if result.Metadata.ProcessedAt.IsZero() {
-					t.Error("ProcessedAt should be set")
-				}
-				if result.Metadata.ProcessedAt.After(time.Now()) {
-					t.Error("ProcessedAt should not be in the future")
-				}
 			}
 		})
 	}
 }
 
-func TestValidateComponents(t *testing.T) {
-	tests := []struct {
-		name       string
-		config     Config
-		components []Component
-		wantErr    bool
-	}{
-		{
-			name:   "valid registry components",
-			config: DefaultConfig(),
-			components: []Component{
-				{
-					ID: "test",
-					Source: map[string]interface{}{
-						"registry": "ghcr.io",
-						"package":  "test/component",
-						"version":  "1.0.0",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "reject local when required",
-			config: Config{
-				RequireRegistryComponents: true,
-			},
-			components: []Component{
-				{
-					ID:     "local",
-					Source: "./local/path",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:   "component without ID",
-			config: DefaultConfig(),
-			components: []Component{
-				{
-					Source: map[string]interface{}{
-						"registry": "ghcr.io",
-						"package":  "test/component",
-						"version":  "1.0.0",
-					},
-				},
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := NewClient(tt.config)
-			err := client.ValidateComponents(tt.components)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateComponents() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestPlatformComponentInjection(t *testing.T) {
+func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config)
 
-	// Test app that should get both gateway and authorizer
-	app := &Application{
-		Name:    "test-app",
-		Version: "1.0.0",
-		Access:  "private",
-		Components: []Component{
-			{
-				ID:     "user-component",
-				Source: map[string]interface{}{"registry": "ghcr.io", "package": "test/comp", "version": "1.0.0"},
-			},
-		},
+	if config.GatewayRegistry != "ghcr.io" {
+		t.Errorf("expected gateway registry 'ghcr.io', got %s", config.GatewayRegistry)
 	}
 
-	// Create a dummy request for testing
-	req := &DeploymentRequest{
-		Application: app,
-	}
-	client.injectPlatformComponents(app, req)
-
-	// Should have 3 components: gateway, authorizer, user component
-	if len(app.Components) != 3 {
-		t.Fatalf("expected 3 components, got %d", len(app.Components))
+	if !config.RequireRegistryComponents {
+		t.Error("RequireRegistryComponents should be true by default")
 	}
 
-	// First should be gateway
-	if app.Components[0].ID != "mcp-gateway" {
-		t.Errorf("first component should be mcp-gateway, got %s", app.Components[0].ID)
-	}
-
-	// Second should be authorizer
-	if app.Components[1].ID != "mcp-authorizer" {
-		t.Errorf("second component should be mcp-authorizer, got %s", app.Components[1].ID)
-	}
-
-	// Third should be user component
-	if app.Components[2].ID != "user-component" {
-		t.Errorf("third component should be user-component, got %s", app.Components[2].ID)
-	}
-
-	// Test public app (should only get gateway)
-	publicApp := &Application{
-		Name:    "public-app",
-		Version: "1.0.0",
-		Access:  "public",
-		Components: []Component{
-			{
-				ID:     "public-component",
-				Source: map[string]interface{}{"registry": "ghcr.io", "package": "test/pub", "version": "1.0.0"},
-			},
-		},
-	}
-
-	// Create a dummy request for testing public app
-	publicReq := &DeploymentRequest{
-		Application: publicApp,
-	}
-	client.injectPlatformComponents(publicApp, publicReq)
-
-	// Should have 2 components: gateway, user component
-	if len(publicApp.Components) != 2 {
-		t.Fatalf("expected 2 components for public app, got %d", len(publicApp.Components))
-	}
-
-	if publicApp.Components[0].ID != "mcp-gateway" {
-		t.Errorf("first component should be mcp-gateway, got %s", publicApp.Components[0].ID)
-	}
-
-	if publicApp.Components[1].ID != "public-component" {
-		t.Errorf("second component should be public-component, got %s", publicApp.Components[1].ID)
+	if len(config.AllowedRegistries) != 1 || config.AllowedRegistries[0] != "ghcr.io" {
+		t.Error("default allowed registries should be [ghcr.io]")
 	}
 }

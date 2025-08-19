@@ -22,7 +22,13 @@ var templatesCUE string
 //go:embed versions.json
 var versionsJSON string
 
-// SDKVersions represents the versions of SDKs used in templates
+// Versions represents all versions used in templates
+type Versions struct {
+	FTLCli string      `json:"ftlCli"`
+	SDK    SDKVersions `json:"sdk"`
+}
+
+// SDKVersions represents the SDK versions for each language
 type SDKVersions struct {
 	Go         string `json:"go"`
 	Rust       string `json:"rust"`
@@ -34,14 +40,14 @@ type SDKVersions struct {
 type Scaffolder struct {
 	ctx       *cue.Context
 	templates cue.Value
-	versions  SDKVersions
+	versions  Versions
 }
 
 // NewScaffolder creates a new scaffolder with embedded templates
 func NewScaffolder() (*Scaffolder, error) {
 	ctx := cuecontext.New()
 
-	var versions SDKVersions
+	var versions Versions
 	if err := json.Unmarshal([]byte(versionsJSON), &versions); err != nil {
 		return nil, fmt.Errorf("failed to parse versions: %w", err)
 	}
@@ -51,12 +57,13 @@ func NewScaffolder() (*Scaffolder, error) {
 %s
 
 _versions: {
+	ftl_cli:    %q
 	go:         %q
 	rust:       %q
 	python:     %q
 	typescript: %q
 }
-`, templatesCUE, versions.Go, versions.Rust, versions.Python, versions.TypeScript)
+`, templatesCUE, versions.FTLCli, versions.SDK.Go, versions.SDK.Rust, versions.SDK.Python, versions.SDK.TypeScript)
 
 	templates := ctx.CompileString(templateWithVersions)
 	if templates.Err() != nil {
@@ -189,6 +196,7 @@ func (s *Scaffolder) createComponentInstance(name, language string) (cue.Value, 
 %s
 
 _versions: {
+	ftl_cli:    %q
 	go:         %q
 	rust:       %q
 	python:     %q
@@ -198,7 +206,7 @@ _versions: {
 component: #Templates[%q] & {
 	name: %q
 }
-`, templatesCUE, s.versions.Go, s.versions.Rust, s.versions.Python, s.versions.TypeScript, language, name)
+`, templatesCUE, s.versions.FTLCli, s.versions.SDK.Go, s.versions.SDK.Rust, s.versions.SDK.Python, s.versions.SDK.TypeScript, language, name)
 
 	instance := s.ctx.CompileString(componentDef)
 	unified := instance

@@ -1,8 +1,6 @@
 module github.com/fastertools/ftl-cli/examples/demo/weather-go
 
-go 1.23
-
-toolchain go1.23.11
+go 1.24
 
 require github.com/fastertools/ftl-cli/sdk/go v0.1.1
 

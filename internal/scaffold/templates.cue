@@ -719,7 +719,7 @@ package scaffold
 		"go.mod": """
 			module github.com/example/\(name)
 
-			go 1.23
+			go 1.24
 
 			require (
 			\tgithub.com/fastertools/ftl-cli/sdk/go v\(_versions.go)
@@ -1034,9 +1034,9 @@ package scaffold
 		"go.mod": """
 			module \(name)
 			
-			go 1.21
+			go 1.24
 			
-			require github.com/fastertools/ftl-cli v0.1.0
+			require github.com/fastertools/ftl-cli v\(_versions.ftl_cli)
 			
 			// For local development, uncomment and adjust the path:
 			// replace github.com/fastertools/ftl-cli => ../path/to/ftl-cli

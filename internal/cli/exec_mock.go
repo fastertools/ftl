@@ -136,7 +136,7 @@ func handleMakeCommand(args []string) {
 
 func handleGoCommand(args []string) {
 	if len(args) == 0 {
-		fmt.Println("go version go1.21.0")
+		fmt.Println("go version go1.25.0")
 		return
 	}
 

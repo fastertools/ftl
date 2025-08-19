@@ -289,7 +289,7 @@ func main() {}
 		// Create go.mod
 		goMod := fmt.Sprintf(`module github.com/example/%s
 
-go 1.22
+go 1.24
 
 require github.com/fermyon/spin-go-sdk v0.2.0
 `, name)

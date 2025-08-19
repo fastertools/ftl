@@ -1,443 +1,232 @@
-// Package platform provides the official API for FTL platform integrations.
-// This package is designed for cloud platforms that deploy FTL applications
-// to WebAssembly runtimes like Fermyon Cloud.
+// Package platform provides the API for FTL platform deployments.
+// This is used by deployment platforms to process FTL applications consistently.
 package platform
 
 import (
+	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/fastertools/ftl-cli/internal/ftl"
+	"github.com/fastertools/ftl-cli/pkg/synthesis"
+	"github.com/fastertools/ftl-cli/pkg/validation"
+	"gopkg.in/yaml.v3"
 )
 
-// Client provides platform integration capabilities for FTL deployments.
-// Use NewClient to create an instance with your configuration.
-type Client struct {
-	config Config
-	synth  *ftl.Synthesizer
+// Processor handles FTL application processing for platform deployments.
+type Processor struct {
+	config      Config
+	validator   *validation.Validator
+	synthesizer *synthesis.Synthesizer
 }
 
-// Config defines the platform-specific configuration for processing deployments.
+// Config defines platform-specific settings.
 type Config struct {
-	// Platform component injection settings
-	InjectGateway     bool   // Always inject mcp-gateway (usually true)
-	InjectAuthorizer  bool   // Inject mcp-authorizer for non-public apps
-	GatewayVersion    string // Version of mcp-gateway to use
-	AuthorizerVersion string // Version of mcp-authorizer to use
+	// Gateway component settings
+	GatewayRegistry string // Default: ghcr.io
+	GatewayPackage  string // Default: fastertools:mcp-gateway
+	GatewayVersion  string // Default: latest stable version
 
-	// Component registry settings
-	GatewayRegistry    string // Registry for mcp-gateway (default: ghcr.io)
-	AuthorizerRegistry string // Registry for mcp-authorizer (default: ghcr.io)
+	// Authorizer component settings
+	AuthorizerRegistry string // Default: ghcr.io
+	AuthorizerPackage  string // Default: fastertools:mcp-authorizer
+	AuthorizerVersion  string // Default: latest stable version
 
 	// Security settings
-	RequireRegistryComponents bool     // Reject local component sources
-	AllowedRegistries         []string // If set, only allow components from these registries
-
-	// Deployment settings
-	DefaultEnvironment string // Default environment if not specified
-	MaxComponents      int    // Maximum number of components allowed (0 = unlimited)
+	RequireRegistryComponents bool     // If true, reject local file sources
+	AllowedRegistries         []string // Whitelist of allowed registries
 }
 
-// DefaultConfig returns a Config with sensible defaults for production platforms.
+// DefaultConfig returns production-ready default configuration.
 func DefaultConfig() Config {
 	return Config{
-		InjectGateway:             true,
-		InjectAuthorizer:          true, // Will be conditional based on access mode
-		GatewayVersion:            "0.0.13-alpha.0",
-		AuthorizerVersion:         "0.0.15-alpha.0",
 		GatewayRegistry:           "ghcr.io",
+		GatewayPackage:            "fastertools:mcp-gateway",
+		GatewayVersion:            "0.0.13-alpha.0",
 		AuthorizerRegistry:        "ghcr.io",
+		AuthorizerPackage:         "fastertools:mcp-authorizer",
+		AuthorizerVersion:         "0.0.15-alpha.0",
 		RequireRegistryComponents: true,
-		DefaultEnvironment:        "production",
-		MaxComponents:             50, // Reasonable limit to prevent abuse
+		AllowedRegistries:         []string{"ghcr.io"},
 	}
 }
 
-// NewClient creates a new platform client with the given configuration.
-func NewClient(config Config) *Client {
-	return &Client{
-		config: config,
-		synth:  ftl.NewSynthesizer(),
+// NewProcessor creates a new platform processor.
+func NewProcessor(config Config) *Processor {
+	return &Processor{
+		config:      config,
+		validator:   validation.New(),
+		synthesizer: synthesis.NewSynthesizer(),
 	}
 }
 
-// DeploymentRequest represents a request to deploy an FTL application.
-// This is the primary input from your platform's API.
-type DeploymentRequest struct {
-	// Application configuration
-	Application *Application `json:"application"`
+// ProcessRequest represents a deployment request from the platform.
+type ProcessRequest struct {
+	// The FTL application configuration (YAML or JSON)
+	ConfigData []byte
 
-	// Deployment-specific settings
-	Environment string            `json:"environment,omitempty"`
-	Variables   map[string]string `json:"variables,omitempty"`
+	// Format of the config data
+	Format string // "yaml" or "json"
 
-	// Optional overrides
-	AccessMode   *string  `json:"access_mode,omitempty"`
-	AllowedRoles []string `json:"allowed_roles,omitempty"`
+	// Deployment-specific variables to inject
+	Variables map[string]string
 
-	// Org access configuration
-	AllowedSubjects []string `json:"allowed_subjects,omitempty"` // User IDs allowed for org access
-
-	// Custom auth configuration (for custom access mode)
-	CustomAuth *CustomAuthConfig `json:"custom_auth,omitempty"`
+	// For org access mode - computed allowed user subjects from WorkOS
+	// The platform should:
+	// 1. Call WorkOS to get org members
+	// 2. Filter by allowed_roles if specified in the app config
+	// 3. Pass the resulting subject list here
+	AllowedSubjects []string
 }
 
-// CustomAuthConfig defines custom authentication settings.
-type CustomAuthConfig struct {
-	Issuer   string   `json:"issuer"`
-	Audience []string `json:"audience"`
+// ProcessResult contains the deployment-ready Spin TOML.
+type ProcessResult struct {
+	// The complete Spin TOML manifest
+	SpinTOML string
+
+	// Metadata about what was processed
+	Metadata ProcessMetadata
 }
 
-// DeploymentResult contains the processed deployment ready for the platform.
-type DeploymentResult struct {
-	// Processed application manifest
-	Manifest *Manifest `json:"manifest"`
-
-	// Generated Spin TOML content
-	SpinTOML string `json:"spin_toml"`
-
-	// Metadata about the deployment
-	Metadata DeploymentMetadata `json:"metadata"`
+// ProcessMetadata provides information about the processing.
+type ProcessMetadata struct {
+	AppName            string
+	AppVersion         string
+	ComponentCount     int
+	AccessMode         string
+	AllowedRoles       []string // For org mode - roles to filter by
+	InjectedGateway    bool
+	InjectedAuthorizer bool
 }
 
-// DeploymentMetadata provides information about the processed deployment.
-type DeploymentMetadata struct {
-	ProcessedAt        time.Time `json:"processed_at"`
-	ComponentCount     int       `json:"component_count"`
-	InjectedGateway    bool      `json:"injected_gateway"`
-	InjectedAuthorizer bool      `json:"injected_authorizer"`
-	AccessMode         string    `json:"access_mode"`
-	Environment        string    `json:"environment"`
-}
+// Process handles an FTL deployment request.
+func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
+	// 1. Parse and validate the configuration
+	var app map[string]interface{}
 
-// ProcessDeployment processes a deployment request according to platform rules.
-// This is the main entry point for platform integrations.
-func (c *Client) ProcessDeployment(req *DeploymentRequest) (*DeploymentResult, error) {
-	// Validate the request
-	if err := c.validateRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid deployment request: %w", err)
-	}
-
-	// Apply defaults
-	app := c.prepareApplication(req)
-
-	// Validate components
-	if err := c.validateComponents(app.Components); err != nil {
-		return nil, fmt.Errorf("component validation failed: %w", err)
-	}
-
-	// Inject platform components based on configuration
-	c.injectPlatformComponents(app, req)
-
-	// Convert to internal format for synthesis
-	internalApp := c.toInternalApplication(app, req)
-
-	// Generate Spin manifest
-	manifest, err := c.synth.SynthesizeToSpin(internalApp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to synthesize manifest: %w", err)
-	}
-
-	// Generate TOML
-	toml, err := c.synth.SynthesizeToTOML(internalApp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate TOML: %w", err)
-	}
-
-	// Apply deployment variables
-	if req.Variables != nil {
-		if manifest.Variables == nil {
-			manifest.Variables = make(map[string]ftl.SpinVariable)
+	switch req.Format {
+	case "yaml":
+		if err := yaml.Unmarshal(req.ConfigData, &app); err != nil {
+			return nil, fmt.Errorf("invalid YAML: %w", err)
 		}
-		for k, v := range req.Variables {
-			manifest.Variables[k] = ftl.SpinVariable{
-				Default: v,
+	case "json":
+		if err := json.Unmarshal(req.ConfigData, &app); err != nil {
+			return nil, fmt.Errorf("invalid JSON: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported format: %s", req.Format)
+	}
+
+	// 2. Validate components if strict mode
+	if p.config.RequireRegistryComponents {
+		if err := p.validateComponents(app); err != nil {
+			return nil, err
+		}
+	}
+
+	// 3. Determine access mode and extract allowed_roles
+	accessMode := "public"
+	if access, ok := app["access"].(string); ok {
+		accessMode = access
+	}
+
+	var allowedRoles []string
+	if accessMode == "org" {
+		if roles, ok := app["allowed_roles"].([]interface{}); ok {
+			for _, role := range roles {
+				if r, ok := role.(string); ok {
+					allowedRoles = append(allowedRoles, r)
+				}
 			}
 		}
 	}
 
-	// Build result
-	result := &DeploymentResult{
-		Manifest: c.toPublicManifest(manifest),
-		SpinTOML: toml,
-		Metadata: DeploymentMetadata{
-			ProcessedAt:        time.Now().UTC(),
-			ComponentCount:     len(app.Components),
-			InjectedGateway:    c.config.InjectGateway,
-			InjectedAuthorizer: c.config.InjectAuthorizer && app.Access != "public",
-			AccessMode:         app.Access,
-			Environment:        c.getEnvironment(req),
+	// 4. Handle org access allowed subjects
+	if accessMode == "org" && len(req.AllowedSubjects) > 0 {
+		app["allowed_subjects"] = req.AllowedSubjects
+	}
+
+	// 5. Prepare platform overrides
+	overrides := map[string]interface{}{
+		"gateway_version":    p.config.GatewayVersion,
+		"authorizer_version": p.config.AuthorizerVersion,
+	}
+
+	// 6. Synthesize to Spin TOML with platform overrides
+	spinTOML, err := p.synthesizer.SynthesizeWithOverrides(app, overrides)
+	if err != nil {
+		return nil, fmt.Errorf("synthesis failed: %w", err)
+	}
+
+	// 7. Build result
+	result := &ProcessResult{
+		SpinTOML: spinTOML,
+		Metadata: ProcessMetadata{
+			AppName:            app["name"].(string),
+			AppVersion:         getStringOrDefault(app["version"], "0.1.0"),
+			ComponentCount:     countComponents(app),
+			AccessMode:         accessMode,
+			AllowedRoles:       allowedRoles,
+			InjectedGateway:    true,
+			InjectedAuthorizer: accessMode != "public",
 		},
 	}
 
 	return result, nil
 }
 
-// ValidateComponents checks that all components meet platform requirements.
-// Use this for pre-flight validation before processing.
-func (c *Client) ValidateComponents(components []Component) error {
-	return c.validateComponents(components)
-}
-
-// GenerateTOML generates Spin TOML from an application.
-// Use this if you need to regenerate TOML from a modified application.
-func (c *Client) GenerateTOML(app *Application) (string, error) {
-	// Create a minimal request for conversion
-	req := &DeploymentRequest{Application: app}
-	internalApp := c.toInternalApplication(app, req)
-	return c.synth.SynthesizeToTOML(internalApp)
-}
-
-// validateRequest validates the deployment request.
-func (c *Client) validateRequest(req *DeploymentRequest) error {
-	if req == nil {
-		return fmt.Errorf("request is nil")
-	}
-	if req.Application == nil {
-		return fmt.Errorf("application is required")
-	}
-	if req.Application.Name == "" {
-		return fmt.Errorf("application name is required")
-	}
-	if req.Application.Version == "" {
-		return fmt.Errorf("application version is required")
-	}
-
-	// Check component limit
-	if c.config.MaxComponents > 0 && len(req.Application.Components) > c.config.MaxComponents {
-		return fmt.Errorf("too many components: %d (max: %d)",
-			len(req.Application.Components), c.config.MaxComponents)
-	}
-
-	return nil
-}
-
 // validateComponents ensures all components meet platform requirements.
-func (c *Client) validateComponents(components []Component) error {
-	for _, comp := range components {
-		// Parse component source
-		localPath, registrySource := parseComponentSource(comp.Source)
+func (p *Processor) validateComponents(app map[string]interface{}) error {
+	components, ok := app["components"].([]interface{})
+	if !ok {
+		return nil // No components is valid
+	}
 
-		// Check if local sources are allowed
-		if c.config.RequireRegistryComponents && localPath != "" {
-			return fmt.Errorf("component %s: local sources not allowed (source: %s)",
-				comp.ID, localPath)
+	for _, comp := range components {
+		component := comp.(map[string]interface{})
+		source := component["source"]
+
+		// Check if source is a string (local path)
+		if _, isString := source.(string); isString {
+			return fmt.Errorf("local component sources not allowed in production")
 		}
 
 		// Check registry whitelist
-		if registrySource != nil && len(c.config.AllowedRegistries) > 0 {
-			allowed := false
-			for _, reg := range c.config.AllowedRegistries {
-				if registrySource.Registry == reg {
-					allowed = true
-					break
-				}
+		if sourceMap, ok := source.(map[string]interface{}); ok {
+			registry := sourceMap["registry"].(string)
+			if !p.isAllowedRegistry(registry) {
+				return fmt.Errorf("registry not allowed: %s", registry)
 			}
-			if !allowed {
-				return fmt.Errorf("component %s: registry %s not in allowed list",
-					comp.ID, registrySource.Registry)
-			}
-		}
-
-		// Validate component has an ID
-		if comp.ID == "" {
-			return fmt.Errorf("component missing ID")
 		}
 	}
 
 	return nil
 }
 
-// prepareApplication applies defaults and overrides to the application.
-func (c *Client) prepareApplication(req *DeploymentRequest) *Application {
-	app := req.Application
-
-	// Apply access mode override
-	if req.AccessMode != nil {
-		app.Access = *req.AccessMode
+// isAllowedRegistry checks if a registry is in the whitelist.
+func (p *Processor) isAllowedRegistry(registry string) bool {
+	if len(p.config.AllowedRegistries) == 0 {
+		return true // No whitelist means all allowed
 	}
 
-	// Set default access if not specified
-	if app.Access == "" {
-		app.Access = "public"
-	}
-
-	// Apply custom auth if provided
-	if req.CustomAuth != nil && app.Access == "custom" {
-		if app.Auth == nil {
-			app.Auth = &Auth{}
-		}
-		app.Auth.JWTIssuer = req.CustomAuth.Issuer
-		if len(req.CustomAuth.Audience) > 0 {
-			app.Auth.JWTAudience = req.CustomAuth.Audience[0]
+	for _, allowed := range p.config.AllowedRegistries {
+		if registry == allowed {
+			return true
 		}
 	}
-
-	return app
+	return false
 }
 
-// injectPlatformComponents adds mcp-gateway and mcp-authorizer as configured.
-func (c *Client) injectPlatformComponents(app *Application, req *DeploymentRequest) {
-	// Always inject gateway if configured
-	if c.config.InjectGateway {
-		gateway := Component{
-			ID: "mcp-gateway",
-			Source: map[string]interface{}{
-				"registry": c.config.GatewayRegistry,
-				"package":  "fastertools:mcp-gateway",
-				"version":  c.config.GatewayVersion,
-			},
-		}
-		app.Components = append([]Component{gateway}, app.Components...)
+// Helper functions
+
+func getStringOrDefault(val interface{}, defaultVal string) string {
+	if s, ok := val.(string); ok {
+		return s
 	}
-
-	// Inject authorizer for non-public apps
-	if c.config.InjectAuthorizer && app.Access != "public" {
-		authorizer := Component{
-			ID: "mcp-authorizer",
-			Source: map[string]interface{}{
-				"registry": c.config.AuthorizerRegistry,
-				"package":  "fastertools:mcp-authorizer",
-				"version":  c.config.AuthorizerVersion,
-			},
-		}
-
-		// Variables are now handled by CUE patterns based on access mode
-		// No need to inject them here
-
-		// Insert after gateway but before user components
-		if c.config.InjectGateway {
-			components := []Component{app.Components[0], authorizer}
-			components = append(components, app.Components[1:]...)
-			app.Components = components
-		} else {
-			app.Components = append([]Component{authorizer}, app.Components...)
-		}
-	}
+	return defaultVal
 }
 
-// getEnvironment determines the environment for the deployment.
-func (c *Client) getEnvironment(req *DeploymentRequest) string {
-	if req.Environment != "" {
-		return req.Environment
+func countComponents(app map[string]interface{}) int {
+	if components, ok := app["components"].([]interface{}); ok {
+		return len(components)
 	}
-	return c.config.DefaultEnvironment
-}
-
-// toInternalApplication converts public Application to internal format.
-func (c *Client) toInternalApplication(app *Application, req *DeploymentRequest) *ftl.Application {
-	internal := &ftl.Application{
-		Name:            app.Name,
-		Version:         app.Version,
-		Description:     app.Description,
-		Access:          ftl.AccessMode(app.Access),
-		Components:      make([]ftl.Component, len(app.Components)),
-		Variables:       app.Variables,
-		AllowedSubjects: req.AllowedSubjects,
-	}
-
-	if app.Auth != nil {
-		// For org access, use WorkOS provider
-		provider := ftl.AuthProviderCustom
-		if app.Access == "org" {
-			provider = ftl.AuthProviderWorkOS
-		}
-
-		internal.Auth = ftl.AuthConfig{
-			Provider:    provider,
-			OrgID:       app.Auth.OrgID,
-			JWTIssuer:   app.Auth.JWTIssuer,
-			JWTAudience: app.Auth.JWTAudience,
-		}
-	}
-
-	for i, comp := range app.Components {
-		// Convert source to internal format
-		var source ftl.ComponentSource
-		localPath, registrySource := parseComponentSource(comp.Source)
-		if localPath != "" {
-			source = ftl.LocalSource(localPath)
-		} else if registrySource != nil {
-			source = &ftl.RegistrySource{
-				Registry: registrySource.Registry,
-				Package:  registrySource.Package,
-				Version:  registrySource.Version,
-			}
-		}
-
-		var build *ftl.BuildConfig
-		if comp.Build != nil {
-			build = &ftl.BuildConfig{
-				Command: comp.Build.Command,
-				Workdir: comp.Build.Workdir,
-			}
-		}
-
-		internal.Components[i] = ftl.Component{
-			ID:        comp.ID,
-			Source:    source,
-			Build:     build,
-			Variables: comp.Variables,
-		}
-	}
-
-	return internal
-}
-
-// toPublicManifest converts internal manifest to public format.
-func (c *Client) toPublicManifest(manifest *ftl.SpinManifest) *Manifest {
-	pubVars := make(map[string]Variable)
-	for k, v := range manifest.Variables {
-		pubVars[k] = Variable{
-			Default:  v.Default,
-			Required: v.Required,
-		}
-	}
-
-	return &Manifest{
-		Application: manifest.Application,
-		Components:  manifest.Component,
-		Triggers:    manifest.Trigger,
-		Variables:   pubVars,
-	}
-}
-
-// parseComponentSource parses a component source and returns either a local path or registry source
-func parseComponentSource(source interface{}) (string, *RegistrySource) {
-	switch s := source.(type) {
-	case string:
-		return s, nil
-	case map[string]interface{}:
-		reg := &RegistrySource{}
-		if r, ok := s["registry"].(string); ok {
-			reg.Registry = r
-		}
-		if p, ok := s["package"].(string); ok {
-			reg.Package = p
-		}
-		if v, ok := s["version"].(string); ok {
-			reg.Version = v
-		}
-		if reg.Registry != "" || reg.Package != "" {
-			return "", reg
-		}
-		return "", nil
-	case map[interface{}]interface{}:
-		reg := &RegistrySource{}
-		if r, ok := s["registry"].(string); ok {
-			reg.Registry = r
-		}
-		if p, ok := s["package"].(string); ok {
-			reg.Package = p
-		}
-		if v, ok := s["version"].(string); ok {
-			reg.Version = v
-		}
-		if reg.Registry != "" || reg.Package != "" {
-			return "", reg
-		}
-		return "", nil
-	default:
-		return "", nil
-	}
+	return 0
 }

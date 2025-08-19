@@ -21,7 +21,9 @@ import (
 	// - custom: User provides all auth configuration
 	access:       "public" | "private" | "org" | "custom" | *"public"
 	auth?:        #AuthConfig  // Required only for "custom" access
-	// For org access mode - list of allowed user subjects (injected by platform)
+	// For org access mode - optional role filter
+	allowed_roles?: [...string]
+	// For org access mode - list of allowed user subjects
 	allowed_subjects?: [...string]
 }
 
@@ -59,8 +61,14 @@ import (
 // ===========================================================================
 
 // Transform raw input data to a validated FTL application
+#PlatformConfig: {
+	gateway_version:     string | *"0.0.13-alpha.0"
+	authorizer_version:  string | *"0.0.15-alpha.0"
+}
+
 #InputTransform: {
 	input: _
+	platform: #PlatformConfig  // Always required, but has defaults
 	
 	// Build validated FTL app from raw input
 	app: #FTLApplication & {
@@ -98,6 +106,7 @@ import (
 	// Transform to Spin manifest
 	manifest: (#TransformToSpin & {
 		input: app
+		platform: platform
 	}).output
 }
 
@@ -107,9 +116,14 @@ import (
 
 #TransformToSpin: {
 	input: #FTLApplication
+	platform: #PlatformConfig  // Always required, has defaults
 	
 	// Helper to determine if we need auth
 	_needsAuth: input.access == "private" || input.access == "org" || input.access == "custom"
+	
+	// Store platform versions in local fields for reference
+	_gatewayVersion: platform.gateway_version
+	_authorizerVersion: platform.authorizer_version
 	
 	output: {
 		spin_manifest_version: 2
@@ -152,7 +166,7 @@ import (
 				source: {
 					registry: "ghcr.io"
 					package:  "fastertools:mcp-gateway"
-					version:  "0.0.13-alpha.0"
+					version: _gatewayVersion
 				}
 				allowed_outbound_hosts: ["http://*.spin.internal"]
 				// Add component_names if there are user components
@@ -170,7 +184,7 @@ import (
 					source: {
 						registry: "ghcr.io"
 						package:  "fastertools:mcp-authorizer"
-						version:  "0.0.15-alpha.0"
+						version: _authorizerVersion
 					}
 					allowed_outbound_hosts: [
 						"http://*.spin.internal",
