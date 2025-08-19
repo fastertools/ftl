@@ -31,5 +31,5 @@ component_names = "{{ component_names }}"
 # Test configuration
 [component.mcp-gateway.tool.spin-test]
 source = "tests/target/wasm32-wasip1/release/mcp_gateway_tests.wasm"
-build = "cargo build --target wasm32-wasip1 --release"
+build = "cargo build --target wasm32-wasip1 --release --target-dir ./target"
 workdir = "tests"

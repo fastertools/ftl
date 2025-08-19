@@ -71,5 +71,5 @@ mcp_auth_forward_claims = "{{ mcp_auth_forward_claims }}"
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]
 source = "tests/target/wasm32-wasip1/release/mcp_authorizer_tests.wasm"
-build = "cargo build --target wasm32-wasip1 --release"
+build = "cargo build --target wasm32-wasip1 --release --target-dir ./target"
 workdir = "tests"
