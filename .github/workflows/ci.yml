@@ -162,21 +162,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: ./.github/actions/setup-rust
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt, clippy
+          components: rustfmt,clippy
           targets: wasm32-wasip1
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-version: ${{ env.RUST_CACHE_VERSION }}
-          
-      - name: Add components and targets
-        run: |
-          rustup component add rustfmt clippy --toolchain ${{ env.RUST_VERSION }}
-          rustup target add wasm32-wasip1
+          cache-key: rust-lint
+          toolchain: ${{ env.RUST_VERSION }}
           
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -191,18 +182,11 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: ./.github/actions/setup-rust
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-wasip1
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-version: ${{ env.RUST_CACHE_VERSION }}
-          
-      - name: Add wasm32-wasip1 target
-        run: rustup target add wasm32-wasip1
+          cache-key: rust-test
+          toolchain: ${{ env.RUST_VERSION }}
           
       - name: Run Rust SDK tests
         run: |
@@ -228,18 +212,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: ./.github/actions/setup-rust
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-wasip1
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-version: ${{ env.RUST_CACHE_VERSION }}
-          
-      - name: Add wasm32-wasip1 target
-        run: rustup target add wasm32-wasip1
+          cache-key: rust-wasm
+          cache-targets: 'true'
+          toolchain: ${{ env.RUST_VERSION }}
           
       - name: Build all WASM components
         run: |
@@ -273,18 +251,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: ./.github/actions/setup-rust
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-wasip1
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-version: ${{ env.RUST_CACHE_VERSION }}
-          
-      - name: Add wasm32-wasip1 target
-        run: rustup target add wasm32-wasip1
+          cache-key: component-tests
+          cache-targets: 'true'
+          toolchain: ${{ env.RUST_VERSION }}
           
       - name: Install Spin
         run: |
