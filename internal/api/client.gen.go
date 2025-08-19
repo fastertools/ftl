@@ -5,14 +5,18 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -74,38 +78,10 @@ const (
 	CreateDeploymentRequestAccessPublic  CreateDeploymentRequestAccess = "public"
 )
 
-// Defines values for CreateDeploymentRequestApplicationAccess.
-const (
-	CreateDeploymentRequestApplicationAccessCustom  CreateDeploymentRequestApplicationAccess = "custom"
-	CreateDeploymentRequestApplicationAccessOrg     CreateDeploymentRequestApplicationAccess = "org"
-	CreateDeploymentRequestApplicationAccessPrivate CreateDeploymentRequestApplicationAccess = "private"
-	CreateDeploymentRequestApplicationAccessPublic  CreateDeploymentRequestApplicationAccess = "public"
-)
-
-// Defines values for CreateDeploymentRequestApplicationAuthProvider.
-const (
-	CreateDeploymentRequestApplicationAuthProviderCustom CreateDeploymentRequestApplicationAuthProvider = "custom"
-	CreateDeploymentRequestApplicationAuthProviderWorkos CreateDeploymentRequestApplicationAuthProvider = "workos"
-)
-
 // Defines values for CreateDeploymentRequestAuthProvider.
 const (
 	CreateDeploymentRequestAuthProviderCustom CreateDeploymentRequestAuthProvider = "custom"
 	CreateDeploymentRequestAuthProviderWorkos CreateDeploymentRequestAuthProvider = "workos"
-)
-
-// Defines values for CreateDeploymentRequestEnvironment.
-const (
-	Development CreateDeploymentRequestEnvironment = "development"
-	Production  CreateDeploymentRequestEnvironment = "production"
-	Staging     CreateDeploymentRequestEnvironment = "staging"
-)
-
-// Defines values for CreateDeploymentResponseBodyStatus.
-const (
-	CreateDeploymentResponseBodyStatusDEPLOYED  CreateDeploymentResponseBodyStatus = "DEPLOYED"
-	CreateDeploymentResponseBodyStatusDEPLOYING CreateDeploymentResponseBodyStatus = "DEPLOYING"
-	CreateDeploymentResponseBodyStatusFAILED    CreateDeploymentResponseBodyStatus = "FAILED"
 )
 
 // Defines values for ListAppsResponseBodyAppsAccessControl.
@@ -127,12 +103,25 @@ const (
 
 // Defines values for ListAppsResponseBodyAppsStatus.
 const (
-	ListAppsResponseBodyAppsStatusACTIVE   ListAppsResponseBodyAppsStatus = "ACTIVE"
-	ListAppsResponseBodyAppsStatusCREATING ListAppsResponseBodyAppsStatus = "CREATING"
-	ListAppsResponseBodyAppsStatusDELETED  ListAppsResponseBodyAppsStatus = "DELETED"
-	ListAppsResponseBodyAppsStatusDELETING ListAppsResponseBodyAppsStatus = "DELETING"
-	ListAppsResponseBodyAppsStatusFAILED   ListAppsResponseBodyAppsStatus = "FAILED"
-	ListAppsResponseBodyAppsStatusPENDING  ListAppsResponseBodyAppsStatus = "PENDING"
+	ACTIVE   ListAppsResponseBodyAppsStatus = "ACTIVE"
+	CREATING ListAppsResponseBodyAppsStatus = "CREATING"
+	DELETED  ListAppsResponseBodyAppsStatus = "DELETED"
+	DELETING ListAppsResponseBodyAppsStatus = "DELETING"
+	FAILED   ListAppsResponseBodyAppsStatus = "FAILED"
+	PENDING  ListAppsResponseBodyAppsStatus = "PENDING"
+)
+
+// Defines values for ListAppsParamsIncludeDeleted.
+const (
+	False ListAppsParamsIncludeDeleted = "false"
+	True  ListAppsParamsIncludeDeleted = "true"
+)
+
+// Defines values for CreateDeploymentParamsEnvironment.
+const (
+	Development CreateDeploymentParamsEnvironment = "development"
+	Production  CreateDeploymentParamsEnvironment = "production"
+	Staging     CreateDeploymentParamsEnvironment = "staging"
 )
 
 // App Application object
@@ -197,59 +186,24 @@ type CreateAppResponseBody struct {
 // CreateAppResponseBodyStatus defines model for CreateAppResponseBody.Status.
 type CreateAppResponseBodyStatus string
 
-// CreateDeploymentRequest Request body for creating a deployment
+// CreateDeploymentRequest FTL application configuration - the entire request body is the raw FTL config as defined by the FTL CLI/SDK
 type CreateDeploymentRequest struct {
-	// Access Access control override
+	// Access Access control mode
 	Access *CreateDeploymentRequestAccess `json:"access,omitempty"`
 
-	// Application FTL application configuration
+	// Application Application metadata
 	Application struct {
-		// Access Access control mode
-		Access *CreateDeploymentRequestApplicationAccess `json:"access,omitempty"`
-
-		// Auth Authentication configuration
-		Auth *struct {
-			JwtAudience *string                                         `json:"jwt_audience,omitempty"`
-			JwtIssuer   *string                                         `json:"jwt_issuer,omitempty"`
-			OrgId       *string                                         `json:"org_id,omitempty"`
-			Provider    *CreateDeploymentRequestApplicationAuthProvider `json:"provider,omitempty"`
-		} `json:"auth,omitempty"`
-
-		// Components Application components
-		Components *[]struct {
-			// Id Component ID
-			Id string `json:"id"`
-
-			// Source Registry reference to pushed component (components must be pushed to ECR first)
-			Source struct {
-				// Package Package path (e.g., app123abc/graph)
-				Package string `json:"package"`
-
-				// Registry ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)
-				Registry string `json:"registry"`
-
-				// Version Component version (e.g., 0.1.0)
-				Version string `json:"version"`
-			} `json:"source"`
-
-			// Variables Component-specific variables
-			Variables *map[string]string `json:"variables,omitempty"`
-		} `json:"components,omitempty"`
-
 		// Description Application description
 		Description *string `json:"description,omitempty"`
 
 		// Name Application name
 		Name string `json:"name"`
 
-		// Variables Application variables
-		Variables *map[string]string `json:"variables,omitempty"`
-
 		// Version Application version
 		Version *string `json:"version,omitempty"`
 	} `json:"application"`
 
-	// Auth Auth configuration override
+	// Auth Authentication configuration
 	Auth *struct {
 		JwtAudience *string                              `json:"jwt_audience,omitempty"`
 		JwtIssuer   *string                              `json:"jwt_issuer,omitempty"`
@@ -257,51 +211,48 @@ type CreateDeploymentRequest struct {
 		Provider    *CreateDeploymentRequestAuthProvider `json:"provider,omitempty"`
 	} `json:"auth,omitempty"`
 
-	// Environment Deployment environment
-	Environment *CreateDeploymentRequestEnvironment `json:"environment,omitempty"`
+	// Components Application components
+	Components []struct {
+		// Id Component ID
+		Id string `json:"id"`
 
-	// Variables Environment-specific variables
+		// Source Registry reference to pushed component (components must be pushed to ECR first)
+		Source struct {
+			// Package Package path (e.g., app123abc/graph)
+			Package string `json:"package"`
+
+			// Registry ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)
+			Registry string `json:"registry"`
+
+			// Version Component version (e.g., 0.1.0)
+			Version string `json:"version"`
+		} `json:"source"`
+
+		// Variables Component-specific variables
+		Variables *map[string]string `json:"variables,omitempty"`
+	} `json:"components"`
+
+	// Variables Application variables
 	Variables *map[string]string `json:"variables,omitempty"`
 }
 
-// CreateDeploymentRequestAccess Access control override
+// CreateDeploymentRequestAccess Access control mode
 type CreateDeploymentRequestAccess string
-
-// CreateDeploymentRequestApplicationAccess Access control mode
-type CreateDeploymentRequestApplicationAccess string
-
-// CreateDeploymentRequestApplicationAuthProvider defines model for CreateDeploymentRequest.Application.Auth.Provider.
-type CreateDeploymentRequestApplicationAuthProvider string
 
 // CreateDeploymentRequestAuthProvider defines model for CreateDeploymentRequest.Auth.Provider.
 type CreateDeploymentRequestAuthProvider string
 
-// CreateDeploymentRequestEnvironment Deployment environment
-type CreateDeploymentRequestEnvironment string
-
 // CreateDeploymentResponseBody Response for successful deployment creation
 type CreateDeploymentResponseBody struct {
-	// AppId Application identifier
-	AppId string `json:"appId"`
-
-	// AppName Application name
-	AppName string `json:"appName"`
-
-	// AppUrl Application URL once deployed
-	AppUrl *string `json:"appUrl,omitempty"`
-
 	// DeploymentId Unique deployment identifier
 	DeploymentId string `json:"deploymentId"`
 
-	// Message Status message
-	Message string `json:"message"`
-
 	// Status Deployment status
-	Status CreateDeploymentResponseBodyStatus `json:"status"`
-}
+	Status string `json:"status"`
 
-// CreateDeploymentResponseBodyStatus Deployment status
-type CreateDeploymentResponseBodyStatus string
+	// Url Deployed application URL
+	Url string `json:"url"`
+}
 
 // CreateEcrTokenRequest Request body for creating ECR token
 type CreateEcrTokenRequest struct {
@@ -376,7 +327,7 @@ type GetUserOrgsResponseBody struct {
 	} `json:"organizations"`
 }
 
-// ListAppsResponseBody List of applications with pagination
+// ListAppsResponseBody List of applications
 type ListAppsResponseBody struct {
 	Apps []struct {
 		AccessControl *ListAppsResponseBodyAppsAccessControl `json:"accessControl,omitempty"`
@@ -405,7 +356,6 @@ type ListAppsResponseBody struct {
 		Status        ListAppsResponseBodyAppsStatus `json:"status"`
 		UpdatedAt     string                         `json:"updatedAt"`
 	} `json:"apps"`
-	NextToken *string `json:"nextToken,omitempty"`
 }
 
 // ListAppsResponseBodyAppsAccessControl defines model for ListAppsResponseBody.Apps.AccessControl.
@@ -454,18 +404,18 @@ type UpdateComponentsResponseBody struct {
 
 // ListAppsParams defines parameters for ListApps.
 type ListAppsParams struct {
-	// Limit Number of items to return (1-100)
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// NextToken Pagination token from previous response
-	NextToken *string `form:"nextToken,omitempty" json:"nextToken,omitempty"`
-
-	// Name Filter by app name
+	// Name Filter by app name (partial match)
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// IncludeDeleted Include deleted apps in the response
+	IncludeDeleted *ListAppsParamsIncludeDeleted `form:"includeDeleted,omitempty" json:"includeDeleted,omitempty"`
 
 	// Authorization Bearer token for authentication
 	Authorization string `json:"Authorization"`
 }
+
+// ListAppsParamsIncludeDeleted defines parameters for ListApps.
+type ListAppsParamsIncludeDeleted string
 
 // CreateAppParams defines parameters for CreateApp.
 type CreateAppParams struct {
@@ -499,9 +449,15 @@ type UpdateComponentsParams struct {
 
 // CreateDeploymentParams defines parameters for CreateDeployment.
 type CreateDeploymentParams struct {
+	// Environment Deployment environment (defaults to production)
+	Environment *CreateDeploymentParamsEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
+
 	// Authorization Bearer token for authentication
 	Authorization string `json:"Authorization"`
 }
+
+// CreateDeploymentParamsEnvironment defines parameters for CreateDeployment.
+type CreateDeploymentParamsEnvironment string
 
 // GetAppLogsParams defines parameters for GetAppLogs.
 type GetAppLogsParams struct {
@@ -841,41 +797,25 @@ func NewListAppsRequest(server string, params *ListAppsParams) (*http.Request, e
 	if params != nil {
 		queryValues := queryURL.Query()
 
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.NextToken != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "nextToken", runtime.ParamLocationQuery, *params.NextToken); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
 		if params.Name != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name", runtime.ParamLocationQuery, *params.Name); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeDeleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeDeleted", runtime.ParamLocationQuery, *params.IncludeDeleted); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1202,6 +1142,28 @@ func NewCreateDeploymentRequestWithBody(server string, appId openapi_types.UUID,
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "environment", runtime.ParamLocationQuery, *params.Environment); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
@@ -2343,4 +2305,146 @@ func ParseGetUserOrgsResponse(rsp *http.Response) (*GetUserOrgsResponse, error) 
 	}
 
 	return response, nil
+}
+
+// Base64 encoded, gzipped, json marshaled Swagger object
+var swaggerSpec = []string{
+
+	"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",
+	"0GZxs/h3AAAA//8CzHBEpmUAAA==",
+}
+
+// GetSwagger returns the content of the embedded swagger specification file
+// or error if failed to decode
+func decodeSpec() ([]byte, error) {
+	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(zipped))
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(zr)
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var rawSpec = decodeSpecCached()
+
+// a naive cached of a decoded swagger spec
+func decodeSpecCached() func() ([]byte, error) {
+	data, err := decodeSpec()
+	return func() ([]byte, error) {
+		return data, err
+	}
+}
+
+// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
+func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
+	res := make(map[string]func() ([]byte, error))
+	if len(pathToFile) > 0 {
+		res[pathToFile] = rawSpec
+	}
+
+	return res
+}
+
+// GetSwagger returns the Swagger specification corresponding to the generated code
+// in this file. The external references of Swagger specification are resolved.
+// The logic of resolving external references is tightly connected to "import-mapping" feature.
+// Externally referenced files must be embedded in the corresponding golang packages.
+// Urls can be supported but this task was out of the scope.
+func GetSwagger() (swagger *openapi3.T, err error) {
+	resolvePath := PathToRawSpec("")
+
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
+		pathToFile := url.String()
+		pathToFile = path.Clean(pathToFile)
+		getSpec, ok := resolvePath[pathToFile]
+		if !ok {
+			err1 := fmt.Errorf("path not found: %s", pathToFile)
+			return nil, err1
+		}
+		return getSpec()
+	}
+	var specData []byte
+	specData, err = rawSpec()
+	if err != nil {
+		return
+	}
+	swagger, err = loader.LoadFromData(specData)
+	if err != nil {
+		return
+	}
+	return
 }

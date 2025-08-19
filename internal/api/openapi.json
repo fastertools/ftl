@@ -47,7 +47,7 @@
       "get": {
         "operationId": "listApps",
         "summary": "List applications",
-        "description": "Retrieves a paginated list of all applications for the authenticated user",
+        "description": "Retrieves all applications for the authenticated user. By default, only active (non-deleted) apps are returned.",
         "tags": ["Apps"],
         "parameters": [
           {
@@ -63,37 +63,26 @@
           },
           {
             "in": "query",
-            "name": "limit",
-            "schema": {
-              "description": "Number of items to return (1-100)",
-              "example": 20,
-              "default": 20,
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            },
-            "required": false,
-            "description": "Number of items to return (1-100)"
-          },
-          {
-            "in": "query",
-            "name": "nextToken",
-            "schema": {
-              "description": "Pagination token from previous response",
-              "type": "string"
-            },
-            "required": false,
-            "description": "Pagination token from previous response"
-          },
-          {
-            "in": "query",
             "name": "name",
             "schema": {
-              "description": "Filter by app name",
+              "description": "Filter by app name (partial match)",
               "type": "string"
             },
             "required": false,
-            "description": "Filter by app name"
+            "description": "Filter by app name (partial match)"
+          },
+          {
+            "in": "query",
+            "name": "includeDeleted",
+            "schema": {
+              "description": "Include deleted apps in the response",
+              "example": "false",
+              "default": "false",
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "description": "Include deleted apps in the response"
           }
         ],
         "responses": {
@@ -224,8 +213,8 @@
     "/v1/apps/{appId}/deployments": {
       "post": {
         "operationId": "createDeployment",
-        "summary": "Create a new deployment",
-        "description": "Triggers a new deployment for an application. If the app does not exist, it will be created automatically. This operation is asynchronous and returns immediately while the deployment runs in the background.",
+        "summary": "Deploy an FTL application",
+        "description": "Deploys an FTL application using the raw FTL configuration format. The entire request body should be the FTL application configuration as defined by the FTL CLI/SDK. This operation is asynchronous and returns immediately while the deployment runs in the background.",
         "tags": ["Apps"],
         "parameters": [
           {
@@ -252,6 +241,18 @@
             },
             "required": true,
             "description": "Application ID (UUID)"
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "schema": {
+              "description": "Deployment environment (defaults to production)",
+              "default": "production",
+              "type": "string",
+              "enum": ["development", "staging", "production"]
+            },
+            "required": false,
+            "description": "Deployment environment (defaults to production)"
           }
         ],
         "requestBody": {
@@ -888,11 +889,11 @@
         "required": ["appName"]
       },
       "CreateDeploymentRequest": {
-        "description": "Request body for creating a deployment",
+        "description": "FTL application configuration - the entire request body is the raw FTL config as defined by the FTL CLI/SDK",
         "type": "object",
         "properties": {
           "application": {
-            "description": "FTL application configuration",
+            "description": "Application metadata",
             "type": "object",
             "properties": {
               "name": {
@@ -908,101 +909,57 @@
               "description": {
                 "description": "Application description",
                 "type": "string"
-              },
-              "components": {
-                "description": "Application components",
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "description": "Component ID",
-                      "type": "string"
-                    },
-                    "source": {
-                      "description": "Registry reference to pushed component (components must be pushed to ECR first)",
-                      "type": "object",
-                      "properties": {
-                        "registry": {
-                          "description": "ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)",
-                          "type": "string"
-                        },
-                        "package": {
-                          "description": "Package path (e.g., app123abc/graph)",
-                          "type": "string"
-                        },
-                        "version": {
-                          "description": "Component version (e.g., 0.1.0)",
-                          "type": "string"
-                        }
-                      },
-                      "required": ["registry", "package", "version"]
-                    },
-                    "variables": {
-                      "description": "Component-specific variables",
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": ["id", "source"]
-                }
-              },
-              "access": {
-                "description": "Access control mode",
-                "type": "string",
-                "enum": ["public", "private", "org", "custom"]
-              },
-              "auth": {
-                "description": "Authentication configuration",
-                "type": "object",
-                "properties": {
-                  "provider": {
-                    "type": "string",
-                    "enum": ["workos", "custom"]
-                  },
-                  "org_id": {
-                    "type": "string"
-                  },
-                  "jwt_issuer": {
-                    "type": "string"
-                  },
-                  "jwt_audience": {
-                    "type": "string"
-                  }
-                }
-              },
-              "variables": {
-                "description": "Application variables",
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
               }
             },
             "required": ["name"]
           },
-          "variables": {
-            "description": "Environment-specific variables",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
+          "components": {
+            "description": "Application components",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Component ID",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "Registry reference to pushed component (components must be pushed to ECR first)",
+                  "type": "object",
+                  "properties": {
+                    "registry": {
+                      "description": "ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)",
+                      "type": "string"
+                    },
+                    "package": {
+                      "description": "Package path (e.g., app123abc/graph)",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "Component version (e.g., 0.1.0)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["registry", "package", "version"]
+                },
+                "variables": {
+                  "description": "Component-specific variables",
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["id", "source"]
             }
           },
-          "environment": {
-            "description": "Deployment environment",
-            "default": "production",
-            "type": "string",
-            "enum": ["development", "staging", "production"]
-          },
           "access": {
-            "description": "Access control override",
+            "description": "Access control mode",
             "type": "string",
             "enum": ["public", "private", "org", "custom"]
           },
           "auth": {
-            "description": "Auth configuration override",
+            "description": "Authentication configuration",
             "type": "object",
             "properties": {
               "provider": {
@@ -1019,9 +976,16 @@
                 "type": "string"
               }
             }
+          },
+          "variables": {
+            "description": "Application variables",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
-        "required": ["application"]
+        "required": ["application", "components"]
       },
       "CreateEcrTokenRequest": {
         "description": "Request body for creating ECR token",
@@ -1071,7 +1035,7 @@
         "required": ["components"]
       },
       "ListAppsResponseBody": {
-        "description": "List of applications with pagination",
+        "description": "List of applications",
         "type": "object",
         "properties": {
           "apps": {
@@ -1165,9 +1129,6 @@
               "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
               "additionalProperties": false
             }
-          },
-          "nextToken": {
-            "type": "string"
           }
         },
         "required": ["apps"],
@@ -1225,29 +1186,16 @@
             "description": "Unique deployment identifier",
             "type": "string"
           },
-          "appId": {
-            "description": "Application identifier",
-            "type": "string"
-          },
-          "appName": {
-            "description": "Application name",
+          "url": {
+            "description": "Deployed application URL",
             "type": "string"
           },
           "status": {
             "description": "Deployment status",
-            "type": "string",
-            "enum": ["DEPLOYING", "DEPLOYED", "FAILED"]
-          },
-          "message": {
-            "description": "Status message",
-            "type": "string"
-          },
-          "appUrl": {
-            "description": "Application URL once deployed",
             "type": "string"
           }
         },
-        "required": ["deploymentId", "appId", "appName", "status", "message"],
+        "required": ["deploymentId", "url", "status"],
         "additionalProperties": false
       },
       "App": {

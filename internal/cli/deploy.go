@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -243,10 +247,11 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Create deployment request with the processed manifest
 	Info("Creating deployment...")
 
+	// Create flat deployment request
 	deploymentReq := createDeploymentRequest(processedManifest, opts)
 
-	// Send deployment request
-	deployment, err := apiClient.CreateDeployment(ctx, appID, deploymentReq)
+	// Send deployment request directly (not using generated client to avoid nested structure)
+	deployment, err := sendDeploymentRequest(ctx, apiClient, appID, deploymentReq, opts.Environment)
 	if err != nil {
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
@@ -405,85 +410,65 @@ func findBuiltWASM(sourcePath, componentID string) (string, error) {
 	return "", fmt.Errorf("could not find built WASM file for component %s", componentID)
 }
 
-func createDeploymentRequest(manifest *validation.Application, opts *DeployOptions) api.CreateDeploymentRequest {
-	req := api.CreateDeploymentRequest{
-		Variables: &opts.Variables,
+// createDeploymentRequest creates a flat FTL deployment request (no "application" wrapper)
+func createDeploymentRequest(manifest *validation.Application, opts *DeployOptions) map[string]interface{} {
+	// Build flat FTL deployment request
+	req := map[string]interface{}{
+		"name": manifest.Name,
 	}
 
-	// Set the application details
-	req.Application.Name = manifest.Name
+	// Add version
 	if manifest.Version != "" {
-		req.Application.Version = &manifest.Version
+		req["version"] = manifest.Version
+	} else {
+		req["version"] = "0.1.0"
 	}
+
+	// Add description if present
 	if manifest.Description != "" {
-		req.Application.Description = &manifest.Description
+		req["description"] = manifest.Description
 	}
 
 	// Set access control
-	switch manifest.Access {
-	case "private":
-		ac := api.CreateDeploymentRequestApplicationAccessPrivate
-		req.Application.Access = &ac
-	case "org":
-		ac := api.CreateDeploymentRequestApplicationAccessOrg
-		req.Application.Access = &ac
-	case "custom":
-		ac := api.CreateDeploymentRequestApplicationAccessCustom
-		req.Application.Access = &ac
-	default:
-		ac := api.CreateDeploymentRequestApplicationAccessPublic
-		req.Application.Access = &ac
+	if manifest.Access != "" {
+		req["access"] = manifest.Access
+	} else {
+		req["access"] = "public"
 	}
 
 	// Set auth configuration if needed
 	if manifest.Auth != nil && (manifest.Access == "org" || manifest.Access == "custom") {
-		req.Application.Auth = &struct {
-			JwtAudience *string                                             `json:"jwt_audience,omitempty"`
-			JwtIssuer   *string                                             `json:"jwt_issuer,omitempty"`
-			OrgId       *string                                             `json:"org_id,omitempty"`
-			Provider    *api.CreateDeploymentRequestApplicationAuthProvider `json:"provider,omitempty"`
-		}{}
-
-		// Default to custom provider when JWT settings are present
+		auth := map[string]interface{}{}
 		if manifest.Auth.JWTIssuer != "" {
-			provider := api.CreateDeploymentRequestApplicationAuthProviderCustom
-			req.Application.Auth.Provider = &provider
-			req.Application.Auth.JwtIssuer = &manifest.Auth.JWTIssuer
+			auth["jwt_issuer"] = manifest.Auth.JWTIssuer
 		}
 		if manifest.Auth.JWTAudience != "" {
-			req.Application.Auth.JwtAudience = &manifest.Auth.JWTAudience
+			auth["jwt_audience"] = manifest.Auth.JWTAudience
+		}
+		if len(auth) > 0 {
+			req["auth"] = auth
 		}
 	}
 
-	// Add components
-	components := make([]struct {
-		Id     string `json:"id"`
-		Source struct {
-			Package  string `json:"package"`
-			Registry string `json:"registry"`
-			Version  string `json:"version"`
-		} `json:"source"`
-		Variables *map[string]string `json:"variables,omitempty"`
-	}, 0, len(manifest.Components))
+	// Add allowed_roles for org mode
+	if manifest.Access == "org" && len(opts.AllowedRoles) > 0 {
+		req["allowed_roles"] = opts.AllowedRoles
+	}
 
+	// Add components
+	components := make([]map[string]interface{}, 0, len(manifest.Components))
 	for _, comp := range manifest.Components {
-		deployComp := struct {
-			Id     string `json:"id"`
-			Source struct {
-				Package  string `json:"package"`
-				Registry string `json:"registry"`
-				Version  string `json:"version"`
-			} `json:"source"`
-			Variables *map[string]string `json:"variables,omitempty"`
-		}{
-			Id: comp.ID,
+		deployComp := map[string]interface{}{
+			"id": comp.ID,
 		}
 
 		// Parse component source - should be registry at this point
 		if regSrc, ok := comp.Source.(*validation.RegistrySource); ok {
-			deployComp.Source.Registry = regSrc.Registry
-			deployComp.Source.Package = regSrc.Package
-			deployComp.Source.Version = regSrc.Version
+			deployComp["source"] = map[string]interface{}{
+				"registry": regSrc.Registry,
+				"package":  regSrc.Package,
+				"version":  regSrc.Version,
+			}
 		} else {
 			// This shouldn't happen after processing
 			Error("Component %s has non-registry source after processing", comp.ID)
@@ -492,39 +477,100 @@ func createDeploymentRequest(manifest *validation.Application, opts *DeployOptio
 
 		// Add component variables if any
 		if len(comp.Variables) > 0 {
-			deployComp.Variables = &comp.Variables
+			deployComp["variables"] = comp.Variables
 		}
 
 		components = append(components, deployComp)
 	}
+	req["components"] = components
 
-	if len(components) > 0 {
-		req.Application.Components = &components
-	}
-
-	// Add application variables if any
+	// Add application variables
 	if len(manifest.Variables) > 0 {
-		req.Application.Variables = &manifest.Variables
+		req["variables"] = manifest.Variables
 	}
 
-	// Set environment based on options
-	switch opts.Environment {
-	case "development":
-		env := api.Development
-		req.Environment = &env
-	case "staging":
-		env := api.Staging
-		req.Environment = &env
-	case "production":
-		env := api.Production
-		req.Environment = &env
-	default:
-		// Default to production if not specified
-		env := api.Production
-		req.Environment = &env
+	// Merge deployment variables from options
+	if len(opts.Variables) > 0 {
+		if existing, ok := req["variables"].(map[string]string); ok {
+			for k, v := range opts.Variables {
+				existing[k] = v
+			}
+		} else {
+			req["variables"] = opts.Variables
+		}
 	}
 
 	return req
+}
+
+// sendDeploymentRequest sends the flat deployment request directly via HTTP
+func sendDeploymentRequest(ctx context.Context, apiClient *api.FTLClient, appID string, deployRequest map[string]interface{}, environment string) (*api.CreateDeploymentResponseBody, error) {
+	// Marshal the flat request
+	body, err := json.Marshal(deployRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal deployment request: %w", err)
+	}
+
+	// Build the URL
+	baseURL := apiClient.GetBaseURL()
+	url := fmt.Sprintf("%s/v1/apps/%s/deployments", baseURL, appID)
+	if environment != "" && environment != "production" {
+		url += fmt.Sprintf("?environment=%s", environment)
+	}
+
+	// Get auth token
+	token, err := apiClient.GetAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth token: %w", err)
+	}
+
+	// Create the request
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	// Send the request
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Check for errors
+	if resp.StatusCode != http.StatusAccepted {
+		var errResp map[string]interface{}
+		if err := json.Unmarshal(respBody, &errResp); err == nil {
+			if errMsg, ok := errResp["error"].(string); ok {
+				return nil, fmt.Errorf("%s", errMsg)
+			}
+			if errMsg, ok := errResp["message"].(string); ok {
+				return nil, fmt.Errorf("%s", errMsg)
+			}
+		}
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	// Parse the success response
+	var result api.CreateDeploymentResponseBody
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
 }
 
 func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string, deploymentID string, sp *spinner.Spinner) (*api.App, error) {

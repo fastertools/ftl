@@ -77,6 +77,16 @@ func (c *FTLClient) Client() *ClientWithResponses {
 	return c.client
 }
 
+// GetBaseURL returns the base URL for the API
+func (c *FTLClient) GetBaseURL() string {
+	return c.baseURL
+}
+
+// GetAuthToken returns the current auth token
+func (c *FTLClient) GetAuthToken(ctx context.Context) (string, error) {
+	return c.authManager.GetToken(ctx)
+}
+
 // parseUUID converts a string to an openapi UUID type
 func parseUUID(s string) (openapi_types.UUID, error) {
 	u, err := uuid.Parse(s)
