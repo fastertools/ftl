@@ -19,14 +19,18 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/fastertools/ftl-cli/internal/auth"
-	"github.com/fastertools/ftl-cli/pkg/types"
+	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
 // DeployOptions holds options for the deploy command
@@ -117,7 +121,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 	if opts.JWTIssuer != "" {
 		if manifest.Auth == nil {
-			manifest.Auth = &types.Auth{}
+			manifest.Auth = &ftltypes.Auth{}
 		}
 		manifest.Auth.JWTIssuer = opts.JWTIssuer
 		if opts.JWTAudience != "" {
@@ -284,7 +288,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 }
 
 // loadDeployManifest loads the FTL manifest configuration for deployment
-func loadDeployManifest(configFile string) (*types.Manifest, error) {
+func loadDeployManifest(configFile string) (*ftltypes.Manifest, error) {
 	// Clean the path to prevent directory traversal
 	configFile = filepath.Clean(configFile)
 	data, err := os.ReadFile(configFile)
@@ -292,7 +296,7 @@ func loadDeployManifest(configFile string) (*types.Manifest, error) {
 		return nil, err
 	}
 
-	var manifest types.Manifest
+	var manifest ftltypes.Manifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
@@ -335,14 +339,14 @@ func parseECRToken(registryURI, authToken string) (*ECRAuth, error) {
 }
 
 // processComponents handles pulling registry components and pushing everything to ECR
-func processComponents(ctx context.Context, manifest *types.Manifest, ecrAuth *ECRAuth, namespace string) (*types.Manifest, error) {
+func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth *ECRAuth, namespace string) (*ftltypes.Manifest, error) {
 	// Create output manifest with ECR references
-	processedManifest := &types.Manifest{
+	processedManifest := &ftltypes.Manifest{
 		Application: manifest.Application,
 		Access:      manifest.Access,
 		Auth:        manifest.Auth,
 		Variables:   manifest.Variables,
-		Components:  make([]types.Component, 0, len(manifest.Components)),
+		Components:  make([]ftltypes.Component, 0, len(manifest.Components)),
 	}
 
 	// Create a WASMPuller for pulling registry components
@@ -357,7 +361,7 @@ func processComponents(ctx context.Context, manifest *types.Manifest, ecrAuth *E
 		var err error
 
 		// Check if it's a local or registry source
-		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
+		if localPath, registrySource := ftltypes.ParseComponentSource(comp.Source); localPath != "" {
 			// Local component - find the built WASM file
 			wasmPath, err = findBuiltWASM(localPath, comp.ID)
 			if err != nil {
@@ -377,7 +381,8 @@ func processComponents(ctx context.Context, manifest *types.Manifest, ecrAuth *E
 		}
 
 		// Push to ECR
-		packageName := fmt.Sprintf("%s:%s", namespace, comp.ID)
+		// Package name should use / not : for the repository path
+		packageName := fmt.Sprintf("%s/%s", namespace, comp.ID)
 		version := manifest.Application.Version
 
 		Info("Pushing %s to ECR", comp.ID)
@@ -387,7 +392,7 @@ func processComponents(ctx context.Context, manifest *types.Manifest, ecrAuth *E
 		Success("Pushed %s", comp.ID)
 
 		// Create processed component with ECR reference
-		processedComp := types.Component{
+		processedComp := ftltypes.Component{
 			ID: comp.ID,
 			Source: map[string]interface{}{
 				"registry": ecrAuth.Registry,
@@ -453,7 +458,7 @@ func NewWASMPuller() *WASMPuller {
 }
 
 // Pull downloads a WASM component from a registry
-func (p *WASMPuller) Pull(ctx context.Context, source *types.RegistrySource) (string, error) {
+func (p *WASMPuller) Pull(ctx context.Context, source *ftltypes.RegistrySource) (string, error) {
 	// Construct the OCI reference
 	ref := fmt.Sprintf("%s/%s:%s", source.Registry, source.Package, source.Version)
 
@@ -551,7 +556,8 @@ func NewWASMPusher(auth *ECRAuth) *WASMPusher {
 	return &WASMPusher{auth: auth}
 }
 
-// Push uploads a WASM component to ECR
+// Push uploads a WASM component to ECR as an OCI artifact
+// Following the CNCF TAG Runtime WASM OCI Artifact specification
 func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version string) error {
 	// Clean the WASM file path
 	wasmPath = filepath.Clean(wasmPath)
@@ -565,24 +571,62 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 	hash := sha256.Sum256(wasmContent)
 	hashStr := hex.EncodeToString(hash[:])
 
-	// Create a temporary tar file containing the WASM
-	tmpDir, err := os.MkdirTemp("", "ftl-push-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	// Create WASM layer with proper media type (compatible with wkg)
+	wasmLayer := static.NewLayer(wasmContent, "application/wasm")
 
-	// Write WASM to temp location
-	tmpWASM := filepath.Join(tmpDir, "component.wasm")
-	if err := os.WriteFile(tmpWASM, wasmContent, 0600); err != nil {
-		return fmt.Errorf("failed to write temp WASM: %w", err)
+	// Create a minimal config file for the image
+	// This follows the CNCF WASM OCI spec
+	cfg := &v1.ConfigFile{
+		Architecture: "wasm",
+		OS:           "wasip2", // Default to wasip2 for components
+		RootFS: v1.RootFS{
+			Type:    "layers",
+			DiffIDs: []v1.Hash{{Algorithm: "sha256", Hex: hashStr}},
+		},
+		Config: v1.Config{
+			// Empty config for WASM artifacts
+		},
+		History: []v1.History{{
+			Created:   v1.Time{Time: time.Now().UTC()},
+			CreatedBy: "ftl-cli",
+			Comment:   "WASM component layer",
+		}},
 	}
 
-	// Create OCI image from the WASM file
-	img, err := tarball.ImageFromPath(tmpWASM, nil)
+	// Build the image from scratch
+	img := empty.Image
+
+	// Add the WASM layer
+	img, err = mutate.Append(img, mutate.Addendum{
+		Layer:     wasmLayer,
+		MediaType: "application/wasm",
+		History: v1.History{
+			Created:   v1.Time{Time: time.Now().UTC()},
+			CreatedBy: "ftl-cli",
+			Comment:   "WASM component layer",
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("failed to create OCI image: %w", err)
+		return fmt.Errorf("failed to add WASM layer: %w", err)
 	}
+
+	// Set the config file
+	img, err = mutate.ConfigFile(img, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to set config: %w", err)
+	}
+
+	// Set the appropriate media types for WASM OCI artifacts
+	// This ensures compatibility with wkg and other WASM tools
+	img = mutate.ConfigMediaType(img, "application/vnd.wasm.config.v0+json")
+	img = mutate.MediaType(img, types.OCIManifestSchema1)
+
+	// Add standard OCI annotations (matching wkg behavior)
+	annotations := map[string]string{
+		"org.opencontainers.image.version": version,
+		"org.opencontainers.image.created": time.Now().UTC().Format(time.RFC3339),
+	}
+	img = mutate.Annotations(img, annotations).(v1.Image)
 
 	// Construct the ECR reference
 	ref := fmt.Sprintf("%s/%s:%s", p.auth.Registry, packageName, version)
@@ -609,7 +653,7 @@ func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version st
 	return nil
 }
 
-func createDeploymentRequest(manifest *types.Manifest, opts *DeployOptions) api.CreateDeploymentRequest {
+func createDeploymentRequest(manifest *ftltypes.Manifest, opts *DeployOptions) api.CreateDeploymentRequest {
 	req := api.CreateDeploymentRequest{
 		Variables: &opts.Variables,
 	}
@@ -682,7 +726,7 @@ func createDeploymentRequest(manifest *types.Manifest, opts *DeployOptions) api.
 		}
 
 		// Parse component source - should be registry at this point
-		if _, registrySource := types.ParseComponentSource(comp.Source); registrySource != nil {
+		if _, registrySource := ftltypes.ParseComponentSource(comp.Source); registrySource != nil {
 			deployComp.Source.Registry = registrySource.Registry
 			deployComp.Source.Package = registrySource.Package
 			deployComp.Source.Version = registrySource.Version
@@ -791,7 +835,7 @@ func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string,
 	return nil, fmt.Errorf("deployment timeout after 3 minutes")
 }
 
-func displayDryRunSummary(manifest *types.Manifest, appExists bool) {
+func displayDryRunSummary(manifest *ftltypes.Manifest, appExists bool) {
 	fmt.Println()
 	fmt.Println("🔍 DRY RUN MODE - No changes will be made")
 	fmt.Println()
@@ -820,7 +864,7 @@ func displayDryRunSummary(manifest *types.Manifest, appExists bool) {
 		fmt.Printf("  • %s\n", comp.ID)
 
 		// Show source type
-		if localPath, registrySource := types.ParseComponentSource(comp.Source); localPath != "" {
+		if localPath, registrySource := ftltypes.ParseComponentSource(comp.Source); localPath != "" {
 			fmt.Printf("    Source: %s (local)\n", localPath)
 			if comp.Build != nil && comp.Build.Command != "" {
 				fmt.Printf("    Build: %s\n", comp.Build.Command)
@@ -871,7 +915,7 @@ func promptConfirm(message string, defaultYes bool) bool {
 }
 
 // displayMCPUrls displays a table showing MCP URLs for the application and its components
-func displayMCPUrls(baseURL string, components []types.Component) {
+func displayMCPUrls(baseURL string, components []ftltypes.Component) {
 	// Ensure the base URL ends with /mcp
 	mcpBaseURL := strings.TrimRight(baseURL, "/") + "/mcp"
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -14,8 +15,13 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	v1types "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -410,4 +416,196 @@ func TestDisplayMCPUrls(t *testing.T) {
 
 	// Just verify the function executes without error
 	assert.True(t, true, "displayMCPUrls executed successfully")
+}
+
+func TestWASMOCIArtifactSpec(t *testing.T) {
+	// Test that our implementation creates OCI artifacts conforming to the
+	// CNCF TAG Runtime WASM OCI Artifact specification that wkg uses
+	
+	t.Run("verify pushed artifact conforms to spec", func(t *testing.T) {
+		// Create a test registry
+		s := httptest.NewServer(registry.New())
+		defer s.Close()
+		
+		regURL := strings.TrimPrefix(s.URL, "http://")
+		
+		// Create a test WASM file
+		tmpDir := t.TempDir()
+		wasmPath := filepath.Join(tmpDir, "test.wasm")
+		wasmContent := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00} // Valid WASM header
+		err := os.WriteFile(wasmPath, wasmContent, 0644)
+		require.NoError(t, err)
+		
+		// Push using our implementation
+		pusher := NewWASMPusher(&ECRAuth{
+			Registry: regURL,
+			Username: "test",
+			Password: "test",
+		})
+		
+		ctx := context.Background()
+		packageName := "test/component"
+		version := "1.0.0"
+		
+		err = pusher.Push(ctx, wasmPath, packageName, version)
+		require.NoError(t, err)
+		
+		// Now pull it back and verify the structure
+		ref, err := name.ParseReference(fmt.Sprintf("%s/%s:%s", regURL, packageName, version))
+		require.NoError(t, err)
+		
+		img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		require.NoError(t, err)
+		
+		// Verify manifest media type
+		mediaType, err := img.MediaType()
+		require.NoError(t, err)
+		assert.Equal(t, v1types.OCIManifestSchema1, mediaType, "manifest should use OCI media type")
+		
+		// Verify config media type
+		configFile, err := img.ConfigFile()
+		require.NoError(t, err)
+		assert.Equal(t, "wasm", configFile.Architecture, "architecture must be 'wasm'")
+		assert.Equal(t, "wasip2", configFile.OS, "OS should be 'wasip2' for components")
+		
+		// Verify we have exactly one layer (WASM content)
+		layers, err := img.Layers()
+		require.NoError(t, err)
+		assert.Len(t, layers, 1, "WASM OCI artifacts must have exactly one layer")
+		
+		// Verify layer media type
+		layer := layers[0]
+		layerMediaType, err := layer.MediaType()
+		require.NoError(t, err)
+		assert.Equal(t, "application/wasm", string(layerMediaType), "layer must use 'application/wasm' media type")
+		
+		// Verify layer content matches original WASM
+		layerReader, err := layer.Uncompressed()
+		require.NoError(t, err)
+		defer layerReader.Close()
+		
+		layerContent, err := io.ReadAll(layerReader)
+		require.NoError(t, err)
+		assert.Equal(t, wasmContent, layerContent, "layer content must match original WASM file")
+		
+		// Verify annotations
+		manifest, err := img.Manifest()
+		require.NoError(t, err)
+		assert.NotNil(t, manifest.Annotations)
+		assert.Equal(t, version, manifest.Annotations["org.opencontainers.image.version"])
+		assert.NotEmpty(t, manifest.Annotations["org.opencontainers.image.created"])
+	})
+	
+	t.Run("verify pulled artifact can be used by wkg-compatible tools", func(t *testing.T) {
+		// This test verifies that artifacts created by wkg can be pulled by our implementation
+		// Create a test registry
+		s := httptest.NewServer(registry.New())
+		defer s.Close()
+		
+		regURL := strings.TrimPrefix(s.URL, "http://")
+		
+		// Create a wkg-style WASM OCI artifact manually
+		wasmContent := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00}
+		
+		// Create image with wkg-compatible structure
+		layer := static.NewLayer(wasmContent, "application/wasm")
+		
+		img := empty.Image
+		img, err := mutate.Append(img, mutate.Addendum{
+			Layer:     layer,
+			MediaType: "application/wasm",
+		})
+		require.NoError(t, err)
+		
+		// Set config as wkg does
+		cfg := &v1.ConfigFile{
+			Architecture: "wasm",
+			OS:           "wasip2",
+			RootFS: v1.RootFS{
+				Type:    "layers",
+				DiffIDs: []v1.Hash{{Algorithm: "sha256", Hex: fmt.Sprintf("%x", sha256.Sum256(wasmContent))}},
+			},
+		}
+		img, err = mutate.ConfigFile(img, cfg)
+		require.NoError(t, err)
+		
+		img = mutate.ConfigMediaType(img, "application/vnd.wasm.config.v0+json")
+		img = mutate.MediaType(img, v1types.OCIManifestSchema1)
+		
+		// Push the wkg-style artifact
+		ref, err := name.ParseReference(fmt.Sprintf("%s/wkg/component:1.0.0", regURL))
+		require.NoError(t, err)
+		
+		err = remote.Write(ref, img, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		require.NoError(t, err)
+		
+		// Now verify our puller can handle it
+		puller := NewWASMPuller()
+		source := &types.RegistrySource{
+			Registry: regURL,
+			Package:  "wkg/component",
+			Version:  "1.0.0",
+		}
+		
+		wasmPath, err := puller.Pull(context.Background(), source)
+		require.NoError(t, err)
+		assert.FileExists(t, wasmPath)
+		
+		// Verify pulled content matches
+		pulledContent, err := os.ReadFile(wasmPath)
+		require.NoError(t, err)
+		assert.Equal(t, wasmContent, pulledContent, "pulled WASM must match original")
+	})
+}
+
+func TestWASMComponentDiscovery(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Additional test cases for WASM component discovery patterns
+	// that are common in the wkg ecosystem
+	testCases := []struct {
+		name        string
+		setupPath   string
+		componentID string
+		expectFound bool
+	}{
+		{
+			name:        "wkg default output location",
+			setupPath:   filepath.Join(tmpDir, "component.wasm"),
+			componentID: "component",
+			expectFound: true,
+		},
+		{
+			name:        "cargo component output",
+			setupPath:   filepath.Join(tmpDir, "target", "wasm32-wasip2", "release", "mycomp.wasm"),
+			componentID: "mycomp",
+			expectFound: true,
+		},
+		{
+			name:        "wasm32-wasi target (legacy)",
+			setupPath:   filepath.Join(tmpDir, "target", "wasm32-wasi", "release", "legacy.wasm"),
+			componentID: "legacy",
+			expectFound: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create the test file
+			err := os.MkdirAll(filepath.Dir(tc.setupPath), 0755)
+			require.NoError(t, err)
+			err = os.WriteFile(tc.setupPath, []byte{0x00, 0x61, 0x73, 0x6d}, 0644) // WASM magic
+			require.NoError(t, err)
+
+			// Try to find it
+			found, err := findBuiltWASM(tmpDir, tc.componentID)
+			if tc.expectFound {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, found)
+				assert.Equal(t, tc.setupPath, found)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }

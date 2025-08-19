@@ -168,7 +168,7 @@ func synthesizeFromJSON(input []byte) (string, error) {
 func synthesizeFromGo(filename string) (string, error) {
 	// Clean the path first
 	filename = filepath.Clean(filename)
-	
+
 	// Get absolute path to ensure the file can be found
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
@@ -184,7 +184,7 @@ func synthesizeFromGo(filename string) (string, error) {
 	if _, err := os.Stat(absPath); err != nil {
 		return "", fmt.Errorf("file not found: %w", err)
 	}
-	
+
 	// Additional validation: ensure no shell metacharacters in the path
 	// even though exec.Command doesn't use shell, this is defense in depth
 	if strings.ContainsAny(absPath, ";|&$`\\\"'<>(){}[]!*?~") {
