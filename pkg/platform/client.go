@@ -11,6 +11,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// DefaultECRRegistry is the FTL platform's ECR registry
+	DefaultECRRegistry = "795394005211.dkr.ecr.us-west-2.amazonaws.com"
+)
+
 // Processor handles FTL application processing for platform deployments.
 type Processor struct {
 	config      Config
@@ -32,7 +37,7 @@ type Config struct {
 
 	// Security settings
 	RequireRegistryComponents bool     // If true, reject local file sources
-	AllowedRegistries         []string // Whitelist of allowed registries
+	AllowedRegistries         []string // Whitelist of allowed registries (empty = allow all)
 }
 
 // DefaultConfig returns production-ready default configuration.
@@ -45,7 +50,10 @@ func DefaultConfig() Config {
 		AuthorizerPackage:         "fastertools:mcp-authorizer",
 		AuthorizerVersion:         "0.0.15-alpha.0",
 		RequireRegistryComponents: true,
-		AllowedRegistries:         []string{"ghcr.io"},
+		AllowedRegistries: []string{
+			"ghcr.io",           // For gateway and authorizer
+			DefaultECRRegistry,  // For user components
+		},
 	}
 }
 

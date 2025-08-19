@@ -211,7 +211,13 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("RequireRegistryComponents should be true by default")
 	}
 
-	if len(config.AllowedRegistries) != 1 || config.AllowedRegistries[0] != "ghcr.io" {
-		t.Error("default allowed registries should be [ghcr.io]")
+	if len(config.AllowedRegistries) != 2 {
+		t.Errorf("default allowed registries should have 2 entries, got %d", len(config.AllowedRegistries))
+	}
+	if config.AllowedRegistries[0] != "ghcr.io" {
+		t.Errorf("first allowed registry should be ghcr.io, got %s", config.AllowedRegistries[0])
+	}
+	if config.AllowedRegistries[1] != DefaultECRRegistry {
+		t.Errorf("second allowed registry should be %s, got %s", DefaultECRRegistry, config.AllowedRegistries[1])
 	}
 }
