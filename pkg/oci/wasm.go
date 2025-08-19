@@ -1,4 +1,4 @@
-package cli
+package oci
 
 import (
 	"crypto/sha256"
@@ -26,9 +26,10 @@ type WASMConfig struct {
 
 // wasmOCIImage implements v1.Image with proper WASM OCI config including layerDigests
 type wasmOCIImage struct {
-	wasmLayer v1.Layer
-	config    []byte
-	hashStr   string
+	wasmLayer   v1.Layer
+	config      []byte
+	hashStr     string
+	annotations map[string]string
 }
 
 
@@ -65,8 +66,8 @@ func (w *wasmOCIImage) ConfigFile() (*v1.ConfigFile, error) {
 	// We can't return the custom fields here, but we override RawConfigFile
 	// to provide the actual config with layerDigests
 	return &v1.ConfigFile{
-		Architecture: "wasm",
-		OS:           "wasip2",
+		Architecture: WASMArchitecture,
+		OS:           WASMOS,
 		Config:       v1.Config{},
 		RootFS: v1.RootFS{
 			Type:    "layers",
@@ -77,7 +78,6 @@ func (w *wasmOCIImage) ConfigFile() (*v1.ConfigFile, error) {
 
 // RawConfigFile returns the raw config file with layerDigests
 func (w *wasmOCIImage) RawConfigFile() ([]byte, error) {
-	Debug("Returning raw config with layerDigests: %s", string(w.config))
 	return w.config, nil
 }
 
@@ -117,7 +117,7 @@ func (w *wasmOCIImage) Manifest() (*v1.Manifest, error) {
 	}
 	
 	layers = append(layers, v1.Descriptor{
-		MediaType: "application/wasm",
+		MediaType: WASMLayerMediaType,
 		Size:      layerSize,
 		Digest:    layerDigest,
 	})
@@ -132,11 +132,12 @@ func (w *wasmOCIImage) Manifest() (*v1.Manifest, error) {
 		SchemaVersion: 2,
 		MediaType:     types.OCIManifestSchema1,
 		Config: v1.Descriptor{
-			MediaType: "application/vnd.wasm.config.v0+json",
+			MediaType: WASMConfigMediaType,
 			Size:      int64(len(w.config)),
 			Digest:    configHash,
 		},
-		Layers: layers,
+		Layers:      layers,
+		Annotations: w.annotations,
 	}, nil
 }
 
@@ -146,12 +147,7 @@ func (w *wasmOCIImage) RawManifest() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	manifestJSON, err := json.Marshal(manifest)
-	if err != nil {
-		return nil, err
-	}
-	Debug("WASM Manifest JSON: %s", string(manifestJSON))
-	return manifestJSON, nil
+	return json.Marshal(manifest)
 }
 
 // LayerByDigest returns a layer by digest

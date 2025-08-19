@@ -2,30 +2,22 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl-cli/pkg/oci"
 	ftltypes "github.com/fastertools/ftl-cli/pkg/types"
 )
 
@@ -308,15 +300,8 @@ func runSynth(ctx context.Context, configFile string) error {
 	return cmd.Run()
 }
 
-// ECRAuth holds parsed ECR authentication details
-type ECRAuth struct {
-	Registry string
-	Username string
-	Password string
-}
-
 // parseECRToken parses the ECR authorization token
-func parseECRToken(registryURI, authToken string) (*ECRAuth, error) {
+func parseECRToken(registryURI, authToken string) (*oci.ECRAuth, error) {
 	decoded, err := base64.StdEncoding.DecodeString(authToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ECR token: %w", err)
@@ -327,7 +312,7 @@ func parseECRToken(registryURI, authToken string) (*ECRAuth, error) {
 		return nil, fmt.Errorf("invalid ECR token format")
 	}
 
-	return &ECRAuth{
+	return &oci.ECRAuth{
 		Registry: registryURI,
 		Username: parts[0],
 		Password: parts[1],
@@ -335,7 +320,7 @@ func parseECRToken(registryURI, authToken string) (*ECRAuth, error) {
 }
 
 // processComponents handles pulling registry components and pushing everything to ECR
-func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth *ECRAuth, namespace string) (*ftltypes.Manifest, error) {
+func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth *oci.ECRAuth, namespace string) (*ftltypes.Manifest, error) {
 	// Create output manifest with ECR references
 	processedManifest := &ftltypes.Manifest{
 		Application: manifest.Application,
@@ -346,10 +331,10 @@ func processComponents(ctx context.Context, manifest *ftltypes.Manifest, ecrAuth
 	}
 
 	// Create a WASMPuller for pulling registry components
-	puller := NewWASMPuller()
+	puller := oci.NewWASMPuller()
 
 	// Create a WASMPusher for pushing to ECR
-	pusher := NewWASMPusher(ecrAuth)
+	pusher := oci.NewWASMPusher(ecrAuth)
 
 	// Process each component
 	for _, comp := range manifest.Components {
@@ -434,193 +419,6 @@ func findBuiltWASM(sourcePath, componentID string) (string, error) {
 	return "", fmt.Errorf("could not find built WASM file for component %s", componentID)
 }
 
-// WASMPuller handles pulling WASM components from OCI registries
-type WASMPuller struct {
-	cacheDir string
-	mu       sync.Mutex
-}
-
-// NewWASMPuller creates a new WASM component puller
-func NewWASMPuller() *WASMPuller {
-	home := os.Getenv("HOME")
-	cacheDir := filepath.Join(home, ".cache", "ftl", "wasm")
-	if err := os.MkdirAll(cacheDir, 0750); err != nil {
-		// Use temp dir as fallback if cache dir can't be created
-		cacheDir = filepath.Join(os.TempDir(), "ftl-wasm-cache")
-		_ = os.MkdirAll(cacheDir, 0750) // Best effort
-	}
-
-	return &WASMPuller{
-		cacheDir: cacheDir,
-	}
-}
-
-// Pull downloads a WASM component from a registry
-func (p *WASMPuller) Pull(ctx context.Context, source *ftltypes.RegistrySource) (string, error) {
-	// Construct the OCI reference
-	ref := fmt.Sprintf("%s/%s:%s", source.Registry, source.Package, source.Version)
-
-	// Parse the reference
-	tag, err := name.ParseReference(ref)
-	if err != nil {
-		return "", fmt.Errorf("invalid reference %s: %w", ref, err)
-	}
-
-	// Pull the image
-	img, err := remote.Image(tag, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-	if err != nil {
-		return "", fmt.Errorf("failed to pull %s: %w", ref, err)
-	}
-
-	// Get the manifest to find the WASM layer
-	manifest, err := img.Manifest()
-	if err != nil {
-		return "", fmt.Errorf("failed to get manifest: %w", err)
-	}
-
-	// Find the WASM layer (usually the first/only layer)
-	if len(manifest.Layers) == 0 {
-		return "", fmt.Errorf("no layers found in image")
-	}
-
-	// Get the first layer
-	layers, err := img.Layers()
-	if err != nil {
-		return "", fmt.Errorf("failed to get layers: %w", err)
-	}
-
-	if len(layers) == 0 {
-		return "", fmt.Errorf("no layers available")
-	}
-
-	layer := layers[0]
-
-	// Get layer content
-	reader, err := layer.Uncompressed()
-	if err != nil {
-		return "", fmt.Errorf("failed to get layer content: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
-
-	// Calculate hash for cache filename
-	hash, err := layer.Digest()
-	if err != nil {
-		return "", fmt.Errorf("failed to get layer digest: %w", err)
-	}
-
-	// Create cache file path - hash.Hex is safe (it's a computed hash)
-	cachePath := filepath.Clean(filepath.Join(p.cacheDir, hash.Hex+".wasm"))
-
-	// Check if already cached
-	if _, err := os.Stat(cachePath); err == nil {
-		Debug("Using cached WASM at %s", cachePath)
-		return cachePath, nil
-	}
-
-	// Write to cache
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// Create temp file - hash.Hex is safe (it's a computed hash)
-	tmpFile := filepath.Clean(cachePath + ".tmp")
-	file, err := os.Create(tmpFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to create cache file: %w", err)
-	}
-
-	_, err = io.Copy(file, reader)
-	_ = file.Close()
-	if err != nil {
-		_ = os.Remove(tmpFile)
-		return "", fmt.Errorf("failed to write WASM content: %w", err)
-	}
-
-	// Atomic rename
-	if err := os.Rename(tmpFile, cachePath); err != nil {
-		_ = os.Remove(tmpFile)
-		return "", fmt.Errorf("failed to finalize cache file: %w", err)
-	}
-
-	return cachePath, nil
-}
-
-// WASMPusher handles pushing WASM components to ECR
-type WASMPusher struct {
-	auth *ECRAuth
-}
-
-// NewWASMPusher creates a new WASM component pusher
-func NewWASMPusher(auth *ECRAuth) *WASMPusher {
-	return &WASMPusher{auth: auth}
-}
-
-// Push uploads a WASM component to ECR as an OCI artifact
-// Following the CNCF TAG Runtime WASM OCI Artifact specification
-func (p *WASMPusher) Push(ctx context.Context, wasmPath, packageName, version string) error {
-	// Clean the WASM file path
-	wasmPath = filepath.Clean(wasmPath)
-	// Read the WASM file
-	wasmContent, err := os.ReadFile(wasmPath)
-	if err != nil {
-		return fmt.Errorf("failed to read WASM file: %w", err)
-	}
-
-	// Calculate SHA256 for the WASM content
-	wasmHash := sha256.Sum256(wasmContent)
-	wasmHashStr := hex.EncodeToString(wasmHash[:])
-
-	// Create WASM layer with proper media type
-	wasmLayer := static.NewLayer(wasmContent, "application/wasm")
-
-	// Create the config JSON with layerDigests field (critical for Spin)
-	configData := WASMConfig{
-		Created:      time.Now().UTC().Format(time.RFC3339),
-		Architecture: "wasm",
-		OS:           "wasip2",
-		LayerDigests: []string{fmt.Sprintf("sha256:%s", wasmHashStr)},
-	}
-	configData.RootFS.Type = "layers"
-	configData.RootFS.DiffIDs = []string{fmt.Sprintf("sha256:%s", wasmHashStr)}
-	
-	configJSON, err := json.Marshal(configData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	// Debug: Log the config JSON to verify it has layer_digests
-	Debug("WASM Config JSON: %s", string(configJSON))
-
-	// Create a custom WASM OCI image
-	img := &wasmOCIImage{
-		wasmLayer: wasmLayer,
-		config:    configJSON,
-		hashStr:   wasmHashStr,
-	}
-
-	// Construct the ECR reference
-	ref := fmt.Sprintf("%s/%s:%s", p.auth.Registry, packageName, version)
-
-	// Parse the reference
-	tag, err := name.ParseReference(ref)
-	if err != nil {
-		return fmt.Errorf("invalid reference %s: %w", ref, err)
-	}
-
-	// Create authenticator
-	authConfig := authn.AuthConfig{
-		Username: p.auth.Username,
-		Password: p.auth.Password,
-	}
-	authenticator := authn.FromConfig(authConfig)
-
-	// Push the image using our custom implementation
-	if err := remote.Write(tag, img, remote.WithAuth(authenticator)); err != nil {
-		return fmt.Errorf("failed to push to ECR: %w", err)
-	}
-
-	Debug("Pushed WASM to %s", ref)
-	return nil
-}
 
 func createDeploymentRequest(manifest *ftltypes.Manifest, opts *DeployOptions) api.CreateDeploymentRequest {
 	req := api.CreateDeploymentRequest{

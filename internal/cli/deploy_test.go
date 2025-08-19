@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/fastertools/ftl-cli/pkg/oci"
 	"github.com/fastertools/ftl-cli/pkg/types"
 )
 
@@ -130,7 +131,7 @@ func TestWASMPuller(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test pulling
-	puller := NewWASMPuller()
+	puller := oci.NewWASMPuller()
 	assert.NotNil(t, puller)
 
 	ctx := context.Background()
@@ -153,16 +154,13 @@ func TestWASMPuller(t *testing.T) {
 
 func TestWASMPusher(t *testing.T) {
 	// Test WASMPusher initialization and basic functionality
-	auth := &ECRAuth{
+	auth := &oci.ECRAuth{
 		Registry: "test.registry.com",
 		Username: "testuser",
 		Password: "testpass",
 	}
-	pusher := NewWASMPusher(auth)
+	pusher := oci.NewWASMPusher(auth)
 	assert.NotNil(t, pusher)
-
-	// Verify auth was set correctly
-	assert.Equal(t, auth, pusher.auth)
 
 	// Test that the Push method exists and can be called
 	// Actual pushing requires a valid OCI image which is complex to mock
@@ -360,7 +358,7 @@ func TestProcessComponentsPackageFormat(t *testing.T) {
 	
 	t.Run("processComponents result format", func(t *testing.T) {
 		// Create a mock processed manifest to verify the expected format
-		ecrAuth := &ECRAuth{
+		ecrAuth := &oci.ECRAuth{
 			Registry: "123456789.dkr.ecr.us-east-1.amazonaws.com",
 		}
 		namespace := "app-uuid-abc123"
@@ -563,7 +561,7 @@ func TestWASMOCIArtifactSpec(t *testing.T) {
 		require.NoError(t, err)
 		
 		// Push using our implementation
-		pusher := NewWASMPusher(&ECRAuth{
+		pusher := oci.NewWASMPusher(&oci.ECRAuth{
 			Registry: regURL,
 			Username: "test",
 			Password: "test",
@@ -666,7 +664,7 @@ func TestWASMOCIArtifactSpec(t *testing.T) {
 		require.NoError(t, err)
 		
 		// Now verify our puller can handle it
-		puller := NewWASMPuller()
+		puller := oci.NewWASMPuller()
 		source := &types.RegistrySource{
 			Registry: regURL,
 			Package:  "wkg/component",
