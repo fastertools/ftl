@@ -192,8 +192,9 @@ jobs:
         run: |
           # Run tests only for the SDK packages which have unit tests
           # Component tests need to be run with spin test separately
-          cd sdk/rust && cargo test --all-features
-          cd ../rust-macros && cargo test --all-features || true
+          # Override the default target to run on native platform
+          cd sdk/rust && cargo test --target x86_64-unknown-linux-gnu --all-features
+          cd ../rust-macros && cargo test --target x86_64-unknown-linux-gnu --all-features || true
           
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
@@ -201,6 +202,7 @@ jobs:
       - name: Generate coverage
         run: |
           cargo llvm-cov --workspace --all-features \
+            --target x86_64-unknown-linux-gnu \
             --lcov --output-path lcov.info || true
             
 
