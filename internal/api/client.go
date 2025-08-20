@@ -68,6 +68,22 @@ func (c *authHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	// Add authorization header
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
+	// Add actor type headers for M2M authentication
+	actorType, _ := c.authManager.GetActorType(req.Context())
+	if actorType == "machine" {
+		req.Header.Set("X-FTL-Actor-Type", "machine")
+		
+		// For M2M, we should extract org_id from the token or config
+		// This would require JWT parsing or storing org_id after token exchange
+		// For now, the backend will extract this from the JWT claims
+	} else {
+		req.Header.Set("X-FTL-Actor-Type", "user")
+		
+		// For users, add user_id and org_id if available
+		// These would typically be extracted from the JWT claims
+		// The backend handles this extraction for now
+	}
+
 	// Execute the request
 	return c.underlying.Do(req)
 }
@@ -236,14 +252,14 @@ func (c *FTLClient) UpdateComponents(ctx context.Context, appID string, request 
 // Note: Deployments are now done via streaming Lambda Function URLs
 // obtained from CreateDeployCredentials, not through the REST API
 
-// Organization API methods
+// User API methods
 
-// GetUserOrgs retrieves the organizations for the authenticated user
-func (c *FTLClient) GetUserOrgs(ctx context.Context) (*GetUserOrgsResponseBody, error) {
-	params := &GetUserOrgsParams{}
-	resp, err := c.client.GetUserOrgsWithResponse(ctx, params)
+// GetUserInfo retrieves the user information and organizations
+func (c *FTLClient) GetUserInfo(ctx context.Context) (*GetUserInfoResponseBody, error) {
+	params := &GetUserInfoParams{}
+	resp, err := c.client.GetUserInfoWithResponse(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user orgs: %w", err)
+		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
 	if resp.HTTPResponse.StatusCode != http.StatusOK {

@@ -261,8 +261,8 @@ type GetAppLogsResponseBody struct {
 	} `json:"metadata"`
 }
 
-// GetUserOrgsResponseBody List of user organizations
-type GetUserOrgsResponseBody struct {
+// GetUserInfoResponseBody User information with organizations
+type GetUserInfoResponseBody struct {
 	// Organizations List of organizations the user belongs to
 	Organizations []struct {
 		// Id Organization ID from WorkOS
@@ -271,6 +271,18 @@ type GetUserOrgsResponseBody struct {
 		// Name Organization name
 		Name string `json:"name"`
 	} `json:"organizations"`
+
+	// User User information
+	User struct {
+		// Email User email address
+		Email *string `json:"email"`
+
+		// Id User ID from WorkOS
+		Id string `json:"id"`
+
+		// Name User full name
+		Name *string `json:"name"`
+	} `json:"user"`
 }
 
 // ListAppsResponseBody List of applications
@@ -411,8 +423,8 @@ type GetAppLogsParams struct {
 	Authorization string `json:"Authorization"`
 }
 
-// GetUserOrgsParams defines parameters for GetUserOrgs.
-type GetUserOrgsParams struct {
+// GetUserInfoParams defines parameters for GetUserInfo.
+type GetUserInfoParams struct {
 	// Authorization Bearer token for authentication
 	Authorization string `json:"Authorization"`
 }
@@ -529,8 +541,8 @@ type ClientInterface interface {
 	// GetAppLogs request
 	GetAppLogs(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetUserOrgs request
-	GetUserOrgs(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetUserInfo request
+	GetUserInfo(ctx context.Context, params *GetUserInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListApps(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -665,8 +677,8 @@ func (c *Client) GetAppLogs(ctx context.Context, appId openapi_types.UUID, param
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetUserOrgs(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetUserOrgsRequest(c.Server, params)
+func (c *Client) GetUserInfo(ctx context.Context, params *GetUserInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserInfoRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1154,8 +1166,8 @@ func NewGetAppLogsRequest(server string, appId openapi_types.UUID, params *GetAp
 	return req, nil
 }
 
-// NewGetUserOrgsRequest generates requests for GetUserOrgs
-func NewGetUserOrgsRequest(server string, params *GetUserOrgsParams) (*http.Request, error) {
+// NewGetUserInfoRequest generates requests for GetUserInfo
+func NewGetUserInfoRequest(server string, params *GetUserInfoParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1163,7 +1175,7 @@ func NewGetUserOrgsRequest(server string, params *GetUserOrgsParams) (*http.Requ
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/v1/user/orgs")
+	operationPath := fmt.Sprintf("/v1/user/info")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1238,40 +1250,40 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// ListAppsWithResponse request
-	ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsResponse, error)
+	ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsWithResponse, error)
 
 	// CreateAppWithBodyWithResponse request with any body
-	CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
+	CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppWithResponse, error)
 
-	CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
+	CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppWithResponse, error)
 
 	// DeleteAppWithResponse request
-	DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppResponse, error)
+	DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppWithResponse, error)
 
 	// GetAppWithResponse request
-	GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppResponse, error)
+	GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppWithResponse, error)
 
 	// ListAppComponentsWithResponse request
-	ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsResponse, error)
+	ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsWithResponse, error)
 
 	// UpdateComponentsWithBodyWithResponse request with any body
-	UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error)
+	UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsWithResponse, error)
 
-	UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error)
+	UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsWithResponse, error)
 
 	// CreateDeployCredentialsWithBodyWithResponse request with any body
-	CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsResponse, error)
+	CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsWithResponse, error)
 
-	CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsResponse, error)
+	CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsWithResponse, error)
 
 	// GetAppLogsWithResponse request
-	GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsResponse, error)
+	GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsWithResponse, error)
 
-	// GetUserOrgsWithResponse request
-	GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsResponse, error)
+	// GetUserInfoWithResponse request
+	GetUserInfoWithResponse(ctx context.Context, params *GetUserInfoParams, reqEditors ...RequestEditorFn) (*GetUserInfoWithResponse, error)
 }
 
-type ListAppsResponse struct {
+type ListAppsWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ListAppsResponseBody
@@ -1281,7 +1293,7 @@ type ListAppsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListAppsResponse) Status() string {
+func (r ListAppsWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1289,14 +1301,14 @@ func (r ListAppsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListAppsResponse) StatusCode() int {
+func (r ListAppsWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateAppResponse struct {
+type CreateAppWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *CreateAppResponseBody
@@ -1307,7 +1319,7 @@ type CreateAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateAppResponse) Status() string {
+func (r CreateAppWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1315,14 +1327,14 @@ func (r CreateAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateAppResponse) StatusCode() int {
+func (r CreateAppWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteAppResponse struct {
+type DeleteAppWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *DeleteAppResponseBody
@@ -1332,7 +1344,7 @@ type DeleteAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteAppResponse) Status() string {
+func (r DeleteAppWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1340,14 +1352,14 @@ func (r DeleteAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteAppResponse) StatusCode() int {
+func (r DeleteAppWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetAppResponse struct {
+type GetAppWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *App
@@ -1357,7 +1369,7 @@ type GetAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetAppResponse) Status() string {
+func (r GetAppWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1365,14 +1377,14 @@ func (r GetAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetAppResponse) StatusCode() int {
+func (r GetAppWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type ListAppComponentsResponse struct {
+type ListAppComponentsWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ListComponentsResponseBody
@@ -1382,7 +1394,7 @@ type ListAppComponentsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListAppComponentsResponse) Status() string {
+func (r ListAppComponentsWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1390,14 +1402,14 @@ func (r ListAppComponentsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListAppComponentsResponse) StatusCode() int {
+func (r ListAppComponentsWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type UpdateComponentsResponse struct {
+type UpdateComponentsWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UpdateComponentsResponseBody
@@ -1408,7 +1420,7 @@ type UpdateComponentsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r UpdateComponentsResponse) Status() string {
+func (r UpdateComponentsWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1416,14 +1428,14 @@ func (r UpdateComponentsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpdateComponentsResponse) StatusCode() int {
+func (r UpdateComponentsWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateDeployCredentialsResponse struct {
+type CreateDeployCredentialsWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *CreateDeployCredentialsResponseBody
@@ -1434,7 +1446,7 @@ type CreateDeployCredentialsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateDeployCredentialsResponse) Status() string {
+func (r CreateDeployCredentialsWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1442,14 +1454,14 @@ func (r CreateDeployCredentialsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateDeployCredentialsResponse) StatusCode() int {
+func (r CreateDeployCredentialsWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetAppLogsResponse struct {
+type GetAppLogsWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *GetAppLogsResponseBody
@@ -1461,7 +1473,7 @@ type GetAppLogsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetAppLogsResponse) Status() string {
+func (r GetAppLogsWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1469,23 +1481,23 @@ func (r GetAppLogsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetAppLogsResponse) StatusCode() int {
+func (r GetAppLogsWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetUserOrgsResponse struct {
+type GetUserInfoWithResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *GetUserOrgsResponseBody
+	JSON200      *GetUserInfoResponseBody
 	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
-func (r GetUserOrgsResponse) Status() string {
+func (r GetUserInfoWithResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1493,127 +1505,127 @@ func (r GetUserOrgsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetUserOrgsResponse) StatusCode() int {
+func (r GetUserInfoWithResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// ListAppsWithResponse request returning *ListAppsResponse
-func (c *ClientWithResponses) ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsResponse, error) {
+// ListAppsWithResponse request returning *ListAppsWithResponse
+func (c *ClientWithResponses) ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsWithResponse, error) {
 	rsp, err := c.ListApps(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListAppsResponse(rsp)
+	return ParseListAppsWithResponse(rsp)
 }
 
-// CreateAppWithBodyWithResponse request with arbitrary body returning *CreateAppResponse
-func (c *ClientWithResponses) CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppResponse, error) {
+// CreateAppWithBodyWithResponse request with arbitrary body returning *CreateAppWithResponse
+func (c *ClientWithResponses) CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppWithResponse, error) {
 	rsp, err := c.CreateAppWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateAppResponse(rsp)
+	return ParseCreateAppWithResponse(rsp)
 }
 
-func (c *ClientWithResponses) CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppResponse, error) {
+func (c *ClientWithResponses) CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppWithResponse, error) {
 	rsp, err := c.CreateApp(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateAppResponse(rsp)
+	return ParseCreateAppWithResponse(rsp)
 }
 
-// DeleteAppWithResponse request returning *DeleteAppResponse
-func (c *ClientWithResponses) DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppResponse, error) {
+// DeleteAppWithResponse request returning *DeleteAppWithResponse
+func (c *ClientWithResponses) DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppWithResponse, error) {
 	rsp, err := c.DeleteApp(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteAppResponse(rsp)
+	return ParseDeleteAppWithResponse(rsp)
 }
 
-// GetAppWithResponse request returning *GetAppResponse
-func (c *ClientWithResponses) GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppResponse, error) {
+// GetAppWithResponse request returning *GetAppWithResponse
+func (c *ClientWithResponses) GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppWithResponse, error) {
 	rsp, err := c.GetApp(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetAppResponse(rsp)
+	return ParseGetAppWithResponse(rsp)
 }
 
-// ListAppComponentsWithResponse request returning *ListAppComponentsResponse
-func (c *ClientWithResponses) ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsResponse, error) {
+// ListAppComponentsWithResponse request returning *ListAppComponentsWithResponse
+func (c *ClientWithResponses) ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsWithResponse, error) {
 	rsp, err := c.ListAppComponents(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListAppComponentsResponse(rsp)
+	return ParseListAppComponentsWithResponse(rsp)
 }
 
-// UpdateComponentsWithBodyWithResponse request with arbitrary body returning *UpdateComponentsResponse
-func (c *ClientWithResponses) UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error) {
+// UpdateComponentsWithBodyWithResponse request with arbitrary body returning *UpdateComponentsWithResponse
+func (c *ClientWithResponses) UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsWithResponse, error) {
 	rsp, err := c.UpdateComponentsWithBody(ctx, appId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateComponentsResponse(rsp)
+	return ParseUpdateComponentsWithResponse(rsp)
 }
 
-func (c *ClientWithResponses) UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error) {
+func (c *ClientWithResponses) UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsWithResponse, error) {
 	rsp, err := c.UpdateComponents(ctx, appId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateComponentsResponse(rsp)
+	return ParseUpdateComponentsWithResponse(rsp)
 }
 
-// CreateDeployCredentialsWithBodyWithResponse request with arbitrary body returning *CreateDeployCredentialsResponse
-func (c *ClientWithResponses) CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsResponse, error) {
+// CreateDeployCredentialsWithBodyWithResponse request with arbitrary body returning *CreateDeployCredentialsWithResponse
+func (c *ClientWithResponses) CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsWithResponse, error) {
 	rsp, err := c.CreateDeployCredentialsWithBody(ctx, appId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateDeployCredentialsResponse(rsp)
+	return ParseCreateDeployCredentialsWithResponse(rsp)
 }
 
-func (c *ClientWithResponses) CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsResponse, error) {
+func (c *ClientWithResponses) CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsWithResponse, error) {
 	rsp, err := c.CreateDeployCredentials(ctx, appId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateDeployCredentialsResponse(rsp)
+	return ParseCreateDeployCredentialsWithResponse(rsp)
 }
 
-// GetAppLogsWithResponse request returning *GetAppLogsResponse
-func (c *ClientWithResponses) GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsResponse, error) {
+// GetAppLogsWithResponse request returning *GetAppLogsWithResponse
+func (c *ClientWithResponses) GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsWithResponse, error) {
 	rsp, err := c.GetAppLogs(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetAppLogsResponse(rsp)
+	return ParseGetAppLogsWithResponse(rsp)
 }
 
-// GetUserOrgsWithResponse request returning *GetUserOrgsResponse
-func (c *ClientWithResponses) GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsResponse, error) {
-	rsp, err := c.GetUserOrgs(ctx, params, reqEditors...)
+// GetUserInfoWithResponse request returning *GetUserInfoWithResponse
+func (c *ClientWithResponses) GetUserInfoWithResponse(ctx context.Context, params *GetUserInfoParams, reqEditors ...RequestEditorFn) (*GetUserInfoWithResponse, error) {
+	rsp, err := c.GetUserInfo(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetUserOrgsResponse(rsp)
+	return ParseGetUserInfoWithResponse(rsp)
 }
 
-// ParseListAppsResponse parses an HTTP response from a ListAppsWithResponse call
-func ParseListAppsResponse(rsp *http.Response) (*ListAppsResponse, error) {
+// ParseListAppsWithResponse parses an HTTP response from a ListAppsWithResponse call
+func ParseListAppsWithResponse(rsp *http.Response) (*ListAppsWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListAppsResponse{
+	response := &ListAppsWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1652,15 +1664,15 @@ func ParseListAppsResponse(rsp *http.Response) (*ListAppsResponse, error) {
 	return response, nil
 }
 
-// ParseCreateAppResponse parses an HTTP response from a CreateAppWithResponse call
-func ParseCreateAppResponse(rsp *http.Response) (*CreateAppResponse, error) {
+// ParseCreateAppWithResponse parses an HTTP response from a CreateAppWithResponse call
+func ParseCreateAppWithResponse(rsp *http.Response) (*CreateAppWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateAppResponse{
+	response := &CreateAppWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1706,15 +1718,15 @@ func ParseCreateAppResponse(rsp *http.Response) (*CreateAppResponse, error) {
 	return response, nil
 }
 
-// ParseDeleteAppResponse parses an HTTP response from a DeleteAppWithResponse call
-func ParseDeleteAppResponse(rsp *http.Response) (*DeleteAppResponse, error) {
+// ParseDeleteAppWithResponse parses an HTTP response from a DeleteAppWithResponse call
+func ParseDeleteAppWithResponse(rsp *http.Response) (*DeleteAppWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteAppResponse{
+	response := &DeleteAppWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1753,15 +1765,15 @@ func ParseDeleteAppResponse(rsp *http.Response) (*DeleteAppResponse, error) {
 	return response, nil
 }
 
-// ParseGetAppResponse parses an HTTP response from a GetAppWithResponse call
-func ParseGetAppResponse(rsp *http.Response) (*GetAppResponse, error) {
+// ParseGetAppWithResponse parses an HTTP response from a GetAppWithResponse call
+func ParseGetAppWithResponse(rsp *http.Response) (*GetAppWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAppResponse{
+	response := &GetAppWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1800,15 +1812,15 @@ func ParseGetAppResponse(rsp *http.Response) (*GetAppResponse, error) {
 	return response, nil
 }
 
-// ParseListAppComponentsResponse parses an HTTP response from a ListAppComponentsWithResponse call
-func ParseListAppComponentsResponse(rsp *http.Response) (*ListAppComponentsResponse, error) {
+// ParseListAppComponentsWithResponse parses an HTTP response from a ListAppComponentsWithResponse call
+func ParseListAppComponentsWithResponse(rsp *http.Response) (*ListAppComponentsWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListAppComponentsResponse{
+	response := &ListAppComponentsWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1847,15 +1859,15 @@ func ParseListAppComponentsResponse(rsp *http.Response) (*ListAppComponentsRespo
 	return response, nil
 }
 
-// ParseUpdateComponentsResponse parses an HTTP response from a UpdateComponentsWithResponse call
-func ParseUpdateComponentsResponse(rsp *http.Response) (*UpdateComponentsResponse, error) {
+// ParseUpdateComponentsWithResponse parses an HTTP response from a UpdateComponentsWithResponse call
+func ParseUpdateComponentsWithResponse(rsp *http.Response) (*UpdateComponentsWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpdateComponentsResponse{
+	response := &UpdateComponentsWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1901,15 +1913,15 @@ func ParseUpdateComponentsResponse(rsp *http.Response) (*UpdateComponentsRespons
 	return response, nil
 }
 
-// ParseCreateDeployCredentialsResponse parses an HTTP response from a CreateDeployCredentialsWithResponse call
-func ParseCreateDeployCredentialsResponse(rsp *http.Response) (*CreateDeployCredentialsResponse, error) {
+// ParseCreateDeployCredentialsWithResponse parses an HTTP response from a CreateDeployCredentialsWithResponse call
+func ParseCreateDeployCredentialsWithResponse(rsp *http.Response) (*CreateDeployCredentialsWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateDeployCredentialsResponse{
+	response := &CreateDeployCredentialsWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1955,15 +1967,15 @@ func ParseCreateDeployCredentialsResponse(rsp *http.Response) (*CreateDeployCred
 	return response, nil
 }
 
-// ParseGetAppLogsResponse parses an HTTP response from a GetAppLogsWithResponse call
-func ParseGetAppLogsResponse(rsp *http.Response) (*GetAppLogsResponse, error) {
+// ParseGetAppLogsWithResponse parses an HTTP response from a GetAppLogsWithResponse call
+func ParseGetAppLogsWithResponse(rsp *http.Response) (*GetAppLogsWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAppLogsResponse{
+	response := &GetAppLogsWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2016,22 +2028,22 @@ func ParseGetAppLogsResponse(rsp *http.Response) (*GetAppLogsResponse, error) {
 	return response, nil
 }
 
-// ParseGetUserOrgsResponse parses an HTTP response from a GetUserOrgsWithResponse call
-func ParseGetUserOrgsResponse(rsp *http.Response) (*GetUserOrgsResponse, error) {
+// ParseGetUserInfoWithResponse parses an HTTP response from a GetUserInfoWithResponse call
+func ParseGetUserInfoWithResponse(rsp *http.Response) (*GetUserInfoWithResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetUserOrgsResponse{
+	response := &GetUserInfoWithResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest GetUserOrgsResponseBody
+		var dest GetUserInfoResponseBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

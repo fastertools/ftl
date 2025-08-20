@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fastertools/ftl-cli/internal/config"
 	"github.com/pkg/browser"
 )
 
@@ -138,6 +139,18 @@ func (m *Manager) CompleteDeviceFlow(ctx context.Context, deviceAuth *DeviceAuth
 		return nil, fmt.Errorf("failed to save credentials: %w", err)
 	}
 
+	// Extract and save user info from JWT
+	if err := m.SaveUserInfoFromToken(token); err != nil {
+		// Non-fatal, just log it
+		fmt.Printf("Warning: failed to save user info: %v\n", err)
+	}
+
+	// Mark as user actor (not machine)
+	if err := m.store.SetActorType("user"); err != nil {
+		// Non-fatal, just log it
+		fmt.Printf("Warning: failed to store actor type: %v\n", err)
+	}
+
 	return creds, nil
 }
 
@@ -240,4 +253,33 @@ func (m *Manager) Refresh(ctx context.Context, creds *Credentials) (*Credentials
 // GetOrRefreshToken gets a valid token, refreshing if necessary
 func (m *Manager) GetOrRefreshToken(ctx context.Context) (string, error) {
 	return m.GetToken(ctx)
+}
+
+// SaveUserInfoFromToken extracts and saves user info from a token
+func (m *Manager) SaveUserInfoFromToken(token *TokenResponse) error {
+	// Import config package
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	
+	// Extract user info from JWT
+	claims, err := ExtractIDToken(token)
+	if err != nil {
+		// Try extracting from access token
+		claims, err = ExtractUserInfo(token.AccessToken)
+		if err != nil {
+			return fmt.Errorf("failed to extract user info: %w", err)
+		}
+	}
+	
+	// Save user info to config
+	userInfo := &config.UserInfo{
+		Username:  claims.GetDisplayName(),
+		Email:     claims.Email,
+		UserID:    claims.UserID,
+		UpdatedAt: time.Now().Format(time.RFC3339),
+	}
+	
+	return cfg.SetCurrentUser(userInfo)
 }

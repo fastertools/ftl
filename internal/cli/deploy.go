@@ -146,9 +146,27 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	}
 	authManager := auth.NewManager(store, nil)
 
+	// Auto-detect and perform M2M authentication if credentials are available
+	if auth.IsM2MConfigured() {
+		Info("M2M credentials detected in environment, authenticating as machine...")
+		if err := authManager.LoginMachine(ctx); err != nil {
+			return fmt.Errorf("failed to authenticate with M2M credentials: %w", err)
+		}
+		Success("Authenticated as machine")
+	}
+
 	// Check authentication
 	if _, err := authManager.GetToken(ctx); err != nil {
-		return fmt.Errorf("not logged in to FTL. Run 'ftl auth login' first")
+		// Check if we have a pre-generated M2M token
+		if token := auth.GetM2MTokenFromEnv(); token != "" {
+			Info("Using M2M token from environment...")
+			if err := authManager.LoginMachineWithToken(ctx, token); err != nil {
+				return fmt.Errorf("failed to authenticate with M2M token: %w", err)
+			}
+			Success("Authenticated with M2M token")
+		} else {
+			return fmt.Errorf("not logged in to FTL. Run 'ftl auth login' first")
+		}
 	}
 
 	// Create API client
@@ -345,7 +363,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to process components: %w", err)
 	}
-	Success("All components processed and pushed to ECR")
+	Success("All components processed and pushed to FTL Engine Registry")
 	fmt.Println()
 
 	// Create deployment request with the processed manifest
@@ -483,7 +501,7 @@ func processComponents(ctx context.Context, manifest *validation.Application, ec
 			version = "0.1.0"
 		}
 
-		Info("Pushing %s to ECR", comp.ID)
+		Info("Pushing %s to FTL Engine Registry", comp.ID)
 		if err := pusher.Push(ctx, wasmPath, packageName, version); err != nil {
 			return nil, fmt.Errorf("failed to push component %s: %w", comp.ID, err)
 		}
@@ -690,9 +708,9 @@ func displayDryRunSummary(manifest *validation.Application, appExists bool) {
 		fmt.Printf("  ✓ Create new app\n")
 	}
 
-	fmt.Printf("  ✓ Pull registry components and push all to ECR\n")
+	fmt.Printf("  ✓ Pull registry components and push all to FTL Engine Registry\n")
 	fmt.Printf("  ✓ Create deployment with processed manifest\n")
-	fmt.Printf("  ✓ Platform will deploy from ECR\n")
+	fmt.Printf("  ✓ Platform will deploy from registry\n")
 
 	fmt.Println()
 	fmt.Println("To perform the actual deployment, run without --dry-run")

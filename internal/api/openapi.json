@@ -456,11 +456,11 @@
         }
       }
     },
-    "/v1/user/orgs": {
+    "/v1/user/info": {
       "get": {
-        "operationId": "getUserOrgs",
-        "summary": "Get user organizations",
-        "description": "Retrieves a list of organizations the authenticated user belongs to",
+        "operationId": "getUserInfo",
+        "summary": "Get user information",
+        "description": "Retrieves the authenticated user information and their organization memberships",
         "tags": ["User"],
         "parameters": [
           {
@@ -477,11 +477,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Organizations retrieved successfully",
+            "description": "User info retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetUserOrgsResponseBody"
+                  "$ref": "#/components/schemas/GetUserInfoResponseBody"
                 }
               }
             }
@@ -1224,10 +1224,32 @@
         "required": ["registry", "deployment", "appId"],
         "additionalProperties": false
       },
-      "GetUserOrgsResponseBody": {
-        "description": "List of user organizations",
+      "GetUserInfoResponseBody": {
+        "description": "User information with organizations",
         "type": "object",
         "properties": {
+          "user": {
+            "description": "User information",
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "User ID from WorkOS",
+                "type": "string"
+              },
+              "email": {
+                "description": "User email address",
+                "type": "string",
+                "nullable": true
+              },
+              "name": {
+                "description": "User full name",
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": ["id", "email", "name"],
+            "additionalProperties": false
+          },
           "organizations": {
             "description": "List of organizations the user belongs to",
             "type": "array",
@@ -1248,7 +1270,7 @@
             }
           }
         },
-        "required": ["organizations"],
+        "required": ["user", "organizations"],
         "additionalProperties": false
       },
       "ListComponentsResponseBody": {

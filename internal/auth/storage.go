@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/zalando/go-keyring"
 )
@@ -17,6 +18,13 @@ type CredentialStore interface {
 	Delete() error
 	// Exists checks if credentials are stored
 	Exists() bool
+	
+	// M2M-specific methods
+	StoreToken(token string, expiresIn int) error
+	GetM2MConfig() (*M2MConfig, error)
+	StoreM2MConfig(config *M2MConfig) error
+	SetActorType(actorType string) error
+	GetActorType() (string, error)
 }
 
 // KeyringStore implements CredentialStore using OS keyring
@@ -79,6 +87,68 @@ func (s *KeyringStore) Exists() bool {
 	return err == nil
 }
 
+// StoreToken stores just an access token (for M2M flows)
+func (s *KeyringStore) StoreToken(token string, expiresIn int) error {
+	creds := &Credentials{
+		AccessToken: token,
+	}
+	// Calculate expiration time if provided
+	if expiresIn > 0 {
+		expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+		creds.ExpiresAt = &expiresAt
+	}
+	return s.Save(creds)
+}
+
+// GetM2MConfig retrieves stored M2M configuration
+func (s *KeyringStore) GetM2MConfig() (*M2MConfig, error) {
+	data, err := keyring.Get(KeyringService, "m2m-config")
+	if err != nil {
+		if err == keyring.ErrNotFound {
+			return nil, fmt.Errorf("no M2M configuration found")
+		}
+		return nil, fmt.Errorf("failed to load M2M config: %w", err)
+	}
+	
+	var config M2MConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return nil, fmt.Errorf("failed to parse M2M config: %w", err)
+	}
+	
+	return &config, nil
+}
+
+// StoreM2MConfig stores M2M configuration
+func (s *KeyringStore) StoreM2MConfig(config *M2MConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal M2M config: %w", err)
+	}
+	
+	if err := keyring.Set(KeyringService, "m2m-config", string(data)); err != nil {
+		return fmt.Errorf("failed to store M2M config: %w", err)
+	}
+	
+	return nil
+}
+
+// SetActorType stores whether the current actor is a user or machine
+func (s *KeyringStore) SetActorType(actorType string) error {
+	return keyring.Set(KeyringService, "actor-type", actorType)
+}
+
+// GetActorType retrieves the stored actor type
+func (s *KeyringStore) GetActorType() (string, error) {
+	actorType, err := keyring.Get(KeyringService, "actor-type")
+	if err != nil {
+		if err == keyring.ErrNotFound {
+			return "", fmt.Errorf("actor type not set")
+		}
+		return "", fmt.Errorf("failed to get actor type: %w", err)
+	}
+	return actorType, nil
+}
+
 // fileKeyringPrompt provides a password for the file-based keyring fallback
 func fileKeyringPrompt(prompt string) (string, error) {
 	// In production, this would prompt the user
@@ -89,8 +159,10 @@ func fileKeyringPrompt(prompt string) (string, error) {
 
 // MockStore implements CredentialStore for testing
 type MockStore struct {
-	creds *Credentials
-	err   error
+	creds     *Credentials
+	m2mConfig *M2MConfig
+	actorType string
+	err       error
 }
 
 // NewMockStore creates a mock credential store for testing
@@ -127,4 +199,57 @@ func (m *MockStore) Delete() error {
 // Exists checks if mock credentials exist
 func (m *MockStore) Exists() bool {
 	return m.creds != nil
+}
+
+// StoreToken stores just an access token (for M2M flows)
+func (m *MockStore) StoreToken(token string, expiresIn int) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.creds = &Credentials{
+		AccessToken: token,
+	}
+	// Calculate expiration time if provided
+	if expiresIn > 0 {
+		expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+		m.creds.ExpiresAt = &expiresAt
+	}
+	return nil
+}
+
+// GetM2MConfig retrieves stored M2M configuration
+func (m *MockStore) GetM2MConfig() (*M2MConfig, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.m2mConfig, nil
+}
+
+// StoreM2MConfig stores M2M configuration
+func (m *MockStore) StoreM2MConfig(config *M2MConfig) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.m2mConfig = config
+	return nil
+}
+
+// SetActorType stores whether the current actor is a user or machine
+func (m *MockStore) SetActorType(actorType string) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.actorType = actorType
+	return nil
+}
+
+// GetActorType retrieves the stored actor type
+func (m *MockStore) GetActorType() (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	if m.actorType == "" {
+		return "", fmt.Errorf("actor type not set")
+	}
+	return m.actorType, nil
 }

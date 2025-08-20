@@ -26,8 +26,19 @@ type Config struct {
 	// LastUpdateCheck tracks when we last checked for updates
 	LastUpdateCheck string `json:"last_update_check,omitempty"`
 	
+	// CurrentUser stores info about the logged-in user
+	CurrentUser *UserInfo `json:"current_user,omitempty"`
+	
 	// Version of the config schema
 	Version string `json:"version"`
+}
+
+// UserInfo stores information about the authenticated user
+type UserInfo struct {
+	Username  string `json:"username,omitempty"`
+	Email     string `json:"email,omitempty"`
+	UserID    string `json:"user_id,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
 // OrgInfo stores information about an organization
@@ -249,5 +260,30 @@ func (c *Config) Reset() error {
 	defer mu.Unlock()
 	
 	*c = *defaultConfig()
+	return c.Save()
+}
+
+// GetCurrentUser returns the current user info
+func (c *Config) GetCurrentUser() *UserInfo {
+	mu.RLock()
+	defer mu.RUnlock()
+	return c.CurrentUser
+}
+
+// SetCurrentUser updates the current user info
+func (c *Config) SetCurrentUser(user *UserInfo) error {
+	mu.Lock()
+	c.CurrentUser = user
+	mu.Unlock()
+	
+	return c.Save()
+}
+
+// ClearCurrentUser removes the current user info
+func (c *Config) ClearCurrentUser() error {
+	mu.Lock()
+	c.CurrentUser = nil
+	mu.Unlock()
+	
 	return c.Save()
 }

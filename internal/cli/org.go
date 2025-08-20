@@ -129,19 +129,36 @@ func runOrgList(ctx context.Context, refresh bool) error {
 			return fmt.Errorf("failed to create API client: %w", err)
 		}
 
-		// Get user's organizations
-		userOrgs, err := client.GetUserOrgs(ctx)
+		// Get user info and organizations
+		userInfo, err := client.GetUserInfo(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get organizations: %w", err)
+			return fmt.Errorf("failed to get user info: %w", err)
 		}
 
-		if userOrgs == nil || len(userOrgs.Organizations) == 0 {
+		if userInfo == nil || len(userInfo.Organizations) == 0 {
 			Warn("No organizations found")
 			return nil
 		}
 
+		// Update config with user info
+		userCfg := &config.UserInfo{
+			UserID:    userInfo.User.Id,
+			UpdatedAt: time.Now().Format(time.RFC3339),
+		}
+		// Handle nullable fields
+		if userInfo.User.Email != nil {
+			userCfg.Email = *userInfo.User.Email
+		}
+		if userInfo.User.Name != nil {
+			userCfg.Username = *userInfo.User.Name
+		}
+		if err := cfg.SetCurrentUser(userCfg); err != nil {
+			// Non-fatal
+			fmt.Printf("Warning: failed to save user info: %v\n", err)
+		}
+
 		// Update config with org info
-		for _, org := range userOrgs.Organizations {
+		for _, org := range userInfo.Organizations {
 			orgInfo := config.OrgInfo{
 				ID:       org.Id,
 				Name:     org.Name, 
@@ -231,13 +248,13 @@ func runOrgSet(ctx context.Context, orgID string, forceInteractive bool) error {
 		return fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	// Get user's organizations
-	userOrgs, err := client.GetUserOrgs(ctx)
+	// Get user info and organizations
+	userInfo, err := client.GetUserInfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get organizations: %w", err)
+		return fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	if userOrgs == nil || len(userOrgs.Organizations) == 0 {
+	if userInfo == nil || len(userInfo.Organizations) == 0 {
 		return fmt.Errorf("no organizations available")
 	}
 
@@ -245,7 +262,7 @@ func runOrgSet(ctx context.Context, orgID string, forceInteractive bool) error {
 	availableOrgs := make(map[string]string) // ID -> Name
 	var orgIDs []string
 	
-	for _, org := range userOrgs.Organizations {
+	for _, org := range userInfo.Organizations {
 		availableOrgs[org.Id] = org.Name
 		orgIDs = append(orgIDs, org.Id)
 		
