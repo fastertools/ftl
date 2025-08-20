@@ -2,15 +2,16 @@
 
 use spin_test_sdk::{spin_test, bindings::wasi::http};
 use crate::test_setup::setup_default_test_config;
-use crate::policy_test_helpers::{setup_test_jwt_validation, *};
+use crate::policy_test_helpers::*;
 
 #[spin_test]
 fn test_policy_allow_all() {
     setup_default_test_config();
+    let (private_key, _public_key) = setup_test_jwt_validation();
     setup_allow_all_policy();
     
     // Create a token with minimal claims
-    let token = create_policy_test_token("user123", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user123", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
@@ -27,10 +28,11 @@ fn test_policy_allow_all() {
 #[spin_test]
 fn test_policy_deny_all() {
     setup_default_test_config();
+    let (private_key, _public_key) = setup_test_jwt_validation();
     setup_deny_all_policy();
     
     // Create a token with admin role - shouldn't matter with deny-all
-    let token = create_policy_test_token("admin", vec!["admin"], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "admin", vec!["admin"], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
@@ -53,10 +55,11 @@ fn test_policy_deny_all() {
 #[spin_test]
 fn test_policy_subject_check() {
     setup_default_test_config();
+    let (private_key, _public_key) = setup_test_jwt_validation();
     setup_subject_check_policy(vec!["alice", "bob"]);
     
     // Test allowed subject
-    let alice_token = create_policy_test_token("alice", vec![], vec![]);
+    let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -67,7 +70,7 @@ fn test_policy_subject_check() {
     assert_eq!(response.status(), 200, "Alice should be allowed");
     
     // Test denied subject
-    let charlie_token = create_policy_test_token("charlie", vec![], vec![]);
+    let charlie_token = create_policy_test_token_with_key(&private_key, "charlie", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -81,10 +84,11 @@ fn test_policy_subject_check() {
 #[spin_test]
 fn test_policy_without_configuration() {
     setup_default_test_config();
-    // Don't set any policy - authorization should be skipped
+    // Set up JWT validation but no policy - authorization should be skipped
+    let (private_key, _public_key) = setup_test_jwt_validation();
     clear_policy_config();
     
-    let token = create_policy_test_token("anyone", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "anyone", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
@@ -101,7 +105,11 @@ fn test_policy_without_configuration() {
 
 #[spin_test]
 fn test_policy_evaluation_error() {
+    println!("DEBUG: Starting test_policy_evaluation_error");
     setup_default_test_config();
+    println!("DEBUG: About to setup JWT validation");
+    let (private_key, _public_key) = setup_test_jwt_validation();
+    println!("DEBUG: JWT validation setup complete");
     
     // Set an invalid policy with syntax errors
     let bad_policy = r#"
@@ -114,9 +122,12 @@ allow if {
     input.token.sub = "test"  # Invalid: should use == not =
 }
 "#;
+    println!("DEBUG: Setting bad policy");
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", bad_policy);
     
-    let token = create_policy_test_token("test", vec![], vec![]);
+    println!("DEBUG: Creating token");
+    let token = create_policy_test_token_with_key(&private_key, "test", vec![], vec![]);
+    println!("DEBUG: Token created successfully");
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
@@ -138,6 +149,8 @@ allow if {
 fn test_policy_with_undefined_result() {
     setup_default_test_config();
     
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured first
+    
     // Policy that doesn't define allow rule properly
     let policy = r#"
 package mcp.authorization
@@ -145,10 +158,9 @@ import rego.v1
 
 # No default, no allow rule - will be undefined
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();

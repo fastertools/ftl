@@ -42,10 +42,10 @@ allow if {
         }
     }"#;
     
-    setup_policy_with_data(policy, data);
+    let (private_key, _public_key) = setup_policy_with_data(policy, data);
     
     // Alice in allowed_users
-    let alice_token = create_policy_test_token("alice", vec![], vec![]);
+    let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
@@ -57,7 +57,7 @@ allow if {
     assert_eq!(response.status(), 200, "Alice should be allowed via data");
     
     // Dave not in allowed_users
-    let dave_token = create_policy_test_token("dave", vec![], vec![]);
+    let dave_token = create_policy_test_token_with_key(&private_key, "dave", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", dave_token).as_bytes()).unwrap();
@@ -69,7 +69,7 @@ allow if {
     assert_eq!(response.status(), 401, "Dave should be denied");
     
     // Charlie can access database component
-    let charlie_token = create_policy_test_token("charlie", vec![], vec![]);
+    let charlie_token = create_policy_test_token_with_key(&private_key, "charlie", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
@@ -132,10 +132,10 @@ allow if {
         }
     }"#;
     
-    setup_policy_with_data(policy, data);
+    let (private_key, _public_key) = setup_policy_with_data(policy, data);
     
     // Test role levels with tools
-    let admin_token = create_policy_test_token("admin", vec![], vec![("role", serde_json::json!("admin"))]);
+    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("role", serde_json::json!("admin"))]);
     
     let body = r#"{
         "jsonrpc":"2.0",
@@ -159,7 +159,7 @@ allow if {
     assert_eq!(response.status(), 200, "Admin level 3 >= required level 2");
     
     // Viewer cannot use delete_all
-    let viewer_token = create_policy_test_token("viewer", vec![], vec![("role", serde_json::json!("viewer"))]);
+    let viewer_token = create_policy_test_token_with_key(&private_key, "viewer", vec![], vec![("role", serde_json::json!("viewer"))]);
     
     let body = r#"{
         "jsonrpc":"2.0",
@@ -246,10 +246,10 @@ allow if {
         }
     }"#;
     
-    setup_policy_with_data(policy, data);
+    let (private_key, _public_key) = setup_policy_with_data(policy, data);
     
     // Test rate limiting
-    let user1_token = create_policy_test_token("user1", vec![], vec![("tier", serde_json::json!("free"))]);
+    let user1_token = create_policy_test_token_with_key(&private_key, "user1", vec![], vec![("tier", serde_json::json!("free"))]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user1_token).as_bytes()).unwrap();
@@ -260,7 +260,7 @@ allow if {
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "User1 under rate limit (5 < 10)");
     
-    let user2_token = create_policy_test_token("user2", vec![], vec![("tier", serde_json::json!("free"))]);
+    let user2_token = create_policy_test_token_with_key(&private_key, "user2", vec![], vec![("tier", serde_json::json!("free"))]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user2_token).as_bytes()).unwrap();
@@ -272,7 +272,7 @@ allow if {
     assert_eq!(response.status(), 401, "User2 over rate limit (15 > 10)");
     
     // Test feature flags
-    let user_token = create_policy_test_token("user", vec![], vec![]);
+    let user_token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
@@ -293,7 +293,7 @@ allow if {
     assert_eq!(response.status(), 401, "Disabled feature should deny access");
     
     // Test team-based access
-    let alice_token = create_policy_test_token("alice", vec![], vec![]);
+    let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
@@ -338,10 +338,10 @@ allow if {
 "#;
     
     // Empty data
-    setup_policy_with_data(policy, "{}");
+    let (private_key, _public_key) = setup_policy_with_data(policy, "{}");
     
     // Normal user - should be denied (data.users doesn't exist)
-    let user_token = create_policy_test_token("user", vec![], vec![]);
+    let user_token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
@@ -353,7 +353,7 @@ allow if {
     assert_eq!(response.status(), 401, "Should deny when referenced data doesn't exist");
     
     // User with bypass claim
-    let bypass_token = create_policy_test_token("special", vec![], vec![("bypass", serde_json::json!(true))]);
+    let bypass_token = create_policy_test_token_with_key(&private_key, "special", vec![], vec![("bypass", serde_json::json!(true))]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", bypass_token).as_bytes()).unwrap();

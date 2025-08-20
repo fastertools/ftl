@@ -19,10 +19,10 @@ allow if {
     input.mcp.method == "tools/list"
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Create JSON-RPC tools/list request
     let body = r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#;
@@ -43,13 +43,13 @@ allow if {
 #[spin_test]
 fn test_mcp_tool_call_authorization() {
     setup_default_test_config();
-    setup_tool_authorization_policy(
+    let (private_key, _public_key) = setup_tool_authorization_policy(
         vec!["read_data", "list_items"],  // allowed tools
         vec!["delete_database", "reset_system"]  // dangerous tools
     );
     
     // User without admin role
-    let user_token = create_policy_test_token("user", vec!["user"], vec![]);
+    let user_token = create_policy_test_token_with_key(&private_key, "user", vec!["user"], vec![]);
     
     // Test allowed tool
     let body = r#"{
@@ -98,7 +98,7 @@ fn test_mcp_tool_call_authorization() {
     assert_eq!(response.status(), 401, "Should deny dangerous tool without admin");
     
     // Admin can use dangerous tools
-    let admin_token = create_policy_test_token("admin", vec!["admin"], vec![]);
+    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec!["admin"], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
@@ -129,10 +129,10 @@ allow if {
     input.mcp
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // POST request with non-JSON content
     let headers = http::types::Headers::new();
@@ -162,6 +162,8 @@ allow if {
 fn test_tool_specific_permissions() {
     setup_default_test_config();
     
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
+    
     // Policy with tool-specific permission requirements
     let policy = r#"
 package mcp.authorization
@@ -189,11 +191,10 @@ allow if {
     scope in user_scopes
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let reader_token = create_policy_test_token("reader", vec![], vec![("scopes", serde_json::json!(["user:read"]))]);
+    let reader_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scopes", serde_json::json!(["user:read"]))]);
     
     // Can read users
     let body = r#"{
@@ -257,10 +258,10 @@ allow if {
     input.mcp.method in ["tools/list", "prompts/list", "resources/list"]
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Invalid JSON body
     let body = r#"{"invalid json": }"#;
@@ -308,10 +309,10 @@ allow if {
     not deny
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Test SELECT query (allowed)
     let body = r#"{

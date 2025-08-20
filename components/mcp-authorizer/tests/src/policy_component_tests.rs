@@ -19,10 +19,10 @@ allow if {
     input.request.component == "data-processor"
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Test allowed component path
     let headers = http::types::Headers::new();
@@ -48,9 +48,9 @@ allow if {
 #[spin_test]
 fn test_component_with_subpath() {
     setup_default_test_config();
-    setup_component_policy(vec!["api-gateway"]);
+    let (private_key, _public_key) = setup_component_policy(vec!["api-gateway"]);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Test component with subpath - should still extract component correctly
     let headers = http::types::Headers::new();
@@ -78,10 +78,10 @@ allow if {
     input.request.component != null
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
-    let token = create_policy_test_token("user", vec![], vec![]);
+    let token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
     
     // Test path without component (/mcp)
     let headers = http::types::Headers::new();
@@ -127,11 +127,11 @@ allow if {
     input.request.component in components
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Alice can access frontend
-    let alice_token = create_policy_test_token("alice", vec![], vec![]);
+    let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -142,7 +142,7 @@ allow if {
     assert_eq!(response.status(), 200, "Alice should access frontend");
     
     // Bob can access database
-    let bob_token = create_policy_test_token("bob", vec![], vec![]);
+    let bob_token = create_policy_test_token_with_key(&private_key, "bob", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", bob_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -153,7 +153,7 @@ allow if {
     assert_eq!(response.status(), 200, "Bob should access database");
     
     // Charlie cannot access backend
-    let charlie_token = create_policy_test_token("charlie", vec![], vec![]);
+    let charlie_token = create_policy_test_token_with_key(&private_key, "charlie", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -194,11 +194,11 @@ allow if {
     role in user_roles
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Admin accessing admin-panel
-    let admin_token = create_policy_test_token("admin", vec!["admin"], vec![]);
+    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec!["admin"], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -209,7 +209,7 @@ allow if {
     assert_eq!(response.status(), 200, "Admin should access admin-panel");
     
     // Regular user cannot access admin-panel
-    let user_token = create_policy_test_token("user", vec!["user"], vec![]);
+    let user_token = create_policy_test_token_with_key(&private_key, "user", vec!["user"], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);
@@ -220,7 +220,7 @@ allow if {
     assert_eq!(response.status(), 401, "User should not access admin-panel");
     
     // Anyone can access public-api
-    let anon_token = create_policy_test_token("anonymous", vec![], vec![]);
+    let anon_token = create_policy_test_token_with_key(&private_key, "anonymous", vec![], vec![]);
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", anon_token).as_bytes()).unwrap();
     let request = http::types::OutgoingRequest::new(headers);

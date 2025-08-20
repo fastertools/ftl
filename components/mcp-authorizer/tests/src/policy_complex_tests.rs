@@ -54,11 +54,11 @@ allow if {
     has_role(user_roles, "user")
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Superuser has all permissions
-    let superuser_token = create_policy_test_token("super", vec!["superuser"], vec![]);
+    let superuser_token = create_policy_test_token_with_key(&private_key, "super", vec!["superuser"], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", superuser_token).as_bytes()).unwrap();
@@ -79,7 +79,7 @@ allow if {
     assert_eq!(response.status(), 200, "Superuser inherits user role");
     
     // Regular user cannot access admin
-    let user_token = create_policy_test_token("user", vec!["user"], vec![]);
+    let user_token = create_policy_test_token_with_key(&private_key, "user", vec!["user"], vec![]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
@@ -94,6 +94,8 @@ allow if {
 #[spin_test]
 fn test_scope_based_authorization() {
     setup_default_test_config();
+    
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     
     // OAuth scope-based policy
     let policy = r#"
@@ -125,11 +127,10 @@ allow if {
     required_scope in user_scopes
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let read_token = create_policy_test_token("reader", vec![], vec![("scopes", serde_json::json!(["users:read"]))]);
+    let read_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scopes", serde_json::json!(["users:read"]))]);
     
     // Can GET user-service
     let headers = http::types::Headers::new();
@@ -152,7 +153,7 @@ allow if {
     assert_eq!(response.status(), 401, "Should deny POST without write scope");
     
     // Admin scope grants everything
-    let admin_token = create_policy_test_token("admin", vec![], vec![("scopes", serde_json::json!(["admin"]))]);
+    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("scopes", serde_json::json!(["admin"]))]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
@@ -199,11 +200,11 @@ allow if {
     input.token.claims.access_hours.end >= 14
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User from engineering at acme-corp
-    let eng_token = create_policy_test_token(
+    let eng_token = create_policy_test_token_with_key(&private_key,
         "engineer",
         vec![],
         vec![
@@ -222,7 +223,7 @@ allow if {
     assert_eq!(response.status(), 200, "Engineering at acme-corp should have access");
     
     // User with high clearance
-    let cleared_token = create_policy_test_token(
+    let cleared_token = create_policy_test_token_with_key(&private_key,
         "agent",
         vec![],
         vec![("clearance_level", serde_json::json!(4))]
@@ -238,7 +239,7 @@ allow if {
     assert_eq!(response.status(), 200, "High clearance should access classified data");
     
     // User with beta access
-    let beta_token = create_policy_test_token(
+    let beta_token = create_policy_test_token_with_key(&private_key,
         "beta_tester",
         vec![],
         vec![("feature_flags", serde_json::json!({"beta_access": true, "alpha_access": false}))]
@@ -257,6 +258,8 @@ allow if {
 #[spin_test]
 fn test_combined_authorization_rules() {
     setup_default_test_config();
+    
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
     
     // Policy combining multiple authorization strategies
     let policy = r#"
@@ -296,11 +299,10 @@ allow if {
     input.request.component in ["public-api", "user-profile"]
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Service account test
-    let service_token = create_policy_test_token("service-account-1", vec![], vec![
+    let service_token = create_policy_test_token_with_key(&private_key, "service-account-1", vec![], vec![
         ("scopes", serde_json::json!(["service:internal"])),
         ("account_type", serde_json::json!("service"))
     ]);
@@ -315,7 +317,7 @@ allow if {
     assert_eq!(response.status(), 200, "Service account should access internal API");
     
     // Payment processor with MFA
-    let payment_token = create_policy_test_token("payment-user", vec!["payments"], vec![
+    let payment_token = create_policy_test_token_with_key(&private_key, "payment-user", vec!["payments"], vec![
         ("scopes", serde_json::json!(["payments:process"])),
         ("mfa_verified", serde_json::json!(true))
     ]);
@@ -330,7 +332,7 @@ allow if {
     assert_eq!(response.status(), 200, "Payment user with MFA should process payments");
     
     // Free tier limitations
-    let free_token = create_policy_test_token(
+    let free_token = create_policy_test_token_with_key(&private_key,
         "free-user",
         vec![],
         vec![("tier", serde_json::json!("free"))]
@@ -350,6 +352,8 @@ allow if {
 fn test_deny_rules_precedence() {
     setup_default_test_config();
     
+    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
+    
     // Policy with explicit deny rules that override allows
     let policy = r#"
 package mcp.authorization
@@ -357,12 +361,7 @@ import rego.v1
 
 default allow := false
 
-# Allow users with valid subscription
-allow if {
-    input.token.claims.subscription_status == "active"
-}
-
-# But deny if account is suspended (overrides allow)
+# Deny if account is suspended
 deny if {
     input.token.claims.account_suspended == true
 }
@@ -372,16 +371,16 @@ deny if {
     input.token.sub in ["hacker1", "spammer2", "banned3"]
 }
 
-# Final decision
+# Allow users with valid subscription (but only if not denied)
 allow if {
+    input.token.claims.subscription_status == "active"
     not deny
 }
 "#;
-    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Active subscription but suspended account
-    let suspended_token = create_policy_test_token(
+    let suspended_token = create_policy_test_token_with_key(&private_key,
         "suspended-user",
         vec![],
         vec![
@@ -400,7 +399,7 @@ allow if {
     assert_eq!(response.status(), 401, "Suspended account should be denied despite active subscription");
     
     // Blacklisted user
-    let blacklisted_token = create_policy_test_token(
+    let blacklisted_token = create_policy_test_token_with_key(&private_key,
         "hacker1",
         vec![],
         vec![("subscription_status", serde_json::json!("active"))]
