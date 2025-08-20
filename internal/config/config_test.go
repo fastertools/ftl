@@ -13,7 +13,7 @@ func TestConfigLoadSave(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldHome := os.Getenv("HOME")
 	oldUserConfig := os.Getenv("XDG_CONFIG_HOME")
-	
+
 	// Set test environment
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer func() {
@@ -59,7 +59,7 @@ func TestConfigLoadSave(t *testing.T) {
 	// Reset and reload to verify persistence
 	instance = nil
 	once = sync.Once{}
-	
+
 	cfg2, err := Load()
 	if err != nil {
 		t.Fatalf("Failed to reload config: %v", err)
@@ -162,7 +162,7 @@ func TestConcurrency(t *testing.T) {
 
 	// Test concurrent access
 	done := make(chan bool, 10)
-	
+
 	// Concurrent writes
 	for i := 0; i < 5; i++ {
 		go func(id int) {

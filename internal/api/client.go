@@ -72,13 +72,13 @@ func (c *authHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	actorType, _ := c.authManager.GetActorType(req.Context())
 	if actorType == "machine" {
 		req.Header.Set("X-FTL-Actor-Type", "machine")
-		
+
 		// For M2M, we should extract org_id from the token or config
 		// This would require JWT parsing or storing org_id after token exchange
 		// For now, the backend will extract this from the JWT claims
 	} else {
 		req.Header.Set("X-FTL-Actor-Type", "user")
-		
+
 		// For users, add user_id and org_id if available
 		// These would typically be extracted from the JWT claims
 		// The backend handles this extraction for now

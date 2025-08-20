@@ -8,23 +8,23 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
-	
+
 	"github.com/fastertools/ftl-cli/pkg/validation"
 )
 
 // DeploymentPreview represents the deployment preview information
 type DeploymentPreview struct {
-	IsUpdate        bool
-	AppName         string
-	AppID           string
-	AccessMode      string
-	Environment     string
-	Organization    string
-	Components      []ComponentPreview
-	Variables       map[string]string
-	ExistingAppID   string
-	ExistingAccess  string
-	Changes         *DeploymentChanges
+	IsUpdate       bool
+	AppName        string
+	AppID          string
+	AccessMode     string
+	Environment    string
+	Organization   string
+	Components     []ComponentPreview
+	Variables      map[string]string
+	ExistingAppID  string
+	ExistingAccess string
+	Changes        *DeploymentChanges
 }
 
 // ComponentPreview represents a component in the preview
@@ -40,16 +40,16 @@ type ComponentPreview struct {
 
 // DeploymentChanges tracks what's changing in an update
 type DeploymentChanges struct {
-	AccessModeChanged     bool
-	OldAccessMode         string
-	NewAccessMode         string
-	ComponentsAdded       []string
-	ComponentsRemoved     []string
-	ComponentsUpdated     []string
-	VariablesChanged      map[string]VariableChange
-	EnvironmentChanged    bool
-	OldEnvironment        string
-	NewEnvironment        string
+	AccessModeChanged  bool
+	OldAccessMode      string
+	NewAccessMode      string
+	ComponentsAdded    []string
+	ComponentsRemoved  []string
+	ComponentsUpdated  []string
+	VariablesChanged   map[string]VariableChange
+	EnvironmentChanged bool
+	OldEnvironment     string
+	NewEnvironment     string
 }
 
 // VariableChange represents a variable modification
@@ -62,61 +62,61 @@ type VariableChange struct {
 // ShowDeploymentPreview displays a comprehensive deployment preview
 func ShowDeploymentPreview(preview *DeploymentPreview) {
 	fmt.Println()
-	
+
 	// Header
 	if preview.IsUpdate {
 		fmt.Printf("%s\n", color.New(color.FgYellow, color.Bold).Sprint("📋 DEPLOYMENT UPDATE PREVIEW"))
 	} else {
 		fmt.Printf("%s\n", color.New(color.FgGreen, color.Bold).Sprint("🚀 NEW DEPLOYMENT PREVIEW"))
 	}
-	
+
 	fmt.Println(strings.Repeat("─", 60))
-	
+
 	// Basic Information
 	fmt.Printf("  %s %s\n", color.New(color.Bold).Sprint("App Name:"), preview.AppName)
 	if preview.AppID != "" {
 		fmt.Printf("  %s %s\n", color.New(color.Bold).Sprint("App ID:"), color.New(color.FgCyan).Sprint(preview.AppID))
 	}
-	
+
 	// Access Mode with visual indicator
 	accessColor := getAccessModeColor(preview.AccessMode)
 	accessIcon := getAccessModeIcon(preview.AccessMode)
-	fmt.Printf("  %s %s %s\n", 
+	fmt.Printf("  %s %s %s\n",
 		color.New(color.Bold).Sprint("Access Mode:"),
 		accessIcon,
 		accessColor.Sprint(preview.AccessMode))
-	
+
 	// Show access mode implications
 	showAccessModeImplications(preview.AccessMode)
-	
+
 	// Environment
 	envColor := color.New(color.FgYellow)
 	if preview.Environment == "production" {
 		envColor = color.New(color.FgRed, color.Bold)
 	}
-	fmt.Printf("  %s %s\n", 
+	fmt.Printf("  %s %s\n",
 		color.New(color.Bold).Sprint("Environment:"),
 		envColor.Sprint(preview.Environment))
-	
+
 	// Organization
 	if preview.Organization != "" {
-		fmt.Printf("  %s %s\n", 
+		fmt.Printf("  %s %s\n",
 			color.New(color.Bold).Sprint("Organization:"),
 			color.New(color.FgMagenta).Sprint(preview.Organization))
 	}
-	
+
 	fmt.Println(strings.Repeat("─", 60))
-	
+
 	// Components Section
-	fmt.Printf("\n%s (%d)\n", 
+	fmt.Printf("\n%s (%d)\n",
 		color.New(color.Bold).Sprint("Components"),
 		len(preview.Components))
-	
+
 	if len(preview.Components) > 0 {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "  NAME\tTYPE\tSOURCE\tSIZE")
 		fmt.Fprintln(w, "  ────\t────\t──────\t────")
-		
+
 		for _, comp := range preview.Components {
 			sourceIcon := "📦"
 			if comp.IsLocal {
@@ -131,50 +131,50 @@ func ShowDeploymentPreview(preview *DeploymentPreview) {
 		}
 		w.Flush()
 	}
-	
+
 	// Variables Section (if any)
 	if len(preview.Variables) > 0 {
-		fmt.Printf("\n%s (%d)\n", 
+		fmt.Printf("\n%s (%d)\n",
 			color.New(color.Bold).Sprint("Variables"),
 			len(preview.Variables))
-		
+
 		for key, value := range preview.Variables {
 			// Mask sensitive values
 			displayValue := value
 			if isSensitiveKey(key) {
 				displayValue = maskValue(value)
 			}
-			fmt.Printf("  %s = %s\n", 
+			fmt.Printf("  %s = %s\n",
 				color.New(color.FgBlue).Sprint(key),
 				displayValue)
 		}
 	}
-	
+
 	// Changes Section (for updates)
 	if preview.IsUpdate && preview.Changes != nil {
 		showDeploymentChanges(preview.Changes)
 	}
-	
+
 	fmt.Println(strings.Repeat("─", 60))
 }
 
 // showDeploymentChanges displays what's changing in an update
 func showDeploymentChanges(changes *DeploymentChanges) {
 	fmt.Printf("\n%s\n", color.New(color.FgYellow, color.Bold).Sprint("⚡ Changes"))
-	
+
 	hasChanges := false
-	
+
 	// Access mode change (critical!)
 	if changes.AccessModeChanged {
 		hasChanges = true
 		oldColor := getAccessModeColor(changes.OldAccessMode)
 		newColor := getAccessModeColor(changes.NewAccessMode)
-		
+
 		fmt.Printf("  %s Access Mode: %s → %s\n",
 			color.New(color.FgRed).Sprint("⚠"),
 			oldColor.Sprint(changes.OldAccessMode),
 			newColor.Sprint(changes.NewAccessMode))
-		
+
 		// Warn about implications
 		if changes.OldAccessMode == "public" && changes.NewAccessMode != "public" {
 			fmt.Printf("    %s App will no longer be publicly accessible\n",
@@ -184,7 +184,7 @@ func showDeploymentChanges(changes *DeploymentChanges) {
 				color.New(color.FgRed, color.Bold).Sprint("→"))
 		}
 	}
-	
+
 	// Environment change
 	if changes.EnvironmentChanged {
 		hasChanges = true
@@ -193,7 +193,7 @@ func showDeploymentChanges(changes *DeploymentChanges) {
 			changes.OldEnvironment,
 			changes.NewEnvironment)
 	}
-	
+
 	// Component changes
 	if len(changes.ComponentsAdded) > 0 {
 		hasChanges = true
@@ -201,21 +201,21 @@ func showDeploymentChanges(changes *DeploymentChanges) {
 			color.New(color.FgGreen).Sprint("+"),
 			strings.Join(changes.ComponentsAdded, ", "))
 	}
-	
+
 	if len(changes.ComponentsRemoved) > 0 {
 		hasChanges = true
 		fmt.Printf("  %s Components removed: %s\n",
 			color.New(color.FgRed).Sprint("-"),
 			strings.Join(changes.ComponentsRemoved, ", "))
 	}
-	
+
 	if len(changes.ComponentsUpdated) > 0 {
 		hasChanges = true
 		fmt.Printf("  %s Components updated: %s\n",
 			color.New(color.FgBlue).Sprint("~"),
 			strings.Join(changes.ComponentsUpdated, ", "))
 	}
-	
+
 	// Variable changes
 	if len(changes.VariablesChanged) > 0 {
 		hasChanges = true
@@ -235,7 +235,7 @@ func showDeploymentChanges(changes *DeploymentChanges) {
 			}
 		}
 	}
-	
+
 	if !hasChanges {
 		fmt.Printf("  %s No configuration changes detected\n",
 			color.New(color.FgGreen).Sprint("✓"))
@@ -255,7 +255,7 @@ func showAccessModeImplications(mode string) {
 	case "custom":
 		implications = "Custom authentication rules apply"
 	}
-	
+
 	if implications != "" {
 		fmt.Printf("  %s %s\n",
 			color.New(color.FgYellow).Sprint("→"),
@@ -302,7 +302,7 @@ func isSensitiveKey(key string) bool {
 		"password", "secret", "token", "key", "api", "auth",
 		"credential", "private", "cert", "ssh",
 	}
-	
+
 	for _, pattern := range sensitivePatterns {
 		if strings.Contains(lowerKey, pattern) {
 			return true
@@ -332,13 +332,13 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 	if forceYes {
 		return true, nil
 	}
-	
+
 	// Show the preview
 	ShowDeploymentPreview(preview)
-	
+
 	// Build confirmation message
 	message := "Deploy this application"
-	
+
 	// Add warnings for critical changes
 	if preview.IsUpdate && preview.Changes != nil {
 		if preview.Changes.AccessModeChanged {
@@ -349,7 +349,7 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 			}
 		}
 	}
-	
+
 	// For production deployments, add extra warning
 	if preview.Environment == "production" {
 		if !preview.IsUpdate {
@@ -358,11 +358,11 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 			message = "🔴 Update PRODUCTION app"
 		}
 	}
-	
+
 	// Interactive confirmation with no default - user must explicitly choose
 	// This follows the CDK pattern for safety
 	confirm := false
-	
+
 	// We need to loop until we get a valid response
 	for {
 		response := ""
@@ -370,7 +370,7 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 			Message: message + "? (y/n)",
 			Help:    "You must explicitly type 'y' for yes or 'n' for no",
 		}
-		
+
 		err := survey.AskOne(prompt, &response, survey.WithValidator(func(val interface{}) error {
 			str, ok := val.(string)
 			if !ok {
@@ -382,11 +382,11 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 			}
 			return nil
 		}))
-		
+
 		if err != nil {
 			return false, err
 		}
-		
+
 		response = strings.ToLower(strings.TrimSpace(response))
 		if response == "y" || response == "yes" {
 			confirm = true
@@ -396,7 +396,7 @@ func ConfirmDeployment(preview *DeploymentPreview, forceYes bool) (bool, error) 
 			break
 		}
 	}
-	
+
 	return confirm, nil
 }
 
@@ -410,14 +410,14 @@ func BuildDeploymentPreviewWithOrg(
 	orgName string,
 ) *DeploymentPreview {
 	preview := BuildDeploymentPreview(manifest, opts, existingAppID, existingAccess, orgID)
-	
+
 	// Use org name if available, otherwise fall back to ID
 	if orgName != "" {
 		preview.Organization = orgName
 	} else if orgID != "" {
 		preview.Organization = orgID
 	}
-	
+
 	return preview
 }
 
@@ -439,22 +439,22 @@ func BuildDeploymentPreview(
 		ExistingAppID:  existingAppID,
 		ExistingAccess: existingAccess,
 	}
-	
+
 	// Add existing app info
 	if existingAppID != "" {
 		preview.AppID = existingAppID
-		
+
 		// Calculate changes
 		preview.Changes = calculateChanges(manifest, opts, existingAccess)
 	}
-	
+
 	// Build component list
 	for _, comp := range manifest.Components {
 		compPreview := ComponentPreview{
 			Name: comp.ID,
 			Type: "wasm",
 		}
-		
+
 		// Check source type
 		switch src := comp.Source.(type) {
 		case *validation.LocalSource:
@@ -470,10 +470,10 @@ func BuildDeploymentPreview(
 			compPreview.Registry = src.Registry
 			compPreview.Version = src.Version
 		}
-		
+
 		preview.Components = append(preview.Components, compPreview)
 	}
-	
+
 	return preview
 }
 
@@ -486,23 +486,23 @@ func calculateChanges(
 	changes := &DeploymentChanges{
 		VariablesChanged: make(map[string]VariableChange),
 	}
-	
+
 	// Check access mode change
 	if existingAccess != "" && existingAccess != manifest.Access {
 		changes.AccessModeChanged = true
 		changes.OldAccessMode = existingAccess
 		changes.NewAccessMode = manifest.Access
 	}
-	
+
 	// Check environment change (if we had previous env info)
 	// This would require storing environment in app metadata
-	
+
 	// Component changes would require comparing with existing deployment
 	// For now, we'll mark all as updated
 	for _, comp := range manifest.Components {
 		changes.ComponentsUpdated = append(changes.ComponentsUpdated, comp.ID)
 	}
-	
+
 	return changes
 }
 

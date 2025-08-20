@@ -13,22 +13,22 @@ import (
 type Config struct {
 	// CurrentOrg is the currently selected organization
 	CurrentOrg string `json:"current_org,omitempty"`
-	
+
 	// DefaultEnvironment is the default deployment environment
 	DefaultEnvironment string `json:"default_environment,omitempty"`
-	
+
 	// Organizations stores metadata about known organizations
 	Organizations map[string]OrgInfo `json:"organizations,omitempty"`
-	
+
 	// Preferences stores user preferences
 	Preferences Preferences `json:"preferences,omitempty"`
-	
+
 	// LastUpdateCheck tracks when we last checked for updates
 	LastUpdateCheck string `json:"last_update_check,omitempty"`
-	
+
 	// CurrentUser stores info about the logged-in user
 	CurrentUser *UserInfo `json:"current_user,omitempty"`
-	
+
 	// Version of the config schema
 	Version string `json:"version"`
 }
@@ -54,13 +54,13 @@ type OrgInfo struct {
 type Preferences struct {
 	// ColorOutput controls whether to use colored output
 	ColorOutput bool `json:"color_output"`
-	
+
 	// Verbose controls verbose output
 	Verbose bool `json:"verbose"`
-	
+
 	// AutoUpdate controls automatic update checks
 	AutoUpdate bool `json:"auto_update"`
-	
+
 	// ConfirmDeploy controls whether to confirm before deploying
 	ConfirmDeploy bool `json:"confirm_deploy"`
 }
@@ -77,7 +77,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get config directory: %w", err)
 	}
-	
+
 	ftlDir := filepath.Join(configDir, "ftl")
 	return filepath.Join(ftlDir, "config.json"), nil
 }
@@ -88,11 +88,11 @@ func Load() (*Config, error) {
 	once.Do(func() {
 		instance, err = load()
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return instance, nil
 }
 
@@ -102,13 +102,13 @@ func load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Try to read existing config
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -118,17 +118,17 @@ func load() (*Config, error) {
 		}
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
-	
+
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	
+
 	// Ensure maps are initialized
 	if cfg.Organizations == nil {
 		cfg.Organizations = make(map[string]OrgInfo)
 	}
-	
+
 	return &cfg, nil
 }
 
@@ -151,36 +151,36 @@ func defaultConfig() *Config {
 func (c *Config) Save() error {
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	path, err := configPath()
 	if err != nil {
 		return err
 	}
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Marshal with indentation for readability
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	
+
 	// Write atomically by writing to temp file then renaming
 	tempPath := path + ".tmp"
 	if err := os.WriteFile(tempPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
-	
+
 	if err := os.Rename(tempPath, path); err != nil {
 		// Clean up temp file on error
 		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to save config: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -196,7 +196,7 @@ func (c *Config) SetCurrentOrg(orgID string) error {
 	mu.Lock()
 	c.CurrentOrg = orgID
 	mu.Unlock()
-	
+
 	return c.Save()
 }
 
@@ -208,7 +208,7 @@ func (c *Config) AddOrganization(info OrgInfo) error {
 	}
 	c.Organizations[info.ID] = info
 	mu.Unlock()
-	
+
 	return c.Save()
 }
 
@@ -216,7 +216,7 @@ func (c *Config) AddOrganization(info OrgInfo) error {
 func (c *Config) GetOrganization(orgID string) (OrgInfo, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
-	
+
 	info, exists := c.Organizations[orgID]
 	return info, exists
 }
@@ -225,12 +225,12 @@ func (c *Config) GetOrganization(orgID string) (OrgInfo, bool) {
 func (c *Config) ListOrganizations() []OrgInfo {
 	mu.RLock()
 	defer mu.RUnlock()
-	
+
 	orgs := make([]OrgInfo, 0, len(c.Organizations))
 	for _, org := range c.Organizations {
 		orgs = append(orgs, org)
 	}
-	
+
 	return orgs
 }
 
@@ -238,7 +238,7 @@ func (c *Config) ListOrganizations() []OrgInfo {
 func (c *Config) GetDefaultEnvironment() string {
 	mu.RLock()
 	defer mu.RUnlock()
-	
+
 	if c.DefaultEnvironment == "" {
 		return "production"
 	}
@@ -250,7 +250,7 @@ func (c *Config) SetDefaultEnvironment(env string) error {
 	mu.Lock()
 	c.DefaultEnvironment = env
 	mu.Unlock()
-	
+
 	return c.Save()
 }
 
@@ -258,7 +258,7 @@ func (c *Config) SetDefaultEnvironment(env string) error {
 func (c *Config) Reset() error {
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	*c = *defaultConfig()
 	return c.Save()
 }
@@ -275,7 +275,7 @@ func (c *Config) SetCurrentUser(user *UserInfo) error {
 	mu.Lock()
 	c.CurrentUser = user
 	mu.Unlock()
-	
+
 	return c.Save()
 }
 
@@ -284,6 +284,6 @@ func (c *Config) ClearCurrentUser() error {
 	mu.Lock()
 	c.CurrentUser = nil
 	mu.Unlock()
-	
+
 	return c.Save()
 }

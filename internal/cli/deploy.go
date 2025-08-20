@@ -177,17 +177,17 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// Check if app exists
 	appName := manifest.Name
-	
+
 	// Add spinner for potentially slow API call (cold starts)
 	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	sp.Suffix = " Checking for existing app..."
 	sp.Start()
-	
+
 	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
 		Name: &appName,
 	})
 	sp.Stop()
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to check existing apps: %w", err)
 	}
@@ -205,7 +205,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// For org-scoped apps, we need to select the org BEFORE showing preview
 	var selectedOrgID string
 	var selectedOrgName string
-	
+
 	if manifest.Access == "org" {
 		// We need to create the app first (if needed) to get org context
 		// Or get temporary creds to see available orgs
@@ -214,7 +214,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 			sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 			sp.Suffix = " Preparing org-scoped deployment..."
 			sp.Start()
-			
+
 			accessControl := api.CreateAppRequestAccessControlOrg
 			createReq := api.CreateAppRequest{
 				AppName:       appName,
@@ -230,23 +230,23 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 			appExists = true // Mark as exists now
 			Success("App prepared with ID: %s", appID)
 		}
-		
+
 		// Get deployment credentials to see available orgs
 		sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 		sp.Suffix = " Checking organization access..."
 		sp.Start()
-		
+
 		componentNames := make([]string, 0, len(manifest.Components))
 		for _, comp := range manifest.Components {
 			componentNames = append(componentNames, comp.ID)
 		}
-		
+
 		tempCreds, err := apiClient.CreateDeployCredentials(ctx, appID, componentNames)
 		sp.Stop()
 		if err != nil {
 			return fmt.Errorf("failed to get deployment context: %w", err)
 		}
-		
+
 		// Select org based on context
 		if tempCreds.Deployment.Context.ActorType == "machine" {
 			if len(tempCreds.Deployment.Context.OrgIds) != 1 {
@@ -269,7 +269,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 					}
 				}
 				if !found {
-					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v", 
+					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v",
 						opts.OrgID, tempCreds.Deployment.Context.OrgIds)
 				}
 			} else if len(tempCreds.Deployment.Context.OrgIds) == 1 {
@@ -282,7 +282,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 				}
 			}
 		}
-		
+
 		// Try to get org name from config
 		if cfg, err := config.Load(); err == nil {
 			if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists && orgInfo.Name != "" {
@@ -293,7 +293,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// NOW build deployment preview with complete information
 	preview := BuildDeploymentPreviewWithOrg(manifest, opts, appID, existingAccess, selectedOrgID, selectedOrgName)
-	
+
 	// Show preview and get confirmation
 	confirmed, err := ConfirmDeployment(preview, opts.Yes)
 	if err != nil {
@@ -306,7 +306,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Create app if it doesn't exist and wasn't already created for org selection
 	if !appExists {
 		Info("Creating app on FTL platform...")
-		
+
 		accessControl := api.CreateAppRequestAccessControlPublic
 		switch manifest.Access {
 		case "private":
@@ -716,7 +716,6 @@ func displayDryRunSummary(manifest *validation.Application, appExists bool) {
 	fmt.Println("To perform the actual deployment, run without --dry-run")
 }
 
-
 // displayMCPUrls displays a table showing MCP URLs for the application and its components
 func displayMCPUrls(baseURL string, components []*validation.Component) {
 	// Ensure the base URL ends with /mcp
@@ -759,7 +758,7 @@ func selectOrganization(orgIDs []string) (string, error) {
 		// Config error is not fatal, continue without it
 		cfg = nil
 	}
-	
+
 	// If we're in a non-interactive environment, use config or first org
 	if !isDeployInteractive() {
 		// Try to use configured org
@@ -772,7 +771,7 @@ func selectOrganization(orgIDs []string) (string, error) {
 				}
 			}
 		}
-		
+
 		Warn("Multiple organizations available. Using first one: %s", orgIDs[0])
 		Warn("To specify an organization, use 'ftl org set' or --org flag")
 		return orgIDs[0], nil
@@ -798,14 +797,14 @@ func selectOrganization(orgIDs []string) (string, error) {
 				if orgID == currentOrg {
 					// Ask if they want to use the configured preference
 					useConfig := false
-					
+
 					// Get org info for better display
 					orgInfo, hasInfo := cfg.GetOrganization(currentOrg)
 					displayName := orgInfo.Name
 					if displayName == "" {
 						displayName = currentOrg // Fall back to ID if no name
 					}
-					
+
 					prompt := &survey.Confirm{
 						Message: fmt.Sprintf("Use current organization '%s'?", displayName),
 						Default: true,
@@ -827,7 +826,7 @@ func selectOrganization(orgIDs []string) (string, error) {
 	// Interactive selection - build display names for all orgs
 	options := make([]string, len(orgIDs))
 	orgMap := make(map[string]string) // display name -> org ID
-	
+
 	for i, orgID := range orgIDs {
 		displayName := orgID
 		if cfg != nil {
@@ -838,7 +837,7 @@ func selectOrganization(orgIDs []string) (string, error) {
 		options[i] = displayName
 		orgMap[displayName] = orgID
 	}
-	
+
 	var selected string
 	prompt := &survey.Select{
 		Message: "Select organization for deployment:",
@@ -853,11 +852,11 @@ func selectOrganization(orgIDs []string) (string, error) {
 
 	// Map display name back to org ID
 	selectedOrgID := orgMap[selected]
-	
+
 	// Update config with selection
 	if cfg != nil {
 		_ = cfg.SetCurrentOrg(selectedOrgID)
-		
+
 		// Update last used time
 		if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists {
 			orgInfo.LastUsed = time.Now().Format(time.RFC3339)
@@ -875,13 +874,12 @@ func isDeployInteractive() bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Check for CI environment variables
 	if os.Getenv("CI") == "true" || os.Getenv("CONTINUOUS_INTEGRATION") == "true" {
 		return false
 	}
-	
+
 	// Check if it's a terminal
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
-

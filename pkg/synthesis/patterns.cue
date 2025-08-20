@@ -3,6 +3,7 @@ package ftl
 import (
 	"strings"
 	"list"
+	"encoding/json"
 )
 
 // ===========================================================================
@@ -64,6 +65,13 @@ import (
 #PlatformConfig: {
 	gateway_version:     string | *"0.0.13-alpha.0"
 	authorizer_version:  string | *"0.0.15-alpha.0"
+	// Deployment context from platform
+	deployment_context?: {
+		actor_type: "user" | "machine"
+		org_id?:    string  // Present for org-scoped deployments
+		// Claims to forward as headers (claim_name -> header_name)
+		forward_claims?: {[string]: string}
+	}
 }
 
 #InputTransform: {
@@ -214,6 +222,17 @@ import (
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
 							
+							// For org mode with machine actor, require org_id claim
+							// This ensures M2M tokens can only access their designated org
+							if platform.deployment_context != _|_ {
+								if platform.deployment_context.actor_type == "machine" {
+									if platform.deployment_context.org_id != _|_ {
+										// Build the JSON object for required claims
+										mcp_auth_required_claims: "{\"org_id\": \"" + platform.deployment_context.org_id + "\"}"
+									}
+								}
+							}
+							
 							// For org mode, inject allowed subjects if provided
 							if input.allowed_subjects != _|_ {
 								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
@@ -224,6 +243,16 @@ import (
 							// For "custom" mode - user must provide auth config
 							mcp_jwt_issuer: input.auth.jwt_issuer | *"https://divine-lion-50-staging.authkit.app"
 							mcp_jwt_audience: input.auth.jwt_audience | *input.name
+						}
+						
+						// Forward claims as headers if specified by platform
+						if platform.deployment_context != _|_ {
+							if platform.deployment_context.forward_claims != _|_ {
+								// Convert the claim->header mapping to JSON string
+								// The mcp-authorizer expects a JSON object like: {"sub": "X-User-ID", "org_id": "X-Org-ID"}
+								_claims_map: platform.deployment_context.forward_claims
+								mcp_auth_forward_claims: json.Marshal(_claims_map)
+							}
 						}
 					}
 				}

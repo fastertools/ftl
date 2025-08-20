@@ -95,7 +95,8 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 			}
 
 			// Print login header
-			fmt.Println("→ Logging in to FTL Engine\n")
+			fmt.Println("→ Logging in to FTL Engine")
+			fmt.Println()
 
 			// Perform login
 			ctx, cancel := context.WithTimeout(context.Background(), auth.LoginTimeout)
@@ -106,14 +107,14 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 				if status := manager.Status(); status.LoggedIn && !status.NeedsRefresh {
 					// Show full auth status
 					color.Green("✅ Already logged in")
-					
+
 					// Show user info
 					if cfg, err := config.Load(); err == nil {
 						if user := cfg.GetCurrentUser(); user != nil && user.Email != "" {
 							fmt.Printf("   Logged in as: %s\n", color.CyanString(user.Email))
 						}
 					}
-					
+
 					// Show token validity
 					if status.Credentials != nil && status.Credentials.ExpiresAt != nil {
 						duration := time.Until(*status.Credentials.ExpiresAt)
@@ -123,7 +124,7 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 								int(duration.Minutes())%60)
 						}
 					}
-					
+
 					fmt.Println()
 					fmt.Printf("Use %s to force re-authentication\n", color.CyanString("ftl auth login --force"))
 					return nil
@@ -157,12 +158,12 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 			// Success
 			fmt.Println()
 			color.Green("✅ Successfully logged in!")
-			
+
 			// Try to fetch and display user info
 			if apiClient, err := api.NewFTLClient(manager, ""); err == nil {
 				if userInfo, err := apiClient.GetUserInfo(ctx); err == nil && userInfo.User.Email != nil {
 					fmt.Printf("   Logged in as: %s\n", color.CyanString(*userInfo.User.Email))
-					
+
 					// Save user info and refresh org list to config
 					if userConfig, err := config.Load(); err == nil {
 						// Save user info
@@ -175,7 +176,7 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 							userCfg.Username = *userInfo.User.Name
 						}
 						_ = userConfig.SetCurrentUser(userCfg)
-						
+
 						// Clear and refresh organization list
 						// This ensures we have the correct orgs for the new user
 						userConfig.Organizations = make(map[string]config.OrgInfo)
@@ -186,7 +187,7 @@ For machine authentication (CI/CD pipelines), use one of these methods:
 							}
 							_ = userConfig.AddOrganization(orgInfo)
 						}
-						
+
 						// Clear current org selection since it may not be valid for new user
 						_ = userConfig.SetCurrentOrg("")
 					}
@@ -286,7 +287,7 @@ func newAuthStatusCmd() *cobra.Command {
 
 			// Show logged in status
 			color.Green("✅ Logged in")
-			
+
 			// Check actor type and show user info
 			actorType, _ := manager.GetActorType(context.Background())
 			if actorType == "machine" {

@@ -78,6 +78,22 @@ type ProcessRequest struct {
 	// For org mode: platform provides all org members (filtered by allowed_roles if specified)
 	// For public/custom modes: this field is ignored
 	AllowedSubjects []string
+
+	// Deployment context for M2M authentication and claim forwarding
+	DeploymentContext *DeploymentContext
+}
+
+// DeploymentContext provides actor and organization context for deployments
+type DeploymentContext struct {
+	// Actor type performing the deployment
+	ActorType string // "user" or "machine"
+
+	// Organization ID for org-scoped deployments
+	OrgID string
+
+	// Claims to forward as headers (claim_name -> header_name)
+	// Example: {"sub": "X-User-ID", "org_id": "X-Org-ID"}
+	ForwardClaims map[string]string
 }
 
 // ProcessResult contains the deployment-ready Spin TOML.
@@ -167,6 +183,20 @@ func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
 	overrides := map[string]interface{}{
 		"gateway_version":    p.config.GatewayVersion,
 		"authorizer_version": p.config.AuthorizerVersion,
+	}
+
+	// Add deployment context if provided
+	if req.DeploymentContext != nil {
+		deploymentCtx := map[string]interface{}{
+			"actor_type": req.DeploymentContext.ActorType,
+		}
+		if req.DeploymentContext.OrgID != "" {
+			deploymentCtx["org_id"] = req.DeploymentContext.OrgID
+		}
+		if len(req.DeploymentContext.ForwardClaims) > 0 {
+			deploymentCtx["forward_claims"] = req.DeploymentContext.ForwardClaims
+		}
+		overrides["deployment_context"] = deploymentCtx
 	}
 
 	// 6. Synthesize to Spin TOML with platform overrides

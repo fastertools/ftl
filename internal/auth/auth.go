@@ -262,7 +262,7 @@ func (m *Manager) SaveUserInfoFromToken(token *TokenResponse) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	// Extract user info from JWT
 	claims, err := ExtractIDToken(token)
 	if err != nil {
@@ -272,7 +272,7 @@ func (m *Manager) SaveUserInfoFromToken(token *TokenResponse) error {
 			return fmt.Errorf("failed to extract user info: %w", err)
 		}
 	}
-	
+
 	// Save user info to config
 	userInfo := &config.UserInfo{
 		Username:  claims.GetDisplayName(),
@@ -280,6 +280,6 @@ func (m *Manager) SaveUserInfoFromToken(token *TokenResponse) error {
 		UserID:    claims.UserID,
 		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
-	
+
 	return cfg.SetCurrentUser(userInfo)
 }

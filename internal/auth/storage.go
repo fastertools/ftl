@@ -18,7 +18,7 @@ type CredentialStore interface {
 	Delete() error
 	// Exists checks if credentials are stored
 	Exists() bool
-	
+
 	// M2M-specific methods
 	StoreToken(token string, expiresIn int) error
 	GetM2MConfig() (*M2MConfig, error)
@@ -109,12 +109,12 @@ func (s *KeyringStore) GetM2MConfig() (*M2MConfig, error) {
 		}
 		return nil, fmt.Errorf("failed to load M2M config: %w", err)
 	}
-	
+
 	var config M2MConfig
 	if err := json.Unmarshal([]byte(data), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse M2M config: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -124,11 +124,11 @@ func (s *KeyringStore) StoreM2MConfig(config *M2MConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal M2M config: %w", err)
 	}
-	
+
 	if err := keyring.Set(KeyringService, "m2m-config", string(data)); err != nil {
 		return fmt.Errorf("failed to store M2M config: %w", err)
 	}
-	
+
 	return nil
 }
 

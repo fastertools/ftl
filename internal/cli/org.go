@@ -39,27 +39,27 @@ organization context, and view the currently selected organization.`,
 // newOrgListCmd creates the 'org list' command
 func newOrgListCmd() *cobra.Command {
 	var refresh bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List available organizations",
-		Long:  "List all organizations you have access to, showing the current selection.",
+		Use:     "list",
+		Short:   "List available organizations",
+		Long:    "List all organizations you have access to, showing the current selection.",
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			return runOrgList(ctx, refresh)
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh organization list from server")
-	
+
 	return cmd
 }
 
 // newOrgSetCmd creates the 'org set' command
 func newOrgSetCmd() *cobra.Command {
 	var interactive bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "set [ORG_ID]",
 		Short: "Set the current organization",
@@ -68,33 +68,33 @@ func newOrgSetCmd() *cobra.Command {
 If no ORG_ID is provided, you'll be prompted to select from available organizations.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			
+
 			var orgID string
 			if len(args) > 0 {
 				orgID = args[0]
 			}
-			
+
 			return runOrgSet(ctx, orgID, interactive)
 		},
 	}
-	
+
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Force interactive selection")
-	
+
 	return cmd
 }
 
 // newOrgCurrentCmd creates the 'org current' command
 func newOrgCurrentCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "current",
-		Short: "Show the current organization",
-		Long:  "Display the currently selected organization context.",
+		Use:     "current",
+		Short:   "Show the current organization",
+		Long:    "Display the currently selected organization context.",
 		Aliases: []string{"show"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runOrgCurrent()
 		},
 	}
-	
+
 	return cmd
 }
 
@@ -109,7 +109,7 @@ func runOrgList(ctx context.Context, refresh bool) error {
 	// Get available orgs from API if refresh requested or no cached orgs
 	var orgs []string
 	needsRefresh := refresh || len(cfg.ListOrganizations()) == 0
-	
+
 	if needsRefresh {
 		// Initialize auth
 		store, err := auth.NewKeyringStore()
@@ -161,7 +161,7 @@ func runOrgList(ctx context.Context, refresh bool) error {
 		for _, org := range userInfo.Organizations {
 			orgInfo := config.OrgInfo{
 				ID:       org.Id,
-				Name:     org.Name, 
+				Name:     org.Name,
 				LastUsed: time.Now().Format(time.RFC3339),
 			}
 			_ = cfg.AddOrganization(orgInfo)
@@ -182,22 +182,22 @@ func runOrgList(ctx context.Context, refresh bool) error {
 
 	// Display organizations
 	currentOrg := cfg.GetCurrentOrg()
-	
+
 	// Use tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "CURRENT\tORG ID\tNAME\tLAST USED")
 	fmt.Fprintln(w, "-------\t------\t----\t---------")
-	
+
 	for _, orgID := range orgs {
 		current := " "
 		if orgID == currentOrg {
 			current = "*"
 		}
-		
+
 		orgInfo, exists := cfg.GetOrganization(orgID)
 		name := "-"
 		lastUsed := "-"
-		
+
 		if exists {
 			if orgInfo.Name != "" {
 				name = orgInfo.Name
@@ -208,17 +208,17 @@ func runOrgList(ctx context.Context, refresh bool) error {
 				}
 			}
 		}
-		
+
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", current, orgID, name, lastUsed)
 	}
-	
+
 	w.Flush()
-	
+
 	if currentOrg == "" {
 		fmt.Println()
 		Info("No organization currently selected. Use 'ftl org set' to select one.")
 	}
-	
+
 	return nil
 }
 
@@ -261,11 +261,11 @@ func runOrgSet(ctx context.Context, orgID string, forceInteractive bool) error {
 	// Build list of available orgs
 	availableOrgs := make(map[string]string) // ID -> Name
 	var orgIDs []string
-	
+
 	for _, org := range userInfo.Organizations {
 		availableOrgs[org.Id] = org.Name
 		orgIDs = append(orgIDs, org.Id)
-		
+
 		// Update cached org info
 		orgInfo := config.OrgInfo{
 			ID:   org.Id,
@@ -327,7 +327,7 @@ func runOrgSet(ctx context.Context, orgID string, forceInteractive bool) error {
 	} else {
 		Success("Current organization set to: %s", orgID)
 	}
-	
+
 	return nil
 }
 
@@ -352,6 +352,6 @@ func runOrgCurrent() error {
 	} else {
 		fmt.Println(currentOrg)
 	}
-	
+
 	return nil
 }

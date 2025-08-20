@@ -84,6 +84,27 @@ func (m *mockCredentialStore) Exists() bool {
 	return m.creds != nil
 }
 
+// M2M methods
+func (m *mockCredentialStore) StoreToken(token string, expiresIn int) error {
+	return nil
+}
+
+func (m *mockCredentialStore) GetM2MConfig() (*auth.M2MConfig, error) {
+	return nil, fmt.Errorf("no M2M config")
+}
+
+func (m *mockCredentialStore) StoreM2MConfig(config *auth.M2MConfig) error {
+	return nil
+}
+
+func (m *mockCredentialStore) SetActorType(actorType string) error {
+	return nil
+}
+
+func (m *mockCredentialStore) GetActorType() (string, error) {
+	return "user", nil
+}
+
 func TestFTLClient_ListApps(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
