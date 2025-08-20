@@ -201,6 +201,11 @@ import (
 							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
+							
+							// For private mode, inject allowed subjects if provided
+							if input.allowed_subjects != _|_ {
+								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
+							}
 						}
 						
 						if input.access == "org" {

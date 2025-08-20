@@ -222,6 +222,40 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		return fmt.Errorf("failed to get deployment credentials: %w", err)
 	}
 
+	// Handle actor context validation
+	if creds.Deployment.Context.ActorType == "machine" && manifest.Access == "private" {
+		return fmt.Errorf("machine actors cannot deploy private apps")
+	}
+
+	// Select org for org-scoped deployments
+	var selectedOrgID string
+	if manifest.Access == "org" {
+		if len(creds.Deployment.Context.OrgIds) == 0 {
+			return fmt.Errorf("app requires org access but you belong to no organizations")
+		}
+
+		if creds.Deployment.Context.ActorType == "machine" {
+			// Machines only have one org
+			if len(creds.Deployment.Context.OrgIds) != 1 {
+				return fmt.Errorf("machine actor must have exactly one org")
+			}
+			selectedOrgID = creds.Deployment.Context.OrgIds[0]
+			Info("Deploying as machine to org: %s", selectedOrgID)
+		} else {
+			// Users might have multiple orgs
+			if len(creds.Deployment.Context.OrgIds) == 1 {
+				selectedOrgID = creds.Deployment.Context.OrgIds[0]
+				Info("Deploying to org: %s", selectedOrgID)
+			} else {
+				// TODO: Implement interactive org selection
+				// For now, use the first org
+				selectedOrgID = creds.Deployment.Context.OrgIds[0]
+				Info("Multiple orgs available, using: %s", selectedOrgID)
+				Info("Available orgs: %v", creds.Deployment.Context.OrgIds)
+			}
+		}
+	}
+
 	// Parse ECR credentials
 	ecrAuth, err := oci.ParseECRToken(creds.Registry.RegistryUri, creds.Registry.AuthorizationToken)
 	if err != nil {
@@ -259,7 +293,13 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	var deploymentURL string
 
-	err = deployer.Deploy(ctx, deploymentJSON, creds, opts.Environment, func(event deploy.StreamEvent) {
+	// Prepare deployment options with org context
+	deployOpts := deploy.DeployOptions{
+		Environment: opts.Environment,
+		OrgID:       selectedOrgID,
+	}
+
+	err = deployer.Deploy(ctx, deploymentJSON, creds, deployOpts, func(event deploy.StreamEvent) {
 		switch event.Type {
 		case "progress":
 			sp.Suffix = fmt.Sprintf(" %s", event.Message)

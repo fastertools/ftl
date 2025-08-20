@@ -70,12 +70,18 @@ func extractRegion(functionURL, registryURI string) string {
 	return "us-west-2"
 }
 
+// DeployOptions contains options for deployment
+type DeployOptions struct {
+	Environment string
+	OrgID       string // Selected org ID for org-scoped deployments
+}
+
 // Deploy performs a deployment using the streaming Lambda Function URL
 func (d *StreamingDeployer) Deploy(
 	ctx context.Context,
 	ftlConfig []byte,
-	creds *api.CreateDeployCredentialsResponse,
-	environment string,
+	creds *api.CreateDeployCredentialsResponseBody,
+	opts DeployOptions,
 	progressCallback func(event StreamEvent),
 ) error {
 	// Extract region from the URLs we have
@@ -103,9 +109,9 @@ func (d *StreamingDeployer) Deploy(
 	}
 
 	// Add environment parameter if not production
-	if environment != "" && environment != "production" {
+	if opts.Environment != "" && opts.Environment != "production" {
 		q := reqURL.Query()
-		q.Set("environment", environment)
+		q.Set("environment", opts.Environment)
 		reqURL.RawQuery = q.Encode()
 	}
 
@@ -118,6 +124,13 @@ func (d *StreamingDeployer) Deploy(
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/x-ndjson")
+
+	// Set actor context headers (required by platform)
+	req.Header.Set("X-FTL-Actor-Type", string(creds.Deployment.Context.ActorType))
+	req.Header.Set("X-FTL-User-ID", creds.Deployment.Context.UserId) // Empty for machines
+	if opts.OrgID != "" {
+		req.Header.Set("X-FTL-Org-ID", opts.OrgID)
+	}
 
 	// Calculate payload hash for signing
 	hash := sha256.Sum256(ftlConfig)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -92,47 +91,21 @@ func TestStreamingDeploySuccess(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-			Region:      "us-west-2",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"user",
+		"user_123",
+		[]string{"org_456"},
+	)
 
 	// Create deployer and test deployment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app", "version": "1.0.0"}`)
 
 	var receivedEvents []StreamEvent
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "", func(event StreamEvent) {
+	opts := DeployOptions{Environment: ""}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, func(event StreamEvent) {
 		receivedEvents = append(receivedEvents, event)
 	})
 
@@ -162,46 +135,20 @@ func TestStreamingDeployError(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-			Region:      "us-west-2",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"user",
+		"user_123",
+		[]string{"org_456"},
+	)
 
 	// Create deployer and test deployment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app", "version": "1.0.0"}`)
 
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "", nil)
+	opts := DeployOptions{Environment: ""}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Failed to build application: syntax error")
@@ -216,46 +163,20 @@ func TestStreamingDeployHTTPError(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-			Region:      "us-west-2",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"user",
+		"user_123",
+		[]string{"org_456"},
+	)
 
 	// Create deployer and test deployment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app", "version": "1.0.0"}`)
 
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "", nil)
+	opts := DeployOptions{Environment: ""}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "deployment failed with status 403")
@@ -276,46 +197,20 @@ func TestStreamingDeployWithEnvironment(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-			Region:      "us-west-2",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"user",
+		"user_123",
+		[]string{"org_456"},
+	)
 
 	// Create deployer and test deployment with environment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app", "version": "1.0.0"}`)
 
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "staging", nil)
+	opts := DeployOptions{Environment: "staging"}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, nil)
 
 	assert.NoError(t, err)
 }
@@ -341,46 +236,21 @@ func TestStreamingDeployMalformedJSON(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"", // No actor type for this test
+		"",
+		nil,
+	)
 
 	// Create deployer and test deployment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app"}`)
 
 	var eventCount int
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "", func(event StreamEvent) {
+	opts := DeployOptions{Environment: ""}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, func(event StreamEvent) {
 		eventCount++
 	})
 
@@ -404,45 +274,20 @@ func TestStreamingDeployIncompleteStream(t *testing.T) {
 	defer server.Close()
 
 	// Create mock credentials
-	creds := &api.CreateDeployCredentialsResponse{
-		Registry: struct {
-			AuthorizationToken string `json:"authorizationToken"`
-			ExpiresAt          string `json:"expiresAt"`
-			PackageNamespace   string `json:"packageNamespace"`
-			ProxyEndpoint      string `json:"proxyEndpoint"`
-			Region             string `json:"region"`
-			RegistryUri        string `json:"registryUri"`
-		}{
-			RegistryUri: "795394005211.dkr.ecr.us-west-2.amazonaws.com",
-		},
-		Deployment: struct {
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			} `json:"credentials"`
-			FunctionUrl string `json:"functionUrl"`
-		}{
-			FunctionUrl: server.URL,
-			Credentials: struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				ExpiresAt       string `json:"expiresAt"`
-				SecretAccessKey string `json:"secretAccessKey"`
-				SessionToken    string `json:"sessionToken"`
-			}{
-				AccessKeyId:     "AKIAIOSFODNN7EXAMPLE",
-				SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				SessionToken:    "test-session-token",
-			},
-		},
-	}
+	creds := createTestCredentials(
+		server.URL,
+		"795394005211.dkr.ecr.us-west-2.amazonaws.com",
+		"", // No actor type for this test
+		"",
+		nil,
+	)
 
 	// Create deployer and test deployment
 	deployer := NewStreamingDeployer()
 	ftlConfig := []byte(`{"name": "test-app"}`)
 
-	err := deployer.Deploy(context.Background(), ftlConfig, creds, "", nil)
+	opts := DeployOptions{Environment: ""}
+	err := deployer.Deploy(context.Background(), ftlConfig, creds, opts, nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "deployment stream ended without completion")

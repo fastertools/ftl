@@ -408,7 +408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateDeployCredentialsResponse"
+                  "$ref": "#/components/schemas/CreateDeployCredentialsResponseBody"
                 }
               }
             }
@@ -1114,7 +1114,7 @@
         "required": ["message"],
         "additionalProperties": false
       },
-      "CreateDeployCredentialsResponse": {
+      "CreateDeployCredentialsResponseBody": {
         "description": "Deployment credentials response with registry and deployment access",
         "type": "object",
         "properties": {
@@ -1185,9 +1185,33 @@
                 },
                 "required": ["accessKeyId", "secretAccessKey", "sessionToken", "expiresAt"],
                 "additionalProperties": false
+              },
+              "context": {
+                "description": "Actor context for deployment",
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "description": "User ID (empty for machine actors)",
+                    "type": "string"
+                  },
+                  "orgIds": {
+                    "description": "Organization IDs (user: all their orgs, machine: single org)",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actorType": {
+                    "description": "Type of actor making the deployment",
+                    "type": "string",
+                    "enum": ["user", "machine"]
+                  }
+                },
+                "required": ["userId", "orgIds", "actorType"],
+                "additionalProperties": false
               }
             },
-            "required": ["functionUrl", "credentials"],
+            "required": ["functionUrl", "credentials", "context"],
             "additionalProperties": false
           },
           "appId": {

@@ -234,4 +234,3 @@ func getStringOrDefault(val interface{}, defaultVal string) string {
 	}
 	return defaultVal
 }
-

@@ -180,7 +180,7 @@ func (c *FTLClient) DeleteApp(ctx context.Context, appID string) error {
 // Deployment Credentials API methods
 
 // CreateDeployCredentials creates temporary credentials for deployment (ECR and Lambda)
-func (c *FTLClient) CreateDeployCredentials(ctx context.Context, appID string, components []string) (*CreateDeployCredentialsResponse, error) {
+func (c *FTLClient) CreateDeployCredentials(ctx context.Context, appID string, components []string) (*CreateDeployCredentialsResponseBody, error) {
 	appUUID, err := parseUUID(appID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid app ID: %w", err)
