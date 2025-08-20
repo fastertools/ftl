@@ -3,6 +3,7 @@ package validation
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"cuelang.org/go/cue"
@@ -152,6 +153,28 @@ func ExtractApplication(v cue.Value) (*Application, error) {
 		}
 	}
 
+	// Extract allowed_roles for org access mode
+	if app.Access == "org" {
+		rolesIter, err := v.LookupPath(cue.ParsePath("allowed_roles")).List()
+		if err == nil {
+			for rolesIter.Next() {
+				if role, err := rolesIter.Value().String(); err == nil {
+					app.AllowedRoles = append(app.AllowedRoles, role)
+				}
+			}
+		}
+
+		// Extract allowed_subjects (usually injected by platform)
+		subjectsIter, err := v.LookupPath(cue.ParsePath("allowed_subjects")).List()
+		if err == nil {
+			for subjectsIter.Next() {
+				if subject, err := subjectsIter.Value().String(); err == nil {
+					app.AllowedSubjects = append(app.AllowedSubjects, subject)
+				}
+			}
+		}
+	}
+
 	return app, nil
 }
 
@@ -220,21 +243,44 @@ func extractComponent(v cue.Value) (*Component, error) {
 // Application represents a validated FTL application
 // These are strongly-typed, validated structures derived from CUE
 type Application struct {
-	Name        string
-	Version     string
-	Description string
-	Access      string
-	Auth        *AuthConfig
-	Components  []*Component
-	Variables   map[string]string
+	Name            string            `json:"name,omitempty"`
+	Version         string            `json:"version,omitempty"`
+	Description     string            `json:"description,omitempty"`
+	Access          string            `json:"access,omitempty"`
+	Auth            *AuthConfig       `json:"auth,omitempty"`
+	Components      []*Component      `json:"components,omitempty"`
+	Variables       map[string]string `json:"variables,omitempty"`
+	AllowedRoles    []string          `json:"allowed_roles,omitempty"`    // For org access mode - optional role filter
+	AllowedSubjects []string          `json:"allowed_subjects,omitempty"` // For org access mode - list of allowed user subjects
 }
 
 // Component represents a validated component
 type Component struct {
-	ID        string
-	Source    ComponentSource
-	Build     *BuildConfig
-	Variables map[string]string
+	ID        string            `json:"id"`
+	Source    ComponentSource   `json:"-"` // Exclude from automatic JSON marshaling
+	Build     *BuildConfig      `json:"build,omitempty"`
+	Variables map[string]string `json:"variables,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for Component to handle the Source interface
+func (c Component) MarshalJSON() ([]byte, error) {
+	type Alias Component // prevent recursion
+	aux := struct {
+		Source interface{} `json:"source"`
+		Alias
+	}{
+		Alias: Alias(c),
+	}
+
+	// Handle the source field based on its concrete type
+	switch src := c.Source.(type) {
+	case *LocalSource:
+		aux.Source = src.Path // Local source is just a string path
+	case *RegistrySource:
+		aux.Source = src // Registry source is a struct
+	}
+
+	return json.Marshal(aux)
 }
 
 // ComponentSource is either local or registry
@@ -244,29 +290,29 @@ type ComponentSource interface {
 
 // LocalSource represents a local component source
 type LocalSource struct {
-	Path string
+	Path string `json:"path"`
 }
 
 func (LocalSource) isComponentSource() {}
 
 // RegistrySource represents a registry component source
 type RegistrySource struct {
-	Registry string
-	Package  string
-	Version  string
+	Registry string `json:"registry"`
+	Package  string `json:"package"`
+	Version  string `json:"version"`
 }
 
 func (RegistrySource) isComponentSource() {}
 
 // BuildConfig represents build configuration
 type BuildConfig struct {
-	Command string
-	Workdir string
-	Watch   []string
+	Command string   `json:"command"`
+	Workdir string   `json:"workdir,omitempty"`
+	Watch   []string `json:"watch,omitempty"`
 }
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	JWTIssuer   string
-	JWTAudience string
+	JWTIssuer   string `json:"jwt_issuer,omitempty"`
+	JWTAudience string `json:"jwt_audience,omitempty"`
 }

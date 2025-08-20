@@ -43,6 +43,13 @@ components:
 				if result.Metadata.AppName != "test-app" {
 					t.Errorf("expected app name 'test-app', got %s", result.Metadata.AppName)
 				}
+				// Verify metadata
+				if result.Metadata.ComponentCount != 1 {
+					t.Errorf("expected 1 component, got %d", result.Metadata.ComponentCount)
+				}
+				if result.Metadata.SubjectsInjected != 0 {
+					t.Errorf("expected 0 subjects injected for public app, got %d", result.Metadata.SubjectsInjected)
+				}
 			},
 		},
 		{
@@ -119,6 +126,37 @@ components:
 			wantErr: true,
 		},
 		{
+			name:   "private access with allowed subjects",
+			config: DefaultConfig(),
+			request: ProcessRequest{
+				Format: "yaml",
+				ConfigData: []byte(`
+name: private-user-app
+access: private
+components:
+  - id: user-service
+    source:
+      registry: ghcr.io
+      package: test/service
+      version: v1.0.0
+`),
+				// Platform provides the authenticated user for private mode
+				AllowedSubjects: []string{"user_authenticated_123"},
+			},
+			wantErr: false,
+			checks: func(t *testing.T, result *ProcessResult) {
+				if !strings.Contains(result.SpinTOML, "mcp-authorizer") {
+					t.Error("SpinTOML should contain mcp-authorizer for private app")
+				}
+				if result.Metadata.AccessMode != "private" {
+					t.Errorf("expected access mode 'private', got %s", result.Metadata.AccessMode)
+				}
+				if result.Metadata.SubjectsInjected != 1 {
+					t.Errorf("expected 1 subject injected for private mode, got %d", result.Metadata.SubjectsInjected)
+				}
+			},
+		},
+		{
 			name:   "org access with allowed subjects",
 			config: DefaultConfig(),
 			request: ProcessRequest{
@@ -143,6 +181,9 @@ components:
 				// The allowed_subjects should be passed through to CUE
 				if result.Metadata.AccessMode != "org" {
 					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
+				}
+				if result.Metadata.SubjectsInjected != 2 {
+					t.Errorf("expected 2 subjects injected, got %d", result.Metadata.SubjectsInjected)
 				}
 			},
 		},
@@ -173,11 +214,8 @@ components:
 				if result.Metadata.AccessMode != "org" {
 					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
 				}
-				if len(result.Metadata.AllowedRoles) != 2 {
-					t.Errorf("expected 2 allowed roles, got %d", len(result.Metadata.AllowedRoles))
-				}
-				if result.Metadata.AllowedRoles[0] != "admin" || result.Metadata.AllowedRoles[1] != "developer" {
-					t.Errorf("expected roles [admin, developer], got %v", result.Metadata.AllowedRoles)
+				if result.Metadata.SubjectsInjected != 2 {
+					t.Errorf("expected 2 subjects injected, got %d", result.Metadata.SubjectsInjected)
 				}
 			},
 		},

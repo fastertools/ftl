@@ -3,12 +3,11 @@
 package platform
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"cuelang.org/go/cue"
 	"github.com/fastertools/ftl-cli/pkg/synthesis"
 	"github.com/fastertools/ftl-cli/pkg/validation"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -74,23 +73,19 @@ type ProcessRequest struct {
 	// Format of the config data
 	Format string // "yaml" or "json"
 
-	// Deployment-specific variables to inject
-	Variables map[string]string
-
-	// For org access mode - computed allowed user subjects from WorkOS
-	// The platform should:
-	// 1. Call WorkOS to get org members
-	// 2. Filter by allowed_roles if specified in the app config
-	// 3. Pass the resulting subject list here
+	// Computed allowed user subjects from WorkOS (only used for private/org access modes)
+	// For private mode: platform provides the single authenticated user
+	// For org mode: platform provides all org members (filtered by allowed_roles if specified)
+	// For public/custom modes: this field is ignored
 	AllowedSubjects []string
 }
 
 // ProcessResult contains the deployment-ready Spin TOML.
 type ProcessResult struct {
-	// The complete Spin TOML manifest
+	// The complete Spin TOML manifest ready for deployment
 	SpinTOML string
 
-	// Metadata about what was processed
+	// Metadata about what was processed (for platform logging/tracking)
 	Metadata ProcessMetadata
 }
 
@@ -100,56 +95,72 @@ type ProcessMetadata struct {
 	AppVersion         string
 	ComponentCount     int
 	AccessMode         string
-	AllowedRoles       []string // For org mode - roles to filter by
 	InjectedGateway    bool
 	InjectedAuthorizer bool
+	SubjectsInjected   int // Number of allowed subjects that were injected
 }
 
 // Process handles an FTL deployment request.
+//
+// The platform only needs to provide:
+//   - The raw FTL configuration (YAML/JSON)
+//   - Computed allowed subjects for private/org modes (from WorkOS)
+//
+// The processor handles all FTL-specific logic internally:
+//   - Validation against CUE schema
+//   - Component registry validation
+//   - Synthesis to Spin TOML
+//   - Gateway/authorizer injection
+//
+// For access modes:
+//   - public: No allowed subjects needed
+//   - private: Platform provides single authenticated user
+//   - org: Platform provides org members (filtered by allowed_roles if specified in config)
+//   - custom: No allowed subjects needed (app handles its own auth)
 func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
-	// 1. Parse and validate the configuration
-	var app map[string]interface{}
+	// 1. Validate and parse the configuration to typed structure
+	var cueValue interface{}
+	var err error
 
 	switch req.Format {
 	case "yaml":
-		if err := yaml.Unmarshal(req.ConfigData, &app); err != nil {
-			return nil, fmt.Errorf("invalid YAML: %w", err)
+		cueValue, err = p.validator.ValidateYAML(req.ConfigData)
+		if err != nil {
+			return nil, fmt.Errorf("validation failed: %w", err)
 		}
 	case "json":
-		if err := json.Unmarshal(req.ConfigData, &app); err != nil {
-			return nil, fmt.Errorf("invalid JSON: %w", err)
+		cueValue, err = p.validator.ValidateJSON(req.ConfigData)
+		if err != nil {
+			return nil, fmt.Errorf("validation failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", req.Format)
 	}
 
+	// Extract typed Application from validated CUE value
+	validatedApp, err := validation.ExtractApplication(cueValue.(cue.Value))
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract application: %w", err)
+	}
+
 	// 2. Validate components if strict mode
 	if p.config.RequireRegistryComponents {
-		if err := p.validateComponents(app); err != nil {
+		if err := p.validateComponents(validatedApp); err != nil {
 			return nil, err
 		}
 	}
 
-	// 3. Determine access mode and extract allowed_roles
-	accessMode := "public"
-	if access, ok := app["access"].(string); ok {
-		accessMode = access
+	// 3. Handle access mode and inject allowed subjects for private/org modes
+	accessMode := validatedApp.Access
+	if accessMode == "" {
+		accessMode = "public"
 	}
 
-	var allowedRoles []string
-	if accessMode == "org" {
-		if roles, ok := app["allowed_roles"].([]interface{}); ok {
-			for _, role := range roles {
-				if r, ok := role.(string); ok {
-					allowedRoles = append(allowedRoles, r)
-				}
-			}
-		}
-	}
-
-	// 4. Handle org access allowed subjects
-	if accessMode == "org" && len(req.AllowedSubjects) > 0 {
-		app["allowed_subjects"] = req.AllowedSubjects
+	// Inject allowed subjects for modes that use WorkOS
+	subjectsInjected := 0
+	if (accessMode == "private" || accessMode == "org") && len(req.AllowedSubjects) > 0 {
+		validatedApp.AllowedSubjects = req.AllowedSubjects
+		subjectsInjected = len(req.AllowedSubjects)
 	}
 
 	// 5. Prepare platform overrides
@@ -159,22 +170,23 @@ func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
 	}
 
 	// 6. Synthesize to Spin TOML with platform overrides
-	spinTOML, err := p.synthesizer.SynthesizeWithOverrides(app, overrides)
+	// The synthesizer accepts interface{} so it can work with both maps and structs
+	spinTOML, err := p.synthesizer.SynthesizeWithOverrides(validatedApp, overrides)
 	if err != nil {
 		return nil, fmt.Errorf("synthesis failed: %w", err)
 	}
 
-	// 7. Build result
+	// 7. Build result with SpinTOML and metadata
 	result := &ProcessResult{
 		SpinTOML: spinTOML,
 		Metadata: ProcessMetadata{
-			AppName:            app["name"].(string),
-			AppVersion:         getStringOrDefault(app["version"], "0.1.0"),
-			ComponentCount:     countComponents(app),
+			AppName:            validatedApp.Name,
+			AppVersion:         getStringOrDefault(validatedApp.Version, "0.1.0"),
+			ComponentCount:     len(validatedApp.Components),
 			AccessMode:         accessMode,
-			AllowedRoles:       allowedRoles,
 			InjectedGateway:    true,
 			InjectedAuthorizer: accessMode != "public",
+			SubjectsInjected:   subjectsInjected,
 		},
 	}
 
@@ -182,26 +194,17 @@ func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
 }
 
 // validateComponents ensures all components meet platform requirements.
-func (p *Processor) validateComponents(app map[string]interface{}) error {
-	components, ok := app["components"].([]interface{})
-	if !ok {
-		return nil // No components is valid
-	}
-
-	for _, comp := range components {
-		component := comp.(map[string]interface{})
-		source := component["source"]
-
-		// Check if source is a string (local path)
-		if _, isString := source.(string); isString {
+func (p *Processor) validateComponents(app *validation.Application) error {
+	for _, component := range app.Components {
+		// Check if source is local (not allowed in production)
+		if _, isLocal := component.Source.(*validation.LocalSource); isLocal {
 			return fmt.Errorf("local component sources not allowed in production")
 		}
 
 		// Check registry whitelist
-		if sourceMap, ok := source.(map[string]interface{}); ok {
-			registry := sourceMap["registry"].(string)
-			if !p.isAllowedRegistry(registry) {
-				return fmt.Errorf("registry not allowed: %s", registry)
+		if regSource, ok := component.Source.(*validation.RegistrySource); ok {
+			if !p.isAllowedRegistry(regSource.Registry) {
+				return fmt.Errorf("registry not allowed: %s", regSource.Registry)
 			}
 		}
 	}
@@ -232,9 +235,3 @@ func getStringOrDefault(val interface{}, defaultVal string) string {
 	return defaultVal
 }
 
-func countComponents(app map[string]interface{}) int {
-	if components, ok := app["components"].([]interface{}); ok {
-		return len(components)
-	}
-	return 0
-}
