@@ -159,43 +159,140 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// Check if app exists
 	appName := manifest.Name
+	
+	// Add spinner for potentially slow API call (cold starts)
+	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	sp.Suffix = " Checking for existing app..."
+	sp.Start()
+	
 	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
 		Name: &appName,
 	})
+	sp.Stop()
+	
 	if err != nil {
 		return fmt.Errorf("failed to check existing apps: %w", err)
 	}
 
 	var appID string
+	var existingAccess string
 	appExists := len(apps.Apps) > 0
-
 	if appExists {
 		appID = apps.Apps[0].AppId.String()
-		if !opts.Yes {
-			Info("Found existing app '%s'", appName)
-			if !promptConfirm("Update existing app?", true) {
-				return fmt.Errorf("deployment cancelled")
+		if apps.Apps[0].AccessControl != nil {
+			existingAccess = string(*apps.Apps[0].AccessControl)
+		}
+	}
+
+	// For org-scoped apps, we need to select the org BEFORE showing preview
+	var selectedOrgID string
+	var selectedOrgName string
+	
+	if manifest.Access == "org" {
+		// We need to create the app first (if needed) to get org context
+		// Or get temporary creds to see available orgs
+		if !appExists {
+			// For new apps, we need to create it first to get deployment context
+			sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			sp.Suffix = " Preparing org-scoped deployment..."
+			sp.Start()
+			
+			accessControl := api.CreateAppRequestAccessControlOrg
+			createReq := api.CreateAppRequest{
+				AppName:       appName,
+				AccessControl: &accessControl,
+			}
+
+			createResp, err := apiClient.CreateApp(ctx, createReq)
+			sp.Stop()
+			if err != nil {
+				return fmt.Errorf("failed to create app: %w", err)
+			}
+			appID = createResp.AppId.String()
+			appExists = true // Mark as exists now
+			Success("App prepared with ID: %s", appID)
+		}
+		
+		// Get deployment credentials to see available orgs
+		sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		sp.Suffix = " Checking organization access..."
+		sp.Start()
+		
+		componentNames := make([]string, 0, len(manifest.Components))
+		for _, comp := range manifest.Components {
+			componentNames = append(componentNames, comp.ID)
+		}
+		
+		tempCreds, err := apiClient.CreateDeployCredentials(ctx, appID, componentNames)
+		sp.Stop()
+		if err != nil {
+			return fmt.Errorf("failed to get deployment context: %w", err)
+		}
+		
+		// Select org based on context
+		if tempCreds.Deployment.Context.ActorType == "machine" {
+			if len(tempCreds.Deployment.Context.OrgIds) != 1 {
+				return fmt.Errorf("machine actor must have exactly one org")
+			}
+			selectedOrgID = tempCreds.Deployment.Context.OrgIds[0]
+			Info("Deploying as machine to org: %s", selectedOrgID)
+		} else {
+			// User org selection
+			if len(tempCreds.Deployment.Context.OrgIds) == 0 {
+				return fmt.Errorf("no organizations available for deployment")
+			} else if opts.OrgID != "" {
+				// Command-line flag takes precedence
+				found := false
+				for _, orgID := range tempCreds.Deployment.Context.OrgIds {
+					if orgID == opts.OrgID {
+						selectedOrgID = opts.OrgID
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v", 
+						opts.OrgID, tempCreds.Deployment.Context.OrgIds)
+				}
+			} else if len(tempCreds.Deployment.Context.OrgIds) == 1 {
+				selectedOrgID = tempCreds.Deployment.Context.OrgIds[0]
+			} else {
+				// Multiple orgs - let user choose
+				selectedOrgID, err = selectOrganization(tempCreds.Deployment.Context.OrgIds)
+				if err != nil {
+					return fmt.Errorf("failed to select organization: %w", err)
+				}
 			}
 		}
-	} else {
-		if !opts.Yes {
-			Info("Creating new app '%s'", appName)
-			if !promptConfirm("Continue?", true) {
-				return fmt.Errorf("deployment cancelled")
+		
+		// Try to get org name from config
+		if cfg, err := config.Load(); err == nil {
+			if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists && orgInfo.Name != "" {
+				selectedOrgName = orgInfo.Name
 			}
 		}
 	}
 
-	// Create app if it doesn't exist
+	// NOW build deployment preview with complete information
+	preview := BuildDeploymentPreviewWithOrg(manifest, opts, appID, existingAccess, selectedOrgID, selectedOrgName)
+	
+	// Show preview and get confirmation
+	confirmed, err := ConfirmDeployment(preview, opts.Yes)
+	if err != nil {
+		return fmt.Errorf("confirmation failed: %w", err)
+	}
+	if !confirmed {
+		return fmt.Errorf("deployment cancelled by user")
+	}
+
+	// Create app if it doesn't exist and wasn't already created for org selection
 	if !appExists {
 		Info("Creating app on FTL platform...")
-
+		
 		accessControl := api.CreateAppRequestAccessControlPublic
 		switch manifest.Access {
 		case "private":
 			accessControl = api.CreateAppRequestAccessControlPrivate
-		case "org":
-			accessControl = api.CreateAppRequestAccessControlOrg
 		case "custom":
 			accessControl = api.CreateAppRequestAccessControlCustom
 		}
@@ -215,7 +312,6 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 
 	// Get deployment credentials (ECR + Lambda)
 	Info("Getting deployment credentials...")
-	// Extract component names to pass to credentials creation
 	componentNames := make([]string, 0, len(manifest.Components))
 	for _, comp := range manifest.Components {
 		componentNames = append(componentNames, comp.ID)
@@ -230,51 +326,9 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		return fmt.Errorf("machine actors cannot deploy private apps")
 	}
 
-	// Select org for org-scoped deployments
-	var selectedOrgID string
-	if manifest.Access == "org" {
-		if len(creds.Deployment.Context.OrgIds) == 0 {
-			return fmt.Errorf("app requires org access but you belong to no organizations")
-		}
-
-		if creds.Deployment.Context.ActorType == "machine" {
-			// Machines only have one org
-			if len(creds.Deployment.Context.OrgIds) != 1 {
-				return fmt.Errorf("machine actor must have exactly one org")
-			}
-			selectedOrgID = creds.Deployment.Context.OrgIds[0]
-			Info("Deploying as machine to org: %s", selectedOrgID)
-		} else {
-			// Users might have multiple orgs
-			if len(creds.Deployment.Context.OrgIds) == 0 {
-				return fmt.Errorf("no organizations available for deployment")
-			} else if opts.OrgID != "" {
-				// Command-line flag takes precedence
-				found := false
-				for _, orgID := range creds.Deployment.Context.OrgIds {
-					if orgID == opts.OrgID {
-						selectedOrgID = opts.OrgID
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v", 
-						opts.OrgID, creds.Deployment.Context.OrgIds)
-				}
-				Info("Deploying to organization: %s", selectedOrgID)
-			} else if len(creds.Deployment.Context.OrgIds) == 1 {
-				selectedOrgID = creds.Deployment.Context.OrgIds[0]
-				Info("Deploying to organization: %s", selectedOrgID)
-			} else {
-				// Multiple orgs - let user choose
-				selectedOrgID, err = selectOrganization(creds.Deployment.Context.OrgIds)
-				if err != nil {
-					return fmt.Errorf("failed to select organization: %w", err)
-				}
-				Info("Deploying to organization: %s", selectedOrgID)
-			}
-		}
+	// Verify we have the org ID for org deployments (should already be set)
+	if manifest.Access == "org" && selectedOrgID == "" {
+		return fmt.Errorf("internal error: organization not selected for org-scoped deployment")
 	}
 
 	// Parse ECR credentials
@@ -308,7 +362,7 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	deployer := deploy.NewStreamingDeployer()
 
 	// Deploy with streaming progress
-	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	sp = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	sp.Suffix = " Starting deployment..."
 	sp.Start()
 
@@ -644,19 +698,6 @@ func displayDryRunSummary(manifest *validation.Application, appExists bool) {
 	fmt.Println("To perform the actual deployment, run without --dry-run")
 }
 
-func promptConfirm(message string, defaultYes bool) bool {
-	prompt := &survey.Confirm{
-		Message: message,
-		Default: defaultYes,
-	}
-
-	var result bool
-	if err := survey.AskOne(prompt, &result); err != nil {
-		return false
-	}
-
-	return result
-}
 
 // displayMCPUrls displays a table showing MCP URLs for the application and its components
 func displayMCPUrls(baseURL string, components []*validation.Component) {
@@ -742,9 +783,9 @@ func selectOrganization(orgIDs []string) (string, error) {
 					
 					// Get org info for better display
 					orgInfo, hasInfo := cfg.GetOrganization(currentOrg)
-					displayName := currentOrg
-					if hasInfo && orgInfo.Name != "" {
-						displayName = fmt.Sprintf("%s (%s)", currentOrg, orgInfo.Name)
+					displayName := orgInfo.Name
+					if displayName == "" {
+						displayName = currentOrg // Fall back to ID if no name
 					}
 					
 					prompt := &survey.Confirm{
@@ -765,11 +806,25 @@ func selectOrganization(orgIDs []string) (string, error) {
 		}
 	}
 
-	// Interactive selection
+	// Interactive selection - build display names for all orgs
+	options := make([]string, len(orgIDs))
+	orgMap := make(map[string]string) // display name -> org ID
+	
+	for i, orgID := range orgIDs {
+		displayName := orgID
+		if cfg != nil {
+			if orgInfo, exists := cfg.GetOrganization(orgID); exists && orgInfo.Name != "" {
+				displayName = orgInfo.Name
+			}
+		}
+		options[i] = displayName
+		orgMap[displayName] = orgID
+	}
+	
 	var selected string
 	prompt := &survey.Select{
 		Message: "Select organization for deployment:",
-		Options: orgIDs,
+		Options: options,
 		Help:    "Choose which organization to deploy this application to",
 	}
 
@@ -778,18 +833,21 @@ func selectOrganization(orgIDs []string) (string, error) {
 		return "", err
 	}
 
+	// Map display name back to org ID
+	selectedOrgID := orgMap[selected]
+	
 	// Update config with selection
 	if cfg != nil {
-		_ = cfg.SetCurrentOrg(selected)
+		_ = cfg.SetCurrentOrg(selectedOrgID)
 		
 		// Update last used time
-		if orgInfo, exists := cfg.GetOrganization(selected); exists {
+		if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists {
 			orgInfo.LastUsed = time.Now().Format(time.RFC3339)
 			_ = cfg.AddOrganization(orgInfo)
 		}
 	}
 
-	return selected, nil
+	return selectedOrgID, nil
 }
 
 // isDeployInteractive checks if we're in an interactive terminal
