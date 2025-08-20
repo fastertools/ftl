@@ -22,7 +22,7 @@ import (
 
 // StreamEvent represents a deployment progress event from the streaming response
 type StreamEvent struct {
-	Type         string            `json:"type"`      // "progress", "complete", "error"
+	Type         string            `json:"type"` // "progress", "complete", "error"
 	Message      string            `json:"message"`
 	DeploymentID string            `json:"deploymentId,omitempty"`
 	URL          string            `json:"url,omitempty"`
@@ -55,7 +55,7 @@ func extractRegion(functionURL, registryURI string) string {
 			}
 		}
 	}
-	
+
 	// Try ECR registry URI (format: 123456789.dkr.ecr.REGION.amazonaws.com)
 	if registryURI != "" {
 		parts := strings.Split(registryURI, ".")
@@ -65,7 +65,7 @@ func extractRegion(functionURL, registryURI string) string {
 			}
 		}
 	}
-	
+
 	// Default to us-west-2 if we can't extract
 	return "us-west-2"
 }
@@ -80,7 +80,7 @@ func (d *StreamingDeployer) Deploy(
 ) error {
 	// Extract region from the URLs we have
 	region := extractRegion(creds.Deployment.FunctionUrl, creds.Registry.RegistryUri)
-	
+
 	// Create AWS config with temporary credentials
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),

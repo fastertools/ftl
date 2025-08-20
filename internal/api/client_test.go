@@ -117,8 +117,8 @@ func TestFTLClient_ListApps(t *testing.T) {
 				Status        ListAppsResponseBodyAppsStatus `json:"status"`
 				UpdatedAt     string                         `json:"updatedAt"`
 			}{
-				{AppId: openapi_types.UUID(uuid.New()), AppName: "Test App 1", CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01", Status: ListAppsResponseBodyAppsStatusACTIVE},
-				{AppId: openapi_types.UUID(uuid.New()), AppName: "Test App 2", CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01", Status: ListAppsResponseBodyAppsStatusACTIVE},
+				{AppId: openapi_types.UUID(uuid.New()), AppName: "Test App 1", CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01", Status: ACTIVE},
+				{AppId: openapi_types.UUID(uuid.New()), AppName: "Test App 2", CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01", Status: ACTIVE},
 			},
 		}
 

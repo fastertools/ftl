@@ -51,8 +51,8 @@ func DefaultConfig() Config {
 		AuthorizerVersion:         "0.0.15-alpha.0",
 		RequireRegistryComponents: true,
 		AllowedRegistries: []string{
-			"ghcr.io",           // For gateway and authorizer
-			DefaultECRRegistry,  // For user components
+			"ghcr.io",          // For gateway and authorizer
+			DefaultECRRegistry, // For user components
 		},
 	}
 }

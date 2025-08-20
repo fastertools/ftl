@@ -392,18 +392,21 @@ func TestCreateDeploymentRequest(t *testing.T) {
 
 	req := createDeploymentRequest(manifest, opts)
 
-	// Verify request structure
-	assert.Equal(t, "test-app", req.Application.Name)
-	if req.Application.Version != nil {
-		assert.Equal(t, "1.0.0", *req.Application.Version)
-	}
-	if req.Application.Description != nil {
-		assert.Equal(t, "Test application", *req.Application.Description)
-	}
-	assert.NotNil(t, req.Application.Components)
-	assert.Len(t, *req.Application.Components, 1)
-	assert.NotNil(t, req.Variables)
-	assert.Equal(t, "deploy_value", (*req.Variables)["DEPLOY_VAR"])
+	// Verify flat request structure (no nested "application" field)
+	assert.Equal(t, "test-app", req["name"])
+	assert.Equal(t, "1.0.0", req["version"])
+	assert.Equal(t, "Test application", req["description"])
+	assert.Equal(t, "private", req["access"])
+
+	// Check components
+	components, ok := req["components"].([]map[string]interface{})
+	assert.True(t, ok)
+	assert.Len(t, components, 1)
+
+	// Check variables are merged correctly
+	variables, ok := req["variables"].(map[string]string)
+	assert.True(t, ok)
+	assert.Equal(t, "deploy_value", variables["DEPLOY_VAR"])
 }
 
 func TestDisplayDryRunSummary(t *testing.T) {

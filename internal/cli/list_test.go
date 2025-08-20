@@ -31,7 +31,7 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					id:          "123e4567-e89b-12d3-a456-426614174000",
 					name:        "active-app",
-					status:      api.ListAppsResponseBodyAppsStatusACTIVE,
+					status:      api.ACTIVE,
 					providerUrl: ptr("https://example.com"),
 					createdAt:   "2024-01-01T00:00:00Z",
 					updatedAt:   "2024-01-01T00:00:00Z",
@@ -39,14 +39,14 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					id:        "223e4567-e89b-12d3-a456-426614174000",
 					name:      "failed-app",
-					status:    api.ListAppsResponseBodyAppsStatusFAILED,
+					status:    api.FAILED,
 					createdAt: "2024-01-01T00:00:00Z",
 					updatedAt: "2024-01-01T00:00:00Z",
 				},
 				{
 					id:        "323e4567-e89b-12d3-a456-426614174000",
 					name:      "pending-app",
-					status:    api.ListAppsResponseBodyAppsStatusPENDING,
+					status:    api.PENDING,
 					createdAt: "2024-01-01T00:00:00Z",
 					updatedAt: "2024-01-01T00:00:00Z",
 				},
@@ -66,7 +66,7 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					id:        "123e4567-e89b-12d3-a456-426614174000",
 					name:      "solo-app",
-					status:    api.ListAppsResponseBodyAppsStatusACTIVE,
+					status:    api.ACTIVE,
 					createdAt: "2024-01-01T00:00:00Z",
 					updatedAt: "2024-01-01T00:00:00Z",
 				},
@@ -93,7 +93,7 @@ func TestDisplayAppsTable(t *testing.T) {
 				{
 					id:            "123e4567-e89b-12d3-a456-426614174000",
 					name:          "verbose-app",
-					status:        api.ListAppsResponseBodyAppsStatusACTIVE,
+					status:        api.ACTIVE,
 					providerUrl:   ptr("https://example.com"),
 					providerError: ptr("Some error occurred"),
 					createdAt:     "2024-01-01T00:00:00Z",
