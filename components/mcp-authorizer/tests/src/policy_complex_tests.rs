@@ -130,7 +130,7 @@ allow if {
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let read_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scopes", serde_json::json!(["users:read"]))]);
+    let read_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scp", serde_json::json!(["users:read"]))]);
     
     // Can GET user-service
     let headers = http::types::Headers::new();
@@ -153,7 +153,7 @@ allow if {
     assert_eq!(response.status(), 401, "Should deny POST without write scope");
     
     // Admin scope grants everything
-    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("scopes", serde_json::json!(["admin"]))]);
+    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("scp", serde_json::json!(["admin"]))]);
     
     let headers = http::types::Headers::new();
     headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
@@ -303,7 +303,7 @@ allow if {
     
     // Service account test
     let service_token = create_policy_test_token_with_key(&private_key, "service-account-1", vec![], vec![
-        ("scopes", serde_json::json!(["service:internal"])),
+        ("scp", serde_json::json!(["service:internal"])),
         ("account_type", serde_json::json!("service"))
     ]);
     
@@ -318,7 +318,7 @@ allow if {
     
     // Payment processor with MFA
     let payment_token = create_policy_test_token_with_key(&private_key, "payment-user", vec!["payments"], vec![
-        ("scopes", serde_json::json!(["payments:process"])),
+        ("scp", serde_json::json!(["payments:process"])),
         ("mfa_verified", serde_json::json!(true))
     ]);
     

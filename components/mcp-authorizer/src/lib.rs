@@ -168,22 +168,31 @@ fn apply_policy_authorization(
     body: Option<&[u8]>,
     policy_config: &PolicyAuthorization,
 ) -> Result<()> {
+    println!("[Auth] Applying policy-based authorization");
+    
     // Create policy engine with the configured policy and data
     let mut engine = PolicyEngine::new_with_policy_and_data(
         &policy_config.policy,
         policy_config.data.as_deref(),
     )
-    .map_err(|e| AuthError::Configuration(format!("Failed to initialize policy engine: {e}")))?;
+    .map_err(|e| {
+        eprintln!("[Auth] Failed to initialize policy engine: {e}");
+        AuthError::Configuration(format!("Failed to initialize policy engine: {e}"))
+    })?;
+    
+    println!("[Auth] Policy engine created, evaluating authorization");
     
     // Evaluate policy
     let allowed = engine.evaluate(token_info, req, body)?;
     
     if !allowed {
+        println!("[Auth] Authorization denied by policy");
         return Err(AuthError::Unauthorized(
             "Access denied by authorization policy".to_string(),
         ));
     }
     
+    println!("[Auth] Authorization granted by policy");
     Ok(())
 }
 

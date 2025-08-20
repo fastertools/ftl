@@ -194,7 +194,7 @@ allow if {
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let reader_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scopes", serde_json::json!(["user:read"]))]);
+    let reader_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scp", serde_json::json!(["user:read"]))]);
     
     // Can read users
     let body = r#"{

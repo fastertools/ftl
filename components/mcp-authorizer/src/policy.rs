@@ -46,17 +46,32 @@ impl PolicyEngine {
         let mut engine = Engine::new();
         
         // Add the policy
+        println!("[Policy] Loading policy ({} bytes)", policy.len());
         engine
             .add_policy("authorization.rego".to_string(), policy.to_string())
-            .map_err(|e| anyhow!("Failed to add policy: {e}"))?;
+            .map_err(|e| {
+                eprintln!("[Policy] ERROR: Failed to parse policy - {e}");
+                eprintln!("[Policy] This is likely a syntax error in your Rego policy");
+                anyhow!("Failed to add policy: {e}")
+            })?;
+        println!("[Policy] Policy loaded successfully");
         
         // Add data if provided
         if let Some(data_json) = data {
+            println!("[Policy] Loading external data ({} bytes)", data_json.len());
             let data_value = Value::from_json_str(data_json)
-                .map_err(|e| anyhow!("Failed to parse policy data: {e}"))?;
+                .map_err(|e| {
+                    eprintln!("[Policy] ERROR: Failed to parse policy data - {e}");
+                    eprintln!("[Policy] Check that your policy data is valid JSON");
+                    anyhow!("Failed to parse policy data: {e}")
+                })?;
             engine
                 .add_data(data_value)
-                .map_err(|e| anyhow!("Failed to add policy data: {e}"))?;
+                .map_err(|e| {
+                    eprintln!("[Policy] ERROR: Failed to add policy data - {e}");
+                    anyhow!("Failed to add policy data: {e}")
+                })?;
+            println!("[Policy] External data loaded successfully");
         }
         
         Ok(Self { engine })
@@ -76,18 +91,33 @@ impl PolicyEngine {
         self.engine.set_input(input);
         
         // Evaluate the allow rule
+        println!("[Policy] Evaluating authorization rule: data.mcp.authorization.allow");
         match self.engine.eval_rule("data.mcp.authorization.allow".to_string()) {
             Ok(value) => {
                 // Check if the result is a boolean true
                 match value {
-                    Value::Bool(b) => Ok(b),
-                    Value::Undefined => Ok(false), // Undefined means not allowed
-                    _ => Err(AuthError::Internal(
-                        "Policy returned non-boolean value".to_string(),
-                    )),
+                    Value::Bool(b) => {
+                        println!("[Policy] Authorization result: {}", if b { "ALLOW" } else { "DENY" });
+                        Ok(b)
+                    },
+                    Value::Undefined => {
+                        println!("[Policy] Authorization result: UNDEFINED (treating as DENY)");
+                        println!("[Policy] Note: Policy may not have an 'allow' rule defined");
+                        Ok(false) // Undefined means not allowed
+                    },
+                    _ => {
+                        eprintln!("[Policy] ERROR: Policy returned non-boolean value: {:?}", value);
+                        Err(AuthError::Internal(
+                            "Policy returned non-boolean value".to_string(),
+                        ))
+                    }
                 }
             }
-            Err(e) => Err(AuthError::Internal(format!("Policy evaluation failed: {e}"))),
+            Err(e) => {
+                eprintln!("[Policy] ERROR: Failed to evaluate policy rule - {e}");
+                eprintln!("[Policy] This may indicate a runtime error in your Rego policy");
+                Err(AuthError::Internal(format!("Policy evaluation failed: {e}")))
+            }
         }
     }
 
