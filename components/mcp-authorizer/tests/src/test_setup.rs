@@ -10,7 +10,7 @@ pub fn setup_default_test_config() {
     // JWT provider settings
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
     variables::set("mcp_jwt_audience", "test-audience");
-    
+
     // For policy tests, the JWT public key will be set by policy_test_helpers
     // when setup_test_jwt_validation() is called
 }

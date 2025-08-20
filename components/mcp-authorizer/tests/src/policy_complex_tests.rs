@@ -1,13 +1,13 @@
 // Complex policy tests with roles, scopes, and claims
 
-use spin_test_sdk::{spin_test, bindings::wasi::http};
-use crate::test_setup::setup_default_test_config;
 use crate::policy_test_helpers::*;
+use crate::test_setup::setup_default_test_config;
+use spin_test_sdk::{bindings::wasi::http, spin_test};
 
 #[spin_test]
 fn test_role_based_authorization() {
     setup_default_test_config();
-    
+
     // Complex role-based policy
     let policy = r#"
 package mcp.authorization
@@ -54,39 +54,62 @@ allow if {
     has_role(user_roles, "user")
 }
 "#;
-    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation(); // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    
+
     // Superuser has all permissions
-    let superuser_token = create_policy_test_token_with_key(&private_key, "super", vec!["superuser"], vec![]);
-    
+    let superuser_token =
+        create_policy_test_token_with_key(&private_key, "super", vec!["superuser"], vec![]);
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", superuser_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", superuser_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/admin-dashboard")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/admin-dashboard"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Superuser should access admin dashboard");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "Superuser should access admin dashboard"
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", superuser_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", superuser_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/user-profile")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/user-profile"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Superuser inherits user role");
-    
+
     // Regular user cannot access admin
     let user_token = create_policy_test_token_with_key(&private_key, "user", vec!["user"], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", user_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/admin-dashboard")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/admin-dashboard"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "User cannot access admin dashboard");
 }
@@ -94,9 +117,9 @@ allow if {
 #[spin_test]
 fn test_scope_based_authorization() {
     setup_default_test_config();
-    
-    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
-    
+
+    let (private_key, _public_key) = setup_test_jwt_validation(); // Ensure JWT validation is configured
+
     // OAuth scope-based policy
     let policy = r#"
 package mcp.authorization
@@ -128,39 +151,68 @@ allow if {
 }
 "#;
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    
+
     // User with read scope
-    let read_token = create_policy_test_token_with_key(&private_key, "reader", vec![], vec![("scp", serde_json::json!(["users:read"]))]);
-    
+    let read_token = create_policy_test_token_with_key(
+        &private_key,
+        "reader",
+        vec![],
+        vec![("scp", serde_json::json!(["users:read"]))],
+    );
+
     // Can GET user-service
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", read_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", read_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/user-service"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow GET with read scope");
-    
+
     // Cannot POST to user-service
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", read_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", read_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
-    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/user-service"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Should deny POST without write scope");
-    
+    assert_eq!(
+        response.status(),
+        401,
+        "Should deny POST without write scope"
+    );
+
     // Admin scope grants everything
-    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("scp", serde_json::json!(["admin"]))]);
-    
+    let admin_token = create_policy_test_token_with_key(
+        &private_key,
+        "admin",
+        vec![],
+        vec![("scp", serde_json::json!(["admin"]))],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", admin_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Delete).unwrap();
-    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/user-service"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Admin scope allows DELETE");
 }
@@ -168,7 +220,7 @@ allow if {
 #[spin_test]
 fn test_custom_claims_authorization() {
     setup_default_test_config();
-    
+
     // Policy using custom JWT claims
     let policy = r#"
 package mcp.authorization
@@ -200,67 +252,100 @@ allow if {
     input.token.claims.access_hours.end >= 14
 }
 "#;
-    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
+    let (private_key, _public_key) = setup_test_jwt_validation(); // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    
+
     // User from engineering at acme-corp
-    let eng_token = create_policy_test_token_with_key(&private_key,
+    let eng_token = create_policy_test_token_with_key(
+        &private_key,
         "engineer",
         vec![],
         vec![
             ("organization", serde_json::json!("acme-corp")),
             ("department", serde_json::json!("engineering")),
-        ]
+        ],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", eng_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", eng_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/internal-tools")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/internal-tools"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Engineering at acme-corp should have access");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "Engineering at acme-corp should have access"
+    );
+
     // User with high clearance
-    let cleared_token = create_policy_test_token_with_key(&private_key,
+    let cleared_token = create_policy_test_token_with_key(
+        &private_key,
         "agent",
         vec![],
-        vec![("clearance_level", serde_json::json!(4))]
+        vec![("clearance_level", serde_json::json!(4))],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", cleared_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", cleared_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/classified-data")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/classified-data"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "High clearance should access classified data");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "High clearance should access classified data"
+    );
+
     // User with beta access
-    let beta_token = create_policy_test_token_with_key(&private_key,
+    let beta_token = create_policy_test_token_with_key(
+        &private_key,
         "beta_tester",
         vec![],
-        vec![("feature_flags", serde_json::json!({"beta_access": true, "alpha_access": false}))]
+        vec![(
+            "feature_flags",
+            serde_json::json!({"beta_access": true, "alpha_access": false}),
+        )],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", beta_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", beta_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/beta-features")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/beta-features"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Beta access flag should grant access");
+    assert_eq!(
+        response.status(),
+        200,
+        "Beta access flag should grant access"
+    );
 }
 
 #[spin_test]
 fn test_combined_authorization_rules() {
     setup_default_test_config();
-    
-    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
-    
+
+    let (private_key, _public_key) = setup_test_jwt_validation(); // Ensure JWT validation is configured
+
     // Policy combining multiple authorization strategies
     let policy = r#"
 package mcp.authorization
@@ -300,60 +385,101 @@ allow if {
 }
 "#;
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    
+
     // Service account test
-    let service_token = create_policy_test_token_with_key(&private_key, "service-account-1", vec![], vec![
-        ("scp", serde_json::json!(["service:internal"])),
-        ("account_type", serde_json::json!("service"))
-    ]);
-    
+    let service_token = create_policy_test_token_with_key(
+        &private_key,
+        "service-account-1",
+        vec![],
+        vec![
+            ("scp", serde_json::json!(["service:internal"])),
+            ("account_type", serde_json::json!("service")),
+        ],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", service_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", service_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/internal-api")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/internal-api"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Service account should access internal API");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "Service account should access internal API"
+    );
+
     // Payment processor with MFA
-    let payment_token = create_policy_test_token_with_key(&private_key, "payment-user", vec!["payments"], vec![
-        ("scp", serde_json::json!(["payments:process"])),
-        ("mfa_verified", serde_json::json!(true))
-    ]);
-    
+    let payment_token = create_policy_test_token_with_key(
+        &private_key,
+        "payment-user",
+        vec!["payments"],
+        vec![
+            ("scp", serde_json::json!(["payments:process"])),
+            ("mfa_verified", serde_json::json!(true)),
+        ],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", payment_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", payment_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
-    request.set_path_with_query(Some("/mcp/x/payment-processor")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/payment-processor"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Payment user with MFA should process payments");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "Payment user with MFA should process payments"
+    );
+
     // Free tier limitations
-    let free_token = create_policy_test_token_with_key(&private_key,
+    let free_token = create_policy_test_token_with_key(
+        &private_key,
         "free-user",
         vec![],
-        vec![("tier", serde_json::json!("free"))]
+        vec![("tier", serde_json::json!("free"))],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", free_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", free_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/premium-features")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/premium-features"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Free tier cannot access premium features");
+    assert_eq!(
+        response.status(),
+        401,
+        "Free tier cannot access premium features"
+    );
 }
 
 #[spin_test]
 fn test_deny_rules_precedence() {
     setup_default_test_config();
-    
-    let (private_key, _public_key) = setup_test_jwt_validation();  // Ensure JWT validation is configured
-    
+
+    let (private_key, _public_key) = setup_test_jwt_validation(); // Ensure JWT validation is configured
+
     // Policy with explicit deny rules that override allows
     let policy = r#"
 package mcp.authorization
@@ -378,39 +504,55 @@ allow if {
 }
 "#;
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    
+
     // Active subscription but suspended account
-    let suspended_token = create_policy_test_token_with_key(&private_key,
+    let suspended_token = create_policy_test_token_with_key(
+        &private_key,
         "suspended-user",
         vec![],
         vec![
             ("subscription_status", serde_json::json!("active")),
-            ("account_suspended", serde_json::json!(true))
-        ]
+            ("account_suspended", serde_json::json!(true)),
+        ],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", suspended_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", suspended_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/service")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Suspended account should be denied despite active subscription");
-    
+    assert_eq!(
+        response.status(),
+        401,
+        "Suspended account should be denied despite active subscription"
+    );
+
     // Blacklisted user
-    let blacklisted_token = create_policy_test_token_with_key(&private_key,
+    let blacklisted_token = create_policy_test_token_with_key(
+        &private_key,
         "hacker1",
         vec![],
-        vec![("subscription_status", serde_json::json!("active"))]
+        vec![("subscription_status", serde_json::json!("active"))],
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", blacklisted_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", blacklisted_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/service")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Blacklisted user should be denied");
 }

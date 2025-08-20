@@ -59,7 +59,7 @@ pub struct JwtProvider {
 pub struct PolicyAuthorization {
     /// Rego policy as a string
     pub policy: String,
-    
+
     /// Policy data as JSON string (optional)
     pub data: Option<String>,
 }
@@ -332,19 +332,16 @@ impl PolicyAuthorization {
         // Load policy (required)
         let policy = variables::get("mcp_policy")
             .map_err(|_| anyhow::anyhow!("mcp_policy variable is required for authorization"))?;
-        
+
         if policy.is_empty() {
             return Err(anyhow::anyhow!("mcp_policy cannot be empty"));
         }
-        
+
         // Load policy data (optional)
         let data = variables::get("mcp_policy_data")
             .ok()
             .filter(|s| !s.is_empty());
-        
-        Ok(Self {
-            policy,
-            data,
-        })
+
+        Ok(Self { policy, data })
     }
 }

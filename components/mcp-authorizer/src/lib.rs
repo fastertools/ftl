@@ -31,7 +31,7 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     let config = match Config::load() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("ERROR: Configuration failed: {e}");
+            log::error!("Configuration failed: {e}");
             // Return configuration error as a proper HTTP response
             let error = AuthError::Configuration(format!("Configuration error: {e}"));
             return Ok(create_config_error_response(&error));
@@ -43,9 +43,9 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
 
     // Log request details for debugging
     if let Some(ref id) = trace_id {
-        eprintln!("[{}] {} {}", id, req.method(), req.path());
+        log::info!("[{}] {} {}", id, req.method(), req.path());
     } else {
-        eprintln!("{} {}", req.method(), req.path());
+        log::info!("{} {}", req.method(), req.path());
     }
 
     // Handle OAuth discovery endpoints (no auth required)
@@ -57,12 +57,11 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     // The policy decides whether to use this information
     let body_bytes = if *req.method() == spin_sdk::http::Method::Post {
         // Check if it's likely JSON content
-        let is_json = req.headers()
-            .any(|(name, value)| {
-                name.eq_ignore_ascii_case("content-type") &&
-                value.as_str().map_or(false, |v| v.contains("json"))
-            });
-        
+        let is_json = req.headers().any(|(name, value)| {
+            name.eq_ignore_ascii_case("content-type")
+                && value.as_str().is_some_and(|v| v.contains("json"))
+        });
+
         if is_json {
             Some(req.body().to_vec())
         } else {
@@ -82,10 +81,13 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
                 // Reconstruct request with body if we consumed it
                 let req_to_forward = if let Some(body) = body_bytes {
                     // Collect headers first
-                    let headers: Vec<(String, String)> = req.headers()
-                        .map(|(name, value)| (name.to_string(), value.as_str().unwrap_or("").to_string()))
+                    let headers: Vec<(String, String)> = req
+                        .headers()
+                        .map(|(name, value)| {
+                            (name.to_string(), value.as_str().unwrap_or("").to_string())
+                        })
                         .collect();
-                    
+
                     // Create a new request with headers and body
                     Request::builder()
                         .method(req.method().clone())
@@ -105,9 +107,9 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
         Err(auth_error) => {
             // Log auth failures for debugging
             if let Some(ref id) = trace_id {
-                eprintln!("[{id}] Auth failed: {auth_error}");
+                log::info!("[{id}] Auth failed: {auth_error}");
             } else {
-                eprintln!("Auth failed: {auth_error}");
+                log::info!("Auth failed: {auth_error}");
             }
             // Return authentication error
             Ok(create_error_response(&auth_error, &req, &config, trace_id))
@@ -135,8 +137,8 @@ async fn authenticate_with_policy(
             // Open KV store for JWKS caching
             let store = Store::open_default()
                 .map_err(|e| {
-                    eprintln!("ERROR: Failed to open KV store: {e}");
-                    eprintln!("HINT: Ensure the mcp-authorizer component has 'key_value_stores = [\"default\"]' in spin.toml");
+                    log::error!("Failed to open KV store: {e}");
+                    log::error!("HINT: Ensure the mcp-authorizer component has 'key_value_stores = [\"default\"]' in spin.toml");
                     AuthError::Internal("KV store access denied. Ensure component has key_value_stores permission in spin.toml".to_string())
                 })?;
 
@@ -168,31 +170,31 @@ fn apply_policy_authorization(
     body: Option<&[u8]>,
     policy_config: &PolicyAuthorization,
 ) -> Result<()> {
-    println!("[Auth] Applying policy-based authorization");
-    
+    log::debug!("Applying policy-based authorization");
+
     // Create policy engine with the configured policy and data
     let mut engine = PolicyEngine::new_with_policy_and_data(
         &policy_config.policy,
         policy_config.data.as_deref(),
     )
     .map_err(|e| {
-        eprintln!("[Auth] Failed to initialize policy engine: {e}");
+        log::error!("Failed to initialize policy engine: {e}");
         AuthError::Configuration(format!("Failed to initialize policy engine: {e}"))
     })?;
-    
-    println!("[Auth] Policy engine created, evaluating authorization");
-    
+
+    log::trace!("Policy engine created, evaluating authorization");
+
     // Evaluate policy
     let allowed = engine.evaluate(token_info, req, body)?;
-    
+
     if !allowed {
-        println!("[Auth] Authorization denied by policy");
+        log::debug!("Authorization denied by policy");
         return Err(AuthError::Unauthorized(
             "Access denied by authorization policy".to_string(),
         ));
     }
-    
-    println!("[Auth] Authorization granted by policy");
+
+    log::debug!("Authorization granted by policy");
     Ok(())
 }
 

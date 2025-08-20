@@ -1,13 +1,13 @@
 // Policy tests with external data
 
-use spin_test_sdk::{spin_test, bindings::wasi::http};
-use crate::test_setup::setup_default_test_config;
 use crate::policy_test_helpers::*;
+use crate::test_setup::setup_default_test_config;
+use spin_test_sdk::{bindings::wasi::http, spin_test};
 
 #[spin_test]
 fn test_policy_with_external_data() {
     setup_default_test_config();
-    
+
     // Policy that uses external data
     let policy = r#"
 package mcp.authorization
@@ -26,7 +26,7 @@ allow if {
     input.token.sub in permissions.users
 }
 "#;
-    
+
     // External data JSON
     let data = r#"{
         "allowed_users": ["alice", "bob", "charlie"],
@@ -41,50 +41,72 @@ allow if {
             }
         }
     }"#;
-    
+
     let (private_key, _public_key) = setup_policy_with_data(policy, data);
-    
+
     // Alice in allowed_users
     let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", alice_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/api-gateway")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/api-gateway"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Alice should be allowed via data");
-    
+
     // Dave not in allowed_users
     let dave_token = create_policy_test_token_with_key(&private_key, "dave", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", dave_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", dave_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/api-gateway")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/api-gateway"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Dave should be denied");
-    
+
     // Charlie can access database component
     let charlie_token = create_policy_test_token_with_key(&private_key, "charlie", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", charlie_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/database")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/database"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Charlie should access database component");
+    assert_eq!(
+        response.status(),
+        200,
+        "Charlie should access database component"
+    );
 }
 
 #[spin_test]
 fn test_complex_data_structures() {
     setup_default_test_config();
-    
+
     let policy = r#"
 package mcp.authorization
 import rego.v1
@@ -112,7 +134,7 @@ allow if {
     window.active == false
 }
 "#;
-    
+
     let data = r#"{
         "tools": {
             "read_config": {"min_level": 1, "category": "read"},
@@ -131,12 +153,17 @@ allow if {
             "database": {"active": true, "message": "Database maintenance in progress"}
         }
     }"#;
-    
+
     let (private_key, _public_key) = setup_policy_with_data(policy, data);
-    
+
     // Test role levels with tools
-    let admin_token = create_policy_test_token_with_key(&private_key, "admin", vec![], vec![("role", serde_json::json!("admin"))]);
-    
+    let admin_token = create_policy_test_token_with_key(
+        &private_key,
+        "admin",
+        vec![],
+        vec![("role", serde_json::json!("admin"))],
+    );
+
     let body = r#"{
         "jsonrpc":"2.0",
         "id":1,
@@ -145,22 +172,34 @@ allow if {
             "name":"update_config"
         }
     }"#;
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", admin_token).as_bytes(),
+        )
+        .unwrap();
     headers.append("content-type", b"application/json").unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
-    request.set_path_with_query(Some("/mcp/x/config-service")).unwrap();
+    request
+        .set_path_with_query(Some("/mcp/x/config-service"))
+        .unwrap();
     let body_stream = request.body().unwrap();
     body_stream.write_bytes(body.as_bytes());
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Admin level 3 >= required level 2");
-    
+
     // Viewer cannot use delete_all
-    let viewer_token = create_policy_test_token_with_key(&private_key, "viewer", vec![], vec![("role", serde_json::json!("viewer"))]);
-    
+    let viewer_token = create_policy_test_token_with_key(
+        &private_key,
+        "viewer",
+        vec![],
+        vec![("role", serde_json::json!("viewer"))],
+    );
+
     let body = r#"{
         "jsonrpc":"2.0",
         "id":1,
@@ -169,16 +208,23 @@ allow if {
             "name":"delete_all"
         }
     }"#;
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", viewer_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", viewer_token).as_bytes(),
+        )
+        .unwrap();
     headers.append("content-type", b"application/json").unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
-    request.set_path_with_query(Some("/mcp/x/config-service")).unwrap();
+    request
+        .set_path_with_query(Some("/mcp/x/config-service"))
+        .unwrap();
     let body_stream = request.body().unwrap();
     body_stream.write_bytes(body.as_bytes());
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Viewer level 1 < required level 4");
 }
@@ -186,7 +232,7 @@ allow if {
 #[spin_test]
 fn test_dynamic_data_rules() {
     setup_default_test_config();
-    
+
     let policy = r#"
 package mcp.authorization
 import rego.v1
@@ -219,7 +265,7 @@ allow if {
     input.token.sub in team.members
 }
 "#;
-    
+
     let data = r#"{
         "rate_limits": {
             "free": {"max_requests": 10, "window": "hour"},
@@ -245,79 +291,131 @@ allow if {
             "team-2": {"members": ["charlie", "dave"], "lead": "charlie"}
         }
     }"#;
-    
+
     let (private_key, _public_key) = setup_policy_with_data(policy, data);
-    
+
     // Test rate limiting
-    let user1_token = create_policy_test_token_with_key(&private_key, "user1", vec![], vec![("tier", serde_json::json!("free"))]);
-    
+    let user1_token = create_policy_test_token_with_key(
+        &private_key,
+        "user1",
+        vec![],
+        vec![("tier", serde_json::json!("free"))],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user1_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", user1_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/api")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "User1 under rate limit (5 < 10)");
-    
-    let user2_token = create_policy_test_token_with_key(&private_key, "user2", vec![], vec![("tier", serde_json::json!("free"))]);
-    
+
+    let user2_token = create_policy_test_token_with_key(
+        &private_key,
+        "user2",
+        vec![],
+        vec![("tier", serde_json::json!("free"))],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user2_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", user2_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/api")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "User2 over rate limit (15 > 10)");
-    
+
     // Test feature flags
     let user_token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", user_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/new-api")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "New API feature is enabled");
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", user_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/disabled-feature")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/disabled-feature"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Disabled feature should deny access");
-    
+    assert_eq!(
+        response.status(),
+        401,
+        "Disabled feature should deny access"
+    );
+
     // Test team-based access
     let alice_token = create_policy_test_token_with_key(&private_key, "alice", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", alice_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/project-alpha")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/project-alpha"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Alice is in team-1 for project-alpha");
-    
+    assert_eq!(
+        response.status(),
+        200,
+        "Alice is in team-1 for project-alpha"
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", alice_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
-    request.set_path_with_query(Some("/mcp/x/project-beta")).unwrap();
-    
+    request
+        .set_path_with_query(Some("/mcp/x/project-beta"))
+        .unwrap();
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Alice is not in team-2 for project-beta");
+    assert_eq!(
+        response.status(),
+        401,
+        "Alice is not in team-2 for project-beta"
+    );
 }
 
 #[spin_test]
 fn test_missing_data_handling() {
     setup_default_test_config();
-    
+
     // Policy that references non-existent data
     let policy = r#"
 package mcp.authorization
@@ -336,31 +434,51 @@ allow if {
     input.token.claims.bypass == true
 }
 "#;
-    
+
     // Empty data
     let (private_key, _public_key) = setup_policy_with_data(policy, "{}");
-    
+
     // Normal user - should be denied (data.users doesn't exist)
     let user_token = create_policy_test_token_with_key(&private_key, "user", vec![], vec![]);
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", user_token).as_bytes())
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/service")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 401, "Should deny when referenced data doesn't exist");
-    
+    assert_eq!(
+        response.status(),
+        401,
+        "Should deny when referenced data doesn't exist"
+    );
+
     // User with bypass claim
-    let bypass_token = create_policy_test_token_with_key(&private_key, "special", vec![], vec![("bypass", serde_json::json!(true))]);
-    
+    let bypass_token = create_policy_test_token_with_key(
+        &private_key,
+        "special",
+        vec![],
+        vec![("bypass", serde_json::json!(true))],
+    );
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", bypass_token).as_bytes()).unwrap();
+    headers
+        .append(
+            "authorization",
+            format!("Bearer {}", bypass_token).as_bytes(),
+        )
+        .unwrap();
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp/x/service")).unwrap();
-    
+
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(response.status(), 200, "Bypass rule should work without data");
+    assert_eq!(
+        response.status(),
+        200,
+        "Bypass rule should work without data"
+    );
 }

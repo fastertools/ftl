@@ -4,6 +4,8 @@ use spin_test_sdk::{
 };
 
 mod authkit_integration_tests;
+mod critical_audit_test;
+mod critical_verification_test;
 mod gateway_forwarding_tests;
 mod jwks_caching_tests;
 mod jwt_test_utils_tests;
@@ -23,9 +25,7 @@ mod provider_config_tests;
 mod scope_validation_tests;
 mod simple_test;
 mod test_audience_required;
-mod test_comprehensive_debug;
 mod test_config_loading;
-mod test_debug;
 mod test_helpers;
 mod test_setup;
 mod test_token_utils;

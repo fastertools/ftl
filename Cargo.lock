@@ -780,6 +780,7 @@ dependencies = [
  "chrono",
  "futures",
  "jsonwebtoken",
+ "log",
  "regorus",
  "serde",
  "serde_json",
