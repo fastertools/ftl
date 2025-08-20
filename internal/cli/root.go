@@ -80,6 +80,7 @@ func init() {
 		newComponentCmd(),
 		newDeployCmd(),
 		newAuthCmd(),
+		newOrgCmd(),
 		newUpCmd(),
 		newRegistryCmd(),
 		newSynthCmd(),

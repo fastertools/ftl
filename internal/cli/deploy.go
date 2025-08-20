@@ -16,6 +16,7 @@ import (
 
 	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl-cli/internal/config"
 	"github.com/fastertools/ftl-cli/internal/deploy"
 	"github.com/fastertools/ftl-cli/pkg/oci"
 	"github.com/fastertools/ftl-cli/pkg/validation"
@@ -32,6 +33,7 @@ type DeployOptions struct {
 	JWTAudience   string
 	AllowedRoles  []string
 	Variables     map[string]string
+	OrgID         string // Explicitly specify organization ID
 }
 
 func newDeployCmd() *cobra.Command {
@@ -72,6 +74,7 @@ Example:
 	cmd.Flags().StringVar(&opts.JWTAudience, "jwt-audience", "", "JWT audience for authentication")
 	cmd.Flags().StringSliceVar(&opts.AllowedRoles, "allowed-roles", nil, "Allowed roles for org mode")
 	cmd.Flags().StringToStringVar(&opts.Variables, "var", nil, "Set variable (can be used multiple times)")
+	cmd.Flags().StringVar(&opts.OrgID, "org", "", "Organization ID for deployment (uses interactive selection if not specified)")
 
 	return cmd
 }
@@ -243,15 +246,33 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 			Info("Deploying as machine to org: %s", selectedOrgID)
 		} else {
 			// Users might have multiple orgs
-			if len(creds.Deployment.Context.OrgIds) == 1 {
+			if len(creds.Deployment.Context.OrgIds) == 0 {
+				return fmt.Errorf("no organizations available for deployment")
+			} else if opts.OrgID != "" {
+				// Command-line flag takes precedence
+				found := false
+				for _, orgID := range creds.Deployment.Context.OrgIds {
+					if orgID == opts.OrgID {
+						selectedOrgID = opts.OrgID
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v", 
+						opts.OrgID, creds.Deployment.Context.OrgIds)
+				}
+				Info("Deploying to organization: %s", selectedOrgID)
+			} else if len(creds.Deployment.Context.OrgIds) == 1 {
 				selectedOrgID = creds.Deployment.Context.OrgIds[0]
-				Info("Deploying to org: %s", selectedOrgID)
+				Info("Deploying to organization: %s", selectedOrgID)
 			} else {
-				// TODO: Implement interactive org selection
-				// For now, use the first org
-				selectedOrgID = creds.Deployment.Context.OrgIds[0]
-				Info("Multiple orgs available, using: %s", selectedOrgID)
-				Info("Available orgs: %v", creds.Deployment.Context.OrgIds)
+				// Multiple orgs - let user choose
+				selectedOrgID, err = selectOrganization(creds.Deployment.Context.OrgIds)
+				if err != nil {
+					return fmt.Errorf("failed to select organization: %w", err)
+				}
+				Info("Deploying to organization: %s", selectedOrgID)
 			}
 		}
 	}
@@ -670,3 +691,121 @@ func displayMCPUrls(baseURL string, components []*validation.Component) {
 	// Add summary line after table
 	_, _ = fmt.Fprintf(colorOutput, "Connect to MCP clients with the URLs above.\n")
 }
+
+// selectOrganization prompts the user to select an organization from the available list
+func selectOrganization(orgIDs []string) (string, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		// Config error is not fatal, continue without it
+		cfg = nil
+	}
+	
+	// If we're in a non-interactive environment, use config or first org
+	if !isDeployInteractive() {
+		// Try to use configured org
+		if cfg != nil {
+			currentOrg := cfg.GetCurrentOrg()
+			for _, orgID := range orgIDs {
+				if orgID == currentOrg {
+					Info("Using configured organization: %s", currentOrg)
+					return currentOrg, nil
+				}
+			}
+		}
+		
+		Warn("Multiple organizations available. Using first one: %s", orgIDs[0])
+		Warn("To specify an organization, use 'ftl org set' or --org flag")
+		return orgIDs[0], nil
+	}
+
+	// Check for environment variable override (prefer explicit env var over config)
+	if envOrgID := os.Getenv("FTL_ORG_ID"); envOrgID != "" {
+		// Validate it's in the list
+		for _, orgID := range orgIDs {
+			if orgID == envOrgID {
+				Info("Using organization from FTL_ORG_ID: %s", envOrgID)
+				return orgID, nil
+			}
+		}
+		return "", fmt.Errorf("FTL_ORG_ID '%s' is not in your available organizations: %v", envOrgID, orgIDs)
+	}
+
+	// Check for configured preference
+	if cfg != nil {
+		currentOrg := cfg.GetCurrentOrg()
+		if currentOrg != "" {
+			for _, orgID := range orgIDs {
+				if orgID == currentOrg {
+					// Ask if they want to use the configured preference
+					useConfig := false
+					
+					// Get org info for better display
+					orgInfo, hasInfo := cfg.GetOrganization(currentOrg)
+					displayName := currentOrg
+					if hasInfo && orgInfo.Name != "" {
+						displayName = fmt.Sprintf("%s (%s)", currentOrg, orgInfo.Name)
+					}
+					
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("Use current organization '%s'?", displayName),
+						Default: true,
+					}
+					if err := survey.AskOne(prompt, &useConfig); err == nil && useConfig {
+						// Update last used time
+						if hasInfo {
+							orgInfo.LastUsed = time.Now().Format(time.RFC3339)
+							_ = cfg.AddOrganization(orgInfo)
+						}
+						return currentOrg, nil
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Interactive selection
+	var selected string
+	prompt := &survey.Select{
+		Message: "Select organization for deployment:",
+		Options: orgIDs,
+		Help:    "Choose which organization to deploy this application to",
+	}
+
+	err = survey.AskOne(prompt, &selected)
+	if err != nil {
+		return "", err
+	}
+
+	// Update config with selection
+	if cfg != nil {
+		_ = cfg.SetCurrentOrg(selected)
+		
+		// Update last used time
+		if orgInfo, exists := cfg.GetOrganization(selected); exists {
+			orgInfo.LastUsed = time.Now().Format(time.RFC3339)
+			_ = cfg.AddOrganization(orgInfo)
+		}
+	}
+
+	return selected, nil
+}
+
+// isDeployInteractive checks if we're in an interactive terminal
+func isDeployInteractive() bool {
+	// Check if stdout is a terminal
+	fileInfo, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	
+	// Check for CI environment variables
+	if os.Getenv("CI") == "true" || os.Getenv("CONTINUOUS_INTEGRATION") == "true" {
+		return false
+	}
+	
+	// Check if it's a terminal
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
