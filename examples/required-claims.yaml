@@ -1,0 +1,19 @@
+name: admin-only-app
+version: 0.1.0
+description: App that requires admin role and specific department
+
+# Org-scoped app with claim requirements
+access: org
+
+# Only allow users with admin role AND engineering department
+required_claims:
+  role: admin
+  department: engineering
+  # Can also check arrays
+  permissions: ["read", "write", "delete"]
+
+components:
+  - id: admin-panel
+    source: ./admin
+    build:
+      command: npm run build

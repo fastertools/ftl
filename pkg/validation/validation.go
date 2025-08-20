@@ -175,6 +175,19 @@ func ExtractApplication(v cue.Value) (*Application, error) {
 		}
 	}
 
+	// Extract required_claims for any access mode (private, org, custom)
+	requiredClaimsValue := v.LookupPath(cue.ParsePath("required_claims"))
+	if requiredClaimsValue.Exists() && requiredClaimsValue.Kind() != cue.NullKind {
+		// Convert CUE value to Go interface{}
+		var claims interface{}
+		if err := requiredClaimsValue.Decode(&claims); err == nil {
+			// Convert to map[string]interface{} if it's a map
+			if claimsMap, ok := claims.(map[string]interface{}); ok {
+				app.RequiredClaims = claimsMap
+			}
+		}
+	}
+
 	return app, nil
 }
 
@@ -249,9 +262,10 @@ type Application struct {
 	Access          string            `json:"access,omitempty"`
 	Auth            *AuthConfig       `json:"auth,omitempty"`
 	Components      []*Component      `json:"components,omitempty"`
-	Variables       map[string]string `json:"variables,omitempty"`
-	AllowedRoles    []string          `json:"allowed_roles,omitempty"`    // For org access mode - optional role filter
-	AllowedSubjects []string          `json:"allowed_subjects,omitempty"` // For org access mode - list of allowed user subjects
+	Variables       map[string]string      `json:"variables,omitempty"`
+	AllowedRoles    []string               `json:"allowed_roles,omitempty"`    // For org access mode - optional role filter
+	AllowedSubjects []string               `json:"allowed_subjects,omitempty"` // For org access mode - list of allowed user subjects
+	RequiredClaims  map[string]interface{} `json:"required_claims,omitempty"`  // For private/org modes - required JWT claim validations
 }
 
 // Component represents a validated component

@@ -26,6 +26,9 @@ import (
 	allowed_roles?: [...string]
 	// For org access mode - list of allowed user subjects
 	allowed_subjects?: [...string]
+	// For private/org modes - required claim validations
+	// Example: {"role": "admin", "department": "engineering"}
+	required_claims?: {[string]: _}
 }
 
 #Component: {
@@ -108,6 +111,11 @@ import (
 		// Pass through allowed_subjects if present
 		if input.allowed_subjects != _|_ {
 			allowed_subjects: input.allowed_subjects
+		}
+		
+		// Pass through required_claims if present
+		if input.required_claims != _|_ {
+			required_claims: input.required_claims
 		}
 	}
 	
@@ -214,6 +222,11 @@ import (
 							if input.allowed_subjects != _|_ {
 								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
 							}
+							
+							// User-specified required claims
+							if input.required_claims != _|_ {
+								mcp_auth_required_claims: json.Marshal(input.required_claims)
+							}
 						}
 						
 						if input.access == "org" {
@@ -222,20 +235,46 @@ import (
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
 							
-							// For org mode with machine actor, require org_id claim
-							// This ensures M2M tokens can only access their designated org
-							if platform.deployment_context != _|_ {
-								if platform.deployment_context.actor_type == "machine" {
-									if platform.deployment_context.org_id != _|_ {
-										// Build the JSON object for required claims
-										mcp_auth_required_claims: "{\"org_id\": \"" + platform.deployment_context.org_id + "\"}"
-									}
-								}
-							}
-							
 							// For org mode, inject allowed subjects if provided
 							if input.allowed_subjects != _|_ {
 								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
+							}
+							
+							// Handle required claims for org mode
+							// We need to merge user-specified claims with M2M org_id if present
+							// Start with user-specified claims
+							if input.required_claims != _|_ {
+								// Check if we have M2M context with org_id
+								if platform.deployment_context != _|_ {
+									if platform.deployment_context.actor_type == "machine" {
+										if platform.deployment_context.org_id != _|_ {
+											// Merge user claims with org_id requirement
+											_merged_claims: input.required_claims & {
+												org_id: platform.deployment_context.org_id
+											}
+											mcp_auth_required_claims: json.Marshal(_merged_claims)
+										}
+									}
+									if platform.deployment_context.actor_type != "machine" {
+										// User deployment - just use user-specified claims
+										mcp_auth_required_claims: json.Marshal(input.required_claims)
+									}
+								}
+								if platform.deployment_context == _|_ {
+									// No deployment context - just use user-specified claims
+									mcp_auth_required_claims: json.Marshal(input.required_claims)
+								}
+							}
+							if input.required_claims == _|_ {
+								// No user claims, check if we need M2M org_id
+								if platform.deployment_context != _|_ {
+									if platform.deployment_context.actor_type == "machine" {
+										if platform.deployment_context.org_id != _|_ {
+											// Just inject org_id requirement for M2M
+											mcp_auth_required_claims: json.Marshal({org_id: platform.deployment_context.org_id})
+										}
+									}
+								}
 							}
 						}
 						

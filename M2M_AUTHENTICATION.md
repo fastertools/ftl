@@ -65,6 +65,31 @@ deployment_context: {
 }
 ```
 
+## JWT Claim Validation
+
+### Required Claims Configuration
+Users can specify required JWT claims that must be present with specific values:
+
+```yaml
+name: my-app
+access: org
+
+# Require specific claims in JWT tokens
+required_claims:
+  role: admin
+  department: engineering
+  permissions: ["read", "write"]
+```
+
+This configuration ensures only tokens with ALL specified claims and values can access the application.
+
+### Use Cases for Required Claims
+1. **Role-based access**: `{"role": "admin"}`
+2. **Department filtering**: `{"department": "engineering"}`
+3. **Multi-tenancy**: `{"tenant_id": "tenant_123"}`
+4. **Permission checking**: `{"permissions": ["read", "write"]}`
+5. **Custom attributes**: `{"clearance_level": "secret"}`
+
 ## JWT Token Structure
 
 ### Machine Token Claims
