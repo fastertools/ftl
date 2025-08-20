@@ -1,0 +1,90 @@
+{
+  "user_components": {
+    "alice": ["data-processor", "reporter", "analytics"],
+    "bob": ["reporter"],
+    "charlie": ["analytics", "ml-tools"]
+  },
+  "component_roles": {
+    "data-processor": ["data-engineer", "admin"],
+    "reporter": ["analyst", "viewer", "admin"],
+    "analytics": ["analyst", "data-scientist", "admin"],
+    "ml-tools": ["data-scientist", "ml-engineer", "admin"]
+  },
+  "tool_permissions": {
+    "data-processor": {
+      "process_batch": {
+        "required_role": "data-engineer",
+        "description": "Process a batch of data"
+      },
+      "delete_dataset": {
+        "required_role": "admin",
+        "description": "Delete an entire dataset"
+      },
+      "export_data": {
+        "required_role": "analyst",
+        "description": "Export processed data"
+      }
+    },
+    "reporter": {
+      "generate_report": {
+        "required_role": "viewer",
+        "description": "Generate a report"
+      },
+      "schedule_report": {
+        "required_role": "analyst",
+        "description": "Schedule automated reports"
+      }
+    },
+    "ml-tools": {
+      "train_model": {
+        "required_role": "ml-engineer",
+        "description": "Train a machine learning model"
+      },
+      "deploy_model": {
+        "required_role": "ml-engineer",
+        "description": "Deploy a model to production"
+      },
+      "evaluate_model": {
+        "required_role": "data-scientist",
+        "description": "Evaluate model performance"
+      }
+    }
+  },
+  "user_tools": {
+    "alice": {
+      "data-processor": ["process_batch", "export_data"],
+      "reporter": ["generate_report", "schedule_report"],
+      "analytics": ["run_analysis", "export_results"]
+    },
+    "bob": {
+      "reporter": ["generate_report"]
+    },
+    "charlie": {
+      "analytics": ["run_analysis", "create_dashboard"],
+      "ml-tools": ["train_model", "evaluate_model"]
+    }
+  },
+  "dangerous_tools": [
+    "delete_dataset",
+    "delete_database",
+    "reset_system",
+    "execute_raw_sql",
+    "modify_permissions",
+    "delete_user",
+    "purge_logs"
+  ],
+  "rate_limits": {
+    "default": {
+      "calls_per_minute": 100,
+      "calls_per_hour": 1000
+    },
+    "alice": {
+      "calls_per_minute": 200,
+      "calls_per_hour": 2000
+    },
+    "bob": {
+      "calls_per_minute": 50,
+      "calls_per_hour": 500
+    }
+  }
+}

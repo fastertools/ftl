@@ -150,23 +150,9 @@ fn build_forwarding_headers(
         )?;
     }
 
-    // Forward configured claims as headers
-    if let Some(authorization) = &config.authorization
-        && let Some(forward_claims) = &authorization.forward_claims
-    {
-        for (claim_name, header_name) in forward_claims {
-            if let Some(claim_value) = auth_context.additional_claims.get(claim_name) {
-                // Convert claim value to string
-                let value_str = match claim_value {
-                    serde_json::Value::String(s) => s.clone(),
-                    serde_json::Value::Number(n) => n.to_string(),
-                    serde_json::Value::Bool(b) => b.to_string(),
-                    _ => claim_value.to_string(),
-                };
-                headers.append(header_name, &value_str.as_bytes().to_vec())?;
-            }
-        }
-    }
+    // Note: Claim forwarding has been removed in favor of policy-based authorization
+    // If specific claims need to be forwarded, they should be added as explicit headers
+    // in the policy evaluation result or as part of the auth context
 
     // Forward the original authorization header
     headers.append(

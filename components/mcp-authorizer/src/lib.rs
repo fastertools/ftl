@@ -12,10 +12,12 @@ mod discovery;
 mod error;
 mod forwarding;
 mod jwks;
+mod policy;
 mod token;
 
-use config::Config;
+use config::{Config, PolicyAuthorization};
 use error::{AuthError, Result};
+use policy::PolicyEngine;
 
 /// Main HTTP component handler
 #[spin_sdk::http_component]
@@ -51,14 +53,50 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
         return Ok(response);
     }
 
+    // For POST requests with JSON content, capture the body for potential policy evaluation
+    // The policy decides whether to use this information
+    let body_bytes = if *req.method() == spin_sdk::http::Method::Post {
+        // Check if it's likely JSON content
+        let is_json = req.headers()
+            .any(|(name, value)| {
+                name.eq_ignore_ascii_case("content-type") &&
+                value.as_str().map_or(false, |v| v.contains("json"))
+            });
+        
+        if is_json {
+            Some(req.body().to_vec())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Authentication is always required for an auth gateway
     // The presence of a provider configuration determines the auth method
-    match authenticate(&req, &config).await {
+    match authenticate_with_policy(&req, &config, body_bytes.as_deref()).await {
         Ok(auth_context) => {
             // Only forward if gateway URL is configured and valid
             // This allows tests to run without forwarding
             if !config.gateway_url.is_empty() && config.gateway_url != "none" {
-                forward_request(req, &config, auth_context, trace_id).await
+                // Reconstruct request with body if we consumed it
+                let req_to_forward = if let Some(body) = body_bytes {
+                    // Collect headers first
+                    let headers: Vec<(String, String)> = req.headers()
+                        .map(|(name, value)| (name.to_string(), value.as_str().unwrap_or("").to_string()))
+                        .collect();
+                    
+                    // Create a new request with headers and body
+                    Request::builder()
+                        .method(req.method().clone())
+                        .uri(req.uri())
+                        .headers(headers)
+                        .body(body)
+                        .build()
+                } else {
+                    req
+                };
+                forward_request(req_to_forward, &config, auth_context, trace_id).await
             } else {
                 // No gateway configured - return success directly (for testing)
                 Ok(Response::new(200, "OK"))
@@ -77,8 +115,12 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
     }
 }
 
-/// Authenticate the incoming request
-async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
+/// Authenticate the incoming request with policy-based authorization
+async fn authenticate_with_policy(
+    req: &Request,
+    config: &Config,
+    body: Option<&[u8]>,
+) -> Result<auth::Context> {
     // Extract bearer token
     let token = auth::extract_bearer_token(req)?;
 
@@ -103,9 +145,9 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
         }
     };
 
-    // Check authorization rules if configured
-    if let Some(authz_rules) = &config.authorization {
-        apply_authorization_rules(&token_info, authz_rules)?;
+    // Apply policy-based authorization if configured
+    if let Some(policy_config) = &config.authorization {
+        apply_policy_authorization(&token_info, req, body, policy_config)?;
     }
 
     // Build auth context with all available claims
@@ -119,41 +161,29 @@ async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
     })
 }
 
-/// Apply authorization rules if configured
-fn apply_authorization_rules(
+/// Apply policy-based authorization using Regorous
+fn apply_policy_authorization(
     token_info: &token::TokenInfo,
-    rules: &config::AuthorizationRules,
+    req: &Request,
+    body: Option<&[u8]>,
+    policy_config: &PolicyAuthorization,
 ) -> Result<()> {
-    // Check allowed subjects
-    if let Some(allowed_subjects) = &rules.allowed_subjects
-        && !allowed_subjects.contains(&token_info.sub)
-    {
+    // Create policy engine with the configured policy and data
+    let mut engine = PolicyEngine::new_with_policy_and_data(
+        &policy_config.policy,
+        policy_config.data.as_deref(),
+    )
+    .map_err(|e| AuthError::Configuration(format!("Failed to initialize policy engine: {e}")))?;
+    
+    // Evaluate policy
+    let allowed = engine.evaluate(token_info, req, body)?;
+    
+    if !allowed {
         return Err(AuthError::Unauthorized(
-            "Access denied: subject not authorized".to_string(),
+            "Access denied by authorization policy".to_string(),
         ));
     }
-
-    // Check required claims
-    if let Some(required_claims) = &rules.required_claims {
-        for (claim_name, required_value) in required_claims {
-            let token_value = token_info.claims.get(claim_name);
-
-            match token_value {
-                Some(value) if value == required_value => {}
-                Some(_) => {
-                    return Err(AuthError::Unauthorized(format!(
-                        "Access denied: claim '{claim_name}' mismatch"
-                    )));
-                }
-                None => {
-                    return Err(AuthError::Unauthorized(format!(
-                        "Access denied: missing required claim '{claim_name}'"
-                    )));
-                }
-            }
-        }
-    }
-
+    
     Ok(())
 }
 

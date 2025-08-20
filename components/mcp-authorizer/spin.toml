@@ -26,10 +26,9 @@ mcp_oauth_token_endpoint = { default = "" }
 mcp_oauth_userinfo_endpoint = { default = "" }
 
 
-# Authorization rules (applied after authentication)
-mcp_auth_allowed_subjects = { default = "" }
-mcp_auth_required_claims = { default = "" }
-mcp_auth_forward_claims = { default = "" }
+# Policy-based authorization (Rego)
+mcp_policy = { default = "" }  # Inline Rego policy (required if authorization is enabled)
+mcp_policy_data = { default = "" }  # Optional JSON data for policy evaluation
 
 [[trigger.http]]
 route = "/..."
@@ -63,10 +62,9 @@ mcp_oauth_token_endpoint = "{{ mcp_oauth_token_endpoint }}"
 mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 
 
-# Authorization rules
-mcp_auth_allowed_subjects = "{{ mcp_auth_allowed_subjects }}"
-mcp_auth_required_claims = "{{ mcp_auth_required_claims }}"
-mcp_auth_forward_claims = "{{ mcp_auth_forward_claims }}"
+# Policy-based authorization
+mcp_policy = "{{ mcp_policy }}"
+mcp_policy_data = "{{ mcp_policy_data }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]

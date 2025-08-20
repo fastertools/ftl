@@ -31,6 +31,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 url = "2.5"
 # For async operations
 futures = "0.3"
+# For policy-based authorization using Rego
+regorus = { version = "0.4", default-features = false, features = ["base64", "base64url"] }
 
 [lints.rust]
 unsafe_code = "forbid"

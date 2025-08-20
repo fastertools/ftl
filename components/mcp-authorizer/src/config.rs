@@ -16,8 +16,8 @@ pub struct Config {
     /// JWT provider configuration (optional - if not set, all requests pass through)
     pub provider: Option<Provider>,
 
-    /// Authorization rules to apply after authentication
-    pub authorization: Option<AuthorizationRules>,
+    /// Policy-based authorization configuration
+    pub authorization: Option<PolicyAuthorization>,
 }
 
 /// Provider type enumeration
@@ -54,17 +54,14 @@ pub struct JwtProvider {
     pub oauth_endpoints: Option<OAuthEndpoints>,
 }
 
-/// Authorization rules to apply after authentication
+/// Policy-based authorization configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthorizationRules {
-    /// List of allowed subjects (if empty, all subjects are allowed)
-    pub allowed_subjects: Option<Vec<String>>,
-
-    /// Required claims (key-value pairs that must match)
-    pub required_claims: Option<std::collections::HashMap<String, serde_json::Value>>,
-
-    /// Claims to forward in headers (claim name -> header name mapping)
-    pub forward_claims: Option<std::collections::HashMap<String, String>>,
+pub struct PolicyAuthorization {
+    /// Rego policy as a string
+    pub policy: String,
+    
+    /// Policy data as JSON string (optional)
+    pub data: Option<String>,
 }
 
 /// OAuth 2.0 endpoint configuration
@@ -115,8 +112,8 @@ impl Config {
             }
         };
 
-        // Load authorization rules if configured
-        let authorization = AuthorizationRules::load().ok();
+        // Load policy authorization if configured
+        let authorization = PolicyAuthorization::load().ok();
 
         Ok(Self {
             gateway_url,
@@ -329,46 +326,25 @@ fn normalize_url(url: &str) -> Result<String> {
     Ok(normalized)
 }
 
-impl AuthorizationRules {
-    /// Load authorization rules from Spin variables
+impl PolicyAuthorization {
+    /// Load policy authorization from Spin variables
     pub fn load() -> Result<Self> {
-        use std::collections::HashMap;
-
-        // Load allowed subjects (comma-separated)
-        let allowed_subjects = variables::get("mcp_auth_allowed_subjects")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.split(',').map(|sub| sub.trim().to_string()).collect());
-
-        // Load required claims (JSON object)
-        let required_claims = variables::get("mcp_auth_required_claims")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                serde_json::from_str::<HashMap<String, serde_json::Value>>(&s)
-                    .map_err(|e| anyhow::anyhow!("Invalid JSON in mcp_auth_required_claims: {e}"))
-            })
-            .transpose()?;
-
-        // Load claim forwarding rules (JSON object: claim_name -> header_name)
-        let forward_claims = variables::get("mcp_auth_forward_claims")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                serde_json::from_str::<HashMap<String, String>>(&s)
-                    .map_err(|e| anyhow::anyhow!("Invalid JSON in mcp_auth_forward_claims: {e}"))
-            })
-            .transpose()?;
-
-        // Return error if no rules are configured
-        if allowed_subjects.is_none() && required_claims.is_none() && forward_claims.is_none() {
-            return Err(anyhow::anyhow!("No authorization rules configured"));
+        // Load policy (required)
+        let policy = variables::get("mcp_policy")
+            .map_err(|_| anyhow::anyhow!("mcp_policy variable is required for authorization"))?;
+        
+        if policy.is_empty() {
+            return Err(anyhow::anyhow!("mcp_policy cannot be empty"));
         }
-
+        
+        // Load policy data (optional)
+        let data = variables::get("mcp_policy_data")
+            .ok()
+            .filter(|s| !s.is_empty());
+        
         Ok(Self {
-            allowed_subjects,
-            required_claims,
-            forward_claims,
+            policy,
+            data,
         })
     }
 }
