@@ -177,23 +177,23 @@ func (c *FTLClient) DeleteApp(ctx context.Context, appID string) error {
 	return nil
 }
 
-// Registry API methods
+// Deployment Credentials API methods
 
-// CreateECRToken creates a temporary ECR authorization token
-func (c *FTLClient) CreateECRToken(ctx context.Context, appID string, components []string) (*CreateEcrTokenResponseBody, error) {
+// CreateDeployCredentials creates temporary credentials for deployment (ECR and Lambda)
+func (c *FTLClient) CreateDeployCredentials(ctx context.Context, appID string, components []string) (*CreateDeployCredentialsResponse, error) {
 	appUUID, err := parseUUID(appID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid app ID: %w", err)
 	}
-	request := CreateEcrTokenRequest{
+	request := CreateDeployCredentialsRequest{
 		AppId:      appUUID,
-		Components: components,
+		Components: &components,
 	}
-	params := &CreateEcrTokenParams{}
+	params := &CreateDeployCredentialsParams{}
 
-	resp, err := c.client.CreateEcrTokenWithResponse(ctx, params, request)
+	resp, err := c.client.CreateDeployCredentialsWithResponse(ctx, appUUID, params, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ECR token: %w", err)
+		return nil, fmt.Errorf("failed to create deployment credentials: %w", err)
 	}
 
 	if resp.HTTPResponse.StatusCode != http.StatusOK {
@@ -233,31 +233,8 @@ func (c *FTLClient) UpdateComponents(ctx context.Context, appID string, request 
 	return resp.JSON200, nil
 }
 
-// Deployment API methods
-
-// CreateDeployment triggers a new deployment for an application
-func (c *FTLClient) CreateDeployment(ctx context.Context, appID string, request CreateDeploymentRequest) (*CreateDeploymentResponseBody, error) {
-	appUUID, err := parseUUID(appID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid app ID: %w", err)
-	}
-	params := &CreateDeploymentParams{}
-
-	resp, err := c.client.CreateDeploymentWithResponse(ctx, appUUID, params, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create deployment: %w", err)
-	}
-
-	if resp.HTTPResponse.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("API error: %s", string(resp.Body))
-	}
-
-	if resp.JSON202 == nil {
-		return nil, fmt.Errorf("unexpected response format")
-	}
-
-	return resp.JSON202, nil
-}
+// Note: Deployments are now done via streaming Lambda Function URLs
+// obtained from CreateDeployCredentials, not through the REST API
 
 // Organization API methods
 

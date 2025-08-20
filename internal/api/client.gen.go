@@ -5,18 +5,14 @@ package api
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -70,20 +66,6 @@ const (
 	CreateAppResponseBodyStatusPENDING  CreateAppResponseBodyStatus = "PENDING"
 )
 
-// Defines values for CreateDeploymentRequestAccess.
-const (
-	CreateDeploymentRequestAccessCustom  CreateDeploymentRequestAccess = "custom"
-	CreateDeploymentRequestAccessOrg     CreateDeploymentRequestAccess = "org"
-	CreateDeploymentRequestAccessPrivate CreateDeploymentRequestAccess = "private"
-	CreateDeploymentRequestAccessPublic  CreateDeploymentRequestAccess = "public"
-)
-
-// Defines values for CreateDeploymentRequestAuthProvider.
-const (
-	CreateDeploymentRequestAuthProviderCustom CreateDeploymentRequestAuthProvider = "custom"
-	CreateDeploymentRequestAuthProviderWorkos CreateDeploymentRequestAuthProvider = "workos"
-)
-
 // Defines values for ListAppsResponseBodyAppsAccessControl.
 const (
 	Custom  ListAppsResponseBodyAppsAccessControl = "custom"
@@ -115,13 +97,6 @@ const (
 const (
 	False ListAppsParamsIncludeDeleted = "false"
 	True  ListAppsParamsIncludeDeleted = "true"
-)
-
-// Defines values for CreateDeploymentParamsEnvironment.
-const (
-	Development CreateDeploymentParamsEnvironment = "development"
-	Production  CreateDeploymentParamsEnvironment = "production"
-	Staging     CreateDeploymentParamsEnvironment = "staging"
 )
 
 // App Application object
@@ -186,105 +161,56 @@ type CreateAppResponseBody struct {
 // CreateAppResponseBodyStatus defines model for CreateAppResponseBody.Status.
 type CreateAppResponseBodyStatus string
 
-// CreateDeploymentRequest FTL application configuration - the entire request body is the raw FTL config as defined by the FTL CLI/SDK
-type CreateDeploymentRequest struct {
-	// Access Access control mode
-	Access *CreateDeploymentRequestAccess `json:"access,omitempty"`
-
-	// Application Application metadata
-	Application struct {
-		// Description Application description
-		Description *string `json:"description,omitempty"`
-
-		// Name Application name
-		Name string `json:"name"`
-
-		// Version Application version
-		Version *string `json:"version,omitempty"`
-	} `json:"application"`
-
-	// Auth Authentication configuration
-	Auth *struct {
-		JwtAudience *string                              `json:"jwt_audience,omitempty"`
-		JwtIssuer   *string                              `json:"jwt_issuer,omitempty"`
-		OrgId       *string                              `json:"org_id,omitempty"`
-		Provider    *CreateDeploymentRequestAuthProvider `json:"provider,omitempty"`
-	} `json:"auth,omitempty"`
-
-	// Components Application components
-	Components []struct {
-		// Id Component ID
-		Id string `json:"id"`
-
-		// Source Registry reference to pushed component (components must be pushed to ECR first)
-		Source struct {
-			// Package Package path (e.g., app123abc/graph)
-			Package string `json:"package"`
-
-			// Registry ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)
-			Registry string `json:"registry"`
-
-			// Version Component version (e.g., 0.1.0)
-			Version string `json:"version"`
-		} `json:"source"`
-
-		// Variables Component-specific variables
-		Variables *map[string]string `json:"variables,omitempty"`
-	} `json:"components"`
-
-	// Variables Application variables
-	Variables *map[string]string `json:"variables,omitempty"`
-}
-
-// CreateDeploymentRequestAccess Access control mode
-type CreateDeploymentRequestAccess string
-
-// CreateDeploymentRequestAuthProvider defines model for CreateDeploymentRequest.Auth.Provider.
-type CreateDeploymentRequestAuthProvider string
-
-// CreateDeploymentResponseBody Response for successful deployment creation
-type CreateDeploymentResponseBody struct {
-	// DeploymentId Unique deployment identifier
-	DeploymentId string `json:"deploymentId"`
-
-	// Status Deployment status
-	Status string `json:"status"`
-
-	// Url Deployed application URL
-	Url string `json:"url"`
-}
-
-// CreateEcrTokenRequest Request body for creating ECR token
-type CreateEcrTokenRequest struct {
-	// AppId Application ID to create ECR token for
+// CreateDeployCredentialsRequest Request body for creating deployment credentials
+type CreateDeployCredentialsRequest struct {
+	// AppId Application ID to create deployment credentials for
 	AppId openapi_types.UUID `json:"appId"`
 
 	// Components Component names to create/ensure repositories for
-	Components []string `json:"components"`
+	Components *[]string `json:"components,omitempty"`
 }
 
-// CreateEcrTokenResponseBody ECR token response with app-scoped credentials
-type CreateEcrTokenResponseBody struct {
-	// AppId Original app UUID for reference
-	AppId *string `json:"appId,omitempty"`
+// CreateDeployCredentialsResponse Deployment credentials response with registry and deployment access
+type CreateDeployCredentialsResponse struct {
+	// AppId Application ID
+	AppId      openapi_types.UUID `json:"appId"`
+	Deployment struct {
+		Credentials struct {
+			// AccessKeyId AWS access key ID
+			AccessKeyId string `json:"accessKeyId"`
 
-	// AuthorizationToken Base64 encoded username:password for Docker login
-	AuthorizationToken string `json:"authorizationToken"`
+			// ExpiresAt Credentials expiration time
+			ExpiresAt string `json:"expiresAt"`
 
-	// ExpiresAt Token expiration time in ISO 8601 format
-	ExpiresAt string `json:"expiresAt"`
+			// SecretAccessKey AWS secret access key
+			SecretAccessKey string `json:"secretAccessKey"`
 
-	// PackageNamespace Sanitized namespace for spin deps publish commands
-	PackageNamespace *string `json:"packageNamespace,omitempty"`
+			// SessionToken AWS session token
+			SessionToken string `json:"sessionToken"`
+		} `json:"credentials"`
 
-	// ProxyEndpoint Full ECR endpoint URL
-	ProxyEndpoint string `json:"proxyEndpoint"`
+		// FunctionUrl Lambda function URL for deployment
+		FunctionUrl string `json:"functionUrl"`
+	} `json:"deployment"`
+	Registry struct {
+		// AuthorizationToken ECR authorization token
+		AuthorizationToken string `json:"authorizationToken"`
 
-	// Region AWS region
-	Region string `json:"region"`
+		// ExpiresAt ECR token expiration time
+		ExpiresAt string `json:"expiresAt"`
 
-	// RegistryUri ECR registry URI without https://
-	RegistryUri string `json:"registryUri"`
+		// PackageNamespace ECR namespace for components
+		PackageNamespace string `json:"packageNamespace"`
+
+		// ProxyEndpoint ECR proxy endpoint
+		ProxyEndpoint string `json:"proxyEndpoint"`
+
+		// Region AWS region
+		Region string `json:"region"`
+
+		// RegistryUri ECR registry URI
+		RegistryUri string `json:"registryUri"`
+	} `json:"registry"`
 }
 
 // DeleteAppResponseBody Response for successful app deletion
@@ -447,17 +373,11 @@ type UpdateComponentsParams struct {
 	Authorization string `json:"Authorization"`
 }
 
-// CreateDeploymentParams defines parameters for CreateDeployment.
-type CreateDeploymentParams struct {
-	// Environment Deployment environment (defaults to production)
-	Environment *CreateDeploymentParamsEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
-
+// CreateDeployCredentialsParams defines parameters for CreateDeployCredentials.
+type CreateDeployCredentialsParams struct {
 	// Authorization Bearer token for authentication
 	Authorization string `json:"Authorization"`
 }
-
-// CreateDeploymentParamsEnvironment defines parameters for CreateDeployment.
-type CreateDeploymentParamsEnvironment string
 
 // GetAppLogsParams defines parameters for GetAppLogs.
 type GetAppLogsParams struct {
@@ -467,12 +387,6 @@ type GetAppLogsParams struct {
 	// Tail Number of log lines from the end (1-1000)
 	Tail *string `form:"tail,omitempty" json:"tail,omitempty"`
 
-	// Authorization Bearer token for authentication
-	Authorization string `json:"Authorization"`
-}
-
-// CreateEcrTokenParams defines parameters for CreateEcrToken.
-type CreateEcrTokenParams struct {
 	// Authorization Bearer token for authentication
 	Authorization string `json:"Authorization"`
 }
@@ -489,11 +403,8 @@ type CreateAppJSONRequestBody = CreateAppRequest
 // UpdateComponentsJSONRequestBody defines body for UpdateComponents for application/json ContentType.
 type UpdateComponentsJSONRequestBody = UpdateComponentsRequest
 
-// CreateDeploymentJSONRequestBody defines body for CreateDeployment for application/json ContentType.
-type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
-
-// CreateEcrTokenJSONRequestBody defines body for CreateEcrToken for application/json ContentType.
-type CreateEcrTokenJSONRequestBody = CreateEcrTokenRequest
+// CreateDeployCredentialsJSONRequestBody defines body for CreateDeployCredentials for application/json ContentType.
+type CreateDeployCredentialsJSONRequestBody = CreateDeployCredentialsRequest
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -590,18 +501,13 @@ type ClientInterface interface {
 
 	UpdateComponents(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateDeploymentWithBody request with any body
-	CreateDeploymentWithBody(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateDeployCredentialsWithBody request with any body
+	CreateDeployCredentialsWithBody(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	CreateDeployment(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateDeployCredentials(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAppLogs request
 	GetAppLogs(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateEcrTokenWithBody request with any body
-	CreateEcrTokenWithBody(ctx context.Context, params *CreateEcrTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateEcrToken(ctx context.Context, params *CreateEcrTokenParams, body CreateEcrTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUserOrgs request
 	GetUserOrgs(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -703,8 +609,8 @@ func (c *Client) UpdateComponents(ctx context.Context, appId openapi_types.UUID,
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateDeploymentWithBody(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDeploymentRequestWithBody(c.Server, appId, params, contentType, body)
+func (c *Client) CreateDeployCredentialsWithBody(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployCredentialsRequestWithBody(c.Server, appId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -715,8 +621,8 @@ func (c *Client) CreateDeploymentWithBody(ctx context.Context, appId openapi_typ
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateDeployment(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDeploymentRequest(c.Server, appId, params, body)
+func (c *Client) CreateDeployCredentials(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployCredentialsRequest(c.Server, appId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -729,30 +635,6 @@ func (c *Client) CreateDeployment(ctx context.Context, appId openapi_types.UUID,
 
 func (c *Client) GetAppLogs(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAppLogsRequest(c.Server, appId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateEcrTokenWithBody(ctx context.Context, params *CreateEcrTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateEcrTokenRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateEcrToken(ctx context.Context, params *CreateEcrTokenParams, body CreateEcrTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateEcrTokenRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1107,19 +989,19 @@ func NewUpdateComponentsRequestWithBody(server string, appId openapi_types.UUID,
 	return req, nil
 }
 
-// NewCreateDeploymentRequest calls the generic CreateDeployment builder with application/json body
-func NewCreateDeploymentRequest(server string, appId openapi_types.UUID, params *CreateDeploymentParams, body CreateDeploymentJSONRequestBody) (*http.Request, error) {
+// NewCreateDeployCredentialsRequest calls the generic CreateDeployCredentials builder with application/json body
+func NewCreateDeployCredentialsRequest(server string, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewCreateDeploymentRequestWithBody(server, appId, params, "application/json", bodyReader)
+	return NewCreateDeployCredentialsRequestWithBody(server, appId, params, "application/json", bodyReader)
 }
 
-// NewCreateDeploymentRequestWithBody generates requests for CreateDeployment with any type of body
-func NewCreateDeploymentRequestWithBody(server string, appId openapi_types.UUID, params *CreateDeploymentParams, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateDeployCredentialsRequestWithBody generates requests for CreateDeployCredentials with any type of body
+func NewCreateDeployCredentialsRequestWithBody(server string, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1134,7 +1016,7 @@ func NewCreateDeploymentRequestWithBody(server string, appId openapi_types.UUID,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/v1/apps/%s/deployments", pathParam0)
+	operationPath := fmt.Sprintf("/v1/apps/%s/deploy-credentials", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1142,28 +1024,6 @@ func NewCreateDeploymentRequestWithBody(server string, appId openapi_types.UUID,
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Environment != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "environment", runtime.ParamLocationQuery, *params.Environment); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
@@ -1274,59 +1134,6 @@ func NewGetAppLogsRequest(server string, appId openapi_types.UUID, params *GetAp
 	return req, nil
 }
 
-// NewCreateEcrTokenRequest calls the generic CreateEcrToken builder with application/json body
-func NewCreateEcrTokenRequest(server string, params *CreateEcrTokenParams, body CreateEcrTokenJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateEcrTokenRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateEcrTokenRequestWithBody generates requests for CreateEcrToken with any type of body
-func NewCreateEcrTokenRequestWithBody(server string, params *CreateEcrTokenParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/registry/tokens")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "Authorization", runtime.ParamLocationHeader, params.Authorization)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Authorization", headerParam0)
-
-	}
-
-	return req, nil
-}
-
 // NewGetUserOrgsRequest generates requests for GetUserOrgs
 func NewGetUserOrgsRequest(server string, params *GetUserOrgsParams) (*http.Request, error) {
 	var err error
@@ -1411,45 +1218,40 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// ListAppsWithResponse request
-	ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsResponse, error)
+	ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsBody, error)
 
 	// CreateAppWithBodyWithResponse request with any body
-	CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
+	CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppBody, error)
 
-	CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
+	CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppBody, error)
 
 	// DeleteAppWithResponse request
-	DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppResponse, error)
+	DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppBody, error)
 
 	// GetAppWithResponse request
-	GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppResponse, error)
+	GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppBody, error)
 
 	// ListAppComponentsWithResponse request
-	ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsResponse, error)
+	ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsBody, error)
 
 	// UpdateComponentsWithBodyWithResponse request with any body
-	UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error)
+	UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsBody, error)
 
-	UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error)
+	UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsBody, error)
 
-	// CreateDeploymentWithBodyWithResponse request with any body
-	CreateDeploymentWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error)
+	// CreateDeployCredentialsWithBodyWithResponse request with any body
+	CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsBody, error)
 
-	CreateDeploymentWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error)
+	CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsBody, error)
 
 	// GetAppLogsWithResponse request
-	GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsResponse, error)
-
-	// CreateEcrTokenWithBodyWithResponse request with any body
-	CreateEcrTokenWithBodyWithResponse(ctx context.Context, params *CreateEcrTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEcrTokenResponse, error)
-
-	CreateEcrTokenWithResponse(ctx context.Context, params *CreateEcrTokenParams, body CreateEcrTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEcrTokenResponse, error)
+	GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsBody, error)
 
 	// GetUserOrgsWithResponse request
-	GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsResponse, error)
+	GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsBody, error)
 }
 
-type ListAppsResponse struct {
+type ListAppsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ListAppsResponseBody
@@ -1459,7 +1261,7 @@ type ListAppsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListAppsResponse) Status() string {
+func (r ListAppsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1467,14 +1269,14 @@ func (r ListAppsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListAppsResponse) StatusCode() int {
+func (r ListAppsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateAppResponse struct {
+type CreateAppBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *CreateAppResponseBody
@@ -1485,7 +1287,7 @@ type CreateAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateAppResponse) Status() string {
+func (r CreateAppBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1493,14 +1295,14 @@ func (r CreateAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateAppResponse) StatusCode() int {
+func (r CreateAppBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteAppResponse struct {
+type DeleteAppBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *DeleteAppResponseBody
@@ -1510,7 +1312,7 @@ type DeleteAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteAppResponse) Status() string {
+func (r DeleteAppBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1518,14 +1320,14 @@ func (r DeleteAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteAppResponse) StatusCode() int {
+func (r DeleteAppBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetAppResponse struct {
+type GetAppBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *App
@@ -1535,7 +1337,7 @@ type GetAppResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetAppResponse) Status() string {
+func (r GetAppBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1543,14 +1345,14 @@ func (r GetAppResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetAppResponse) StatusCode() int {
+func (r GetAppBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type ListAppComponentsResponse struct {
+type ListAppComponentsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ListComponentsResponseBody
@@ -1560,7 +1362,7 @@ type ListAppComponentsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListAppComponentsResponse) Status() string {
+func (r ListAppComponentsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1568,14 +1370,14 @@ func (r ListAppComponentsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListAppComponentsResponse) StatusCode() int {
+func (r ListAppComponentsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type UpdateComponentsResponse struct {
+type UpdateComponentsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UpdateComponentsResponseBody
@@ -1586,7 +1388,7 @@ type UpdateComponentsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r UpdateComponentsResponse) Status() string {
+func (r UpdateComponentsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1594,24 +1396,25 @@ func (r UpdateComponentsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpdateComponentsResponse) StatusCode() int {
+func (r UpdateComponentsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateDeploymentResponse struct {
+type CreateDeployCredentialsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON202      *CreateDeploymentResponseBody
-	JSON400      *ErrorResponse
+	JSON200      *CreateDeployCredentialsResponse
 	JSON401      *ErrorResponse
+	JSON403      *ErrorResponse
+	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateDeploymentResponse) Status() string {
+func (r CreateDeployCredentialsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1619,14 +1422,14 @@ func (r CreateDeploymentResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateDeploymentResponse) StatusCode() int {
+func (r CreateDeployCredentialsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetAppLogsResponse struct {
+type GetAppLogsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *GetAppLogsResponseBody
@@ -1638,7 +1441,7 @@ type GetAppLogsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetAppLogsResponse) Status() string {
+func (r GetAppLogsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1646,38 +1449,14 @@ func (r GetAppLogsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetAppLogsResponse) StatusCode() int {
+func (r GetAppLogsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateEcrTokenResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *CreateEcrTokenResponseBody
-	JSON401      *ErrorResponse
-	JSON500      *ErrorResponse
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateEcrTokenResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateEcrTokenResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetUserOrgsResponse struct {
+type GetUserOrgsBody struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *GetUserOrgsResponseBody
@@ -1686,7 +1465,7 @@ type GetUserOrgsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetUserOrgsResponse) Status() string {
+func (r GetUserOrgsBody) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1694,144 +1473,127 @@ func (r GetUserOrgsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetUserOrgsResponse) StatusCode() int {
+func (r GetUserOrgsBody) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// ListAppsWithResponse request returning *ListAppsResponse
-func (c *ClientWithResponses) ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsResponse, error) {
+// ListAppsWithResponse request returning *ListAppsBody
+func (c *ClientWithResponses) ListAppsWithResponse(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*ListAppsBody, error) {
 	rsp, err := c.ListApps(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListAppsResponse(rsp)
+	return ParseListAppsBody(rsp)
 }
 
-// CreateAppWithBodyWithResponse request with arbitrary body returning *CreateAppResponse
-func (c *ClientWithResponses) CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppResponse, error) {
+// CreateAppWithBodyWithResponse request with arbitrary body returning *CreateAppBody
+func (c *ClientWithResponses) CreateAppWithBodyWithResponse(ctx context.Context, params *CreateAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppBody, error) {
 	rsp, err := c.CreateAppWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateAppResponse(rsp)
+	return ParseCreateAppBody(rsp)
 }
 
-func (c *ClientWithResponses) CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppResponse, error) {
+func (c *ClientWithResponses) CreateAppWithResponse(ctx context.Context, params *CreateAppParams, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppBody, error) {
 	rsp, err := c.CreateApp(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateAppResponse(rsp)
+	return ParseCreateAppBody(rsp)
 }
 
-// DeleteAppWithResponse request returning *DeleteAppResponse
-func (c *ClientWithResponses) DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppResponse, error) {
+// DeleteAppWithResponse request returning *DeleteAppBody
+func (c *ClientWithResponses) DeleteAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *DeleteAppParams, reqEditors ...RequestEditorFn) (*DeleteAppBody, error) {
 	rsp, err := c.DeleteApp(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteAppResponse(rsp)
+	return ParseDeleteAppBody(rsp)
 }
 
-// GetAppWithResponse request returning *GetAppResponse
-func (c *ClientWithResponses) GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppResponse, error) {
+// GetAppWithResponse request returning *GetAppBody
+func (c *ClientWithResponses) GetAppWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppParams, reqEditors ...RequestEditorFn) (*GetAppBody, error) {
 	rsp, err := c.GetApp(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetAppResponse(rsp)
+	return ParseGetAppBody(rsp)
 }
 
-// ListAppComponentsWithResponse request returning *ListAppComponentsResponse
-func (c *ClientWithResponses) ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsResponse, error) {
+// ListAppComponentsWithResponse request returning *ListAppComponentsBody
+func (c *ClientWithResponses) ListAppComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *ListAppComponentsParams, reqEditors ...RequestEditorFn) (*ListAppComponentsBody, error) {
 	rsp, err := c.ListAppComponents(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListAppComponentsResponse(rsp)
+	return ParseListAppComponentsBody(rsp)
 }
 
-// UpdateComponentsWithBodyWithResponse request with arbitrary body returning *UpdateComponentsResponse
-func (c *ClientWithResponses) UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error) {
+// UpdateComponentsWithBodyWithResponse request with arbitrary body returning *UpdateComponentsBody
+func (c *ClientWithResponses) UpdateComponentsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateComponentsBody, error) {
 	rsp, err := c.UpdateComponentsWithBody(ctx, appId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateComponentsResponse(rsp)
+	return ParseUpdateComponentsBody(rsp)
 }
 
-func (c *ClientWithResponses) UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsResponse, error) {
+func (c *ClientWithResponses) UpdateComponentsWithResponse(ctx context.Context, appId openapi_types.UUID, params *UpdateComponentsParams, body UpdateComponentsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateComponentsBody, error) {
 	rsp, err := c.UpdateComponents(ctx, appId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateComponentsResponse(rsp)
+	return ParseUpdateComponentsBody(rsp)
 }
 
-// CreateDeploymentWithBodyWithResponse request with arbitrary body returning *CreateDeploymentResponse
-func (c *ClientWithResponses) CreateDeploymentWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error) {
-	rsp, err := c.CreateDeploymentWithBody(ctx, appId, params, contentType, body, reqEditors...)
+// CreateDeployCredentialsWithBodyWithResponse request with arbitrary body returning *CreateDeployCredentialsBody
+func (c *ClientWithResponses) CreateDeployCredentialsWithBodyWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsBody, error) {
+	rsp, err := c.CreateDeployCredentialsWithBody(ctx, appId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateDeploymentResponse(rsp)
+	return ParseCreateDeployCredentialsBody(rsp)
 }
 
-func (c *ClientWithResponses) CreateDeploymentWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeploymentParams, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error) {
-	rsp, err := c.CreateDeployment(ctx, appId, params, body, reqEditors...)
+func (c *ClientWithResponses) CreateDeployCredentialsWithResponse(ctx context.Context, appId openapi_types.UUID, params *CreateDeployCredentialsParams, body CreateDeployCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployCredentialsBody, error) {
+	rsp, err := c.CreateDeployCredentials(ctx, appId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateDeploymentResponse(rsp)
+	return ParseCreateDeployCredentialsBody(rsp)
 }
 
-// GetAppLogsWithResponse request returning *GetAppLogsResponse
-func (c *ClientWithResponses) GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsResponse, error) {
+// GetAppLogsWithResponse request returning *GetAppLogsBody
+func (c *ClientWithResponses) GetAppLogsWithResponse(ctx context.Context, appId openapi_types.UUID, params *GetAppLogsParams, reqEditors ...RequestEditorFn) (*GetAppLogsBody, error) {
 	rsp, err := c.GetAppLogs(ctx, appId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetAppLogsResponse(rsp)
+	return ParseGetAppLogsBody(rsp)
 }
 
-// CreateEcrTokenWithBodyWithResponse request with arbitrary body returning *CreateEcrTokenResponse
-func (c *ClientWithResponses) CreateEcrTokenWithBodyWithResponse(ctx context.Context, params *CreateEcrTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEcrTokenResponse, error) {
-	rsp, err := c.CreateEcrTokenWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateEcrTokenResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateEcrTokenWithResponse(ctx context.Context, params *CreateEcrTokenParams, body CreateEcrTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEcrTokenResponse, error) {
-	rsp, err := c.CreateEcrToken(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateEcrTokenResponse(rsp)
-}
-
-// GetUserOrgsWithResponse request returning *GetUserOrgsResponse
-func (c *ClientWithResponses) GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsResponse, error) {
+// GetUserOrgsWithResponse request returning *GetUserOrgsBody
+func (c *ClientWithResponses) GetUserOrgsWithResponse(ctx context.Context, params *GetUserOrgsParams, reqEditors ...RequestEditorFn) (*GetUserOrgsBody, error) {
 	rsp, err := c.GetUserOrgs(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetUserOrgsResponse(rsp)
+	return ParseGetUserOrgsBody(rsp)
 }
 
-// ParseListAppsResponse parses an HTTP response from a ListAppsWithResponse call
-func ParseListAppsResponse(rsp *http.Response) (*ListAppsResponse, error) {
+// ParseListAppsBody parses an HTTP response from a ListAppsWithResponse call
+func ParseListAppsBody(rsp *http.Response) (*ListAppsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListAppsResponse{
+	response := &ListAppsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1870,15 +1632,15 @@ func ParseListAppsResponse(rsp *http.Response) (*ListAppsResponse, error) {
 	return response, nil
 }
 
-// ParseCreateAppResponse parses an HTTP response from a CreateAppWithResponse call
-func ParseCreateAppResponse(rsp *http.Response) (*CreateAppResponse, error) {
+// ParseCreateAppBody parses an HTTP response from a CreateAppWithResponse call
+func ParseCreateAppBody(rsp *http.Response) (*CreateAppBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateAppResponse{
+	response := &CreateAppBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1924,15 +1686,15 @@ func ParseCreateAppResponse(rsp *http.Response) (*CreateAppResponse, error) {
 	return response, nil
 }
 
-// ParseDeleteAppResponse parses an HTTP response from a DeleteAppWithResponse call
-func ParseDeleteAppResponse(rsp *http.Response) (*DeleteAppResponse, error) {
+// ParseDeleteAppBody parses an HTTP response from a DeleteAppWithResponse call
+func ParseDeleteAppBody(rsp *http.Response) (*DeleteAppBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteAppResponse{
+	response := &DeleteAppBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1971,15 +1733,15 @@ func ParseDeleteAppResponse(rsp *http.Response) (*DeleteAppResponse, error) {
 	return response, nil
 }
 
-// ParseGetAppResponse parses an HTTP response from a GetAppWithResponse call
-func ParseGetAppResponse(rsp *http.Response) (*GetAppResponse, error) {
+// ParseGetAppBody parses an HTTP response from a GetAppWithResponse call
+func ParseGetAppBody(rsp *http.Response) (*GetAppBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAppResponse{
+	response := &GetAppBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2018,15 +1780,15 @@ func ParseGetAppResponse(rsp *http.Response) (*GetAppResponse, error) {
 	return response, nil
 }
 
-// ParseListAppComponentsResponse parses an HTTP response from a ListAppComponentsWithResponse call
-func ParseListAppComponentsResponse(rsp *http.Response) (*ListAppComponentsResponse, error) {
+// ParseListAppComponentsBody parses an HTTP response from a ListAppComponentsWithResponse call
+func ParseListAppComponentsBody(rsp *http.Response) (*ListAppComponentsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListAppComponentsResponse{
+	response := &ListAppComponentsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2065,15 +1827,15 @@ func ParseListAppComponentsResponse(rsp *http.Response) (*ListAppComponentsRespo
 	return response, nil
 }
 
-// ParseUpdateComponentsResponse parses an HTTP response from a UpdateComponentsWithResponse call
-func ParseUpdateComponentsResponse(rsp *http.Response) (*UpdateComponentsResponse, error) {
+// ParseUpdateComponentsBody parses an HTTP response from a UpdateComponentsWithResponse call
+func ParseUpdateComponentsBody(rsp *http.Response) (*UpdateComponentsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpdateComponentsResponse{
+	response := &UpdateComponentsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2119,33 +1881,26 @@ func ParseUpdateComponentsResponse(rsp *http.Response) (*UpdateComponentsRespons
 	return response, nil
 }
 
-// ParseCreateDeploymentResponse parses an HTTP response from a CreateDeploymentWithResponse call
-func ParseCreateDeploymentResponse(rsp *http.Response) (*CreateDeploymentResponse, error) {
+// ParseCreateDeployCredentialsBody parses an HTTP response from a CreateDeployCredentialsWithResponse call
+func ParseCreateDeployCredentialsBody(rsp *http.Response) (*CreateDeployCredentialsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateDeploymentResponse{
+	response := &CreateDeployCredentialsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
-		var dest CreateDeploymentResponseBody
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateDeployCredentialsResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON202 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
@@ -2153,6 +1908,20 @@ func ParseCreateDeploymentResponse(rsp *http.Response) (*CreateDeploymentRespons
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
@@ -2166,15 +1935,15 @@ func ParseCreateDeploymentResponse(rsp *http.Response) (*CreateDeploymentRespons
 	return response, nil
 }
 
-// ParseGetAppLogsResponse parses an HTTP response from a GetAppLogsWithResponse call
-func ParseGetAppLogsResponse(rsp *http.Response) (*GetAppLogsResponse, error) {
+// ParseGetAppLogsBody parses an HTTP response from a GetAppLogsWithResponse call
+func ParseGetAppLogsBody(rsp *http.Response) (*GetAppLogsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAppLogsResponse{
+	response := &GetAppLogsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2227,55 +1996,15 @@ func ParseGetAppLogsResponse(rsp *http.Response) (*GetAppLogsResponse, error) {
 	return response, nil
 }
 
-// ParseCreateEcrTokenResponse parses an HTTP response from a CreateEcrTokenWithResponse call
-func ParseCreateEcrTokenResponse(rsp *http.Response) (*CreateEcrTokenResponse, error) {
+// ParseGetUserOrgsBody parses an HTTP response from a GetUserOrgsWithResponse call
+func ParseGetUserOrgsBody(rsp *http.Response) (*GetUserOrgsBody, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateEcrTokenResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest CreateEcrTokenResponseBody
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetUserOrgsResponse parses an HTTP response from a GetUserOrgsWithResponse call
-func ParseGetUserOrgsResponse(rsp *http.Response) (*GetUserOrgsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetUserOrgsResponse{
+	response := &GetUserOrgsBody{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2305,146 +2034,4 @@ func ParseGetUserOrgsResponse(rsp *http.Response) (*GetUserOrgsResponse, error) 
 	}
 
 	return response, nil
-}
-
-// Base64 encoded, gzipped, json marshaled Swagger object
-var swaggerSpec = []string{
-
-	"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",
-	"0GZxs/h3AAAA//8CzHBEpmUAAA==",
-}
-
-// GetSwagger returns the content of the embedded swagger specification file
-// or error if failed to decode
-func decodeSpec() ([]byte, error) {
-	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
-	if err != nil {
-		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
-	}
-	zr, err := gzip.NewReader(bytes.NewReader(zipped))
-	if err != nil {
-		return nil, fmt.Errorf("error decompressing spec: %w", err)
-	}
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(zr)
-	if err != nil {
-		return nil, fmt.Errorf("error decompressing spec: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-var rawSpec = decodeSpecCached()
-
-// a naive cached of a decoded swagger spec
-func decodeSpecCached() func() ([]byte, error) {
-	data, err := decodeSpec()
-	return func() ([]byte, error) {
-		return data, err
-	}
-}
-
-// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
-func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
-	res := make(map[string]func() ([]byte, error))
-	if len(pathToFile) > 0 {
-		res[pathToFile] = rawSpec
-	}
-
-	return res
-}
-
-// GetSwagger returns the Swagger specification corresponding to the generated code
-// in this file. The external references of Swagger specification are resolved.
-// The logic of resolving external references is tightly connected to "import-mapping" feature.
-// Externally referenced files must be embedded in the corresponding golang packages.
-// Urls can be supported but this task was out of the scope.
-func GetSwagger() (swagger *openapi3.T, err error) {
-	resolvePath := PathToRawSpec("")
-
-	loader := openapi3.NewLoader()
-	loader.IsExternalRefsAllowed = true
-	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
-		pathToFile := url.String()
-		pathToFile = path.Clean(pathToFile)
-		getSpec, ok := resolvePath[pathToFile]
-		if !ok {
-			err1 := fmt.Errorf("path not found: %s", pathToFile)
-			return nil, err1
-		}
-		return getSpec()
-	}
-	var specData []byte
-	specData, err = rawSpec()
-	if err != nil {
-		return
-	}
-	swagger, err = loader.LoadFromData(specData)
-	if err != nil {
-		return
-	}
-	return
 }

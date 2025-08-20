@@ -20,6 +20,7 @@ help:
 	@echo "    test-components   - Test WebAssembly components"
 	@echo ""
 	@echo "  Development Commands:"
+	@echo "    generate-api  - Generate API client from OpenAPI spec"
 	@echo "    fmt           - Format all code (Go + Rust)"
 	@echo "    lint          - Lint all code (Go + Rust)"
 	@echo "    coverage      - Generate test coverage reports"
@@ -27,6 +28,12 @@ help:
 	@echo "  Quick Commands:"
 	@echo "    dev           - Quick development build and test"
 	@echo "    all           - Build everything (CLI + components)"
+
+# Generate API client from OpenAPI spec
+generate-api:
+	@echo "🔄 Generating API client from OpenAPI spec..."
+	@oapi-codegen -package api -generate types,client -o internal/api/client.gen.go internal/api/openapi.json
+	@echo "✅ API client generated: internal/api/client.gen.go"
 
 # Build FTL CLI (Go)
 build:

@@ -210,105 +210,6 @@
         }
       }
     },
-    "/v1/apps/{appId}/deployments": {
-      "post": {
-        "operationId": "createDeployment",
-        "summary": "Deploy an FTL application",
-        "description": "Deploys an FTL application using the raw FTL configuration format. The entire request body should be the FTL application configuration as defined by the FTL CLI/SDK. This operation is asynchronous and returns immediately while the deployment runs in the background.",
-        "tags": ["Apps"],
-        "parameters": [
-          {
-            "in": "header",
-            "name": "Authorization",
-            "schema": {
-              "description": "Bearer token for authentication",
-              "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "description": "Bearer token for authentication"
-          },
-          {
-            "in": "path",
-            "name": "appId",
-            "schema": {
-              "description": "Application ID (UUID)",
-              "example": "123e4567-e89b-12d3-a456-426614174000",
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
-            },
-            "required": true,
-            "description": "Application ID (UUID)"
-          },
-          {
-            "in": "query",
-            "name": "environment",
-            "schema": {
-              "description": "Deployment environment (defaults to production)",
-              "default": "production",
-              "type": "string",
-              "enum": ["development", "staging", "production"]
-            },
-            "required": false,
-            "description": "Deployment environment (defaults to production)"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDeploymentRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Deployment accepted and initiated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateDeploymentResponseBody"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request - validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid authorization",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/apps/{appId}": {
       "get": {
         "operationId": "getApp",
@@ -459,12 +360,12 @@
         }
       }
     },
-    "/v1/registry/tokens": {
+    "/v1/apps/{appId}/deploy-credentials": {
       "post": {
-        "operationId": "createEcrToken",
-        "summary": "Create ECR authorization token",
-        "description": "Creates a temporary ECR authorization token for pushing container images to ECR repositories under the specified app namespace",
-        "tags": ["Registry"],
+        "operationId": "createDeployCredentials",
+        "summary": "Create deployment credentials",
+        "description": "Creates temporary credentials for deployment. Returns ECR registry credentials for pushing components and STS credentials for invoking the deployment function URL. The actual deployment is performed via the function URL returned in the response, not through this API.",
+        "tags": ["Apps"],
         "parameters": [
           {
             "in": "header",
@@ -476,6 +377,19 @@
             },
             "required": true,
             "description": "Bearer token for authentication"
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "schema": {
+              "description": "Application ID (UUID)",
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+            },
+            "required": true,
+            "description": "Application ID (UUID)"
           }
         ],
         "requestBody": {
@@ -483,24 +397,44 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateEcrTokenRequest"
+                "$ref": "#/components/schemas/CreateDeployCredentialsRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "ECR token created successfully",
+            "description": "Deployment credentials created successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateEcrTokenResponseBody"
+                  "$ref": "#/components/schemas/CreateDeployCredentialsResponse"
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - app not owned by user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -888,125 +822,26 @@
         },
         "required": ["appName"]
       },
-      "CreateDeploymentRequest": {
-        "description": "FTL application configuration - the entire request body is the raw FTL config as defined by the FTL CLI/SDK",
-        "type": "object",
-        "properties": {
-          "application": {
-            "description": "Application metadata",
-            "type": "object",
-            "properties": {
-              "name": {
-                "description": "Application name",
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 50
-              },
-              "version": {
-                "description": "Application version",
-                "type": "string"
-              },
-              "description": {
-                "description": "Application description",
-                "type": "string"
-              }
-            },
-            "required": ["name"]
-          },
-          "components": {
-            "description": "Application components",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "description": "Component ID",
-                  "type": "string"
-                },
-                "source": {
-                  "description": "Registry reference to pushed component (components must be pushed to ECR first)",
-                  "type": "object",
-                  "properties": {
-                    "registry": {
-                      "description": "ECR registry endpoint (e.g., 795394005211.dkr.ecr.us-west-2.amazonaws.com)",
-                      "type": "string"
-                    },
-                    "package": {
-                      "description": "Package path (e.g., app123abc/graph)",
-                      "type": "string"
-                    },
-                    "version": {
-                      "description": "Component version (e.g., 0.1.0)",
-                      "type": "string"
-                    }
-                  },
-                  "required": ["registry", "package", "version"]
-                },
-                "variables": {
-                  "description": "Component-specific variables",
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": ["id", "source"]
-            }
-          },
-          "access": {
-            "description": "Access control mode",
-            "type": "string",
-            "enum": ["public", "private", "org", "custom"]
-          },
-          "auth": {
-            "description": "Authentication configuration",
-            "type": "object",
-            "properties": {
-              "provider": {
-                "type": "string",
-                "enum": ["workos", "custom"]
-              },
-              "org_id": {
-                "type": "string"
-              },
-              "jwt_issuer": {
-                "type": "string"
-              },
-              "jwt_audience": {
-                "type": "string"
-              }
-            }
-          },
-          "variables": {
-            "description": "Application variables",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        },
-        "required": ["application", "components"]
-      },
-      "CreateEcrTokenRequest": {
-        "description": "Request body for creating ECR token",
+      "CreateDeployCredentialsRequest": {
+        "description": "Request body for creating deployment credentials",
         "type": "object",
         "properties": {
           "appId": {
-            "description": "Application ID to create ECR token for",
+            "description": "Application ID to create deployment credentials for",
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
           },
           "components": {
             "description": "Component names to create/ensure repositories for",
-            "minItems": 1,
+            "default": [],
             "type": "array",
             "items": {
               "type": "string"
             }
           }
         },
-        "required": ["appId", "components"]
+        "required": ["appId"]
       },
       "UpdateComponentsRequest": {
         "description": "Request body for updating components",
@@ -1178,26 +1013,6 @@
         "required": ["appId", "appName", "status", "createdAt", "updatedAt"],
         "additionalProperties": false
       },
-      "CreateDeploymentResponseBody": {
-        "description": "Response for successful deployment creation",
-        "type": "object",
-        "properties": {
-          "deploymentId": {
-            "description": "Unique deployment identifier",
-            "type": "string"
-          },
-          "url": {
-            "description": "Deployed application URL",
-            "type": "string"
-          },
-          "status": {
-            "description": "Deployment status",
-            "type": "string"
-          }
-        },
-        "required": ["deploymentId", "url", "status"],
-        "additionalProperties": false
-      },
       "App": {
         "description": "Application object",
         "type": "object",
@@ -1299,41 +1114,90 @@
         "required": ["message"],
         "additionalProperties": false
       },
-      "CreateEcrTokenResponseBody": {
-        "description": "ECR token response with app-scoped credentials",
+      "CreateDeployCredentialsResponse": {
+        "description": "Deployment credentials response with registry and deployment access",
         "type": "object",
         "properties": {
-          "registryUri": {
-            "description": "ECR registry URI without https://",
-            "type": "string"
+          "registry": {
+            "type": "object",
+            "properties": {
+              "registryUri": {
+                "description": "ECR registry URI",
+                "type": "string"
+              },
+              "authorizationToken": {
+                "description": "ECR authorization token",
+                "type": "string"
+              },
+              "proxyEndpoint": {
+                "description": "ECR proxy endpoint",
+                "type": "string"
+              },
+              "expiresAt": {
+                "description": "ECR token expiration time",
+                "type": "string"
+              },
+              "region": {
+                "description": "AWS region",
+                "type": "string"
+              },
+              "packageNamespace": {
+                "description": "ECR namespace for components",
+                "type": "string"
+              }
+            },
+            "required": [
+              "registryUri",
+              "authorizationToken",
+              "proxyEndpoint",
+              "expiresAt",
+              "region",
+              "packageNamespace"
+            ],
+            "additionalProperties": false
           },
-          "authorizationToken": {
-            "description": "Base64 encoded username:password for Docker login",
-            "type": "string"
-          },
-          "proxyEndpoint": {
-            "description": "Full ECR endpoint URL",
-            "type": "string",
-            "format": "uri"
-          },
-          "expiresAt": {
-            "description": "Token expiration time in ISO 8601 format",
-            "type": "string"
-          },
-          "region": {
-            "description": "AWS region",
-            "type": "string"
-          },
-          "packageNamespace": {
-            "description": "Sanitized namespace for spin deps publish commands",
-            "type": "string"
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "functionUrl": {
+                "description": "Lambda function URL for deployment",
+                "type": "string"
+              },
+              "credentials": {
+                "type": "object",
+                "properties": {
+                  "accessKeyId": {
+                    "description": "AWS access key ID",
+                    "type": "string"
+                  },
+                  "secretAccessKey": {
+                    "description": "AWS secret access key",
+                    "type": "string"
+                  },
+                  "sessionToken": {
+                    "description": "AWS session token",
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "description": "Credentials expiration time",
+                    "type": "string"
+                  }
+                },
+                "required": ["accessKeyId", "secretAccessKey", "sessionToken", "expiresAt"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["functionUrl", "credentials"],
+            "additionalProperties": false
           },
           "appId": {
-            "description": "Original app UUID for reference",
-            "type": "string"
+            "description": "Application ID",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
           }
         },
-        "required": ["registryUri", "authorizationToken", "proxyEndpoint", "expiresAt", "region"],
+        "required": ["registry", "deployment", "appId"],
         "additionalProperties": false
       },
       "GetUserOrgsResponseBody": {

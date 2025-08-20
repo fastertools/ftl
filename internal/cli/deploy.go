@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +16,7 @@ import (
 
 	"github.com/fastertools/ftl-cli/internal/api"
 	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl-cli/internal/deploy"
 	"github.com/fastertools/ftl-cli/pkg/oci"
 	"github.com/fastertools/ftl-cli/pkg/validation"
 )
@@ -212,29 +210,26 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 		Success("App created with ID: %s", appID)
 	}
 
-	// Get ECR credentials
-	Info("Getting registry credentials...")
-	// Extract component names to pass to ECR token creation
+	// Get deployment credentials (ECR + Lambda)
+	Info("Getting deployment credentials...")
+	// Extract component names to pass to credentials creation
 	componentNames := make([]string, 0, len(manifest.Components))
 	for _, comp := range manifest.Components {
 		componentNames = append(componentNames, comp.ID)
 	}
-	ecrToken, err := apiClient.CreateECRToken(ctx, appID, componentNames)
+	creds, err := apiClient.CreateDeployCredentials(ctx, appID, componentNames)
 	if err != nil {
-		return fmt.Errorf("failed to get ECR token: %w", err)
+		return fmt.Errorf("failed to get deployment credentials: %w", err)
 	}
 
 	// Parse ECR credentials
-	ecrAuth, err := oci.ParseECRToken(ecrToken.RegistryUri, ecrToken.AuthorizationToken)
+	ecrAuth, err := oci.ParseECRToken(creds.Registry.RegistryUri, creds.Registry.AuthorizationToken)
 	if err != nil {
-		return fmt.Errorf("failed to parse ECR token: %w", err)
+		return fmt.Errorf("failed to parse ECR credentials: %w", err)
 	}
 
 	// Process components: pull registry components and push everything to ECR
-	if ecrToken.PackageNamespace == nil || *ecrToken.PackageNamespace == "" {
-		return fmt.Errorf("ECR token response missing required packageNamespace field")
-	}
-	namespace := *ecrToken.PackageNamespace
+	namespace := creds.Registry.PackageNamespace
 
 	Info("Processing components...")
 	processedManifest, err := processComponents(ctx, manifest, ecrAuth, namespace)
@@ -245,34 +240,50 @@ func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	fmt.Println()
 
 	// Create deployment request with the processed manifest
-	Info("Creating deployment...")
+	Info("Deploying application...")
 
 	// Create flat deployment request
 	deploymentReq := createDeploymentRequest(processedManifest, opts)
-
-	// Send deployment request directly (not using generated client to avoid nested structure)
-	deployment, err := sendDeploymentRequest(ctx, apiClient, appID, deploymentReq, opts.Environment)
+	deploymentJSON, err := json.Marshal(deploymentReq)
 	if err != nil {
-		return fmt.Errorf("failed to create deployment: %w", err)
+		return fmt.Errorf("failed to marshal deployment request: %w", err)
 	}
 
-	// Poll for deployment status
+	// Create streaming deployer
+	deployer := deploy.NewStreamingDeployer()
+
+	// Deploy with streaming progress
 	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	sp.Suffix = " Waiting for deployment to start..."
+	sp.Suffix = " Starting deployment..."
 	sp.Start()
 
-	deployed, err := waitForDeployment(ctx, apiClient, appID, deployment.DeploymentId, sp)
+	var deploymentURL string
+
+	err = deployer.Deploy(ctx, deploymentJSON, creds, opts.Environment, func(event deploy.StreamEvent) {
+		switch event.Type {
+		case "progress":
+			sp.Suffix = fmt.Sprintf(" %s", event.Message)
+		case "complete":
+			deploymentURL = event.URL
+			sp.Stop()
+			Success("Deployment completed successfully!")
+			if event.DeploymentID != "" {
+				Info("Deployment ID: %s", event.DeploymentID)
+			}
+		case "error":
+			sp.Stop()
+			Error("Deployment failed: %s", event.Message)
+		}
+	})
+
 	if err != nil {
 		sp.Stop()
 		return fmt.Errorf("deployment failed: %w", err)
 	}
 
-	sp.Stop()
-	Success("Deployment completed successfully!")
-
-	if deployed.ProviderUrl != nil && *deployed.ProviderUrl != "" {
+	if deploymentURL != "" {
 		// Display MCP URLs for the deployed application
-		displayMCPUrls(*deployed.ProviderUrl, processedManifest.Components)
+		displayMCPUrls(deploymentURL, processedManifest.Components)
 	}
 
 	return nil
@@ -503,137 +514,8 @@ func createDeploymentRequest(manifest *validation.Application, opts *DeployOptio
 	return req
 }
 
-// sendDeploymentRequest sends the flat deployment request directly via HTTP
-func sendDeploymentRequest(ctx context.Context, apiClient *api.FTLClient, appID string, deployRequest map[string]interface{}, environment string) (*api.CreateDeploymentResponseBody, error) {
-	// Marshal the flat request
-	body, err := json.Marshal(deployRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal deployment request: %w", err)
-	}
-
-	// Build the URL
-	baseURL := apiClient.GetBaseURL()
-	url := fmt.Sprintf("%s/v1/apps/%s/deployments", baseURL, appID)
-	if environment != "" && environment != "production" {
-		url += fmt.Sprintf("?environment=%s", environment)
-	}
-
-	// Get auth token
-	token, err := apiClient.GetAuthToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get auth token: %w", err)
-	}
-
-	// Create the request
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	// Send the request
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// Check for errors
-	if resp.StatusCode != http.StatusAccepted {
-		var errResp map[string]interface{}
-		if err := json.Unmarshal(respBody, &errResp); err == nil {
-			if errMsg, ok := errResp["error"].(string); ok {
-				return nil, fmt.Errorf("%s", errMsg)
-			}
-			if errMsg, ok := errResp["message"].(string); ok {
-				return nil, fmt.Errorf("%s", errMsg)
-			}
-		}
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	// Parse the success response
-	var result api.CreateDeploymentResponseBody
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	return &result, nil
-}
-
-func waitForDeployment(ctx context.Context, client *api.FTLClient, appID string, deploymentID string, sp *spinner.Spinner) (*api.App, error) {
-	maxAttempts := 36 // 3 minutes with 5-second intervals
-
-	for i := 0; i < maxAttempts; i++ {
-		app, err := client.GetApp(ctx, appID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get app status: %w", err)
-		}
-
-		// Check the latest deployment status if available
-		if app.LatestDeployment != nil {
-			// Check if this is our deployment
-			if app.LatestDeployment.DeploymentId == deploymentID {
-				switch app.LatestDeployment.Status {
-				case api.AppLatestDeploymentStatusDeployed:
-					// Deployment succeeded
-					return app, nil
-				case api.AppLatestDeploymentStatusFailed:
-					// Deployment failed
-					errMsg := "deployment failed"
-					if app.LatestDeployment.StatusMessage != nil && *app.LatestDeployment.StatusMessage != "" {
-						errMsg = *app.LatestDeployment.StatusMessage
-					}
-					return nil, fmt.Errorf("%s", errMsg)
-				case api.AppLatestDeploymentStatusPending, api.AppLatestDeploymentStatusDeploying:
-					// Still in progress
-					sp.Suffix = fmt.Sprintf(" Deployment in progress... (%s)", app.LatestDeployment.Status)
-				default:
-					// Unknown status, continue polling
-					sp.Suffix = fmt.Sprintf(" Deployment in progress... (%s)", app.LatestDeployment.Status)
-				}
-			} else {
-				// This is a different deployment, might be a race condition
-				// Continue polling to see if our deployment shows up
-				sp.Suffix = fmt.Sprintf(" Waiting for deployment to start... (%s, %s, %s)", app.LatestDeployment.DeploymentId, deploymentID, app.LatestDeployment.Status)
-			}
-		} else {
-			// No deployment info yet, check app status as fallback
-			switch app.Status {
-			case api.AppStatusACTIVE:
-				// App is active but no deployment info, consider it success
-				return app, nil
-			case api.AppStatusFAILED:
-				errMsg := "app failed"
-				if app.ProviderError != nil {
-					errMsg = *app.ProviderError
-				}
-				return nil, fmt.Errorf("%s", errMsg)
-			case api.AppStatusDELETED, api.AppStatusDELETING:
-				return nil, fmt.Errorf("app was deleted during deployment")
-			default:
-				// Still pending or creating
-				sp.Suffix = fmt.Sprintf(" Waiting for deployment... (app: %s)", app.Status)
-			}
-		}
-
-		time.Sleep(5 * time.Second)
-	}
-
-	return nil, fmt.Errorf("deployment timeout after 3 minutes")
-}
+// Note: Deployment is now done via streaming Lambda Function URLs
+// The old polling-based deployment has been replaced with real-time streaming
 
 func displayDryRunSummary(manifest *validation.Application, appExists bool) {
 	fmt.Println()
