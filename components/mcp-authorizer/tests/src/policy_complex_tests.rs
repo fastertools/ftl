@@ -3,7 +3,6 @@
 use spin_test_sdk::{spin_test, bindings::wasi::http};
 use crate::test_setup::setup_default_test_config;
 use crate::policy_test_helpers::*;
-use crate::test_token_utils::{TokenBuilder, KeyPairType};
 
 #[spin_test]
 fn test_role_based_authorization() {
@@ -55,25 +54,26 @@ allow if {
     has_role(user_roles, "user")
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Superuser has all permissions
     let superuser_token = create_policy_test_token("super", vec!["superuser"], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/admin-dashboard")
-        .header("authorization", format!("Bearer {}", superuser_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", superuser_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/admin-dashboard")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Superuser should access admin dashboard");
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/user-profile")
-        .header("authorization", format!("Bearer {}", superuser_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", superuser_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-profile")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Superuser inherits user role");
@@ -81,11 +81,11 @@ allow if {
     // Regular user cannot access admin
     let user_token = create_policy_test_token("user", vec!["user"], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/admin-dashboard")
-        .header("authorization", format!("Bearer {}", user_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/admin-dashboard")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "User cannot access admin dashboard");
@@ -125,49 +125,40 @@ allow if {
     required_scope in user_scopes
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let mut builder = TokenBuilder::new(KeyPairType::default());
-    builder.with_subject("reader");
-    builder.with_audience("test-audience");
-    builder.with_issuer("https://test.authkit.app");
-    builder.with_scope("users:read");
-    let read_token = builder.build().unwrap();
+    let read_token = create_policy_test_token("reader", vec![], vec![("scopes", serde_json::json!(["users:read"]))]);
     
     // Can GET user-service
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/user-service")
-        .header("authorization", format!("Bearer {}", read_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", read_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow GET with read scope");
     
     // Cannot POST to user-service
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/user-service")
-        .header("authorization", format!("Bearer {}", read_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", read_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny POST without write scope");
     
     // Admin scope grants everything
-    let mut builder = TokenBuilder::new(KeyPairType::default());
-    builder.with_subject("admin");
-    builder.with_audience("test-audience");
-    builder.with_issuer("https://test.authkit.app");
-    builder.with_scope("admin");
-    let admin_token = builder.build().unwrap();
+    let admin_token = create_policy_test_token("admin", vec![], vec![("scopes", serde_json::json!(["admin"]))]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Delete)
-        .uri("/mcp/x/user-service")
-        .header("authorization", format!("Bearer {}", admin_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Delete).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Admin scope allows DELETE");
@@ -208,6 +199,7 @@ allow if {
     input.token.claims.access_hours.end >= 14
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User from engineering at acme-corp
@@ -220,11 +212,11 @@ allow if {
         ]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/internal-tools")
-        .header("authorization", format!("Bearer {}", eng_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", eng_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/internal-tools")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Engineering at acme-corp should have access");
@@ -236,11 +228,11 @@ allow if {
         vec![("clearance_level", serde_json::json!(4))]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/classified-data")
-        .header("authorization", format!("Bearer {}", cleared_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", cleared_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/classified-data")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "High clearance should access classified data");
@@ -252,11 +244,11 @@ allow if {
         vec![("feature_flags", serde_json::json!({"beta_access": true, "alpha_access": false}))]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/beta-features")
-        .header("authorization", format!("Bearer {}", beta_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", beta_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/beta-features")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Beta access flag should grant access");
@@ -304,41 +296,35 @@ allow if {
     input.request.component in ["public-api", "user-profile"]
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Service account test
-    let mut builder = TokenBuilder::new(KeyPairType::default());
-    builder.with_subject("service-account-1");
-    builder.with_audience("test-audience");
-    builder.with_issuer("https://test.authkit.app");
-    builder.with_scope("service:internal");
-    builder.with_claim("account_type", serde_json::json!("service"));
-    let service_token = builder.build().unwrap();
+    let service_token = create_policy_test_token("service-account-1", vec![], vec![
+        ("scopes", serde_json::json!(["service:internal"])),
+        ("account_type", serde_json::json!("service"))
+    ]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/internal-api")
-        .header("authorization", format!("Bearer {}", service_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", service_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/internal-api")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Service account should access internal API");
     
     // Payment processor with MFA
-    let mut builder = TokenBuilder::new(KeyPairType::default());
-    builder.with_subject("payment-user");
-    builder.with_audience("test-audience");
-    builder.with_issuer("https://test.authkit.app");
-    builder.with_scope("payments:process");
-    builder.with_claim("roles", serde_json::json!(["payments"]));
-    builder.with_claim("mfa_verified", serde_json::json!(true));
-    let payment_token = builder.build().unwrap();
+    let payment_token = create_policy_test_token("payment-user", vec!["payments"], vec![
+        ("scopes", serde_json::json!(["payments:process"])),
+        ("mfa_verified", serde_json::json!(true))
+    ]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/payment-processor")
-        .header("authorization", format!("Bearer {}", payment_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", payment_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/payment-processor")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Payment user with MFA should process payments");
@@ -350,11 +336,11 @@ allow if {
         vec![("tier", serde_json::json!("free"))]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/premium-features")
-        .header("authorization", format!("Bearer {}", free_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", free_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/premium-features")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Free tier cannot access premium features");
@@ -391,6 +377,7 @@ allow if {
     not deny
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Active subscription but suspended account
@@ -403,11 +390,11 @@ allow if {
         ]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/service")
-        .header("authorization", format!("Bearer {}", suspended_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", suspended_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/service")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Suspended account should be denied despite active subscription");
@@ -419,11 +406,11 @@ allow if {
         vec![("subscription_status", serde_json::json!("active"))]
     );
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/service")
-        .header("authorization", format!("Bearer {}", blacklisted_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", blacklisted_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/service")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Blacklisted user should be denied");

@@ -21,6 +21,8 @@ base64 = "0.22"
 chrono = "0.4"
 rsa = { version = "0.9", features = ["pem"] }
 rand = "0.8"
+rand_chacha = "0.3"
 
 # This test suite is part of the root workspace
 # Tests are run with: spin test
+once_cell = "1.19"

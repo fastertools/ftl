@@ -20,7 +20,9 @@ pub struct TestKeyPair {
 impl TestKeyPair {
     /// Generate a new RSA key pair for testing
     pub fn generate() -> Self {
-        let mut rng = rand::thread_rng();
+        // Use deterministic RNG for WASM compatibility
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let bits = 2048;
         let private_key =
             RsaPrivateKey::new(&mut rng, bits).expect("failed to generate private key");

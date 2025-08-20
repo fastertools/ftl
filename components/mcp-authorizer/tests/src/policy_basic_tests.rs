@@ -2,8 +2,7 @@
 
 use spin_test_sdk::{spin_test, bindings::wasi::http};
 use crate::test_setup::setup_default_test_config;
-use crate::policy_test_helpers::*;
-use crate::test_token_utils::TokenBuilder;
+use crate::policy_test_helpers::{setup_test_jwt_validation, *};
 
 #[spin_test]
 fn test_policy_allow_all() {
@@ -13,11 +12,11 @@ fn test_policy_allow_all() {
     // Create a token with minimal claims
     let token = create_policy_test_token("user123", vec![], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     
@@ -33,11 +32,11 @@ fn test_policy_deny_all() {
     // Create a token with admin role - shouldn't matter with deny-all
     let token = create_policy_test_token("admin", vec!["admin"], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     
@@ -58,22 +57,22 @@ fn test_policy_subject_check() {
     
     // Test allowed subject
     let alice_token = create_policy_test_token("alice", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", alice_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Alice should be allowed");
     
     // Test denied subject
     let charlie_token = create_policy_test_token("charlie", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", charlie_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Charlie should be denied");
@@ -87,11 +86,11 @@ fn test_policy_without_configuration() {
     
     let token = create_policy_test_token("anyone", vec![], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     
@@ -119,11 +118,11 @@ allow if {
     
     let token = create_policy_test_token("test", vec![], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     
@@ -146,15 +145,16 @@ import rego.v1
 
 # No default, no allow rule - will be undefined
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     

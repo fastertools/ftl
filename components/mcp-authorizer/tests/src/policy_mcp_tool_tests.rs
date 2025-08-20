@@ -19,6 +19,7 @@ allow if {
     input.mcp.method == "tools/list"
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
@@ -26,13 +27,14 @@ allow if {
     // Create JSON-RPC tools/list request
     let body = r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow tools/list");
@@ -60,13 +62,14 @@ fn test_mcp_tool_call_authorization() {
         }
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", user_token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow safe tool");
@@ -82,13 +85,14 @@ fn test_mcp_tool_call_authorization() {
         }
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", user_token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny dangerous tool without admin");
@@ -96,13 +100,14 @@ fn test_mcp_tool_call_authorization() {
     // Admin can use dangerous tools
     let admin_token = create_policy_test_token("admin", vec!["admin"], vec![]);
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", admin_token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Admin should access dangerous tool");
@@ -124,28 +129,30 @@ allow if {
     input.mcp
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
     
     // POST request with non-JSON content
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", token))
-        .header("content-type", "text/plain")
-        .body(b"plain text body")
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"text/plain").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(b"plain text body");
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny when MCP context not available");
     
     // GET request (no body)
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny GET request (no MCP context)");
@@ -182,17 +189,11 @@ allow if {
     scope in user_scopes
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // User with read scope
-    let mut builder = crate::test_token_utils::TokenBuilder::new(
-        crate::test_token_utils::KeyPairType::default()
-    );
-    builder.with_subject("reader");
-    builder.with_audience("test-audience");
-    builder.with_issuer("https://test.authkit.app");
-    builder.with_scope("user:read");
-    let reader_token = builder.build().unwrap();
+    let reader_token = create_policy_test_token("reader", vec![], vec![("scopes", serde_json::json!(["user:read"]))]);
     
     // Can read users
     let body = r#"{
@@ -202,13 +203,14 @@ allow if {
         "params":{"name":"read_users"}
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/user-service")
-        .header("authorization", format!("Bearer {}", reader_token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", reader_token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow read with read scope");
@@ -221,13 +223,14 @@ allow if {
         "params":{"name":"create_user"}
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/user-service")
-        .header("authorization", format!("Bearer {}", reader_token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", reader_token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/user-service")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny create without write scope");
@@ -254,6 +257,7 @@ allow if {
     input.mcp.method in ["tools/list", "prompts/list", "resources/list"]
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
@@ -261,13 +265,14 @@ allow if {
     // Invalid JSON body
     let body = r#"{"invalid json": }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, 
@@ -303,6 +308,7 @@ allow if {
     not deny
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
@@ -321,13 +327,14 @@ allow if {
         }
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/database")
-        .header("authorization", format!("Bearer {}", token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/database")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow SELECT operation");
@@ -346,13 +353,14 @@ allow if {
         }
     }"#;
     
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/database")
-        .header("authorization", format!("Bearer {}", token))
-        .header("content-type", "application/json")
-        .body(body.as_bytes())
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers.append("content-type", b"application/json").unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/database")).unwrap();
+    let body_stream = request.body().unwrap();
+    body_stream.write_bytes(body.as_bytes());
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny DROP operation");

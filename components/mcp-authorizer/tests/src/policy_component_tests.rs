@@ -2,7 +2,7 @@
 
 use spin_test_sdk::{spin_test, bindings::wasi::http};
 use crate::test_setup::setup_default_test_config;
-use crate::policy_test_helpers::*;
+use crate::policy_test_helpers::{setup_test_jwt_validation, *};
 
 #[spin_test]
 fn test_component_path_extraction() {
@@ -19,26 +19,27 @@ allow if {
     input.request.component == "data-processor"
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
     
     // Test allowed component path
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/data-processor")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/data-processor")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should allow data-processor component");
     
     // Test denied component path
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/other-component")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/other-component")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny other-component");
@@ -52,11 +53,11 @@ fn test_component_with_subpath() {
     let token = create_policy_test_token("user", vec![], vec![]);
     
     // Test component with subpath - should still extract component correctly
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Post)
-        .uri("/mcp/x/api-gateway/readonly")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Post).unwrap();
+    request.set_path_with_query(Some("/mcp/x/api-gateway/readonly")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Should extract component from path with subpath");
@@ -77,26 +78,27 @@ allow if {
     input.request.component != null
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     let token = create_policy_test_token("user", vec![], vec![]);
     
     // Test path without component (/mcp)
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny when no component in path");
     
     // Test root path
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/")
-        .header("authorization", format!("Bearer {}", token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Should deny root path (no component)");
@@ -125,37 +127,38 @@ allow if {
     input.request.component in components
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Alice can access frontend
     let alice_token = create_policy_test_token("alice", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/frontend")
-        .header("authorization", format!("Bearer {}", alice_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", alice_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/frontend")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Alice should access frontend");
     
     // Bob can access database
     let bob_token = create_policy_test_token("bob", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/database")
-        .header("authorization", format!("Bearer {}", bob_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", bob_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/database")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Bob should access database");
     
     // Charlie cannot access backend
     let charlie_token = create_policy_test_token("charlie", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/backend")
-        .header("authorization", format!("Bearer {}", charlie_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", charlie_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/backend")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "Charlie should not access backend");
@@ -191,37 +194,38 @@ allow if {
     role in user_roles
 }
 "#;
+    setup_test_jwt_validation();  // Ensure JWT validation is configured
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     
     // Admin accessing admin-panel
     let admin_token = create_policy_test_token("admin", vec!["admin"], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/admin-panel")
-        .header("authorization", format!("Bearer {}", admin_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", admin_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/admin-panel")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Admin should access admin-panel");
     
     // Regular user cannot access admin-panel
     let user_token = create_policy_test_token("user", vec!["user"], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/admin-panel")
-        .header("authorization", format!("Bearer {}", user_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", user_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/admin-panel")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 401, "User should not access admin-panel");
     
     // Anyone can access public-api
     let anon_token = create_policy_test_token("anonymous", vec![], vec![]);
-    let request = http::types::OutgoingRequest::new(http::types::Headers::new()); // Fix imports
-        .method(&http::types::Method::Get)
-        .uri("/mcp/x/public-api")
-        .header("authorization", format!("Bearer {}", anon_token))
-        .build();
+    let headers = http::types::Headers::new();
+    headers.append("authorization", format!("Bearer {}", anon_token).as_bytes()).unwrap();
+    let request = http::types::OutgoingRequest::new(headers);
+    request.set_method(&http::types::Method::Get).unwrap();
+    request.set_path_with_query(Some("/mcp/x/public-api")).unwrap();
     
     let response = spin_test_sdk::perform_request(request);
     assert_eq!(response.status(), 200, "Anyone should access public-api");
