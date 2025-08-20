@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -41,6 +44,32 @@ func NewStreamingDeployer() *StreamingDeployer {
 	}
 }
 
+// extractRegion extracts the AWS region from various AWS URLs
+func extractRegion(functionURL, registryURI string) string {
+	// Try Lambda function URL first (format: https://xxx.lambda-url.REGION.on.aws/)
+	if u, err := url.Parse(functionURL); err == nil {
+		parts := strings.Split(u.Host, ".")
+		for i, part := range parts {
+			if part == "lambda-url" && i+1 < len(parts) {
+				return parts[i+1]
+			}
+		}
+	}
+	
+	// Try ECR registry URI (format: 123456789.dkr.ecr.REGION.amazonaws.com)
+	if registryURI != "" {
+		parts := strings.Split(registryURI, ".")
+		for i, part := range parts {
+			if part == "ecr" && i+1 < len(parts) {
+				return parts[i+1]
+			}
+		}
+	}
+	
+	// Default to us-west-2 if we can't extract
+	return "us-west-2"
+}
+
 // Deploy performs a deployment using the streaming Lambda Function URL
 func (d *StreamingDeployer) Deploy(
 	ctx context.Context,
@@ -49,9 +78,12 @@ func (d *StreamingDeployer) Deploy(
 	environment string,
 	progressCallback func(event StreamEvent),
 ) error {
+	// Extract region from the URLs we have
+	region := extractRegion(creds.Deployment.FunctionUrl, creds.Registry.RegistryUri)
+	
 	// Create AWS config with temporary credentials
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(creds.Registry.Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
 				creds.Deployment.Credentials.AccessKeyId,
@@ -87,17 +119,21 @@ func (d *StreamingDeployer) Deploy(
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/x-ndjson")
 
+	// Calculate payload hash for signing
+	hash := sha256.Sum256(ftlConfig)
+	payloadHash := hex.EncodeToString(hash[:])
+
 	// Sign the request with AWS SigV4
 	signer := v4.NewSigner()
 
-	credsProvider := cfg.Credentials
-	awsCreds, err := credsProvider.Retrieve(ctx)
+	// Get credentials from the config
+	awsCreds, err := cfg.Credentials.Retrieve(ctx)
 	if err != nil {
 		return fmt.Errorf("retrieve AWS credentials: %w", err)
 	}
 
-	// Sign with unsigned payload (streaming)
-	err = signer.SignHTTP(ctx, awsCreds, req, "UNSIGNED-PAYLOAD", "lambda", creds.Registry.Region, time.Now())
+	// Sign the request
+	err = signer.SignHTTP(ctx, awsCreds, req, payloadHash, "lambda", region, time.Now())
 	if err != nil {
 		return fmt.Errorf("sign request: %w", err)
 	}
