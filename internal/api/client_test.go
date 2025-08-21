@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl/internal/auth"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"

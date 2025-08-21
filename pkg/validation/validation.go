@@ -11,7 +11,7 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"cuelang.org/go/encoding/yaml"
 
-	"github.com/fastertools/ftl-cli/pkg/synthesis"
+	"github.com/fastertools/ftl/pkg/synthesis"
 )
 
 // Validator provides CUE-based validation for FTL configurations

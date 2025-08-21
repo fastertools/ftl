@@ -17,7 +17,7 @@ Language-specific SDKs for building MCP (Model Context Protocol) tools.
 - **Features**: Zero dependencies (only spin-sdk), Python 3.10+ support, type hints
 
 ### [Go](./go)
-- **Package**: `github.com/fastertools/ftl-cli/sdk/go`
+- **Package**: `github.com/fastertools/ftl/sdk/go`
 - **Features**: TinyGo WASI support, zero external dependencies, idiomatic Go API
 
 ## Quick Start

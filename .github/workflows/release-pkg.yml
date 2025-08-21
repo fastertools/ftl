@@ -1,0 +1,166 @@
+# Release Go pkg module
+#
+# WORKFLOW PURPOSE:
+# This workflow releases the public Go libraries in the pkg/ directory
+# as a separate Go module that external projects can import.
+#
+# TAGGING STRATEGY:
+# Go modules with subdirectories require special tag format: pkg/v{version}
+# This allows go get github.com/fastertools/ftl/pkg@v1.0.0 to work correctly
+#
+name: Release Go pkg
+
+on:
+  push:
+    tags:
+      - 'pkg/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., pkg/v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify-tag:
+    name: Verify Tag Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify tag format and branch
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          fi
+          
+          # Verify tag format matches Go module convention
+          if ! echo "$TAG_NAME" | grep -qE '^pkg/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$'; then
+            echo "::error::Tag must be in format pkg/vX.Y.Z (got: $TAG_NAME)"
+            exit 1
+          fi
+          
+          # Check if tag exists on main branch
+          if ! git merge-base --is-ancestor tags/$TAG_NAME origin/main 2>/dev/null; then
+            echo "::error::Tag $TAG_NAME is not on the main branch"
+            exit 1
+          fi
+
+  test:
+    name: Test pkg module
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: pkg/go.sum
+      
+      - name: Run tests
+        working-directory: pkg
+        run: |
+          go mod download
+          go test -v -race ./...
+
+  create-release:
+    name: Create GitHub Release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract version
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          fi
+          VERSION=${TAG_NAME#pkg/v}
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous pkg release tag
+          PREV_TAG=$(git tag -l 'pkg/v*' --sort=-version:refname | grep -v "${{ steps.version.outputs.tag }}" | head -n1)
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "This is the first pkg release"
+            CHANGES="Initial release of FTL pkg Go module"
+          else
+            echo "Previous tag: $PREV_TAG"
+            # Get changes since last pkg release
+            CHANGES=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..${{ steps.version.outputs.tag }} -- pkg/)
+          fi
+          
+          # Write to file to preserve formatting
+          cat > changelog.md << EOF
+          ## What's Changed in pkg v${{ steps.version.outputs.version }}
+          
+          $CHANGES
+          
+          ## Installation
+          
+          \`\`\`bash
+          go get github.com/fastertools/ftl/pkg@v${{ steps.version.outputs.version }}
+          \`\`\`
+          
+          ## Documentation
+          
+          - [pkg.go.dev](https://pkg.go.dev/github.com/fastertools/ftl/pkg@v${{ steps.version.outputs.version }})
+          - [API Reference](https://github.com/fastertools/ftl/tree/${{ steps.version.outputs.tag }}/pkg)
+          EOF
+          
+          echo "changelog_file=changelog.md" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: pkg v${{ steps.version.outputs.version }}
+          body_path: ${{ steps.changelog.outputs.changelog_file }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: false
+
+  verify-module:
+    name: Verify Go Module
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for pkg.go.dev to index
+        run: |
+          sleep 30
+      
+      - name: Verify module is accessible
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          fi
+          VERSION=${TAG_NAME#pkg/v}
+          
+          # Create a test project
+          mkdir test-import
+          cd test-import
+          go mod init test
+          
+          # Try to get the module
+          if go get github.com/fastertools/ftl/pkg@v${VERSION}; then
+            echo "✅ Module successfully published and accessible"
+          else
+            echo "⚠️ Module not yet indexed by proxy, but tag was created successfully"
+            echo "It may take a few minutes for the module to be available via go get"
+          fi

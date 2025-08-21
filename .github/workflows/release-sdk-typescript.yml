@@ -151,7 +151,7 @@ jobs:
             ### Links
             
             - [NPM Package](https://www.npmjs.com/package/ftl-sdk)
-            - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/typescript)
+            - [Documentation](https://github.com/fastertools/ftl/tree/main/sdk/typescript)
 
   update-templates:
     name: Update Templates PR
@@ -220,7 +220,7 @@ jobs:
           
           ### Links
           - [NPM Package](https://www.npmjs.com/package/ftl-sdk/v/${VERSION})
-          - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-typescript-v${VERSION})
+          - [Release](https://github.com/fastertools/ftl/releases/tag/sdk-typescript-v${VERSION})
           
           ---
           *This PR was automatically created by the release workflow.*

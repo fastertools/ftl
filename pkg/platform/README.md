@@ -5,7 +5,7 @@ The `pkg/platform` package provides the official API for integrating FTL with cl
 ## Installation
 
 ```go
-import "github.com/fastertools/ftl-cli/pkg/platform"
+import "github.com/fastertools/ftl/pkg/platform"
 ```
 
 ## Quick Start
@@ -128,7 +128,7 @@ package lambda
 
 import (
     "context"
-    "github.com/fastertools/ftl-cli/pkg/platform"
+    "github.com/fastertools/ftl/pkg/platform"
 )
 
 func HandleDeployment(ctx context.Context, req APIGatewayRequest) (APIGatewayResponse, error) {

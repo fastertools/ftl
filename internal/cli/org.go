@@ -11,9 +11,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/api"
-	"github.com/fastertools/ftl-cli/internal/auth"
-	"github.com/fastertools/ftl-cli/internal/config"
+	"github.com/fastertools/ftl/internal/api"
+	"github.com/fastertools/ftl/internal/auth"
+	"github.com/fastertools/ftl/internal/config"
 )
 
 // newOrgCmd creates the org command group

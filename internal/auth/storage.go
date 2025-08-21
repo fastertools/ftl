@@ -154,7 +154,7 @@ func fileKeyringPrompt(prompt string) (string, error) {
 	// In production, this would prompt the user
 	// For now, use a static key derived from the service name
 	// This is only used as a fallback when OS keyring is unavailable
-	return "ftl-cli-keyring-encryption-key", nil
+	return "ftl-keyring-encryption-key", nil
 }
 
 // MockStore implements CredentialStore for testing

@@ -722,7 +722,7 @@ package scaffold
 			go 1.24
 
 			require (
-			\tgithub.com/fastertools/ftl-cli/sdk/go v\(_versions.go)
+			\tgithub.com/fastertools/ftl/sdk/go v\(_versions.go)
 			)
 			"""
 		
@@ -792,7 +792,7 @@ package scaffold
 			package main
 
 			import (
-			\t"github.com/fastertools/ftl-cli/sdk/go/ftl"
+			\t"github.com/fastertools/ftl/sdk/go/ftl"
 			)
 
 			// ExampleToolInput defines the input for the example tool
@@ -946,7 +946,7 @@ package scaffold
 		"app.cue": """
 			package app
 			
-			import "github.com/fastertools/ftl-cli/patterns"
+			import "github.com/fastertools/ftl/patterns"
 			
 			// Define your FTL application
 			app: #FTLApplication & {
@@ -998,7 +998,7 @@ package scaffold
 				"fmt"
 				"log"
 			
-				"github.com/fastertools/ftl-cli/pkg/cdk"
+				"github.com/fastertools/ftl/pkg/cdk"
 			)
 			
 			func main() {
@@ -1036,10 +1036,10 @@ package scaffold
 			
 			go 1.24
 			
-			require github.com/fastertools/ftl-cli v\(_versions.ftl_cli)
+			require github.com/fastertools/ftl v\(_versions.ftl_cli)
 			
 			// For local development, uncomment and adjust the path:
-			// replace github.com/fastertools/ftl-cli => ../path/to/ftl-cli
+			// replace github.com/fastertools/ftl => ../path/to/ftl-cli
 			"""
 		
 		".gitignore": #CommonGitignore

@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/api"
-	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl/internal/api"
+	"github.com/fastertools/ftl/internal/auth"
 )
 
 func newDeleteCmd() *cobra.Command {

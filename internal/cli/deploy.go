@@ -14,12 +14,12 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/api"
-	"github.com/fastertools/ftl-cli/internal/auth"
-	"github.com/fastertools/ftl-cli/internal/config"
-	"github.com/fastertools/ftl-cli/internal/deploy"
-	"github.com/fastertools/ftl-cli/pkg/oci"
-	"github.com/fastertools/ftl-cli/pkg/validation"
+	"github.com/fastertools/ftl/internal/api"
+	"github.com/fastertools/ftl/internal/auth"
+	"github.com/fastertools/ftl/internal/config"
+	"github.com/fastertools/ftl/internal/deploy"
+	"github.com/fastertools/ftl/pkg/oci"
+	"github.com/fastertools/ftl/pkg/validation"
 )
 
 // DeployOptions holds options for the deploy command

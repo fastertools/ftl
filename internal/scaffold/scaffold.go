@@ -13,7 +13,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fastertools/ftl-cli/pkg/validation"
+	"github.com/fastertools/ftl/pkg/validation"
 )
 
 //go:embed templates.cue

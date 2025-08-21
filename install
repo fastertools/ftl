@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # FTL CLI installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
 # Options:
 #   -y, --yes        Automatically answer yes to all prompts
 #   -h, --help       Show help message
 
-REPO="fastertools/ftl-cli"
+REPO="fastertools/ftl"
 BINARY_NAME="ftl"
 AUTO_YES=false
 
@@ -67,17 +67,17 @@ Options:
 
 Examples:
     # Install latest release (interactive)
-    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
 
     # Install specific version
-    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/cli-v0.0.28/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl/cli-v0.0.28/install.sh | bash
 
     # Automatic installation (no prompts)
-    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/cli-v0.0.28/install.sh | bash -s -- --yes
+    curl -fsSL https://raw.githubusercontent.com/fastertools/ftl/cli-v0.0.28/install.sh | bash -s -- --yes
 
     # For private repos (requires gh CLI to be authenticated)
     gh auth login  # If not already authenticated
-    curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+    curl -fsSL https://$(gh auth token)@raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
 
 Note: This installer requires GitHub CLI (gh) to be installed and authenticated.
       Install gh from: https://cli.github.com

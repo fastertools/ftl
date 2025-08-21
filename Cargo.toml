@@ -27,8 +27,8 @@ edition = "2024"
 rust-version = "1.89"
 authors = ["FTL Contributors"]
 license = "Apache-2.0"
-repository = "https://github.com/fastertools/ftl-cli"
-homepage = "https://github.com/fastertools/ftl-cli"
+repository = "https://github.com/fastertools/ftl"
+homepage = "https://github.com/fastertools/ftl"
 
 [workspace.dependencies]
 # Common dependencies used across workspace

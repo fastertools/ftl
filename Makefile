@@ -38,9 +38,9 @@ generate-api:
 # Build FTL CLI (Go)
 build:
 	@echo "🔨 Building FTL CLI..."
-	@go build -ldflags "-X github.com/fastertools/ftl-cli/internal/cli.version=$$(git describe --tags --always) \
-		-X github.com/fastertools/ftl-cli/internal/cli.commit=$$(git rev-parse --short HEAD) \
-		-X github.com/fastertools/ftl-cli/internal/cli.buildDate=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+	@go build -ldflags "-X github.com/fastertools/ftl/internal/cli.version=$$(git describe --tags --always) \
+		-X github.com/fastertools/ftl/internal/cli.commit=$$(git rev-parse --short HEAD) \
+		-X github.com/fastertools/ftl/internal/cli.buildDate=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 		-o bin/ftl ./cmd/ftl
 	@echo "✅ FTL CLI built: bin/ftl"
 

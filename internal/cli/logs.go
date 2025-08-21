@@ -11,8 +11,8 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/api"
-	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl/internal/api"
+	"github.com/fastertools/ftl/internal/auth"
 )
 
 // LogsOptions holds configuration for the logs command.

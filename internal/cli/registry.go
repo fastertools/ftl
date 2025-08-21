@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fastertools/ftl-cli/pkg/spin"
+	"github.com/fastertools/ftl/pkg/spin"
 	"github.com/spf13/cobra"
 )
 

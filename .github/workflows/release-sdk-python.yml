@@ -187,7 +187,7 @@ jobs:
           ### Links
           
           - [PyPI Package](https://pypi.org/project/ftl-sdk/${{ needs.verify-tag.outputs.version }}/)
-          - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/python)
+          - [Documentation](https://github.com/fastertools/ftl/tree/main/sdk/python)
 
     - name: Verify PyPI installation
       run: |
@@ -269,7 +269,7 @@ jobs:
           
           ### Links
           - [PyPI Package](https://pypi.org/project/ftl-sdk/${VERSION}/)
-          - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-python-v${VERSION})
+          - [Release](https://github.com/fastertools/ftl/releases/tag/sdk-python-v${VERSION})
           
           ---
           *🤖 This PR was automatically created by the release workflow*

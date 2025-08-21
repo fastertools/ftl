@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fastertools/ftl-cli/pkg/validation"
+	"github.com/fastertools/ftl/pkg/validation"
 	"gopkg.in/yaml.v3"
 )
 

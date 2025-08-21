@@ -6,7 +6,7 @@ import (
     "fmt"
     "os"
     
-    "github.com/fastertools/ftl-cli/go/spindl/pkg/ftl"
+    "github.com/fastertools/ftl/go/spindl/pkg/ftl"
 )
 
 func main() {

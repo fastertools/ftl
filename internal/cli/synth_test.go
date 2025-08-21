@@ -121,7 +121,7 @@ func TestSynthesizeFromGo(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl-cli/pkg/synthesis"
+	"github.com/fastertools/ftl/pkg/synthesis"
 )
 
 func main() {

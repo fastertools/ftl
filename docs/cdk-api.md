@@ -10,7 +10,7 @@ package main
 import (
     "fmt"
     "log"
-    "github.com/fastertools/ftl-cli/go/ftl/pkg/synthesis"
+    "github.com/fastertools/ftl/go/ftl/pkg/synthesis"
 )
 
 func main() {

@@ -36,6 +36,9 @@ jobs:
               "FTL CLI")
                 TAG="cli-v${VERSION}"
                 ;;
+              "Go pkg")
+                TAG="pkg/v${VERSION}"
+                ;;
               "Rust SDK")
                 TAG="sdk-rust-v${VERSION}"
                 ;;

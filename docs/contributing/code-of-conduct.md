@@ -164,7 +164,7 @@ Project maintainers should:
 
 - corey@coreyr.com -- One day we'll have real emails
 - fastertools (FTL) [Discord](https://discord.gg/jDgHerNT) - All FTL Engine members can be reached here for now
-- **GitHub Discussions**: [github.com/fastertools/ftl/discussions](https://github.com/fastertools/ftl-cli/discussions)
+- **GitHub Discussions**: [github.com/fastertools/ftl/discussions](https://github.com/fastertools/ftl/discussions)
 
 ## Acknowledgment
 

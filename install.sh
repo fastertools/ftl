@@ -12,7 +12,7 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO="fastertools/ftl-cli"
+REPO="fastertools/ftl"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="ftl"
 

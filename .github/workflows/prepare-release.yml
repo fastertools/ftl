@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - cli
+          - pkg
           - sdk-rust
           - sdk-typescript
           - sdk-python
@@ -61,7 +62,7 @@ jobs:
           python-version: '3.10'
       
       - name: Setup Go
-        if: inputs.component == 'sdk-go' || inputs.component == 'cli'
+        if: inputs.component == 'sdk-go' || inputs.component == 'cli' || inputs.component == 'pkg'
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -120,6 +121,9 @@ jobs:
             cli)
               CURRENT_VERSION=$(jq -r '.ftlCli' "$VERSIONS_FILE")
               ;;
+            pkg)
+              CURRENT_VERSION=$(jq -r '.pkg' "$VERSIONS_FILE")
+              ;;
             sdk-rust)
               CURRENT_VERSION=$(jq -r '.sdk.rust' "$VERSIONS_FILE")
               ;;
@@ -133,8 +137,8 @@ jobs:
               CURRENT_VERSION=$(jq -r '.sdk.go' "$VERSIONS_FILE")
               ;;
             mcp-authorizer|mcp-gateway)
-              # Components currently use their Cargo.toml version
-              CURRENT_VERSION=$(grep '^version' "components/${COMPONENT}/Cargo.toml" | head -1 | cut -d'"' -f2)
+              # Components are tracked in versions.json
+              CURRENT_VERSION=$(jq -r ".components.\"${COMPONENT}\"" "$VERSIONS_FILE")
               ;;
           esac
           
@@ -184,6 +188,13 @@ jobs:
               jq --arg version "$NEW_VERSION" '.ftlCli = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Format the JSON file nicely
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              git add "$VERSIONS_FILE"
+              ;;
+            pkg)
+              # Update versions.json for pkg
+              jq --arg version "$NEW_VERSION" '.pkg = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               git add "$VERSIONS_FILE"
@@ -258,14 +269,17 @@ jobs:
               git add "$VERSIONS_FILE" sdk/go/README.md sdk/go/go.mod sdk/go/go.sum
               ;;
             mcp-authorizer|mcp-gateway)
-              # Components don't have entries in versions.json yet, but we should add them
-              # For now, just update their Cargo.toml
+              # Update versions.json for component
+              jq --arg version "$NEW_VERSION" --arg comp "$COMPONENT" '.components[$comp] = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              # Update component Cargo.toml
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
               
               # Update Cargo.lock - components use ftl- prefix in package names
               cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}" || true
               
-              git add "components/${COMPONENT}/Cargo.toml" Cargo.lock
+              git add "$VERSIONS_FILE" "components/${COMPONENT}/Cargo.toml" Cargo.lock
               
               # Update component versions in examples if they exist
               echo "Updating component references in examples..."
@@ -350,6 +364,10 @@ jobs:
             cli)
               TAG="cli-v${NEW_VERSION}"
               TITLE="release: FTL CLI v${NEW_VERSION}"
+              ;;
+            pkg)
+              TAG="pkg/v${NEW_VERSION}"
+              TITLE="release: Go pkg v${NEW_VERSION}"
               ;;
             sdk-rust)
               TAG="sdk-rust-v${NEW_VERSION}"

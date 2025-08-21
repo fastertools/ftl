@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/fastertools/ftl-cli/internal/manifest"
+	"github.com/fastertools/ftl/internal/manifest"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

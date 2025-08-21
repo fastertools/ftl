@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/fastertools/ftl-cli/internal/api"
+	"github.com/fastertools/ftl/internal/api"
 )
 
 func TestDisplayAppsTable(t *testing.T) {
