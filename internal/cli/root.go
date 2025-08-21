@@ -87,6 +87,7 @@ func init() {
 		newListCmd(),
 		newStatusCmd(),
 		newDeleteCmd(),
+		newLogsCmd(),
 	)
 }
 

@@ -20,7 +20,7 @@ source = "target/wasm32-wasip1/release/mcp_gateway.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal"]
 
 [component.mcp-gateway.build]
-command = "cargo build --target wasm32-wasip1 --release --target-dir ./target"
+command = "cargo build --target wasm32-wasip1 --profile dev --target-dir ./target"
 workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
 
