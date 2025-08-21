@@ -73,9 +73,18 @@ var (
 
 // configPath returns the path to the config file
 func configPath() (string, error) {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get config directory: %w", err)
+	var configDir string
+
+	// Check XDG_CONFIG_HOME first for testing and Linux compatibility
+	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		configDir = xdgConfig
+	} else {
+		// Fall back to os.UserConfigDir() for platform-specific defaults
+		var err error
+		configDir, err = os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get config directory: %w", err)
+		}
 	}
 
 	ftlDir := filepath.Join(configDir, "ftl")

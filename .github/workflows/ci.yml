@@ -324,7 +324,7 @@ jobs:
           ./ftl-linux-amd64 --help
           
           # Test building a sample project
-          ./ftl-linux-amd64 init test-project --format yaml --no-interactive
+          ./ftl-linux-amd64 init test-project --language yaml --no-interactive
           cd test-project
           ../ftl-linux-amd64 build
           
