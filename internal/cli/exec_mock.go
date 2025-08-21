@@ -201,7 +201,7 @@ route = '/...'
 
 		if outputFile != "" {
 			// Write to the specified file
-			if err := os.WriteFile(outputFile, []byte(spinTOML), 0644); err != nil {
+			if err := os.WriteFile(outputFile, []byte(spinTOML), 0600); err != nil {
 				fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
 				os.Exit(1)
 			}
