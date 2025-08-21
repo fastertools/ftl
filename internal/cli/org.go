@@ -185,8 +185,8 @@ func runOrgList(ctx context.Context, refresh bool) error {
 
 	// Use tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "CURRENT\tORG ID\tNAME\tLAST USED")
-	fmt.Fprintln(w, "-------\t------\t----\t---------")
+	_, _ = fmt.Fprintln(w, "CURRENT\tORG ID\tNAME\tLAST USED")
+	_, _ = fmt.Fprintln(w, "-------\t------\t----\t---------")
 
 	for _, orgID := range orgs {
 		current := " "
