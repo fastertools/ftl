@@ -1,0 +1,885 @@
+package cli
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/briandowns/spinner"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+
+	"github.com/fastertools/ftl-cli/internal/api"
+	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl-cli/internal/config"
+	"github.com/fastertools/ftl-cli/internal/deploy"
+	"github.com/fastertools/ftl-cli/pkg/oci"
+	"github.com/fastertools/ftl-cli/pkg/validation"
+)
+
+// DeployOptions holds options for the deploy command
+type DeployOptions struct {
+	Environment   string
+	ConfigFile    string
+	DryRun        bool
+	Yes           bool
+	AccessControl string
+	JWTIssuer     string
+	JWTAudience   string
+	AllowedRoles  []string
+	Variables     map[string]string
+	OrgID         string // Explicitly specify organization ID
+}
+
+func newDeployCmd() *cobra.Command {
+	opts := &DeployOptions{
+		Variables: make(map[string]string),
+	}
+
+	cmd := &cobra.Command{
+		Use:   "deploy [flags]",
+		Short: "Deploy the FTL application to the platform",
+		Long: `Deploy the FTL application to the platform.
+
+This command:
+1. Reads your FTL configuration (ftl.yaml, ftl.json, or app.cue)
+2. Builds local components
+3. Creates/updates the app on FTL platform
+4. Pushes built components to the registry
+5. Sends the FTL config to the platform for deployment
+6. Platform synthesizes Spin manifest and deploys
+
+Example:
+  ftl deploy
+  ftl deploy --access-control private
+  ftl deploy --jwt-issuer https://auth.example.com --jwt-audience api.example.com
+  ftl deploy --dry-run`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			return runDeploy(ctx, opts)
+		},
+	}
+
+	cmd.Flags().StringVarP(&opts.Environment, "environment", "e", "production", "Deployment environment")
+	cmd.Flags().StringVarP(&opts.ConfigFile, "file", "f", "", "FTL configuration file (auto-detects if not specified)")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Validate configuration without deploying")
+	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().StringVar(&opts.AccessControl, "access-control", "", "Access control mode (public, private, org, custom)")
+	cmd.Flags().StringVar(&opts.JWTIssuer, "jwt-issuer", "", "JWT issuer URL for authentication")
+	cmd.Flags().StringVar(&opts.JWTAudience, "jwt-audience", "", "JWT audience for authentication")
+	cmd.Flags().StringSliceVar(&opts.AllowedRoles, "allowed-roles", nil, "Allowed roles for org mode")
+	cmd.Flags().StringToStringVar(&opts.Variables, "var", nil, "Set variable (can be used multiple times)")
+	cmd.Flags().StringVar(&opts.OrgID, "org", "", "Organization ID for deployment (uses interactive selection if not specified)")
+
+	return cmd
+}
+
+func runDeploy(ctx context.Context, opts *DeployOptions) error {
+	// Auto-detect config file if not specified
+	if opts.ConfigFile == "" {
+		for _, file := range []string{"ftl.yaml", "ftl.yml", "ftl.json", "app.cue"} {
+			if _, err := os.Stat(file); err == nil {
+				opts.ConfigFile = file
+				break
+			}
+		}
+		if opts.ConfigFile == "" {
+			return fmt.Errorf("no FTL configuration file found (ftl.yaml, ftl.json, or app.cue)")
+		}
+	}
+
+	// First synthesize spin.toml from the FTL configuration
+	Info("Synthesizing Spin manifest from %s", opts.ConfigFile)
+	if err := runSynth(ctx, opts.ConfigFile); err != nil {
+		return fmt.Errorf("failed to synthesize spin.toml: %w", err)
+	}
+	Success("Generated spin.toml")
+
+	// Load and parse configuration
+	manifest, err := loadDeployManifest(opts.ConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Apply command-line overrides
+	if opts.AccessControl != "" {
+		manifest.Access = opts.AccessControl
+	}
+	if opts.JWTIssuer != "" {
+		if manifest.Auth == nil {
+			manifest.Auth = &validation.AuthConfig{}
+		}
+		manifest.Auth.JWTIssuer = opts.JWTIssuer
+		if opts.JWTAudience != "" {
+			manifest.Auth.JWTAudience = opts.JWTAudience
+		}
+	}
+
+	// Run spin build to build all local components
+	if !opts.DryRun {
+		Info("Building local components with 'spin build'")
+		cmd := ExecCommand("spin", "build")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to build components: %w", err)
+		}
+		Success("All local components built successfully")
+		fmt.Println()
+	}
+
+	// Dry-run mode: validate configuration without authentication
+	if opts.DryRun {
+		displayDryRunSummary(manifest, false)
+		return nil
+	}
+
+	// Initialize auth manager
+	store, err := auth.NewKeyringStore()
+	if err != nil {
+		return fmt.Errorf("failed to initialize credential store: %w", err)
+	}
+	authManager := auth.NewManager(store, nil)
+
+	// Auto-detect and perform M2M authentication if credentials are available
+	if auth.IsM2MConfigured() {
+		Info("M2M credentials detected in environment, authenticating as machine...")
+		if err := authManager.LoginMachine(ctx); err != nil {
+			return fmt.Errorf("failed to authenticate with M2M credentials: %w", err)
+		}
+		Success("Authenticated as machine")
+	}
+
+	// Check authentication
+	if _, err := authManager.GetToken(ctx); err != nil {
+		// Check if we have a pre-generated M2M token
+		if token := auth.GetM2MTokenFromEnv(); token != "" {
+			Info("Using M2M token from environment...")
+			if err := authManager.LoginMachineWithToken(ctx, token); err != nil {
+				return fmt.Errorf("failed to authenticate with M2M token: %w", err)
+			}
+			Success("Authenticated with M2M token")
+		} else {
+			return fmt.Errorf("not logged in to FTL. Run 'ftl auth login' first")
+		}
+	}
+
+	// Create API client
+	apiClient, err := api.NewFTLClient(authManager, "")
+	if err != nil {
+		return fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	// Check if app exists
+	appName := manifest.Name
+
+	// Add spinner for potentially slow API call (cold starts)
+	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	sp.Suffix = " Checking for existing app..."
+	sp.Start()
+
+	apps, err := apiClient.ListApps(ctx, &api.ListAppsParams{
+		Name: &appName,
+	})
+	sp.Stop()
+
+	if err != nil {
+		return fmt.Errorf("failed to check existing apps: %w", err)
+	}
+
+	var appID string
+	var existingAccess string
+	appExists := len(apps.Apps) > 0
+	if appExists {
+		appID = apps.Apps[0].AppId.String()
+		if apps.Apps[0].AccessControl != nil {
+			existingAccess = string(*apps.Apps[0].AccessControl)
+		}
+	}
+
+	// For org-scoped apps, we need to select the org BEFORE showing preview
+	var selectedOrgID string
+	var selectedOrgName string
+
+	if manifest.Access == "org" {
+		// We need to create the app first (if needed) to get org context
+		// Or get temporary creds to see available orgs
+		if !appExists {
+			// For new apps, we need to create it first to get deployment context
+			sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			sp.Suffix = " Preparing org-scoped deployment..."
+			sp.Start()
+
+			accessControl := api.CreateAppRequestAccessControlOrg
+			createReq := api.CreateAppRequest{
+				AppName:       appName,
+				AccessControl: &accessControl,
+			}
+
+			createResp, err := apiClient.CreateApp(ctx, createReq)
+			sp.Stop()
+			if err != nil {
+				return fmt.Errorf("failed to create app: %w", err)
+			}
+			appID = createResp.AppId.String()
+			appExists = true // Mark as exists now
+			Success("App prepared with ID: %s", appID)
+		}
+
+		// Get deployment credentials to see available orgs
+		sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		sp.Suffix = " Checking organization access..."
+		sp.Start()
+
+		componentNames := make([]string, 0, len(manifest.Components))
+		for _, comp := range manifest.Components {
+			componentNames = append(componentNames, comp.ID)
+		}
+
+		tempCreds, err := apiClient.CreateDeployCredentials(ctx, appID, componentNames)
+		sp.Stop()
+		if err != nil {
+			return fmt.Errorf("failed to get deployment context: %w", err)
+		}
+
+		// Select org based on context
+		if tempCreds.Deployment.Context.ActorType == "machine" {
+			if len(tempCreds.Deployment.Context.OrgIds) != 1 {
+				return fmt.Errorf("machine actor must have exactly one org")
+			}
+			selectedOrgID = tempCreds.Deployment.Context.OrgIds[0]
+			Info("Deploying as machine to org: %s", selectedOrgID)
+		} else {
+			// User org selection
+			if len(tempCreds.Deployment.Context.OrgIds) == 0 {
+				return fmt.Errorf("no organizations available for deployment")
+			} else if opts.OrgID != "" {
+				// Command-line flag takes precedence
+				found := false
+				for _, orgID := range tempCreds.Deployment.Context.OrgIds {
+					if orgID == opts.OrgID {
+						selectedOrgID = opts.OrgID
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("specified organization '%s' is not in your available organizations: %v",
+						opts.OrgID, tempCreds.Deployment.Context.OrgIds)
+				}
+			} else if len(tempCreds.Deployment.Context.OrgIds) == 1 {
+				selectedOrgID = tempCreds.Deployment.Context.OrgIds[0]
+			} else {
+				// Multiple orgs - let user choose
+				selectedOrgID, err = selectOrganization(tempCreds.Deployment.Context.OrgIds)
+				if err != nil {
+					return fmt.Errorf("failed to select organization: %w", err)
+				}
+			}
+		}
+
+		// Try to get org name from config
+		if cfg, err := config.Load(); err == nil {
+			if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists && orgInfo.Name != "" {
+				selectedOrgName = orgInfo.Name
+			}
+		}
+	}
+
+	// NOW build deployment preview with complete information
+	preview := BuildDeploymentPreviewWithOrg(manifest, opts, appID, existingAccess, selectedOrgID, selectedOrgName)
+
+	// Show preview and get confirmation
+	confirmed, err := ConfirmDeployment(preview, opts.Yes)
+	if err != nil {
+		return fmt.Errorf("confirmation failed: %w", err)
+	}
+	if !confirmed {
+		return fmt.Errorf("deployment cancelled by user")
+	}
+
+	// Create app if it doesn't exist and wasn't already created for org selection
+	if !appExists {
+		Info("Creating app on FTL platform...")
+
+		accessControl := api.CreateAppRequestAccessControlPublic
+		switch manifest.Access {
+		case "private":
+			accessControl = api.CreateAppRequestAccessControlPrivate
+		case "custom":
+			accessControl = api.CreateAppRequestAccessControlCustom
+		}
+
+		createReq := api.CreateAppRequest{
+			AppName:       appName,
+			AccessControl: &accessControl,
+		}
+
+		createResp, err := apiClient.CreateApp(ctx, createReq)
+		if err != nil {
+			return fmt.Errorf("failed to create app: %w", err)
+		}
+		appID = createResp.AppId.String()
+		Success("App created with ID: %s", appID)
+	}
+
+	// Get deployment credentials (ECR + Lambda)
+	Info("Getting deployment credentials...")
+	componentNames := make([]string, 0, len(manifest.Components))
+	for _, comp := range manifest.Components {
+		componentNames = append(componentNames, comp.ID)
+	}
+	creds, err := apiClient.CreateDeployCredentials(ctx, appID, componentNames)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment credentials: %w", err)
+	}
+
+	// Handle actor context validation
+	if creds.Deployment.Context.ActorType == "machine" && manifest.Access == "private" {
+		return fmt.Errorf("machine actors cannot deploy private apps")
+	}
+
+	// Verify we have the org ID for org deployments (should already be set)
+	if manifest.Access == "org" && selectedOrgID == "" {
+		return fmt.Errorf("internal error: organization not selected for org-scoped deployment")
+	}
+
+	// Parse ECR credentials
+	ecrAuth, err := oci.ParseECRToken(creds.Registry.RegistryUri, creds.Registry.AuthorizationToken)
+	if err != nil {
+		return fmt.Errorf("failed to parse ECR credentials: %w", err)
+	}
+
+	// Process components: pull registry components and push everything to ECR
+	namespace := creds.Registry.PackageNamespace
+
+	Info("Processing components...")
+	processedManifest, err := processComponents(ctx, manifest, ecrAuth, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to process components: %w", err)
+	}
+	Success("All components processed and pushed to FTL Engine Registry")
+	fmt.Println()
+
+	// Create deployment request with the processed manifest
+	Info("Deploying application...")
+
+	// Create flat deployment request
+	deploymentReq := createDeploymentRequest(processedManifest, opts)
+	deploymentJSON, err := json.Marshal(deploymentReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deployment request: %w", err)
+	}
+
+	// Create streaming deployer
+	deployer := deploy.NewStreamingDeployer()
+
+	// Deploy with streaming progress
+	sp = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	sp.Suffix = " Starting deployment..."
+	sp.Start()
+
+	var deploymentURL string
+
+	// Prepare deployment options with org context
+	deployOpts := deploy.DeployOptions{
+		Environment: opts.Environment,
+		OrgID:       selectedOrgID,
+	}
+
+	err = deployer.Deploy(ctx, deploymentJSON, creds, deployOpts, func(event deploy.StreamEvent) {
+		switch event.Type {
+		case "progress":
+			sp.Suffix = fmt.Sprintf(" %s", event.Message)
+		case "complete":
+			deploymentURL = event.URL
+			sp.Stop()
+			Success("Deployment completed successfully!")
+			if event.DeploymentID != "" {
+				Info("Deployment ID: %s", event.DeploymentID)
+			}
+		case "error":
+			sp.Stop()
+			Error("Deployment failed: %s", event.Message)
+		}
+	})
+
+	if err != nil {
+		sp.Stop()
+		return fmt.Errorf("deployment failed: %w", err)
+	}
+
+	if deploymentURL != "" {
+		// Display MCP URLs for the deployed application
+		displayMCPUrls(deploymentURL, processedManifest.Components)
+	}
+
+	return nil
+}
+
+// loadDeployManifest loads the FTL manifest configuration for deployment
+func loadDeployManifest(configFile string) (*validation.Application, error) {
+	// Clean the path to prevent directory traversal
+	configFile = filepath.Clean(configFile)
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	v := validation.New()
+	validatedValue, err := v.ValidateYAML(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate manifest: %w", err)
+	}
+
+	return validation.ExtractApplication(validatedValue)
+}
+
+// runSynth runs the synth command to generate spin.toml
+func runSynth(ctx context.Context, configFile string) error {
+	cmd := ExecCommand("ftl", "synth", "-o", "spin.toml", configFile)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// processComponents handles pulling registry components and pushing everything to ECR
+func processComponents(ctx context.Context, manifest *validation.Application, ecrAuth *oci.ECRAuth, namespace string) (*validation.Application, error) {
+	// Create output manifest with ECR references
+	processedManifest := &validation.Application{
+		Name:        manifest.Name,
+		Version:     manifest.Version,
+		Description: manifest.Description,
+		Access:      manifest.Access,
+		Auth:        manifest.Auth,
+		Variables:   manifest.Variables,
+		Components:  make([]*validation.Component, 0, len(manifest.Components)),
+	}
+
+	// Create a WASMPuller for pulling registry components
+	puller := oci.NewWASMPuller()
+
+	// Create a WASMPusher for pushing to ECR
+	pusher := oci.NewWASMPusher(ecrAuth)
+
+	// Process each component
+	for _, comp := range manifest.Components {
+		var wasmPath string
+		var err error
+
+		// Check if it's a local or registry source
+		switch src := comp.Source.(type) {
+		case *validation.LocalSource:
+			// Local component - find the built WASM file
+			wasmPath, err = findBuiltWASM(src.Path, comp.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find built WASM for %s: %w", comp.ID, err)
+			}
+			Info("Found local component %s at %s", comp.ID, wasmPath)
+		case *validation.RegistrySource:
+			// Registry component - pull it
+			Info("Pulling component %s from %s", comp.ID, src.Registry)
+			wasmPath, err = puller.Pull(ctx, src.Registry, src.Package, src.Version)
+			if err != nil {
+				return nil, fmt.Errorf("failed to pull component %s: %w", comp.ID, err)
+			}
+			Success("Pulled %s", comp.ID)
+		default:
+			return nil, fmt.Errorf("invalid source for component %s", comp.ID)
+		}
+
+		// Push to ECR
+		// Package name should use / not : for the repository path
+		packageName := fmt.Sprintf("%s/%s", namespace, comp.ID)
+		version := manifest.Version
+		if version == "" {
+			version = "0.1.0"
+		}
+
+		Info("Pushing %s to FTL Engine Registry", comp.ID)
+		if err := pusher.Push(ctx, wasmPath, packageName, version); err != nil {
+			return nil, fmt.Errorf("failed to push component %s: %w", comp.ID, err)
+		}
+		Success("Pushed %s", comp.ID)
+
+		// Create processed component with ECR reference
+		// Convert package name from namespace/component to namespace:component for Spin compatibility
+		spinPackageName := strings.Replace(packageName, "/", ":", 1)
+		processedComp := &validation.Component{
+			ID: comp.ID,
+			Source: &validation.RegistrySource{
+				Registry: ecrAuth.Registry,
+				Package:  spinPackageName,
+				Version:  version,
+			},
+			Build:     comp.Build,
+			Variables: comp.Variables,
+		}
+		processedManifest.Components = append(processedManifest.Components, processedComp)
+	}
+
+	return processedManifest, nil
+}
+
+// findBuiltWASM locates the built WASM file for a local component
+func findBuiltWASM(sourcePath, componentID string) (string, error) {
+	// Check if sourcePath is already a .wasm file
+	if strings.HasSuffix(sourcePath, ".wasm") {
+		if _, err := os.Stat(sourcePath); err == nil {
+			return sourcePath, nil
+		}
+	}
+
+	// Look in common build output locations
+	possiblePaths := []string{
+		filepath.Join(sourcePath, componentID+".wasm"),
+		filepath.Join(sourcePath, "target", "wasm32-wasip2", "release", componentID+".wasm"),
+		filepath.Join(sourcePath, "target", "wasm32-wasi", "release", componentID+".wasm"),
+		filepath.Join(sourcePath, "build", componentID+".wasm"),
+		filepath.Join(sourcePath, "dist", componentID+".wasm"),
+		componentID + ".wasm",
+	}
+
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find built WASM file for component %s", componentID)
+}
+
+// createDeploymentRequest creates a flat FTL deployment request (no "application" wrapper)
+func createDeploymentRequest(manifest *validation.Application, opts *DeployOptions) map[string]interface{} {
+	// Build flat FTL deployment request
+	req := map[string]interface{}{
+		"name": manifest.Name,
+	}
+
+	// Add version
+	if manifest.Version != "" {
+		req["version"] = manifest.Version
+	} else {
+		req["version"] = "0.1.0"
+	}
+
+	// Add description if present
+	if manifest.Description != "" {
+		req["description"] = manifest.Description
+	}
+
+	// Set access control
+	if manifest.Access != "" {
+		req["access"] = manifest.Access
+	} else {
+		req["access"] = "public"
+	}
+
+	// Set auth configuration if needed
+	if manifest.Auth != nil && (manifest.Access == "org" || manifest.Access == "custom") {
+		auth := map[string]interface{}{}
+		if manifest.Auth.JWTIssuer != "" {
+			auth["jwt_issuer"] = manifest.Auth.JWTIssuer
+		}
+		if manifest.Auth.JWTAudience != "" {
+			auth["jwt_audience"] = manifest.Auth.JWTAudience
+		}
+		if len(auth) > 0 {
+			req["auth"] = auth
+		}
+	}
+
+	// Add allowed_roles for org mode
+	if manifest.Access == "org" && len(opts.AllowedRoles) > 0 {
+		req["allowed_roles"] = opts.AllowedRoles
+	}
+
+	// Add components
+	components := make([]map[string]interface{}, 0, len(manifest.Components))
+	for _, comp := range manifest.Components {
+		deployComp := map[string]interface{}{
+			"id": comp.ID,
+		}
+
+		// Parse component source - should be registry at this point
+		if regSrc, ok := comp.Source.(*validation.RegistrySource); ok {
+			deployComp["source"] = map[string]interface{}{
+				"registry": regSrc.Registry,
+				"package":  regSrc.Package,
+				"version":  regSrc.Version,
+			}
+		} else {
+			// This shouldn't happen after processing
+			Error("Component %s has non-registry source after processing", comp.ID)
+			continue
+		}
+
+		// Add component variables if any
+		if len(comp.Variables) > 0 {
+			deployComp["variables"] = comp.Variables
+		}
+
+		components = append(components, deployComp)
+	}
+	req["components"] = components
+
+	// Add application variables
+	if len(manifest.Variables) > 0 {
+		req["variables"] = manifest.Variables
+	}
+
+	// Merge deployment variables from options
+	if len(opts.Variables) > 0 {
+		if existing, ok := req["variables"].(map[string]string); ok {
+			for k, v := range opts.Variables {
+				existing[k] = v
+			}
+		} else {
+			req["variables"] = opts.Variables
+		}
+	}
+
+	return req
+}
+
+// Note: Deployment is now done via streaming Lambda Function URLs
+// The old polling-based deployment has been replaced with real-time streaming
+
+func displayDryRunSummary(manifest *validation.Application, appExists bool) {
+	fmt.Println()
+	fmt.Println("🔍 DRY RUN MODE - No changes will be made")
+	fmt.Println()
+
+	color.Cyan("Application Configuration:")
+	fmt.Printf("  Name: %s\n", manifest.Name)
+	fmt.Printf("  Version: %s\n", manifest.Version)
+	if manifest.Description != "" {
+		fmt.Printf("  Description: %s\n", manifest.Description)
+	}
+	fmt.Printf("  Access Control: %s\n", manifest.Access)
+
+	if manifest.Auth != nil {
+		if manifest.Auth.JWTIssuer != "" {
+			fmt.Printf("  Auth Provider: Custom\n")
+			fmt.Printf("  JWT Issuer: %s\n", manifest.Auth.JWTIssuer)
+			if manifest.Auth.JWTAudience != "" {
+				fmt.Printf("  JWT Audience: %s\n", manifest.Auth.JWTAudience)
+			}
+		}
+	}
+
+	fmt.Println()
+	color.Cyan("Components:")
+	for _, comp := range manifest.Components {
+		fmt.Printf("  • %s\n", comp.ID)
+
+		// Show source type
+		switch src := comp.Source.(type) {
+		case *validation.LocalSource:
+			fmt.Printf("    Source: %s (local)\n", src.Path)
+			if comp.Build != nil && comp.Build.Command != "" {
+				fmt.Printf("    Build: %s\n", comp.Build.Command)
+			}
+		case *validation.RegistrySource:
+			fmt.Printf("    Source: %s (registry)\n", src.Registry)
+			if src.Package != "" {
+				fmt.Printf("    Package: %s\n", src.Package)
+			}
+			if src.Version != "" {
+				fmt.Printf("    Version: %s\n", src.Version)
+			}
+		}
+	}
+
+	fmt.Println()
+	color.Cyan("Actions that would be performed:")
+
+	fmt.Printf("  ✓ Synthesize spin.toml from configuration\n")
+	fmt.Printf("  ✓ Build local components with 'spin build'\n")
+
+	if appExists {
+		fmt.Printf("  ✓ Update existing app\n")
+	} else {
+		fmt.Printf("  ✓ Create new app\n")
+	}
+
+	fmt.Printf("  ✓ Pull registry components and push all to FTL Engine Registry\n")
+	fmt.Printf("  ✓ Create deployment with processed manifest\n")
+	fmt.Printf("  ✓ Platform will deploy from registry\n")
+
+	fmt.Println()
+	fmt.Println("To perform the actual deployment, run without --dry-run")
+}
+
+// displayMCPUrls displays a table showing MCP URLs for the application and its components
+func displayMCPUrls(baseURL string, components []*validation.Component) {
+	// Ensure the base URL ends with /mcp
+	mcpBaseURL := strings.TrimRight(baseURL, "/") + "/mcp"
+
+	// Create data writer for table output
+	dw := NewDataWriter(colorOutput, "table")
+
+	// Build table with headers
+	tb := NewTableBuilder("COMPONENT", "URL")
+
+	// Add the main application MCP URL
+	tb.AddRow("*all", mcpBaseURL)
+
+	// Add component-specific MCP URLs
+	for _, comp := range components {
+		componentURL := fmt.Sprintf("%s/x/%s", mcpBaseURL, comp.ID)
+		tb.AddRow(comp.ID, componentURL)
+	}
+
+	// Write the table (with empty line before it)
+	fmt.Println()
+	if err := tb.Write(dw); err != nil {
+		// Fallback to simple display if table fails
+		fmt.Printf("URL: %s\n", mcpBaseURL)
+		for _, comp := range components {
+			fmt.Printf("%s: %s/x/%s\n", comp.ID, mcpBaseURL, comp.ID)
+		}
+	}
+
+	// Add summary line after table
+	_, _ = fmt.Fprintf(colorOutput, "Connect to MCP clients with the URLs above.\n")
+}
+
+// selectOrganization prompts the user to select an organization from the available list
+func selectOrganization(orgIDs []string) (string, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		// Config error is not fatal, continue without it
+		cfg = nil
+	}
+
+	// If we're in a non-interactive environment, use config or first org
+	if !isDeployInteractive() {
+		// Try to use configured org
+		if cfg != nil {
+			currentOrg := cfg.GetCurrentOrg()
+			for _, orgID := range orgIDs {
+				if orgID == currentOrg {
+					Info("Using configured organization: %s", currentOrg)
+					return currentOrg, nil
+				}
+			}
+		}
+
+		Warn("Multiple organizations available. Using first one: %s", orgIDs[0])
+		Warn("To specify an organization, use 'ftl org set' or --org flag")
+		return orgIDs[0], nil
+	}
+
+	// Check for environment variable override (prefer explicit env var over config)
+	if envOrgID := os.Getenv("FTL_ORG_ID"); envOrgID != "" {
+		// Validate it's in the list
+		for _, orgID := range orgIDs {
+			if orgID == envOrgID {
+				Info("Using organization from FTL_ORG_ID: %s", envOrgID)
+				return orgID, nil
+			}
+		}
+		return "", fmt.Errorf("FTL_ORG_ID '%s' is not in your available organizations: %v", envOrgID, orgIDs)
+	}
+
+	// Check for configured preference
+	if cfg != nil {
+		currentOrg := cfg.GetCurrentOrg()
+		if currentOrg != "" {
+			for _, orgID := range orgIDs {
+				if orgID == currentOrg {
+					// Ask if they want to use the configured preference
+					useConfig := false
+
+					// Get org info for better display
+					orgInfo, hasInfo := cfg.GetOrganization(currentOrg)
+					displayName := orgInfo.Name
+					if displayName == "" {
+						displayName = currentOrg // Fall back to ID if no name
+					}
+
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("Use current organization '%s'?", displayName),
+						Default: true,
+					}
+					if err := survey.AskOne(prompt, &useConfig); err == nil && useConfig {
+						// Update last used time
+						if hasInfo {
+							orgInfo.LastUsed = time.Now().Format(time.RFC3339)
+							_ = cfg.AddOrganization(orgInfo)
+						}
+						return currentOrg, nil
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Interactive selection - build display names for all orgs
+	options := make([]string, len(orgIDs))
+	orgMap := make(map[string]string) // display name -> org ID
+
+	for i, orgID := range orgIDs {
+		displayName := orgID
+		if cfg != nil {
+			if orgInfo, exists := cfg.GetOrganization(orgID); exists && orgInfo.Name != "" {
+				displayName = orgInfo.Name
+			}
+		}
+		options[i] = displayName
+		orgMap[displayName] = orgID
+	}
+
+	var selected string
+	prompt := &survey.Select{
+		Message: "Select organization for deployment:",
+		Options: options,
+		Help:    "Choose which organization to deploy this application to",
+	}
+
+	err = survey.AskOne(prompt, &selected)
+	if err != nil {
+		return "", err
+	}
+
+	// Map display name back to org ID
+	selectedOrgID := orgMap[selected]
+
+	// Update config with selection
+	if cfg != nil {
+		_ = cfg.SetCurrentOrg(selectedOrgID)
+
+		// Update last used time
+		if orgInfo, exists := cfg.GetOrganization(selectedOrgID); exists {
+			orgInfo.LastUsed = time.Now().Format(time.RFC3339)
+			_ = cfg.AddOrganization(orgInfo)
+		}
+	}
+
+	return selectedOrgID, nil
+}
+
+// isDeployInteractive checks if we're in an interactive terminal
+func isDeployInteractive() bool {
+	// Check if stdout is a terminal
+	fileInfo, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+
+	// Check for CI environment variables
+	if os.Getenv("CI") == "true" || os.Getenv("CONTINUOUS_INTEGRATION") == "true" {
+		return false
+	}
+
+	// Check if it's a terminal
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}

@@ -1,87 +1,139 @@
-.PHONY: ci fmt-check lint test coverage coverage-html fmt fix-clippy fix dev pre-push build-release default
+# FTL - Polyglot WebAssembly MCP Platform
+# Main orchestration Makefile
+
+.PHONY: all help build test clean install
 
 # Default to showing help
-default:
+help:
+	@echo "FTL - Fast, polyglot toolkit for building MCP tools on WebAssembly"
+	@echo ""
 	@echo "Available targets:"
-	@echo "  ci            - Run all CI checks"
-	@echo "  fmt-check     - Check formatting"
-	@echo "  lint          - Run clippy"
-	@echo "  test          - Run tests"
-	@echo "  coverage      - Run tests with coverage"
-	@echo "  coverage-html - Generate HTML coverage report"
-	@echo "  fmt       	   - Fix formatting"
-	@echo "  fix-clippy    - Fix clippy warnings"
-	@echo "  fix           - Fix everything"
-	@echo "  dev           - Quick dev check"
-	@echo "  pre-push      - Pre-push checks"
-	@echo "  build-release - Build release"
+	@echo ""
+	@echo "  Core Commands:"
+	@echo "    build         - Build FTL CLI (Go)"
+	@echo "    test          - Run all tests (Go CLI + Rust SDKs)"
+	@echo "    install       - Install FTL CLI to system"
+	@echo "    clean         - Clean all build artifacts"
+	@echo ""
+	@echo "  Component Commands:"
+	@echo "    build-components  - Build WebAssembly components"
+	@echo "    test-components   - Test WebAssembly components"
+	@echo ""
+	@echo "  Development Commands:"
+	@echo "    generate-api  - Generate API client from OpenAPI spec"
+	@echo "    fmt           - Format all code (Go + Rust)"
+	@echo "    lint          - Lint all code (Go + Rust)"
+	@echo "    coverage      - Generate test coverage reports"
+	@echo ""
+	@echo "  Quick Commands:"
+	@echo "    dev           - Quick development build and test"
+	@echo "    all           - Build everything (CLI + components)"
 
-# Run all CI checks
-ci:
-	@echo "🔍 Running CI checks..."
-	@$(MAKE) fmt-check
-	@$(MAKE) lint
-	@$(MAKE) test
-	@echo "✅ All CI checks passed!"
+# Generate API client from OpenAPI spec
+generate-api:
+	@echo "🔄 Generating API client from OpenAPI spec..."
+	@oapi-codegen -package api -generate types,client -o internal/api/client.gen.go internal/api/openapi.json
+	@echo "✅ API client generated: internal/api/client.gen.go"
 
-# Check formatting
-fmt-check:
-	cargo fmt --all -- --check
-
-# Run clippy
-lint:
-	cargo clippy --all-targets --all-features --workspace -- -D warnings
-
-# Run tests
-test:
-	cargo nextest run
-
-test-all: test
-	cd components/mcp-authorizer && spin build && spin test
-	cd components/mcp-gateway && spin build && spin test
-
-# Run tests with coverage
-# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
-coverage:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-'
-
-# Generate HTML coverage report
-# Note: Spin components (ftl-mcp-*) are excluded as they require WASM coverage tooling
-coverage-open:
-	cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-' --open
-
-# Fix formatting
-fmt:
-	cargo fmt --all
-
-# Fix clippy warnings
-fix-clippy:
-	cargo clippy --all-targets --all-features --workspace --fix --allow-dirty --allow-staged
-
-# Fix everything
-fix:
-	@$(MAKE) fmt
-	@$(MAKE) fix-clippy
-
-# Quick dev check
-dev:
-	@$(MAKE) fmt
-	@$(MAKE) lint
-
-# Pre-push checks
-pre-push:
-	@$(MAKE) fix
-	@$(MAKE) test
-
+# Build FTL CLI (Go)
 build:
-	cargo build
+	@echo "🔨 Building FTL CLI..."
+	@go build -ldflags "-X github.com/fastertools/ftl-cli/internal/cli.version=$$(git describe --tags --always) \
+		-X github.com/fastertools/ftl-cli/internal/cli.commit=$$(git rev-parse --short HEAD) \
+		-X github.com/fastertools/ftl-cli/internal/cli.buildDate=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		-o bin/ftl ./cmd/ftl
+	@echo "✅ FTL CLI built: bin/ftl"
 
-build-all: build
-	cargo build-wasm
+# Test Go CLI
+test-cli:
+	@echo "🧪 Testing FTL CLI..."
+	@go test -v ./...
 
-# Build release
-build-release:
-	cargo build --release
+# Test Rust SDKs
+test-sdk:
+	@echo "🧪 Testing Rust SDKs..."
+	@cd sdk/rust && cargo test --target $(shell rustc -vV | sed -n 's/host: //p')
+	@cd sdk/rust-macros && cargo test --target $(shell rustc -vV | sed -n 's/host: //p')
 
-build-all-release: build-release
-	cargo build-wasm --release
+# Build WebAssembly components
+build-components:
+	@echo "🔨 Building WebAssembly components..."
+	@# With .cargo/config.toml, wasm32-wasip1 is the default target
+	@cargo build --workspace --release
+	@echo "✅ Components built in target/wasm32-wasip1/release/"
+
+# Test WebAssembly components
+test-components:
+	@echo "🧪 Testing WebAssembly components..."
+	@if command -v spin >/dev/null 2>&1; then \
+		cd components/mcp-authorizer && spin build && spin test; \
+		cd ../mcp-gateway && spin build && spin test; \
+	else \
+		echo "⚠️  spin not installed"; \
+		echo "   Install from: https://developer.fermyon.com/spin/install"; \
+	fi
+
+# Run all tests
+test: test-cli test-sdk test-components
+
+# Format all code
+fmt:
+	@echo "🎨 Formatting code..."
+	@echo "  Formatting Go code..."
+	@go fmt ./...
+	@echo "  Formatting Rust code..."
+	@cargo fmt --all
+
+# Lint all code
+lint:
+	@echo "🔍 Linting code..."
+	@echo "  Linting Go code..."
+	@go vet ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	fi
+	@echo "  Linting Rust code..."
+	@cargo clippy --all-targets --all-features -- -D warnings
+
+# Generate coverage reports
+coverage:
+	@echo "📊 Generating coverage reports..."
+	@echo "  Go coverage..."
+	@go test -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage-go.html
+	@go tool cover -func=coverage.out | tail -1
+	@echo "  Coverage report: coverage-go.html"
+
+# Install FTL CLI
+install: build
+	@echo "📦 Installing FTL CLI..."
+	@mkdir -p ~/.local/bin
+	@cp bin/ftl ~/.local/bin/
+	@echo "✅ Installed to ~/.local/bin/ftl"
+	@echo ""
+	@echo "Make sure ~/.local/bin is in your PATH:"
+	@echo '  export PATH=$$HOME/.local/bin:$$PATH'
+
+# Install to system location (requires sudo)
+install-system: build
+	@echo "📦 Installing FTL CLI to system..."
+	@sudo cp bin/ftl /usr/local/bin/
+	@echo "✅ Installed to /usr/local/bin/ftl"
+
+# Clean all build artifacts
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	@rm -rf bin/ target/ coverage*.out coverage*.html
+	@go clean -cache -testcache
+	@cargo clean
+	@echo "✅ Clean complete"
+
+# Quick development cycle
+dev: fmt build test-cli
+	@echo "✅ Development build complete"
+
+# Build everything
+all: build build-components
+	@echo "✅ All components built successfully"
+
+.DEFAULT_GOAL := help

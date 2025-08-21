@@ -129,7 +129,7 @@ fn build_forwarding_headers(
         headers.append(&name.to_string(), &value.as_bytes().to_vec())?;
     }
 
-    // Add authentication context headers
+    // Add standard authentication context headers
     headers.append(
         &"x-auth-client-id".to_string(),
         &auth_context.client_id.as_bytes().to_vec(),
@@ -150,10 +150,9 @@ fn build_forwarding_headers(
         )?;
     }
 
-    // Add organization ID if present
-    if let Some(org_id) = &auth_context.org_id {
-        headers.append(&"x-auth-org-id".to_string(), &org_id.as_bytes().to_vec())?;
-    }
+    // Note: Claim forwarding has been removed in favor of policy-based authorization
+    // If specific claims need to be forwarded, they should be added as explicit headers
+    // in the policy evaluation result or as part of the auth context
 
     // Forward the original authorization header
     headers.append(

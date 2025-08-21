@@ -1,9 +1,0 @@
-manifest_version = "1"
-id = "ftl-mcp-go"
-description = "Go FTL MCP tool component"
-tags = ["mcp", "http", "go", "golang", "ftl", "tool"]
-
-[add_component]
-skip_files = ["spin.toml", "README.md", ".gitignore"]
-[add_component.snippets]
-component = "component.txt"

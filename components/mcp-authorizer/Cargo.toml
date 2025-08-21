@@ -1,8 +1,8 @@
 [package]
-name = "ftl-mcp-authorizer"
+name = "mcp-authorizer"
 authors.workspace = true
 description = "MCP authorization component for FTL servers using AuthKit"
-version = "0.0.14"
+version = "0.0.15-alpha.0"
 license.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ categories = ["web-programming", "wasm", "authentication"]
 publish = false
 
 [lib]
-name = "ftl_mcp_authorizer"
+name = "mcp_authorizer"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
@@ -25,12 +25,15 @@ spin-sdk = "3.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 jsonwebtoken = "9.3"
+log = "0.4"
 # For time handling
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 # For URL parsing
 url = "2.5"
 # For async operations
 futures = "0.3"
+# For policy-based authorization using Rego
+regorus = { version = "0.4", default-features = false, features = ["base64", "base64url"] }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -8,12 +8,12 @@ description = "Authentication gateway for FTL MCP servers"
 
 [variables]
 # Core settings
-mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
+mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
 mcp_trace_header = { default = "x-trace-id" }
-mcp_provider_type = { default = "jwt" }
+mcp_provider_type = { default = "" }  # Empty = no auth provider configured
 
 # JWT provider settings
-mcp_jwt_issuer = { default = "https://test.authkit.app" }
+mcp_jwt_issuer = { default = "" }
 mcp_jwt_audience = { default = "" }
 mcp_jwt_jwks_uri = { default = "" }
 mcp_jwt_public_key = { default = "" }
@@ -25,18 +25,17 @@ mcp_oauth_authorize_endpoint = { default = "" }
 mcp_oauth_token_endpoint = { default = "" }
 mcp_oauth_userinfo_endpoint = { default = "" }
 
-# Static provider settings
-mcp_static_tokens = { default = "" }
 
-# Tenant restriction (for private mode)
-mcp_tenant_id = { default = "" }
+# Policy-based authorization (Rego)
+mcp_policy = { default = "" }  # Inline Rego policy (required if authorization is enabled)
+mcp_policy_data = { default = "" }  # Optional JSON data for policy evaluation
 
 [[trigger.http]]
 route = "/..."
 component = "mcp-authorizer"
 
 [component.mcp-authorizer]
-source = "target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm"
+source = "target/wasm32-wasip1/release/mcp_authorizer.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*"]
 key_value_stores = ["default"]
 [component.mcp-authorizer.build]
@@ -62,14 +61,13 @@ mcp_oauth_authorize_endpoint = "{{ mcp_oauth_authorize_endpoint }}"
 mcp_oauth_token_endpoint = "{{ mcp_oauth_token_endpoint }}"
 mcp_oauth_userinfo_endpoint = "{{ mcp_oauth_userinfo_endpoint }}"
 
-# Static provider settings
-mcp_static_tokens = "{{ mcp_static_tokens }}"
 
-# Tenant restriction (for private mode)
-mcp_tenant_id = "{{ mcp_tenant_id }}"
+# Policy-based authorization
+mcp_policy = "{{ mcp_policy }}"
+mcp_policy_data = "{{ mcp_policy_data }}"
 
 # Test configuration
 [component.mcp-authorizer.tool.spin-test]
-source = "tests/target/wasm32-wasip1/release/tests.wasm"
-build = "cargo build --target wasm32-wasip1 --release"
+source = "tests/target/wasm32-wasip1/release/mcp_authorizer_tests.wasm"
+build = "cargo build --target wasm32-wasip1 --release --target-dir ./target"
 workdir = "tests"

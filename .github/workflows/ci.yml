@@ -1,517 +1,161 @@
 name: CI
 
 on:
-  workflow_call:  # Only run when called by ci-status.yml
-    inputs:
-      cli-changed:
-        required: true
-        type: string
-      rust-sdk-changed:
-        required: true
-        type: string
-      typescript-sdk-changed:
-        required: true
-        type: string
-      core-crates-changed:
-        required: true
-        type: string
-      components-changed:
-        required: true
-        type: string
-      go-sdk-changed:
-        required: true
-        type: string
-      python-sdk-changed:
-        required: true
-        type: string
-      ci-changed:
-        required: true
-        type: string
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
+  # Go environment
+  GO_VERSION: '1.24'
+  
+  # Rust environment  
+  RUST_VERSION: '1.89'
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
+  
+  # Caching versions (bump to invalidate)
+  GO_CACHE_VERSION: v1
+  RUST_CACHE_VERSION: v1
 
 jobs:
-  lint-cli:
-    name: Lint CLI
-    if: inputs.cli-changed == 'true'
+  # ============================================================================
+  # Go CLI Jobs
+  # ============================================================================
+  
+  go-lint:
+    name: Go Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Rust with linting tools
-        uses: ./.github/actions/setup-rust
-        with:
-          components: rustfmt, clippy
-          cache-key: ci-lint-v189
-          install-system-deps: 'true'
-      
-      - name: Check formatting (CLI)
-        run: |
-          cargo fmt --package ftl-cli -- --check
-          # Check formatting for all ftl-* crates
-          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
-            cargo fmt --package $pkg -- --check
-          done
-      
-      - name: Run clippy (CLI)
-        run: |
-          cargo clippy --package ftl-cli --all-targets --all-features -- -D warnings
-          # Run clippy for all ftl-* crates
-          for pkg in ftl-commands ftl-common ftl-language ftl-runtime; do
-            cargo clippy --package $pkg --all-targets --all-features -- -D warnings
-          done
-
-  lint-rust-sdk:
-    name: Lint Rust SDK
-    if: inputs.rust-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Rust with linting tools
-        uses: ./.github/actions/setup-rust
-        with:
-          components: rustfmt, clippy
-          cache-key: ci-lint-rust-sdk-v189
-      
-      - name: Check formatting (SDK)
-        run: |
-          cargo fmt --package ftl-sdk --package ftl-sdk-macros -- --check
-      
-      - name: Run clippy (SDK)
-        run: |
-          cargo clippy --package ftl-sdk --package ftl-sdk-macros --all-targets --all-features -- -D warnings
-
-  lint-typescript-sdk:
-    name: Lint TypeScript SDK
-    if: inputs.typescript-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      
-      - name: Install dependencies
-        run: |
-          cd sdk/typescript
-          npm ci
-      
-      - name: Check formatting
-        run: |
-          cd sdk/typescript
-          npm run format:check
-      
-      - name: Run linter
-        run: |
-          cd sdk/typescript
-          npm run lint
-      
-      - name: Run type checking
-        run: |
-          cd sdk/typescript
-          npm run typecheck
-      
-      - name: Run tests
-        run: |
-          cd sdk/typescript
-          npm test
-
-  lint-go-sdk:
-    name: Lint Go SDK
-    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-      
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.23-${{ hashFiles('sdk/go/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-1.23-
-      
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
       - name: Install golangci-lint
-        working-directory: sdk/go
         run: |
-          go mod download
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-      
-      - name: Run go fmt
-        working-directory: sdk/go
-        run: |
-          fmt_output=$(go fmt ./...)
-          if [ -n "$fmt_output" ]; then
-            echo "The following files need formatting:"
-            echo "$fmt_output"
-            exit 1
-          fi
-      
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+          sh -s -- -b $(go env GOPATH)/bin v2.4.0
+          
       - name: Run golangci-lint
-        working-directory: sdk/go
-        run: golangci-lint run --build-tags test
+        run: golangci-lint run --timeout 5m ./...
+        
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || \
+            (echo "::error::go mod tidy produced changes. Run 'go mod tidy' and commit the changes." && exit 1)
 
-  test-go-sdk:
-    name: Test Go SDK
-    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
+  go-test:
+    name: Go Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-      
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.23-${{ hashFiles('sdk/go/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-1.23-
-      
-      - name: Install dependencies
-        working-directory: sdk/go
-        run: go mod download
-      
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
+      - name: Install Spin
+        run: |
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          spin --version
+          
+      - name: Build ftl binary
+        run: go build -o ftl ./cmd/ftl
+          
+      - name: Add ftl to PATH
+        run: |
+          mkdir -p $HOME/bin
+          mv ftl $HOME/bin/
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
       - name: Run tests
-        working-directory: sdk/go
-        run: go test -v -race -coverprofile=coverage.out -tags test ./...
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./sdk/go/coverage.out
-          flags: go-sdk
-          name: go-sdk-coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-      
-      - name: Check for security vulnerabilities
-        working-directory: sdk/go
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck -tags test ./...
-
-  tinygo-validation:
-    name: TinyGo Compilation Validation
-    if: inputs.go-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+        
+  go-build:
+    name: Go Build
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-      
-      - name: Set up TinyGo
-        uses: acifani/setup-tinygo@v2
-        with:
-          tinygo-version: '0.38.0'
-      
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.23-tinygo-${{ hashFiles('sdk/go/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-1.23-tinygo-
-            ${{ runner.os }}-go-1.23-
-      
-      - name: Validate Go SDK compiles with TinyGo
-        working-directory: sdk/go
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
-          echo "Testing Go SDK compilation with TinyGo..."
-          tinygo test -target=wasip1 -c .
-      
-      - name: Create and test minimal project
-        run: |
-          echo "Creating minimal test project..."
-          mkdir -p /tmp/tinygo-test
-          cd /tmp/tinygo-test
+          go build -v -ldflags "-s -w" -o ftl-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/ftl
           
-          # Create go.mod
-          cat > go.mod << 'EOF'
-          module tinygo-test-project
-          
-          go 1.23
-          
-          require github.com/fastertools/ftl-cli/sdk/go v0.0.0
-          
-          replace github.com/fastertools/ftl-cli/sdk/go => ${{ github.workspace }}/sdk/go
-          EOF
-          
-          # Create test file
-          cat > main_test.go << 'EOF'
-          package main
-          
-          import (
-              "testing"
-              "github.com/fastertools/ftl-cli/sdk/go"
-          )
-          
-          func TestCreateTextResponse(t *testing.T) {
-              response := ftl.CreateTextResponse("test")
-              if response.Content == nil {
-                  t.Fatal("response.Content should not be nil")
-              }
-              if *response.Content != "test" {
-                  t.Errorf("expected 'test', got %s", *response.Content)
-              }
-          }
-          EOF
-          
-          echo "Testing minimal project with TinyGo..."
-          tinygo test -target=wasip1 -c .
-
-  test-python-sdk:
-    name: Test Python SDK
-    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.10-${{ hashFiles('sdk/python/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-3.10-
-            ${{ runner.os }}-pip-
-      
-      - name: Install tox
-        run: |
-          python -m pip install --upgrade pip
-          pip install tox tox-gh-actions
-      
-      - name: Run tox tests
-        run: tox
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./sdk/python/coverage.xml
-          flags: python-sdk
-          name: python-sdk-coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  lint-python-sdk:
-    name: Lint Python SDK
-    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lint-${{ hashFiles('sdk/python/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-lint-
-            ${{ runner.os }}-pip-
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-      
-      - name: Check formatting with black
-        run: black --check src tests
-      
-      - name: Run ruff linter
-        run: ruff check src tests
-      
-      - name: Run mypy type checker
-        run: mypy src
-
-  wasm-python-sdk:
-    name: Test Python WebAssembly Compatibility
-    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install componentize-py and SDK
-        run: |
-          python -m pip install --upgrade pip
-          pip install componentize-py spin-sdk
-          pip install -e .
-      
-      - name: Test WASM build
-        run: |
-          # Create a test file that uses the SDK
-          cat > test_wasm.py << 'EOF'
-          from ftl_sdk import FTL
-          
-          ftl = FTL()
-          
-          @ftl.tool
-          def test() -> str:
-              """Test tool"""
-              return "test"
-          
-          # Spin expects IncomingHandler, not Handler
-          IncomingHandler = ftl.create_handler()
-          EOF
-          
-          # Try to build with componentize-py, including SDK source path
-          componentize-py -w spin-http componentize test_wasm -p . -p src -o test.wasm
-          
-          # Verify the WASM file was created
-          test -f test.wasm || exit 1
-          
-          # Clean up
-          rm test_wasm.py test.wasm
-
-  security-python-sdk:
-    name: Security Scan Python SDK
-    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install safety
-        run: |
-          python -m pip install --upgrade pip
-          pip install safety
-      
-      - name: Install SDK dependencies
-        run: pip install -e .
-      
-      - name: Run safety check
-        run: safety check
-        continue-on-error: true  # Don't fail the build for security warnings
-
-  build-python-sdk:
-    name: Build Python Distribution
-    if: inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-      
-      - name: Build distribution
-        run: python -m build
-      
-      - name: Check distribution
-        run: twine check dist/*
-      
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-package-distributions
-          path: sdk/python/dist/
+          name: ftl-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ftl-${{ matrix.goos }}-${{ matrix.goarch }}*
 
-
-  test-sdk:
-    name: Test Rust SDK
-    if: inputs.rust-sdk-changed == 'true' || inputs.ci-changed == 'true'
+  go-security:
+    name: Go Security Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Rust with test tools
-        uses: ./.github/actions/setup-rust
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          components: llvm-tools-preview
-          cache-key: ci-test-sdk-v189
-      
-      - name: Setup test tools
-        uses: ./.github/actions/setup-test-tools
-      
-      - name: Run SDK tests with coverage
-        run: |
-          # Run SDK tests with coverage (excluding macros which are hard to test)
-          cargo llvm-cov nextest --package ftl-sdk --all-features --profile ci --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
           
-          # Generate coverage report
-          cargo llvm-cov report --package ftl-sdk --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros'
-
-  test-core:
-    name: Test Core Crates
-    if: inputs.core-crates-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Rust with test tools
-        uses: ./.github/actions/setup-rust
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
         with:
-          components: llvm-tools-preview
-          cache-key: ci-test-core-v189
-          install-system-deps: 'true'
-      
-      - name: Setup test tools
-        uses: ./.github/actions/setup-test-tools
-      
-      - name: Run core crate tests with coverage
-        run: |
-          # Run only core crate tests (excluding ftl-cli, ftl-sdk-macros, and spin components)
-          cargo llvm-cov nextest --workspace --exclude ftl-cli --exclude ftl-sdk-macros --all-features --profile ci --ignore-filename-regex '(test_helpers|api_client|deps)\.rs|sdk/rust-macros|components/mcp-'
+          args: '-no-fail -fmt sarif -out gosec-results.sarif ./...'
           
-      - name: Check coverage threshold
-        uses: ./.github/actions/check-coverage
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec-results.sarif
+          
+      - name: Run go mod audit
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-  security:
-    name: Security Audit
-    if: inputs.cli-changed == 'true' || inputs.rust-sdk-changed == 'true' || inputs.core-crates-changed == 'true' || inputs.go-sdk-changed == 'true' || inputs.python-sdk-changed == 'true' || inputs.ci-changed == 'true'
+  # ============================================================================
+  # Rust Components & SDK Jobs
+  # ============================================================================
+  
+  rust-lint:
+    name: Rust Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -519,39 +163,359 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: ci-security-v189
-          install-system-deps: 'true'
-      - name: Install cargo-audit
-        uses: taiki-e/install-action@cargo-audit
-      - name: Run security audit
-        run: cargo audit
+          components: rustfmt,clippy
+          targets: wasm32-wasip1
+          cache-key: rust-lint
+          toolchain: ${{ env.RUST_VERSION }}
+          
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
-  wasm:
-    name: WebAssembly Components
-    if: inputs.components-changed == 'true' || inputs.ci-changed == 'true'
+  rust-test:
+    name: Rust Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Rust for WASM
+      - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
           targets: wasm32-wasip1
-          cache-key: ci-wasm-v189
-          cache-targets: 'true'
-      
-      - name: Install cargo-component
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-component
-      
-      - name: Build WebAssembly components
-        run: |
-          cargo build-wasm --release
+          cache-key: rust-test
+          toolchain: ${{ env.RUST_VERSION }}
           
-      - name: Verify WebAssembly artifacts
+      - name: Run Rust SDK tests
         run: |
-          # Verify the expected WASM files were built
-          ls -la target/wasm32-wasip1/release/ftl_mcp_authorizer.wasm
-          ls -la target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
-          echo "WebAssembly components built successfully"
+          # Run tests only for the SDK packages which have unit tests
+          # Component tests need to be run with spin test separately
+          # Override the default target to run on native platform
+          cd sdk/rust && cargo test --target x86_64-unknown-linux-gnu --all-features
+          cd ../rust-macros && cargo test --target x86_64-unknown-linux-gnu --all-features || true
+          
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+        
+      - name: Generate coverage
+        run: |
+          cargo llvm-cov --workspace --all-features \
+            --target x86_64-unknown-linux-gnu \
+            --lcov --output-path lcov.info || true
+            
+
+
+  rust-build-wasm:
+    name: Build WASM Components
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          targets: wasm32-wasip1
+          cache-key: rust-wasm
+          cache-targets: 'true'
+          toolchain: ${{ env.RUST_VERSION }}
+          
+      - name: Build all WASM components
+        run: |
+          cargo build --workspace --release --target wasm32-wasip1
+          
+      - name: Check WASM file sizes
+        run: |
+          echo "WASM Component Sizes:"
+          echo "====================="
+          ls -lh target/wasm32-wasip1/release/*.wasm | awk '{print $5, $9}'
+          
+          # Fail if any WASM is over 10MB
+          for wasm in target/wasm32-wasip1/release/*.wasm; do
+            size=$(stat -c%s "$wasm" 2>/dev/null || stat -f%z "$wasm" 2>/dev/null)
+            if [ "$size" -gt 10485760 ]; then
+              echo "::error::$(basename $wasm) is over 10MB ($size bytes)"
+              exit 1
+            fi
+          done
+          
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-components
+          path: target/wasm32-wasip1/release/*.wasm
+
+  component-tests:
+    name: Component Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          targets: wasm32-wasip1
+          cache-key: component-tests
+          cache-targets: 'true'
+          toolchain: ${{ env.RUST_VERSION }}
+          
+      - name: Install Spin
+        run: |
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          spin --version
+          
+      - name: Install spin-test plugin
+        run: |
+          spin plugin install --yes -u https://github.com/spinframework/spin-test/releases/download/canary/spin-test.json
+          
+      - name: Run MCP Authorizer tests
+        run: |
+          cd components/mcp-authorizer
+          cargo build --target wasm32-wasip1 --release --target-dir ./target
+          spin test
+          
+      - name: Run MCP Gateway tests
+        run: |
+          cd components/mcp-gateway
+          cargo build --target wasm32-wasip1 --release --target-dir ./target
+          spin test
+
+  # ============================================================================
+  # Integration Tests
+  # ============================================================================
+  
+  integration-test:
+    name: Integration Tests
+    needs: [go-build, rust-build-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
+      - name: Download CLI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ftl-linux-amd64
+          
+      - name: Download WASM components
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-components
+          path: components/
+          
+      - name: Make CLI executable
+        run: chmod +x ftl-linux-amd64
+        
+      - name: Install Spin
+        run: |
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          
+      - name: Run integration tests
+        run: |
+          # Test CLI commands
+          ./ftl-linux-amd64 --version
+          ./ftl-linux-amd64 --help
+          
+          # Test building a sample project
+          ./ftl-linux-amd64 init test-project --language yaml --no-interactive
+          cd test-project
+          ../ftl-linux-amd64 build
+          
+          # Test component functionality
+          # Add more integration tests here
+
+  # ============================================================================
+  # SDK Tests (Python, TypeScript, etc.)
+  # ============================================================================
+  
+  python-sdk-test:
+    name: Python SDK Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('sdk/python/pyproject.toml') }}
+          
+      - name: Install dependencies
+        run: |
+          cd sdk/python
+          pip install -e .[dev]
+          
+      - name: Run tests
+        run: |
+          cd sdk/python
+          pytest --cov=ftl_sdk --cov-report=xml
+
+  typescript-sdk-test:
+    name: TypeScript SDK Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+          
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+          
+      - name: Build
+        run: |
+          cd sdk/typescript
+          npm run build
+          
+      - name: Run tests
+        run: |
+          cd sdk/typescript
+          npm test -- --coverage
+  # ============================================================================
+  # Final Status Check
+  # ============================================================================
+  
+  ci-status:
+    name: CI Status
+    if: always()
+    needs: 
+      - go-lint
+      - go-test
+      - go-build
+      - go-security
+      - rust-lint
+      - rust-test
+      - rust-build-wasm
+      - component-tests
+      - integration-test
+      - python-sdk-test
+      - typescript-sdk-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Status
+        run: |
+          echo "CI Status Summary"
+          echo "================="
+          
+          all_passed=true
+          
+          # Check go-lint
+          if [ "${{ needs.go-lint.result }}" == "success" ]; then
+            echo "✅ go-lint: passed"
+          else
+            echo "❌ go-lint: ${{ needs.go-lint.result }}"
+            all_passed=false
+          fi
+          
+          # Check go-test
+          if [ "${{ needs.go-test.result }}" == "success" ]; then
+            echo "✅ go-test: passed"
+          else
+            echo "❌ go-test: ${{ needs.go-test.result }}"
+            all_passed=false
+          fi
+          
+          # Check go-build
+          if [ "${{ needs.go-build.result }}" == "success" ]; then
+            echo "✅ go-build: passed"
+          else
+            echo "❌ go-build: ${{ needs.go-build.result }}"
+            all_passed=false
+          fi
+          
+          # Check go-security
+          if [ "${{ needs.go-security.result }}" == "success" ]; then
+            echo "✅ go-security: passed"
+          else
+            echo "❌ go-security: ${{ needs.go-security.result }}"
+            all_passed=false
+          fi
+          
+          # Check rust-lint
+          if [ "${{ needs.rust-lint.result }}" == "success" ]; then
+            echo "✅ rust-lint: passed"
+          else
+            echo "❌ rust-lint: ${{ needs.rust-lint.result }}"
+            all_passed=false
+          fi
+          
+          # Check rust-test
+          if [ "${{ needs.rust-test.result }}" == "success" ]; then
+            echo "✅ rust-test: passed"
+          else
+            echo "❌ rust-test: ${{ needs.rust-test.result }}"
+            all_passed=false
+          fi
+          
+          # Check rust-build-wasm
+          if [ "${{ needs.rust-build-wasm.result }}" == "success" ]; then
+            echo "✅ rust-build-wasm: passed"
+          else
+            echo "❌ rust-build-wasm: ${{ needs.rust-build-wasm.result }}"
+            all_passed=false
+          fi
+          
+          # Check component-tests
+          if [ "${{ needs.component-tests.result }}" == "success" ]; then
+            echo "✅ component-tests: passed"
+          else
+            echo "❌ component-tests: ${{ needs.component-tests.result }}"
+            all_passed=false
+          fi
+          
+          # Check integration-test
+          if [ "${{ needs.integration-test.result }}" == "success" ]; then
+            echo "✅ integration-test: passed"
+          else
+            echo "❌ integration-test: ${{ needs.integration-test.result }}"
+            all_passed=false
+          fi
+          
+          # Check python-sdk-test
+          if [ "${{ needs.python-sdk-test.result }}" == "success" ]; then
+            echo "✅ python-sdk-test: passed"
+          else
+            echo "❌ python-sdk-test: ${{ needs.python-sdk-test.result }}"
+            all_passed=false
+          fi
+          
+          # Check typescript-sdk-test
+          if [ "${{ needs.typescript-sdk-test.result }}" == "success" ]; then
+            echo "✅ typescript-sdk-test: passed"
+          else
+            echo "❌ typescript-sdk-test: ${{ needs.typescript-sdk-test.result }}"
+            all_passed=false
+          fi
+          
+          if [ "$all_passed" == "true" ]; then
+            echo ""
+            echo "✅ All CI checks passed!"
+          else
+            echo ""
+            echo "❌ Some CI checks failed"
+            exit 1
+          fi

@@ -13,11 +13,11 @@ pub struct Config {
     /// Header name for request tracing
     pub trace_header: String,
 
-    /// JWT provider configuration (always required)
-    pub provider: Provider,
+    /// JWT provider configuration (optional - if not set, all requests pass through)
+    pub provider: Option<Provider>,
 
-    /// Required tenant ID for private mode (optional)
-    pub tenant_id: Option<String>,
+    /// Policy-based authorization configuration
+    pub authorization: Option<PolicyAuthorization>,
 }
 
 /// Provider type enumeration
@@ -27,10 +27,6 @@ pub enum Provider {
     /// JWT provider with JWKS or static key
     #[serde(rename = "jwt")]
     Jwt(JwtProvider),
-
-    /// Static token provider for development
-    #[serde(rename = "static")]
-    Static(StaticProvider),
 }
 
 /// JWT provider configuration
@@ -58,33 +54,14 @@ pub struct JwtProvider {
     pub oauth_endpoints: Option<OAuthEndpoints>,
 }
 
-/// Static token provider configuration for development
+/// Policy-based authorization configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaticProvider {
-    /// Map of token strings to their metadata
-    pub tokens: std::collections::HashMap<String, StaticTokenInfo>,
+pub struct PolicyAuthorization {
+    /// Rego policy as a string
+    pub policy: String,
 
-    /// Required scopes for all requests
-    pub required_scopes: Option<Vec<String>>,
-}
-
-/// Static token information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaticTokenInfo {
-    /// Client ID for this token
-    pub client_id: String,
-
-    /// User ID (subject)
-    pub sub: String,
-
-    /// Scopes granted to this token
-    pub scopes: Vec<String>,
-
-    /// Optional expiration timestamp
-    pub expires_at: Option<i64>,
-
-    /// Organization ID (optional)
-    pub org_id: Option<String>,
+    /// Policy data as JSON string (optional)
+    pub data: Option<String>,
 }
 
 /// OAuth 2.0 endpoint configuration
@@ -99,25 +76,50 @@ impl Config {
     /// Load configuration from Spin variables
     pub fn load() -> Result<Self> {
         let gateway_url = variables::get("mcp_gateway_url")
-            .unwrap_or_else(|_| "https://mcp-gateway.spin.internal".to_string());
+            .unwrap_or_else(|_| "http://mcp-gateway.spin.internal".to_string());
 
         let trace_header = variables::get("mcp_trace_header")
             .unwrap_or_else(|_| "x-trace-id".to_string())
             .to_lowercase();
 
-        // Provider configuration is always required
-        let provider = Provider::load()?;
+        // Load provider configuration - propagate errors for invalid configs
+        // but allow missing provider (returns None)
+        let provider = match Provider::load() {
+            Ok(p) => Some(p),
+            Err(e) => {
+                // Check if this is a "no provider configured" situation vs actual error
+                // If all provider variables are missing/empty, that's OK (no provider)
+                // Otherwise it's a configuration error that should be propagated
+                let has_provider_config = variables::get("mcp_jwt_issuer")
+                    .ok()
+                    .filter(|s| !s.is_empty())
+                    .is_some()
+                    || variables::get("mcp_jwt_jwks_uri")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .is_some()
+                    || variables::get("mcp_jwt_public_key")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .is_some();
 
-        // Load tenant ID for private mode
-        let tenant_id = variables::get("mcp_tenant_id")
-            .ok()
-            .filter(|s| !s.is_empty());
+                if has_provider_config {
+                    // Provider was configured but has errors - propagate the error
+                    return Err(e);
+                }
+                // No provider configured at all - that's OK
+                None
+            }
+        };
+
+        // Load policy authorization if configured
+        let authorization = PolicyAuthorization::load().ok();
 
         Ok(Self {
             gateway_url,
             trace_header,
             provider,
-            tenant_id,
+            authorization,
         })
     }
 }
@@ -125,14 +127,26 @@ impl Config {
 impl Provider {
     /// Load provider configuration
     fn load() -> Result<Self> {
-        // Check provider type first
-        let provider_type =
-            variables::get("mcp_provider_type").unwrap_or_else(|_| "jwt".to_string());
+        // Check if any provider configuration exists
+        let has_jwt_config = variables::get("mcp_jwt_issuer")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .is_some()
+            || variables::get("mcp_jwt_jwks_uri")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .is_some()
+            || variables::get("mcp_jwt_public_key")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .is_some();
 
-        match provider_type.as_str() {
-            "static" => Self::load_static_provider(),
-            "jwt" | _ => Self::load_jwt_provider(),
+        // If no provider configuration at all, return error (no provider configured)
+        if !has_jwt_config {
+            return Err(anyhow::anyhow!("No authentication provider configured"));
         }
+
+        Self::load_jwt_provider()
     }
 
     /// Load JWT provider configuration
@@ -186,11 +200,25 @@ impl Provider {
             ));
         }
 
-        // Load audience (optional)
-        let audience = variables::get("mcp_jwt_audience")
+        // Load audience (required for security)
+        let audience_str = variables::get("mcp_jwt_audience")
             .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| vec![s]);
+            .filter(|s| !s.is_empty());
+
+        // Audience is required when using JWT provider
+        if audience_str.is_none() {
+            return Err(anyhow::anyhow!(
+                "mcp_jwt_audience is required for JWT authentication (security best practice)"
+            ));
+        }
+
+        // Parse audience - can be comma-separated for multiple audiences
+        let audience = audience_str.map(|s| {
+            s.split(',')
+                .map(|aud| aud.trim().to_string())
+                .filter(|aud| !aud.is_empty())
+                .collect()
+        });
 
         // Load algorithm (optional, defaults to RS256)
         let algorithm = variables::get("mcp_jwt_algorithm")
@@ -227,89 +255,6 @@ impl Provider {
             algorithm,
             required_scopes,
             oauth_endpoints,
-        }))
-    }
-
-    /// Load static provider configuration
-    fn load_static_provider() -> Result<Self> {
-        use std::collections::HashMap;
-
-        // Load static tokens from configuration
-        // Format: mcp_static_tokens = "token1:client1:user1:read,write[:expires_at[:org_id]];token2:client2:user2:admin"
-        let tokens_config = variables::get("mcp_static_tokens")
-            .map_err(|_| anyhow::anyhow!("Missing mcp_static_tokens for static provider"))?;
-
-        let mut tokens = HashMap::new();
-
-        for token_def in tokens_config.split(';') {
-            let token_def = token_def.trim();
-            if token_def.is_empty() {
-                continue;
-            }
-
-            let parts: Vec<&str> = token_def.split(':').collect();
-            if parts.len() < 4 {
-                return Err(anyhow::anyhow!(
-                    "Invalid static token format. Expected: token:client_id:sub:scope1,scope2"
-                ));
-            }
-
-            let token = (*parts
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Missing token"))?)
-            .to_string();
-            let client_id = (*parts
-                .get(1)
-                .ok_or_else(|| anyhow::anyhow!("Missing client_id"))?)
-            .to_string();
-            let sub = (*parts.get(2).ok_or_else(|| anyhow::anyhow!("Missing sub"))?).to_string();
-            let scopes = parts
-                .get(3)
-                .ok_or_else(|| anyhow::anyhow!("Missing scopes"))?
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            // Optional expiration timestamp as 5th part
-            let expires_at = parts.get(4).and_then(|s| s.parse::<i64>().ok());
-
-            // Optional org_id as 6th part (or 5th if no expiration)
-            let org_id = if expires_at.is_some() {
-                parts.get(5).map(|s| (*s).to_string())
-            } else {
-                // If 5th part is not a number, treat it as org_id
-                parts
-                    .get(4)
-                    .filter(|s| s.parse::<i64>().is_err())
-                    .map(|s| (*s).to_string())
-            };
-
-            tokens.insert(
-                token,
-                StaticTokenInfo {
-                    client_id,
-                    sub,
-                    scopes,
-                    expires_at,
-                    org_id,
-                },
-            );
-        }
-
-        if tokens.is_empty() {
-            return Err(anyhow::anyhow!("No static tokens configured"));
-        }
-
-        // Load required scopes (optional)
-        let required_scopes = variables::get("mcp_jwt_required_scopes")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.split(',').map(|scope| scope.trim().to_string()).collect());
-
-        Ok(Self::Static(StaticProvider {
-            tokens,
-            required_scopes,
         }))
     }
 }
@@ -379,4 +324,24 @@ fn normalize_url(url: &str) -> Result<String> {
     }
 
     Ok(normalized)
+}
+
+impl PolicyAuthorization {
+    /// Load policy authorization from Spin variables
+    pub fn load() -> Result<Self> {
+        // Load policy (required)
+        let policy = variables::get("mcp_policy")
+            .map_err(|_| anyhow::anyhow!("mcp_policy variable is required for authorization"))?;
+
+        if policy.is_empty() {
+            return Err(anyhow::anyhow!("mcp_policy cannot be empty"));
+        }
+
+        // Load policy data (optional)
+        let data = variables::get("mcp_policy_data")
+            .ok()
+            .filter(|s| !s.is_empty());
+
+        Ok(Self { policy, data })
+    }
 }

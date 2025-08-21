@@ -1,0 +1,237 @@
+name: Release Go CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+
+env:
+  GO_VERSION: '1.24'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify-tag:
+    name: Verify Tag on Main Branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify tag is on main branch
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          fi
+          
+          # Check if tag exists on main branch
+          if ! git merge-base --is-ancestor tags/$TAG_NAME origin/main 2>/dev/null; then
+            echo "::error::Tag $TAG_NAME is not on the main branch"
+            exit 1
+          fi
+
+  build-binaries:
+    name: Build ${{ matrix.name }}
+    needs: verify-tag
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            name: linux-amd64
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            name: linux-arm64
+            goos: linux
+            goarch: arm64
+          
+          # macOS builds
+          - os: macos-latest
+            name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION_WITHOUT_V=${VERSION#v}" >> $GITHUB_OUTPUT
+      
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        shell: bash
+        run: |
+          # Build with version information
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          LDFLAGS="-s -w"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.version=$VERSION"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.commit=$COMMIT"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.buildDate=$BUILD_DATE"
+          
+          go build -ldflags "$LDFLAGS" -o ftl ./cmd/ftl
+      
+      - name: Create archive
+        shell: bash
+        run: |
+          ARCHIVE_NAME="ftl-${{ steps.version.outputs.VERSION }}-${{ matrix.name }}"
+          tar czf "${ARCHIVE_NAME}.tar.gz" ftl README.md LICENSE
+          echo "ARCHIVE_PATH=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ftl-${{ matrix.name }}
+          path: ${{ env.ARCHIVE_PATH }}
+          if-no-files-found: error
+
+  create-release:
+    name: Create Release
+    needs: [verify-tag, build-binaries]
+    runs-on: ubuntu-latest
+    outputs:
+      release_url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          for dir in */; do
+            cd "$dir"
+            for file in *; do
+              if [ -f "$file" ]; then
+                sha256sum "$file" > "${file}.sha256"
+                mv "$file" "$file.sha256" ../
+              fi
+            done
+            cd ..
+          done
+          cd ..
+          mv artifacts/* .
+      
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Installation
+          
+          ### Quick Install (Linux/macOS)
+          
+          ```bash
+          # Download and install the latest version
+          curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+          ```
+          
+          ### Manual Installation
+          
+          Download the appropriate archive for your platform from the assets below, then:
+          
+          **Linux/macOS:**
+          ```bash
+          tar xzf ftl-*.tar.gz
+          chmod +x ftl
+          sudo mv ftl /usr/local/bin/
+          ```
+          
+          **Windows:**
+          ```powershell
+          # Extract the zip file
+          # Move ftl.exe to a directory in your PATH
+          ```
+          
+          ### Build from Source
+          
+          ```bash
+          go install github.com/fastertools/ftl-cli/cmd/ftl@${{ steps.version.outputs.VERSION }}
+          ```
+          
+          ### Verify Installation
+          
+          ```bash
+          ftl --version
+          ```
+          
+          ## What's Changed
+          
+          See the [full changelog](https://github.com/fastertools/ftl-cli/compare/...${{ steps.version.outputs.VERSION }})
+          
+          ## Checksums
+          
+          SHA256 checksums are provided for all release artifacts.
+          EOF
+      
+      - name: Create Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          generate_release_notes: true
+          body_path: release-notes.md
+          files: |
+            ftl-*.tar.gz
+            ftl-*.zip
+            *.sha256
+
+  publish-homebrew:
+    name: Update Homebrew Formula
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref, '-') }}  # Skip for pre-releases
+    steps:
+      - name: Trigger Homebrew update
+        run: |
+          echo "Would trigger Homebrew formula update here"
+          # This would typically trigger a workflow in a homebrew-tap repository

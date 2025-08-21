@@ -61,13 +61,13 @@ jobs:
           python-version: '3.10'
       
       - name: Setup Go
-        if: inputs.component == 'sdk-go'
+        if: inputs.component == 'sdk-go' || inputs.component == 'cli'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.x'
+          go-version: '1.24'
       
       - name: Setup Rust
-        if: inputs.component != 'sdk-typescript' && inputs.component != 'sdk-python' && inputs.component != 'sdk-go'
+        if: inputs.component == 'sdk-rust' || inputs.component == 'mcp-authorizer' || inputs.component == 'mcp-gateway'
         uses: ./.github/actions/setup-rust
         with:
           cache-key: prepare-release-v189
@@ -102,7 +102,13 @@ jobs:
           # Get current version based on component
           case "$COMPONENT" in
             cli)
-              CURRENT_VERSION=$(grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)
+              # For Go CLI, get version from latest tag or use 0.0.0 if no tags exist
+              LATEST_TAG=$(git tag --list "v*" --sort=-version:refname | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
+              if [ -z "$LATEST_TAG" ]; then
+                CURRENT_VERSION="0.0.0"
+              else
+                CURRENT_VERSION=${LATEST_TAG#v}
+              fi
               ;;
             sdk-rust)
               CURRENT_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
@@ -165,9 +171,9 @@ jobs:
           
           case "$COMPONENT" in
             cli)
-              sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" cli/Cargo.toml
-              # Update Cargo.lock - use workspace flag for consistency
-              cargo update --workspace -p ftl-cli --precise "$NEW_VERSION" || cargo update --workspace -p ftl-cli
+              # For Go CLI, just create a version file that can be used during build
+              echo "$NEW_VERSION" > VERSION
+              git add VERSION
               ;;
             sdk-rust)
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
@@ -239,20 +245,8 @@ jobs:
                 fi
               done
               
-              # Update template ftl.toml files to use the new version
-              echo "Updating component references in templates..."
-              find templates -name "ftl.toml" -type f | while read -r file; do
-                # Update gateway versions
-                if [ "${COMPONENT}" = "mcp-gateway" ]; then
-                  echo "Updating gateway version to ${NEW_VERSION} in $file"
-                  sed -i "s|^gateway = \"ghcr.io/fastertools/mcp-gateway:[^\"]*\"|gateway = \"ghcr.io/fastertools/mcp-gateway:${NEW_VERSION}\"|" "$file"
-                fi
-                # Update authorizer versions
-                if [ "${COMPONENT}" = "mcp-authorizer" ]; then
-                  echo "Updating authorizer version to ${NEW_VERSION} in $file"
-                  sed -i "s|^authorizer = \"ghcr.io/fastertools/mcp-authorizer:[^\"]*\"|authorizer = \"ghcr.io/fastertools/mcp-authorizer:${NEW_VERSION}\"|" "$file"
-                fi
-              done
+              # Note: Component references in scaffolded projects are handled at generation time
+              echo "Component version ${NEW_VERSION} will be used for new projects"
               ;;
           esac
       

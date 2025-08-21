@@ -30,11 +30,11 @@ check: format-check lint test
 # Build optimized release
 release: clean
 	cargo build --target wasm32-wasip1 --release
-	@echo "Release build complete: target/wasm32-wasip1/release/ftl_mcp_gateway.wasm"
+	@echo "Release build complete: target/wasm32-wasip1/release/mcp_gateway.wasm"
 
 publish: build
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
-	wkg oci push ghcr.io/fastertools/mcp-gateway:$$VERSION target/wasm32-wasip1/release/ftl_mcp_gateway.wasm
+	spin deps publish --registry ghcr.io --package fastertools:mcp-gateway@$$VERSION target/wasm32-wasip1/release/mcp_gateway.wasm
 
 # Help
 help:

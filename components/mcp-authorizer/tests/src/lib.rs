@@ -1,29 +1,36 @@
 use spin_test_sdk::{
-    bindings::{
-        fermyon::spin_test_virt::variables,
-        wasi::http
-    },
+    bindings::{fermyon::spin_test_virt::variables, wasi::http},
     spin_test,
 };
 
+mod authkit_integration_tests;
+mod critical_audit_test;
+mod critical_verification_test;
+mod gateway_forwarding_tests;
+mod jwks_caching_tests;
+mod jwt_test_utils_tests;
 mod jwt_tests;
 mod jwt_verification_tests;
-mod jwks_caching_tests;
-mod oauth_discovery_tests;
-mod error_response_tests;
-mod provider_config_tests;
 mod kid_validation_tests;
-mod scope_validation_tests;
-mod gateway_forwarding_tests;
-mod static_provider_tests;
-mod jwt_test_utils_tests;
-mod test_token_utils;
+mod multiple_audiences_tests;
+mod oauth_discovery_tests;
 mod optional_issuer_tests;
-mod authkit_integration_tests;
-mod tenant_validation_tests;
-mod test_helpers;
+mod policy_basic_tests;
+mod policy_complex_tests;
+mod policy_component_tests;
+mod policy_data_tests;
+mod policy_mcp_tool_tests;
+mod policy_org_mode_tests;
+mod policy_private_mode_tests;
+mod policy_test_helpers;
+mod provider_config_tests;
+mod scope_validation_tests;
 mod simple_test;
+mod test_audience_required;
+mod test_config_loading;
+mod test_helpers;
 mod test_setup;
+mod test_token_utils;
 
 // Response data helper to extract all needed information
 pub struct ResponseData {
@@ -35,26 +42,32 @@ pub struct ResponseData {
 impl ResponseData {
     pub fn from_response(response: http::types::IncomingResponse) -> Self {
         let status = response.status();
-        
+
         // Extract headers before consuming response
-        let headers = response.headers()
+        let headers = response
+            .headers()
             .entries()
             .into_iter()
             .map(|(name, value)| (name.to_string(), value.to_vec()))
             .collect();
-        
+
         // Now consume response to get body
         let body = response.body().unwrap_or_else(|_| Vec::new());
-        
-        Self { status, headers, body }
+
+        Self {
+            status,
+            headers,
+            body,
+        }
     }
-    
+
     pub fn find_header(&self, name: &str) -> Option<&Vec<u8>> {
-        self.headers.iter()
+        self.headers
+            .iter()
             .find(|(h_name, _)| h_name.eq_ignore_ascii_case(name))
             .map(|(_, value)| value)
     }
-    
+
     pub fn body_json(&self) -> Option<serde_json::Value> {
         if self.body.is_empty() {
             None
@@ -70,7 +83,7 @@ impl ResponseData {
 fn unauthenticated_request() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // Make request without auth header
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -106,7 +119,7 @@ fn options_cors_request() {
 fn metadata_endpoint() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // With the test configuration, we have a provider configured
     // Test /.well-known/oauth-protected-resource endpoint
     let headers = http::types::Headers::new();
@@ -133,7 +146,7 @@ fn metadata_endpoint() {
 fn authorization_server_metadata() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // With the test configuration, we have a provider configured
     // Test /.well-known/oauth-authorization-server endpoint
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -157,7 +170,7 @@ fn authorization_server_metadata() {
 fn provider_config_works() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // Test that the provider configuration works correctly
     // Make request to metadata endpoint
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -179,7 +192,7 @@ fn provider_config_works() {
 fn trace_id_header() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // Test that trace ID is propagated through requests
     let headers = http::types::Headers::new();
     headers.append("x-trace-id", b"test-trace-123").unwrap();
@@ -201,7 +214,7 @@ fn trace_id_header() {
 fn auth_enabled_requires_token() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // With auth enabled in test config, requests without auth should fail
     // Make request without auth header
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
@@ -221,7 +234,7 @@ fn auth_enabled_requires_token() {
 fn metadata_endpoint_with_provider() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     // Test /.well-known/oauth-protected-resource endpoint
     let headers = http::types::Headers::new();
     headers.append("host", b"example.com").unwrap();
@@ -260,6 +273,7 @@ fn https_enforcement_rejects_http() {
 fn https_enforcement_accepts_bare_domain() {
     // Test that bare domains work (https:// is added automatically)
     variables::set("mcp_jwt_issuer", "example.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly
@@ -277,6 +291,7 @@ fn https_enforcement_accepts_bare_domain() {
 fn https_enforcement_accepts_https_prefix() {
     // Test that explicit https:// URLs work
     variables::set("mcp_jwt_issuer", "https://example.authkit.app");
+    variables::set("mcp_jwt_audience", "test-api");
     // Don't set jwks_uri - let auto-derivation work for .authkit.app domain
 
     // Make a metadata request to verify it initialized correctly

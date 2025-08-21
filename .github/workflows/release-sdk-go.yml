@@ -1,9 +1,8 @@
 # Release Go SDK
 #
 # WORKFLOW PURPOSE:
-# This workflow handles the core Go SDK release process when a new version tag is pushed.
-# It creates GitHub releases and prepares template update PRs, but does NOT perform 
-# Go module proxy-dependent operations (those are handled by release-sdk-go-templates.yml).
+# This workflow handles the Go SDK release process when a new version tag is pushed.
+# It creates GitHub releases and updates the SDK version in the template configuration.
 #
 # FLOW:
 # 1. Tag validation and version parsing
@@ -11,7 +10,7 @@
 # 3. Create GitHub release with dual tagging strategy:
 #    - sdk-go-v{version} (release tracking)
 #    - sdk/go/v{version} (Go module resolution)
-# 4. Create template update PR with text-only changes (no go mod tidy)
+# 4. Create template version update PR
 #
 # FAILURE HANDLING:
 # - Manual workflow dispatch available for retries
@@ -127,9 +126,6 @@ jobs:
           echo "SUCCESS: Version $new is newer than $current"
         fi
 
-    # Note: Go SDK tests (including TinyGo compatibility) are handled by CI workflow
-    # This release workflow focuses on publishing and template updates
-
   release:
     name: Create Release
     needs: [verify-tag, validate-and-test]
@@ -218,17 +214,11 @@ jobs:
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          # Update Go templates (text-only changes, no go mod operations)
-          find templates -name "go.mod" -type f | while read -r file; do
-            if grep -q 'github.com/fastertools/ftl-cli/sdk/go' "$file"; then
-              # Update the require statement
-              sed -i "s|github.com/fastertools/ftl-cli/sdk/go v[^ ]*|github.com/fastertools/ftl-cli/sdk/go v$VERSION|" "$file"
-              echo "SUCCESS: Updated $file"
-              
-              # Note: go mod tidy and validation are handled by release-sdk-go-templates.yml
-              # to avoid Go module proxy timing dependencies
-            fi
-          done
+          # Update Go SDK version in versions.json
+          jq --arg v "$VERSION" '.go = $v' internal/scaffold/versions.json > versions.tmp
+          mv versions.tmp internal/scaffold/versions.json
+          
+          echo "✅ Updated Go SDK to v$VERSION in versions.json"
       
       - name: Commit changes
         run: |
@@ -257,8 +247,8 @@ jobs:
           This PR updates project templates to use the newly published Go SDK version.
           
           ### Changes
-          - Updated Go project templates to use SDK v${VERSION}
-          - Ran \`go mod tidy\` for all affected templates
+          - Updated Go SDK version to v${VERSION} in internal/scaffold/versions.json
+          - This will affect all new Go components created with \`ftl component add\`
           
           ### Context
           This is an automated PR created after successfully publishing Go SDK v${VERSION}.
@@ -266,8 +256,7 @@ jobs:
           ### Checklist
           - [x] SDK v${VERSION} tag has been created
           - [x] Go module subdirectory tag created for proper versioning
-          - [x] Templates updated to new version (text changes only)
-          - [ ] Go module validation (triggered by release-sdk-go-templates.yml)
+          - [x] Templates updated to new version
           - [ ] CI tests pass with new version
           
           ### Links

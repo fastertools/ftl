@@ -5,7 +5,7 @@ The MCP Authorizer includes test utilities to help with JWT token generation in 
 ## Basic Usage
 
 ```rust
-use ftl_mcp_authorizer::test_utils::{TestKeyPair, create_test_token};
+use mcp_authorizer::test_utils::{TestKeyPair, create_test_token};
 
 // Generate a test key pair
 let key_pair = TestKeyPair::generate();
@@ -22,7 +22,7 @@ let token = create_test_token(&key_pair, vec!["read", "write"]);
 The `TestTokenBuilder` provides a fluent API for creating customized tokens:
 
 ```rust
-use ftl_mcp_authorizer::test_utils::{TestKeyPair, TestTokenBuilder};
+use mcp_authorizer::test_utils::{TestKeyPair, TestTokenBuilder};
 use chrono::Duration;
 
 let key_pair = TestKeyPair::generate();
@@ -75,7 +75,7 @@ let token = key_pair.create_token(
 For testing token expiration:
 
 ```rust
-use ftl_mcp_authorizer::test_utils::create_expired_token;
+use mcp_authorizer::test_utils::create_expired_token;
 
 let expired_token = create_expired_token(&key_pair);
 ```
@@ -85,7 +85,7 @@ let expired_token = create_expired_token(&key_pair);
 ```rust
 #[test]
 fn test_jwt_authentication() {
-    use ftl_mcp_authorizer::test_utils::{TestKeyPair, TestTokenBuilder};
+    use mcp_authorizer::test_utils::{TestKeyPair, TestTokenBuilder};
     
     // Generate keys
     let key_pair = TestKeyPair::generate();

@@ -23,8 +23,8 @@ pub struct TokenInfo {
     /// Scopes
     pub scopes: Vec<String>,
 
-    /// Organization ID (optional)
-    pub org_id: Option<String>,
+    /// All claims from the token (for authorization and forwarding)
+    pub claims: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// JWT Claims structure
@@ -54,15 +54,7 @@ struct Claims {
     #[serde(skip_serializing_if = "Option::is_none")]
     scp: Option<ScopeValue>,
 
-    /// Client ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    client_id: Option<String>,
-
-    /// Organization ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    org_id: Option<String>,
-
-    /// Additional claims
+    /// Additional claims (captures all other claims)
     #[serde(flatten)]
     additional: serde_json::Map<String, serde_json::Value>,
 }
@@ -84,6 +76,7 @@ enum ScopeValue {
 }
 
 /// Verify a JWT token using the provided configuration
+#[allow(clippy::too_many_lines)]
 pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Result<TokenInfo> {
     // Decode header to get KID if present
     let header = decode_header(token)?;
@@ -125,19 +118,31 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
     };
     let mut validation = Validation::new(algorithm);
 
-    // Set issuer validation
+    // Set issuer validation (only if configured)
     if !provider.issuer.is_empty() {
         validation.set_issuer(&[&provider.issuer]);
     }
 
-    // Set audience validation
+    // Set audience validation (always required for security)
     if let Some(audiences) = &provider.audience {
         validation.set_audience(audiences);
     } else {
-        // Explicitly disable audience validation when no audience is configured
-        // This is needed for WorkOS AuthKit compatibility
-        validation.validate_aud = false;
+        // This should never happen as audience is required in config
+        return Err(AuthError::Configuration(
+            "Audience validation is required but no audience configured".to_string(),
+        ));
     }
+
+    // Enable nbf (not before) validation if present in token
+    validation.validate_nbf = true;
+
+    // Add leeway for clock skew tolerance (60 seconds is reasonable for distributed systems)
+    // This helps with slight time differences between the token issuer and validator
+    validation.leeway = 60;
+
+    // Set required claims - we always require exp (default), sub, and iss
+    // The jsonwebtoken library will ensure these claims are present before validation
+    validation.set_required_spec_claims(&["exp", "sub", "iss"]);
 
     // Decode and validate token
     let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
@@ -177,14 +182,57 @@ pub async fn verify(token: &str, provider: &JwtProvider, store: &Store) -> Resul
     }
 
     // Extract client ID (prefer explicit claim over sub)
-    let client_id = claims.client_id.as_ref().unwrap_or(&claims.sub).clone();
+    let client_id = claims
+        .additional
+        .get("client_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&claims.sub)
+        .to_string();
+
+    // Build complete claims map
+    let mut all_claims = std::collections::HashMap::new();
+    all_claims.insert(
+        "sub".to_string(),
+        serde_json::Value::String(claims.sub.clone()),
+    );
+    all_claims.insert(
+        "iss".to_string(),
+        serde_json::Value::String(claims.iss.clone()),
+    );
+    if let Some(aud) = claims.aud {
+        all_claims.insert(
+            "aud".to_string(),
+            match aud {
+                AudienceValue::Single(s) => serde_json::Value::String(s),
+                AudienceValue::Multiple(v) => serde_json::json!(v),
+            },
+        );
+    }
+    all_claims.insert("exp".to_string(), serde_json::json!(claims.exp));
+    all_claims.insert("iat".to_string(), serde_json::json!(claims.iat));
+    if let Some(scope) = claims.scope {
+        all_claims.insert("scope".to_string(), serde_json::Value::String(scope));
+    }
+    if let Some(scp) = claims.scp {
+        all_claims.insert(
+            "scp".to_string(),
+            match scp {
+                ScopeValue::String(s) => serde_json::Value::String(s),
+                ScopeValue::List(v) => serde_json::json!(v),
+            },
+        );
+    }
+    // Add all additional claims
+    for (key, value) in claims.additional {
+        all_claims.insert(key, value);
+    }
 
     Ok(TokenInfo {
         client_id,
         sub: claims.sub,
         iss: claims.iss,
         scopes,
-        org_id: claims.org_id,
+        claims: all_claims,
     })
 }
 

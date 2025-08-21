@@ -15,7 +15,7 @@ FTL's architecture is designed around security, performance, and polyglot compos
 
 FTL represents a sophisticated, WebAssembly-based framework for building and deploying polyglot Model Context Protocol (MCP) servers. The architecture demonstrates several key innovations:
 
-- **Dynamic Configuration Transpilation**: Simple `ftl.toml` configs expand into complex `spin.toml` runtime configurations
+- **Dynamic Configuration Transpilation**: Simple FTL configs expand into complex `spin.toml` runtime configurations
 - **Component-Based Security**: WebAssembly sandboxing with OAuth 2.0/JWT authentication
 - **Polyglot Tool Composition**: Multiple languages (Rust, Python, Go, TypeScript) unified through WASM Component Model  
 - **Edge-Optimized Deployment**: Sub-millisecond cold starts with global distribution capabilities
@@ -29,7 +29,7 @@ FTL represents a sophisticated, WebAssembly-based framework for building and dep
 
 ```mermaid
 graph TB
-    Client[MCP Client<br/>Claude, etc] 
+    Client[MCP Client<br/>Claude, etc]
     Gateway[FTL Gateway<br/>mcp-gateway]
     Auth[FTL Authorizer<br/>mcp-authorizer]
     Tools[Tool Components<br/>WASM]
@@ -310,7 +310,7 @@ mcp_jwt_issuer = { default = "https://divine-lion-50-staging.authkit.app" }
 mcp_jwt_audience = { default = "https://mcp-server" }
 mcp_jwt_jwks_uri = { default = "https://divine-lion-50-staging.authkit.app/.well-known/jwks.json" }
 mcp_authorization_header_name = { default = "Authorization" }
-mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal" }
+mcp_gateway_url = { default = "http://mcp-gateway.spin.internal" }
 # ... 10+ more variables
 ```
 
@@ -426,7 +426,7 @@ Add Context Headers:
 - x-auth-scopes: mcp:read mcp:write
 - x-auth-org-id: org-789 (if tenant isolation enabled)
     ↓
-Forward to Gateway: POST http://ftl-mcp-gateway.spin.internal/mcp
+Forward to Gateway: POST http://mcp-gateway.spin.internal/mcp
 ```
 
 ### 3. Gateway Processing  

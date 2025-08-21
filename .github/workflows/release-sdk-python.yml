@@ -224,22 +224,11 @@ jobs:
         run: |
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
-          # Update Python templates
-          find templates -name "requirements.txt" -type f | while read -r file; do
-            if grep -q 'ftl-sdk' "$file"; then
-              sed -i "s/ftl-sdk==.*/ftl-sdk==$VERSION/" "$file"
-              echo "✅ Updated $file"
-            fi
-          done
+          # Update Python SDK version in versions.json
+          jq --arg v "$VERSION" '.python = $v' internal/scaffold/versions.json > versions.tmp
+          mv versions.tmp internal/scaffold/versions.json
           
-          # Update pyproject.toml files in templates
-          find templates -name "pyproject.toml" -type f | while read -r file; do
-            if grep -q 'ftl-sdk' "$file"; then
-              # Update pinned version format: ftl-sdk==X.Y.Z
-              sed -i "s/ftl-sdk==[^\"']*/ftl-sdk==$VERSION/" "$file"
-              echo "✅ Updated $file"
-            fi
-          done
+          echo "✅ Updated Python SDK to v$VERSION in versions.json"
       
       - name: Commit changes
         run: |
@@ -268,7 +257,7 @@ jobs:
           This PR updates project templates to use the newly published ftl-sdk version.
           
           ### Changes
-          - Updated Python project templates to use ftl-sdk v${VERSION}
+          - Updated Python SDK version to v${VERSION} in internal/scaffold/versions.json
           
           ### Context
           This is an automated PR created after successfully publishing ftl-sdk v${VERSION} to PyPI.

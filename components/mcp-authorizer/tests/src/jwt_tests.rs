@@ -1,8 +1,6 @@
 use spin_test_sdk::{
     bindings::{
-        fermyon::spin_test_virt::variables,
-        fermyon::spin_wasi_virt::http_handler,
-        wasi::http,
+        fermyon::spin_test_virt::variables, fermyon::spin_wasi_virt::http_handler, wasi::http,
     },
     spin_test,
 };
@@ -10,8 +8,8 @@ use spin_test_sdk::{
 use base64::Engine;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::EncodePublicKey, RsaPrivateKey, RsaPublicKey};
 use rsa::traits::PublicKeyParts;
+use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::EncodePublicKey, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -58,11 +56,9 @@ fn generate_rsa_key_pair() -> (RsaPrivateKey, RsaPublicKey) {
 
 /// Mock JWKS endpoint
 fn mock_jwks_endpoint(public_key: &RsaPublicKey, url: &str) {
-    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(&public_key.n().to_bytes_be());
-    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(&public_key.e().to_bytes_be());
-    
+    let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
+
     let jwks = json!({
         "keys": [{
             "kty": "RSA",
@@ -72,19 +68,16 @@ fn mock_jwks_endpoint(public_key: &RsaPublicKey, url: &str) {
             "e": e
         }]
     });
-    
+
     let response = http::types::OutgoingResponse::new(http::types::Headers::new());
     response.set_status_code(200).unwrap();
     let headers = response.headers();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let body = response.body().unwrap();
     body.write_bytes(serde_json::to_string(&jwks).unwrap().as_bytes());
-    
-    http_handler::set_response(
-        url,
-        http_handler::ResponseHandler::Response(response),
-    );
+
+    http_handler::set_response(url, http_handler::ResponseHandler::Response(response));
 }
 
 fn create_token(
@@ -97,7 +90,7 @@ fn create_token(
 ) -> String {
     let now = Utc::now();
     let exp = now + Duration::seconds(expires_in_seconds);
-    
+
     let mut claims = Claims {
         sub: subject.to_string(),
         iss: issuer.to_string(),
@@ -120,7 +113,8 @@ fn create_token(
         if let Some(s) = scp.as_str() {
             claims.scp = Some(ScopeValue::String(s.to_string()));
         } else if let Some(arr) = scp.as_array() {
-            let scopes: Vec<String> = arr.iter()
+            let scopes: Vec<String> = arr
+                .iter()
                 .filter_map(|v| v.as_str())
                 .map(|s| s.to_string())
                 .collect();
@@ -129,7 +123,9 @@ fn create_token(
     }
 
     let header = Header::new(Algorithm::RS256);
-    let pem_string = private_key.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap();
+    let pem_string = private_key
+        .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+        .unwrap();
     let encoding_key = EncodingKey::from_rsa_pem(pem_string.as_bytes()).unwrap();
 
     jsonwebtoken::encode(&header, &claims, &encoding_key).unwrap()
@@ -145,12 +141,14 @@ fn create_token_with_scopes(
     let aud = audience.map(|a| AudienceValue::Single(a.to_string()));
     let mut additional = serde_json::Map::new();
     additional.insert("scope".to_string(), json!(scopes.join(" ")));
-    
+
     create_token(private_key, subject, issuer, aud, 3600, additional)
 }
 
 fn get_public_key_pem(public_key: &RsaPublicKey) -> String {
-    public_key.to_public_key_pem(rsa::pkcs8::LineEnding::LF).unwrap()
+    public_key
+        .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
+        .unwrap()
 }
 
 // Mock JWKS response helper
@@ -164,8 +162,8 @@ fn mock_jwks_response(public_key: &RsaPublicKey, kid: Option<&str>) -> Value {
             "use": "sig",
             "alg": "RS256",
             "kid": kid.unwrap_or("test-key-1"),
-            "n": base64::engine::general_purpose::STANDARD.encode(&public_key.n().to_bytes_be()),
-            "e": base64::engine::general_purpose::STANDARD.encode(&public_key.e().to_bytes_be())
+            "n": base64::engine::general_purpose::STANDARD.encode(public_key.n().to_bytes_be()),
+            "e": base64::engine::general_purpose::STANDARD.encode(public_key.e().to_bytes_be())
         }]
     })
 }
@@ -176,13 +174,13 @@ fn test_valid_token_with_public_key() {
     // Configure provider with a test public key
     let (private_key, public_key) = generate_rsa_key_pair();
     let public_key_pem = get_public_key_pem(&public_key);
-    
+
     // Set up configuration with public key instead of JWKS
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
-    variables::set("mcp_jwt_issuer", "https://test.example.com");  // Use non-authkit issuer to avoid auto-derivation
+    variables::set("mcp_gateway_url", "none");
+    variables::set("mcp_jwt_issuer", "https://test.example.com"); // Use non-authkit issuer to avoid auto-derivation
     variables::set("mcp_jwt_audience", "test-audience");
     variables::set("mcp_jwt_public_key", &public_key_pem);
-    
+
     // Mock MCP gateway
     let gateway_response = http::types::OutgoingResponse::new(http::types::Headers::new());
     gateway_response.set_status_code(200).unwrap();
@@ -194,30 +192,32 @@ fn test_valid_token_with_public_key() {
         "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
-    
+
     // Create a valid token
     let token = create_token_with_scopes(
         &private_key,
         "test-user",
-        "https://test.example.com",  // Match the configured issuer
+        "https://test.example.com", // Match the configured issuer
         Some("test-audience"),
         vec!["read", "write"],
     );
-    
+
     // Make request with valid token
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", token).as_bytes())
+        .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_path_with_query(Some("/mcp")).unwrap();
     request.set_method(&http::types::Method::Post).unwrap();
-    
+
     let body = request.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
-    
+
     let response = spin_test_sdk::perform_request(request);
-    
+
     // Should succeed with public key verification
     assert_eq!(response.status(), 200);
 }
@@ -227,20 +227,21 @@ fn test_valid_token_with_public_key() {
 fn test_missing_authorization_header() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
-    
+
     assert_eq!(response.status(), 401);
-    
+
     // Check WWW-Authenticate header
     let headers = response.headers();
     let entries = headers.entries();
-    let www_auth = entries.iter()
+    let www_auth = entries
+        .iter()
         .find(|(name, _)| name == "www-authenticate")
         .map(|(_, value)| String::from_utf8_lossy(value));
-    
+
     assert!(www_auth.is_some());
     let auth_value = www_auth.unwrap();
     assert!(auth_value.contains("Bearer"));
@@ -253,23 +254,26 @@ fn test_missing_authorization_header() {
 fn test_invalid_bearer_format() {
     // Setup default configuration
     crate::test_setup::setup_default_test_config();
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", b"InvalidFormat token").unwrap();
-    
+    headers
+        .append("authorization", b"InvalidFormat token")
+        .unwrap();
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
-    
+
     assert_eq!(response.status(), 401);
-    
+
     // Check error response
     let headers = response.headers();
     let entries = headers.entries();
-    let www_auth = entries.iter()
+    let www_auth = entries
+        .iter()
         .find(|(name, _)| name == "www-authenticate")
         .map(|(_, value)| String::from_utf8_lossy(value));
-    
+
     assert!(www_auth.is_some());
     assert!(www_auth.unwrap().contains("error=\"invalid_token\""));
 }
@@ -277,21 +281,26 @@ fn test_invalid_bearer_format() {
 // Test: Malformed JWT token
 #[spin_test]
 fn test_malformed_jwt() {
+    // Setup default configuration
+    crate::test_setup::setup_default_test_config();
+
     let malformed_tokens = vec![
         "not.a.jwt",
         "too.many.parts.here.invalid",
         "invalid-token",
         "header.payload", // Missing signature
     ];
-    
+
     for token in malformed_tokens {
         let headers = http::types::Headers::new();
-        headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
-        
+        headers
+            .append("authorization", format!("Bearer {}", token).as_bytes())
+            .unwrap();
+
         let request = http::types::OutgoingRequest::new(headers);
         request.set_path_with_query(Some("/mcp")).unwrap();
         let response = spin_test_sdk::perform_request(request);
-        
+
         assert_eq!(response.status(), 401);
     }
 }
@@ -301,16 +310,22 @@ fn test_malformed_jwt() {
 fn test_expired_token() {
     // Set up test configuration
     use spin_test_sdk::bindings::fermyon::spin_test_virt::variables;
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
-    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set(
+        "mcp_jwt_jwks_uri",
+        "https://test.authkit.app/.well-known/jwks.json",
+    );
     variables::set("mcp_jwt_audience", "test-audience");
-    
+
     let (private_key, public_key) = generate_rsa_key_pair();
-    
+
     // Mock JWKS endpoint
-    mock_jwks_endpoint(&public_key, "https://test.authkit.app/.well-known/jwks.json");
-    
+    mock_jwks_endpoint(
+        &public_key,
+        "https://test.authkit.app/.well-known/jwks.json",
+    );
+
     // Create an expired token
     let token = create_token(
         &private_key,
@@ -320,14 +335,16 @@ fn test_expired_token() {
         -3600, // Expired 1 hour ago
         serde_json::Map::new(),
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
-    
+    headers
+        .append("authorization", format!("Bearer {}", token).as_bytes())
+        .unwrap();
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
-    
+
     assert_eq!(response.status(), 401);
 }
 
@@ -335,16 +352,22 @@ fn test_expired_token() {
 #[spin_test]
 fn test_multiple_audiences() {
     // Set up test configuration
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "https://test.authkit.app");
-    variables::set("mcp_jwt_jwks_uri", "https://test.authkit.app/.well-known/jwks.json");
+    variables::set(
+        "mcp_jwt_jwks_uri",
+        "https://test.authkit.app/.well-known/jwks.json",
+    );
     variables::set("mcp_jwt_audience", "test-audience");
-    
+
     let (private_key, public_key) = generate_rsa_key_pair();
-    
+
     // Mock JWKS endpoint
-    mock_jwks_endpoint(&public_key, "https://test.authkit.app/.well-known/jwks.json");
-    
+    mock_jwks_endpoint(
+        &public_key,
+        "https://test.authkit.app/.well-known/jwks.json",
+    );
+
     // Mock MCP gateway
     let gateway_response = http::types::OutgoingResponse::new(http::types::Headers::new());
     gateway_response.set_status_code(200).unwrap();
@@ -356,7 +379,7 @@ fn test_multiple_audiences() {
         "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
-    
+
     // Create token with multiple audiences
     let additional = serde_json::Map::new();
     let token = create_token(
@@ -370,20 +393,22 @@ fn test_multiple_audiences() {
         3600,
         additional,
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", token).as_bytes())
+        .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_path_with_query(Some("/mcp")).unwrap();
     request.set_method(&http::types::Method::Post).unwrap();
-    
+
     let body = request.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
-    
+
     let response = spin_test_sdk::perform_request(request);
-    
+
     // Should succeed - one of the audiences matches configured audience
     assert_eq!(response.status(), 200);
 }
@@ -392,11 +417,11 @@ fn test_multiple_audiences() {
 #[spin_test]
 fn test_scope_formats() {
     let (private_key, _) = generate_rsa_key_pair();
-    
+
     // Test 1: Standard OAuth2 'scope' claim as string
     let mut additional = serde_json::Map::new();
     additional.insert("scope".to_string(), json!("read write admin"));
-    
+
     let token = create_token(
         &private_key,
         "test-user",
@@ -405,14 +430,14 @@ fn test_scope_formats() {
         3600,
         additional,
     );
-    
+
     // Test would verify scope extraction in actual implementation
     assert!(!token.is_empty());
-    
+
     // Test 2: Microsoft-style 'scp' claim as string
     let mut additional = serde_json::Map::new();
     additional.insert("scp".to_string(), json!("read write admin"));
-    
+
     let token = create_token(
         &private_key,
         "test-user",
@@ -421,13 +446,13 @@ fn test_scope_formats() {
         3600,
         additional,
     );
-    
+
     assert!(!token.is_empty());
-    
+
     // Test 3: 'scp' claim as array
     let mut additional = serde_json::Map::new();
     additional.insert("scp".to_string(), json!(["read", "write", "admin"]));
-    
+
     let token = create_token(
         &private_key,
         "test-user",
@@ -436,7 +461,7 @@ fn test_scope_formats() {
         3600,
         additional,
     );
-    
+
     assert!(!token.is_empty());
 }
 
@@ -447,12 +472,12 @@ fn test_provider_requires_key_or_jwks() {
     variables::set("mcp_jwt_issuer", "https://example.com");
     variables::set("mcp_jwt_jwks_uri", ""); // Empty JWKS URI
     variables::set("mcp_jwt_audience", "");
-    
+
     // Component should fail to initialize without key or JWKS URI
     let request = http::types::OutgoingRequest::new(http::types::Headers::new());
     request.set_path_with_query(Some("/mcp")).unwrap();
     let response = spin_test_sdk::perform_request(request);
-    
+
     assert_eq!(response.status(), 500);
 }
 
@@ -462,13 +487,13 @@ fn test_string_issuer() {
     // Configure provider with string issuer (kept as-is per RFC 7519)
     let (private_key, public_key) = generate_rsa_key_pair();
     let public_key_pem = get_public_key_pem(&public_key);
-    
-    variables::set("mcp_gateway_url", "https://test-gateway.spin.internal");
+
+    variables::set("mcp_gateway_url", "none");
     variables::set("mcp_jwt_issuer", "my-service"); // String issuer kept as-is
     variables::set("mcp_jwt_audience", "test-audience");
     variables::set("mcp_jwt_public_key", &public_key_pem);
     // Don't set jwks_uri at all to avoid conflicts
-    
+
     // Mock MCP gateway
     let gateway_response = http::types::OutgoingResponse::new(http::types::Headers::new());
     gateway_response.set_status_code(200).unwrap();
@@ -480,7 +505,7 @@ fn test_string_issuer() {
         "https://test-gateway.spin.internal/mcp",
         http_handler::ResponseHandler::Response(gateway_response),
     );
-    
+
     // Create token with string issuer (not URL)
     let token = create_token(
         &private_key,
@@ -490,20 +515,22 @@ fn test_string_issuer() {
         3600,
         serde_json::Map::new(),
     );
-    
+
     let headers = http::types::Headers::new();
-    headers.append("authorization", format!("Bearer {}", token).as_bytes()).unwrap();
+    headers
+        .append("authorization", format!("Bearer {}", token).as_bytes())
+        .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_path_with_query(Some("/mcp")).unwrap();
     request.set_method(&http::types::Method::Post).unwrap();
-    
+
     let body = request.body().unwrap();
     body.write_bytes(b"{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}");
-    
+
     let response = spin_test_sdk::perform_request(request);
-    
+
     // Should succeed because string issuer matches exactly
     assert_eq!(response.status(), 200);
 }
@@ -512,11 +539,11 @@ fn test_string_issuer() {
 #[spin_test]
 fn test_client_id_extraction() {
     let (private_key, _) = generate_rsa_key_pair();
-    
+
     // Test with explicit client_id claim
     let mut additional = serde_json::Map::new();
     additional.insert("client_id".to_string(), json!("app456"));
-    
+
     let token = create_token(
         &private_key,
         "user123", // sub claim
@@ -525,7 +552,7 @@ fn test_client_id_extraction() {
         3600,
         additional,
     );
-    
+
     // Token should prefer client_id over sub when both present
     assert!(!token.is_empty());
 }

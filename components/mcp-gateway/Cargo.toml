@@ -1,8 +1,8 @@
 [package]
-name = "ftl-mcp-gateway"
+name = "mcp-gateway"
 authors.workspace = true
 description = "MCP gateway component"
-version = "0.0.12"
+version = "0.0.13-alpha.0"
 license.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ categories = ["web-programming", "wasm"]
 publish = false
 
 [lib]
-name = "ftl_mcp_gateway"
+name = "mcp_gateway"
 crate-type = ["cdylib"]
 
 [package.metadata.component]

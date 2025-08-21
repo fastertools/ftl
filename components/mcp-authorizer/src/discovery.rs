@@ -57,7 +57,7 @@ pub fn oauth_protected_resource(
 ) -> Response {
     // Build metadata based on provider type
     let metadata = match &config.provider {
-        crate::config::Provider::Jwt(jwt_provider) => {
+        Some(crate::config::Provider::Jwt(jwt_provider)) => {
             // For AuthKit domains, return simplified metadata pointing to AuthKit
             let authorization_servers = if !jwt_provider.issuer.is_empty()
                 && (jwt_provider.issuer.contains(".authkit.app")
@@ -85,17 +85,13 @@ pub fn oauth_protected_resource(
                 },
             })
         }
-        crate::config::Provider::Static(_) => {
+        None => {
+            // Public mode - no authentication required
             json!({
                 "resource": get_resource_urls(req),
                 "authorization_servers": [],
-                "bearer_methods_supported": ["header"],
-                "authentication_methods": {
-                    "bearer": {
-                        "required": true,
-                        "description": "Static token authentication for development",
-                    }
-                },
+                "bearer_methods_supported": [],
+                "authentication_methods": {},
             })
         }
     };
@@ -111,7 +107,7 @@ pub fn oauth_authorization_server(
 ) -> Response {
     // Build metadata based on provider type
     let metadata = match &config.provider {
-        crate::config::Provider::Jwt(jwt_provider) => {
+        Some(crate::config::Provider::Jwt(jwt_provider)) => {
             // For AuthKit domains, return comprehensive metadata
             if !jwt_provider.issuer.is_empty()
                 && (jwt_provider.issuer.contains(".authkit.app")
@@ -165,11 +161,11 @@ pub fn oauth_authorization_server(
                 })
             }
         }
-        crate::config::Provider::Static(_) => {
-            // Static provider has no authorization server
+        None => {
+            // Public mode - no authorization server
             json!({
                 "error": "not_supported",
-                "error_description": "Static token provider does not support OAuth authorization server metadata"
+                "error_description": "Public mode does not require OAuth authorization"
             })
         }
     };
@@ -187,7 +183,7 @@ pub fn openid_configuration(
     // but with some additional fields
     // Build metadata based on provider type
     let metadata = match &config.provider {
-        crate::config::Provider::Jwt(jwt_provider) => {
+        Some(crate::config::Provider::Jwt(jwt_provider)) => {
             // For AuthKit, return AuthKit-specific OpenID metadata
             if !jwt_provider.issuer.is_empty()
                 && (jwt_provider.issuer.contains(".authkit.app")
@@ -255,11 +251,11 @@ pub fn openid_configuration(
                 })
             }
         }
-        crate::config::Provider::Static(_) => {
-            // Static provider has no OAuth support
+        None => {
+            // Public mode - no OpenID support
             json!({
                 "error": "not_supported",
-                "error_description": "Static token provider does not support OpenID Connect"
+                "error_description": "Public mode does not require OpenID Connect"
             })
         }
     };

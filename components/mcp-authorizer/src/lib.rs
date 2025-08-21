@@ -12,11 +12,12 @@ mod discovery;
 mod error;
 mod forwarding;
 mod jwks;
-mod static_token;
+mod policy;
 mod token;
 
-use config::Config;
+use config::{Config, PolicyAuthorization};
 use error::{AuthError, Result};
+use policy::PolicyEngine;
 
 /// Main HTTP component handler
 #[spin_sdk::http_component]
@@ -26,72 +27,175 @@ async fn handle_request(req: Request) -> anyhow::Result<impl IntoResponse> {
         return Ok(create_cors_response());
     }
 
-    // Load configuration
-    let config = Config::load()?;
+    // Load configuration and handle errors properly
+    let config = match Config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Configuration failed: {e}");
+            // Return configuration error as a proper HTTP response
+            let error = AuthError::Configuration(format!("Configuration error: {e}"));
+            return Ok(create_config_error_response(&error));
+        }
+    };
 
     // Extract trace ID for request tracking
     let trace_id = extract_trace_id(&req, &config.trace_header);
+
+    // Log request details for debugging
+    if let Some(ref id) = trace_id {
+        log::info!("[{}] {} {}", id, req.method(), req.path());
+    } else {
+        log::info!("{} {}", req.method(), req.path());
+    }
 
     // Handle OAuth discovery endpoints (no auth required)
     if let Some(response) = handle_discovery(&req, &config, trace_id.as_ref()) {
         return Ok(response);
     }
 
-    // Authenticate the request - auth is always required
-    match authenticate(&req, &config).await {
+    // For POST requests with JSON content, capture the body for potential policy evaluation
+    // The policy decides whether to use this information
+    let body_bytes = if *req.method() == spin_sdk::http::Method::Post {
+        // Check if it's likely JSON content
+        let is_json = req.headers().any(|(name, value)| {
+            name.eq_ignore_ascii_case("content-type")
+                && value.as_str().is_some_and(|v| v.contains("json"))
+        });
+
+        if is_json {
+            Some(req.body().to_vec())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Authentication is always required for an auth gateway
+    // The presence of a provider configuration determines the auth method
+    match authenticate_with_policy(&req, &config, body_bytes.as_deref()).await {
         Ok(auth_context) => {
-            // Forward authenticated request
-            forward_request(req, &config, auth_context, trace_id).await
+            // Only forward if gateway URL is configured and valid
+            // This allows tests to run without forwarding
+            if !config.gateway_url.is_empty() && config.gateway_url != "none" {
+                // Reconstruct request with body if we consumed it
+                let req_to_forward = if let Some(body) = body_bytes {
+                    // Collect headers first
+                    let headers: Vec<(String, String)> = req
+                        .headers()
+                        .map(|(name, value)| {
+                            (name.to_string(), value.as_str().unwrap_or("").to_string())
+                        })
+                        .collect();
+
+                    // Create a new request with headers and body
+                    Request::builder()
+                        .method(req.method().clone())
+                        .uri(req.uri())
+                        .headers(headers)
+                        .body(body)
+                        .build()
+                } else {
+                    req
+                };
+                forward_request(req_to_forward, &config, auth_context, trace_id).await
+            } else {
+                // No gateway configured - return success directly (for testing)
+                Ok(Response::new(200, "OK"))
+            }
         }
         Err(auth_error) => {
+            // Log auth failures for debugging
+            if let Some(ref id) = trace_id {
+                log::info!("[{id}] Auth failed: {auth_error}");
+            } else {
+                log::info!("Auth failed: {auth_error}");
+            }
             // Return authentication error
             Ok(create_error_response(&auth_error, &req, &config, trace_id))
         }
     }
 }
 
-/// Authenticate the incoming request
-async fn authenticate(req: &Request, config: &Config) -> Result<auth::Context> {
+/// Authenticate the incoming request with policy-based authorization
+async fn authenticate_with_policy(
+    req: &Request,
+    config: &Config,
+    body: Option<&[u8]>,
+) -> Result<auth::Context> {
     // Extract bearer token
     let token = auth::extract_bearer_token(req)?;
 
-    // Verify token based on provider type
-    let token_info = match &config.provider {
+    // Provider must exist for authentication
+    let provider = config.provider.as_ref().ok_or_else(|| {
+        AuthError::Unauthorized("No authentication provider configured".to_string())
+    })?;
+
+    // Verify token using JWT provider
+    let token_info = match provider {
         config::Provider::Jwt(jwt_provider) => {
             // Open KV store for JWKS caching
             let store = Store::open_default()
-                .map_err(|e| AuthError::Internal(format!("Failed to open KV store: {e}")))?;
+                .map_err(|e| {
+                    log::error!("Failed to open KV store: {e}");
+                    log::error!("HINT: Ensure the mcp-authorizer component has 'key_value_stores = [\"default\"]' in spin.toml");
+                    AuthError::Internal("KV store access denied. Ensure component has key_value_stores permission in spin.toml".to_string())
+                })?;
 
-            // Verify JWT token
+            // Verify JWT token (signature, expiry, issuer, audience)
             token::verify(token, jwt_provider, &store).await?
-        }
-        config::Provider::Static(static_provider) => {
-            // Verify static token
-            static_token::verify(token, static_provider)?
         }
     };
 
-    // Check tenant restriction if configured
-    if let Some(required_tenant) = &config.tenant_id {
-        // Extract tenant ID from token (org_id for organizations, sub for individuals)
-        let token_tenant = token_info.org_id.as_ref().unwrap_or(&token_info.sub);
-
-        if token_tenant != required_tenant {
-            return Err(AuthError::Unauthorized(
-                "Access denied: invalid tenant".to_string(),
-            ));
-        }
+    // Apply policy-based authorization if configured
+    if let Some(policy_config) = &config.authorization {
+        apply_policy_authorization(&token_info, req, body, policy_config)?;
     }
 
-    // Build auth context
+    // Build auth context with all available claims
     Ok(auth::Context {
         client_id: token_info.client_id,
         user_id: token_info.sub.clone(),
         scopes: token_info.scopes,
         issuer: token_info.iss,
         raw_token: token.to_string(),
-        org_id: token_info.org_id,
+        additional_claims: token_info.claims,
     })
+}
+
+/// Apply policy-based authorization using Regorous
+fn apply_policy_authorization(
+    token_info: &token::TokenInfo,
+    req: &Request,
+    body: Option<&[u8]>,
+    policy_config: &PolicyAuthorization,
+) -> Result<()> {
+    log::debug!("Applying policy-based authorization");
+
+    // Create policy engine with the configured policy and data
+    let mut engine = PolicyEngine::new_with_policy_and_data(
+        &policy_config.policy,
+        policy_config.data.as_deref(),
+    )
+    .map_err(|e| {
+        log::error!("Failed to initialize policy engine: {e}");
+        AuthError::Configuration(format!("Failed to initialize policy engine: {e}"))
+    })?;
+
+    log::trace!("Policy engine created, evaluating authorization");
+
+    // Evaluate policy
+    let allowed = engine.evaluate(token_info, req, body)?;
+
+    if !allowed {
+        log::debug!("Authorization denied by policy");
+        return Err(AuthError::Unauthorized(
+            "Access denied by authorization policy".to_string(),
+        ));
+    }
+
+    log::debug!("Authorization granted by policy");
+    Ok(())
 }
 
 /// Handle OAuth discovery endpoints
@@ -242,4 +346,27 @@ fn extract_host(req: &Request) -> Option<String> {
                 .and_then(|(_, value)| value.as_str())
                 .map(String::from)
         })
+}
+
+/// Create configuration error response (simpler version without request context)
+fn create_config_error_response(error: &AuthError) -> Response {
+    let body = serde_json::json!({
+        "error": "server_error",
+        "error_description": error.to_string()
+    });
+
+    Response::builder()
+        .status(500)
+        .header("content-type", "application/json")
+        .header("access-control-allow-origin", "*")
+        .header(
+            "access-control-allow-methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        )
+        .header(
+            "access-control-allow-headers",
+            "Content-Type, Authorization",
+        )
+        .body(body.to_string())
+        .build()
 }
