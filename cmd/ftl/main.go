@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/fastertools/ftl-cli/internal/cli"
+	"github.com/fastertools/ftl/internal/cli"
 )
 
 // Version information set at build time

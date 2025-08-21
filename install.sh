@@ -12,7 +12,7 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO="fastertools/ftl-cli"
+REPO="fastertools/ftl"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="ftl"
 
@@ -62,14 +62,15 @@ detect_platform() {
     echo "${PLATFORM}-${ARCH}"
 }
 
-# Get the latest release version
+# Get the latest CLI release version
 get_latest_version() {
-    local url="https://api.github.com/repos/${REPO}/releases/latest"
+    local url="https://api.github.com/repos/${REPO}/releases"
     
+    # Get releases and filter for CLI releases (cli-v*)
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+        curl -fsSL "$url" | grep '"tag_name":' | grep '"cli-v' | head -1 | sed -E 's/.*"([^"]+)".*/\1/'
     elif command -v wget >/dev/null 2>&1; then
-        wget -qO- "$url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+        wget -qO- "$url" | grep '"tag_name":' | grep '"cli-v' | head -1 | sed -E 's/.*"([^"]+)".*/\1/'
     else
         error "Neither curl nor wget found. Please install one of them."
     fi
@@ -86,7 +87,9 @@ install_ftl() {
     
     info "Installing FTL CLI ${version} for ${platform}..."
     
-    local archive_name="ftl-${version}-${platform}.tar.gz"
+    # Strip 'cli-v' prefix from version for archive name
+    local version_num="${version#cli-v}"
+    local archive_name="ftl-${version_num}-${platform}.tar.gz"
     local download_url="https://github.com/${REPO}/releases/download/${version}/${archive_name}"
     
     # Create temporary directory

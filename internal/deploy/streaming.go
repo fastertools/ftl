@@ -17,7 +17,7 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/fastertools/ftl-cli/internal/api"
+	"github.com/fastertools/ftl/internal/api"
 )
 
 // StreamEvent represents a deployment progress event from the streaming response

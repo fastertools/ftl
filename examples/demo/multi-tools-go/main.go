@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 	
-	ftl "github.com/fastertools/ftl-cli/sdk/go"
+	ftl "github.com/fastertools/ftl/sdk/go"
 )
 
 func init() {

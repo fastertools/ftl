@@ -9,7 +9,7 @@ Faster tools for AI agents
 [![Rust](https://img.shields.io/badge/rust-1.89+-orange.svg)](https://www.rust-lang.org)
 [![Discord](https://img.shields.io/discord/1397659435177869403?logo=discord&label=Discord&link=https%3A%2F%2Fdiscord.gg%2FByFw4eKEU7)](https://discord.gg/ByFw4eKEU7)
 
-[Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Releases](https://github.com/fastertools/ftl-cli/releases)
+[Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Releases](https://github.com/fastertools/ftl/releases)
 
 ⚡️ [Quick Start](#quick-start)
 
@@ -62,10 +62,10 @@ To build tools in different languages, you'll need their corresponding toolchain
 
 To get `ftl` installed run the [install script](install.sh). Download and run manually or download and install with curl/wget:
 ```bash
-curl -o- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+curl -o- https://raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
 ```
 ```bash
-wget -qO- https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
 ```
 
 ### Create a new project and scaffold a tool

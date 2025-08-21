@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/fastertools/ftl-cli/pkg/oci"
-	"github.com/fastertools/ftl-cli/pkg/validation"
+	"github.com/fastertools/ftl/oci"
+	"github.com/fastertools/ftl/validation"
 )
 
 func TestDeployCommand(t *testing.T) {

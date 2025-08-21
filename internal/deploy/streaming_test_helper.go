@@ -1,7 +1,7 @@
 package deploy
 
 import (
-	"github.com/fastertools/ftl-cli/internal/api"
+	"github.com/fastertools/ftl/internal/api"
 )
 
 // Helper function to create test credentials

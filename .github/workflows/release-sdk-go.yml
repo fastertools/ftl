@@ -168,19 +168,19 @@ jobs:
           ### Installation
           
           ```bash
-          go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}
+          go get github.com/fastertools/ftl/sdk/go@v${{ needs.verify-tag.outputs.version }}
           ```
           
           ### Links
           
-          - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }})
-          - [Documentation](https://github.com/fastertools/ftl-cli/tree/main/sdk/go)
+          - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl/sdk/go@v${{ needs.verify-tag.outputs.version }})
+          - [Documentation](https://github.com/fastertools/ftl/tree/main/sdk/go)
 
     - name: Report module information
       run: |
         echo ""
         echo "Go module users can import with:"
-        echo "  go get github.com/fastertools/ftl-cli/sdk/go@v${{ needs.verify-tag.outputs.version }}"
+        echo "  go get github.com/fastertools/ftl/sdk/go@v${{ needs.verify-tag.outputs.version }}"
         echo ""
         echo "Created tags:"
         echo "  - sdk-go-v${{ needs.verify-tag.outputs.version }} (release tracking)"
@@ -215,7 +215,7 @@ jobs:
           VERSION="${{ needs.verify-tag.outputs.version }}"
           
           # Update Go SDK version in versions.json
-          jq --arg v "$VERSION" '.go = $v' internal/scaffold/versions.json > versions.tmp
+          jq --arg v "$VERSION" '.sdk.go = $v' internal/scaffold/versions.json > versions.tmp
           mv versions.tmp internal/scaffold/versions.json
           
           echo "✅ Updated Go SDK to v$VERSION in versions.json"
@@ -260,8 +260,8 @@ jobs:
           - [ ] CI tests pass with new version
           
           ### Links
-          - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go@v${VERSION})
-          - [Release](https://github.com/fastertools/ftl-cli/releases/tag/sdk-go-v${VERSION})
+          - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl/sdk/go@v${VERSION})
+          - [Release](https://github.com/fastertools/ftl/releases/tag/sdk-go-v${VERSION})
           
           ---
           *This PR was automatically created by the release workflow*

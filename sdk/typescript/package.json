@@ -1,6 +1,6 @@
 {
   "name": "ftl-sdk",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "Thin SDK providing MCP protocol types for FTL tool development",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -54,10 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/fastertools/ftl-cli.git"
+    "url": "https://github.com/fastertools/ftl.git"
   },
   "bugs": {
-    "url": "https://github.com/fastertools/ftl-cli/issues"
+    "url": "https://github.com/fastertools/ftl/issues"
   },
-  "homepage": "https://github.com/fastertools/ftl-cli#readme"
+  "homepage": "https://github.com/fastertools/ftl#readme"
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fastertools/ftl-cli/internal/config"
+	"github.com/fastertools/ftl/internal/config"
 	"github.com/pkg/browser"
 )
 

@@ -4,16 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ftl-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python SDK for building MCP tools that compile to WebAssembly"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "FTL CLI Contributors", email = "ftl-cli@fastertools.com"}
+    {name = "FTL Contributors", email = "ftl@fastertools.com"}
 ]
 maintainers = [
-    {name = "FTL CLI Contributors", email = "ftl-cli@fastertools.com"}
+    {name = "FTL Contributors", email = "ftl@fastertools.com"}
 ]
 keywords = ["ftl", "mcp", "wasm", "webassembly", "spin", "fermyon", "model-context-protocol"]
 classifiers = [
@@ -47,10 +47,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/fastertools/ftl-cli"
-Repository = "https://github.com/fastertools/ftl-cli"
-Issues = "https://github.com/fastertools/ftl-cli/issues"
-Documentation = "https://github.com/fastertools/ftl-cli/tree/main/sdk/python"
+Homepage = "https://github.com/fastertools/ftl"
+Repository = "https://github.com/fastertools/ftl"
+Issues = "https://github.com/fastertools/ftl/issues"
+Documentation = "https://github.com/fastertools/ftl/tree/main/sdk/python"
 
 [tool.setuptools.packages.find]
 where = ["src"]

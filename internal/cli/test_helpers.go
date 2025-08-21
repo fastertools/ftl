@@ -152,7 +152,7 @@ components: []`
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl-cli/pkg/synthesis"
+	"github.com/fastertools/ftl/synthesis"
 )
 
 func main() {
@@ -168,7 +168,7 @@ func main() {
 
 go 1.24
 
-require github.com/fastertools/ftl-cli/go/ftl v0.0.0`
+require github.com/fastertools/ftl/go/ftl v0.0.0`
 		err = os.WriteFile(tmpDir+"/go.mod", []byte(modContent), 0600)
 		require.NoError(t, err)
 	}

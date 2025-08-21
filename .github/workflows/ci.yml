@@ -68,8 +68,13 @@ jobs:
           
       - name: Install Spin
         run: |
+          # Install in a temp directory to avoid conflicts
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
           curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
           sudo mv spin /usr/local/bin/
+          cd -
+          rm -rf $TEMP_DIR
           spin --version
           
       - name: Build ftl binary
@@ -256,8 +261,13 @@ jobs:
           
       - name: Install Spin
         run: |
+          # Install in a temp directory to avoid conflicts
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
           curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
           sudo mv spin /usr/local/bin/
+          cd -
+          rm -rf $TEMP_DIR
           spin --version
           
       - name: Install spin-test plugin
@@ -309,8 +319,13 @@ jobs:
         
       - name: Install Spin
         run: |
+          # Install in a temp directory to avoid conflicts
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
           curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
           sudo mv spin /usr/local/bin/
+          cd -
+          rm -rf $TEMP_DIR
           
       - name: Run integration tests
         run: |

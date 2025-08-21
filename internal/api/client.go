@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl/internal/auth"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fastertools/ftl-cli/internal/api"
+	"github.com/fastertools/ftl/internal/api"
 )
 
 func TestIsInteractive(t *testing.T) {

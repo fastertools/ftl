@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fastertools/ftl-cli/pkg/spin"
-	"github.com/fastertools/ftl-cli/pkg/synthesis"
+	"github.com/fastertools/ftl/spin"
+	"github.com/fastertools/ftl/synthesis"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

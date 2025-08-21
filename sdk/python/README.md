@@ -4,8 +4,8 @@ Python SDK for building Model Context Protocol (MCP) tools that compile to WebAs
 
 [![PyPI Version](https://img.shields.io/pypi/v/ftl-sdk.svg)](https://pypi.org/project/ftl-sdk/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/ftl-sdk.svg)](https://pypi.org/project/ftl-sdk/)
-[![License](https://img.shields.io/github/license/fastertools/ftl-cli.svg)](https://github.com/fastertools/ftl-cli/blob/main/LICENSE)
-[![GitHub Actions](https://github.com/fastertools/ftl-cli/workflows/Test%20Python%20SDK/badge.svg)](https://github.com/fastertools/ftl-cli/actions)
+[![License](https://img.shields.io/github/license/fastertools/ftl.svg)](https://github.com/fastertools/ftl/blob/main/LICENSE)
+[![GitHub Actions](https://github.com/fastertools/ftl/workflows/Test%20Python%20SDK/badge.svg)](https://github.com/fastertools/ftl/actions)
 
 ## Installation
 
@@ -24,7 +24,7 @@ pip install ftl-sdk==0.1.0
 ### Development Version
 
 ```bash
-pip install git+https://github.com/fastertools/ftl-cli.git#subdirectory=sdk/python
+pip install git+https://github.com/fastertools/ftl.git#subdirectory=sdk/python
 ```
 
 ### From TestPyPI (Pre-releases)
@@ -425,7 +425,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ```bash
 # Clone the repository
-git clone https://github.com/fastertools/ftl-cli.git
+git clone https://github.com/fastertools/ftl.git
 cd ftl-cli/sdk/python
 
 # Create virtual environment

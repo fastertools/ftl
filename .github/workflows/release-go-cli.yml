@@ -3,11 +3,11 @@ name: Release Go CLI
 on:
   push:
     tags:
-      - 'v*'
+      - 'cli-v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
+        description: 'Tag to release (e.g., cli-v1.0.0)'
         required: true
 
 env:
@@ -101,9 +101,9 @@ jobs:
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
           LDFLAGS="-s -w"
-          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.version=$VERSION"
-          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.commit=$COMMIT"
-          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl-cli/internal/cli.buildDate=$BUILD_DATE"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl/internal/cli.version=$VERSION"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl/internal/cli.commit=$COMMIT"
+          LDFLAGS="$LDFLAGS -X github.com/fastertools/ftl/internal/cli.buildDate=$BUILD_DATE"
           
           go build -ldflags "$LDFLAGS" -o ftl ./cmd/ftl
       
@@ -171,7 +171,7 @@ jobs:
           
           ```bash
           # Download and install the latest version
-          curl -fsSL https://raw.githubusercontent.com/fastertools/ftl-cli/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/fastertools/ftl/main/install.sh | bash
           ```
           
           ### Manual Installation
@@ -194,7 +194,7 @@ jobs:
           ### Build from Source
           
           ```bash
-          go install github.com/fastertools/ftl-cli/cmd/ftl@${{ steps.version.outputs.VERSION }}
+          go install github.com/fastertools/ftl/cmd/ftl@${{ steps.version.outputs.VERSION }}
           ```
           
           ### Verify Installation
@@ -205,7 +205,7 @@ jobs:
           
           ## What's Changed
           
-          See the [full changelog](https://github.com/fastertools/ftl-cli/compare/...${{ steps.version.outputs.VERSION }})
+          See the [full changelog](https://github.com/fastertools/ftl/compare/...${{ steps.version.outputs.VERSION }})
           
           ## Checksums
           

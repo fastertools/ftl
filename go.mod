@@ -1,4 +1,4 @@
-module github.com/fastertools/ftl-cli
+module github.com/fastertools/ftl
 
 go 1.24
 

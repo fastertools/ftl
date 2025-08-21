@@ -1,4 +1,4 @@
-# Nextest configuration for ftl-cli
+# Nextest configuration for ftl
 
 [profile.default]
 # Run tests using as many threads as available

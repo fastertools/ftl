@@ -2,7 +2,7 @@
 name = "mcp-authorizer"
 authors.workspace = true
 description = "MCP authorization component for FTL servers using AuthKit"
-version = "0.0.15-alpha.0"
+version = "0.1.0"
 license.workspace = true
 rust-version.workspace = true
 edition.workspace = true

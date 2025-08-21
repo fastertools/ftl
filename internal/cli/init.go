@@ -7,7 +7,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/scaffold"
+	"github.com/fastertools/ftl/internal/scaffold"
 )
 
 // InitOptions holds options for the init command

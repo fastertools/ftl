@@ -4,28 +4,28 @@ Version: 0.1.1
 
 A lightweight SDK for building MCP (Model Context Protocol) tools with Go using the Spin framework.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/fastertools/ftl-cli/sdk/go.svg)](https://pkg.go.dev/github.com/fastertools/ftl-cli/sdk/go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/fastertools/ftl-cli/sdk/go)](https://goreportcard.com/report/github.com/fastertools/ftl-cli/sdk/go)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/fastertools/ftl-cli)
+[![Go Reference](https://pkg.go.dev/badge/github.com/fastertools/ftl/sdk/go.svg)](https://pkg.go.dev/github.com/fastertools/ftl/sdk/go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fastertools/ftl/sdk/go)](https://goreportcard.com/report/github.com/fastertools/ftl/sdk/go)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/fastertools/ftl)
 
 ## Installation
 
 ### Latest Version
 
 ```bash
-go get github.com/fastertools/ftl-cli/sdk/go@latest
+go get github.com/fastertools/ftl/sdk/go@latest
 ```
 
 ### Specific Version
 
 ```bash
-go get github.com/fastertools/ftl-cli/sdk/go@v0.1.0
+go get github.com/fastertools/ftl/sdk/go@v0.1.0
 ```
 
 ### Development Version
 
 ```bash
-go get github.com/fastertools/ftl-cli/sdk/go@main
+go get github.com/fastertools/ftl/sdk/go@main
 ```
 
 ## Requirements
@@ -47,7 +47,7 @@ ftl add my-go-tool -l go
 package main
 
 import (
-    ftl "github.com/fastertools/ftl-cli/sdk/go"
+    ftl "github.com/fastertools/ftl/sdk/go"
 )
 
 func init() {
@@ -157,7 +157,7 @@ import (
     "fmt"
     "strings"
     
-    ftl "github.com/fastertools/ftl-cli/sdk/go"
+    ftl "github.com/fastertools/ftl/sdk/go"
 )
 
 func init() {
@@ -313,7 +313,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ```bash
 # Clone the repository
-git clone https://github.com/fastertools/ftl-cli.git
+git clone https://github.com/fastertools/ftl.git
 cd ftl-cli/sdk/go
 
 # Install development dependencies

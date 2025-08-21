@@ -103,7 +103,7 @@ const (
 	// Maximum time to wait for login completion
 	LoginTimeout = 30 * time.Minute
 	// Keyring service name
-	KeyringService = "ftl-cli"
+	KeyringService = "ftl"
 	// Keyring username
 	KeyringUsername = "default"
 )

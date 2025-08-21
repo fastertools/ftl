@@ -297,7 +297,7 @@ if (isTextContent(content)) {
 
 ## Examples
 
-See the [examples directory](https://github.com/fastertools/ftl-cli/tree/main/examples/demo) for complete examples:
+See the [examples directory](https://github.com/fastertools/ftl/tree/main/examples/demo) for complete examples:
 
 - `echo-ts`: Simple echo tool
 - `multi-tools-ts`: Multiple tools in one component  

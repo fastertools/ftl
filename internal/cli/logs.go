@@ -11,8 +11,8 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 
-	"github.com/fastertools/ftl-cli/internal/api"
-	"github.com/fastertools/ftl-cli/internal/auth"
+	"github.com/fastertools/ftl/internal/api"
+	"github.com/fastertools/ftl/internal/auth"
 )
 
 // LogsOptions holds configuration for the logs command.
@@ -21,17 +21,17 @@ type LogsOptions struct {
 	// AppID can be either a UUID or an application name.
 	// When a name is provided, it will be resolved to a UUID.
 	AppID string
-	
+
 	// Since specifies the time range for logs.
 	// Supported formats:
 	// - Relative: "30m", "1h", "7d"
 	// - RFC3339: "2024-01-15T10:00:00Z"
 	// - Unix timestamp: "1705315200"
 	Since string
-	
+
 	// Tail limits the number of log lines returned.
 	// Valid range: 1-1000, default: 100
-	Tail  string
+	Tail string
 }
 
 func newLogsCmd() *cobra.Command {
@@ -61,12 +61,12 @@ Examples:
   ftl logs my-app --since 30m --tail 50`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			
+
 			// Get app identifier from args if provided
 			if len(args) > 0 {
 				opts.AppID = args[0]
 			}
-			
+
 			return runLogs(ctx, opts)
 		},
 	}
@@ -83,7 +83,7 @@ func runLogs(ctx context.Context, opts *LogsOptions) error {
 	if err := validateLogsOptions(opts); err != nil {
 		return err
 	}
-	
+
 	// Get auth manager
 	store, err := auth.NewKeyringStore()
 	if err != nil {
@@ -94,7 +94,7 @@ func runLogs(ctx context.Context, opts *LogsOptions) error {
 			"  - On macOS: Ensure Keychain Access is working\n"+
 			"  - On Windows: Check Windows Credential Manager", err)
 	}
-	
+
 	authManager := auth.NewManager(store, nil)
 	token, err := authManager.GetOrRefreshToken(ctx)
 	if err != nil {
@@ -163,15 +163,15 @@ func runLogs(ctx context.Context, opts *LogsOptions) error {
 	if err != nil {
 		return fmt.Errorf("invalid app ID: %w", err)
 	}
-	
+
 	// Get logs
 	Info("Fetching logs for app %s...", appID)
-	
+
 	params := &api.GetAppLogsParams{
 		Since: &opts.Since,
 		Tail:  &opts.Tail,
 	}
-	
+
 	resp, err := client.GetAppLogsWithResponse(ctx, openapi_types.UUID(appUUID), params)
 	if err != nil {
 		return fmt.Errorf("failed to get logs: %w", err)
@@ -206,10 +206,10 @@ func runLogs(ctx context.Context, opts *LogsOptions) error {
 	fmt.Println()
 	color.Cyan("▶ Logs for app %s (last %.0f lines from %s)", appID, logsResp.Metadata.Tail, logsResp.Metadata.Since)
 	fmt.Println(strings.Repeat("─", 80))
-	
+
 	// Print the logs
 	fmt.Println(logsResp.Logs)
-	
+
 	return nil
 }
 
@@ -219,7 +219,7 @@ func validateLogsOptions(opts *LogsOptions) error {
 	if opts.AppID == "" {
 		return fmt.Errorf("app name or ID is required")
 	}
-	
+
 	// Validate tail parameter if provided
 	if opts.Tail != "" {
 		// Check if it's a valid number
@@ -227,16 +227,16 @@ func validateLogsOptions(opts *LogsOptions) error {
 		if _, err := fmt.Sscanf(opts.Tail, "%d", &tailNum); err != nil {
 			return fmt.Errorf("--tail must be a number, got: %s", opts.Tail)
 		}
-		
+
 		// Check range (1-1000)
 		if tailNum < 1 || tailNum > 1000 {
 			return fmt.Errorf("--tail must be between 1 and 1000, got: %d", tailNum)
 		}
 	}
-	
+
 	// Since parameter validation is done server-side as it's more complex
 	// (relative times, RFC3339, Unix timestamps)
-	
+
 	return nil
 }
 
@@ -246,12 +246,12 @@ func isUUID(s string) bool {
 	if len(s) != 36 {
 		return false
 	}
-	
+
 	// Check for hyphens in the right places
 	if s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
 		return false
 	}
-	
+
 	// Check that all other characters are hex
 	for i, c := range s {
 		if i == 8 || i == 13 || i == 18 || i == 23 {
@@ -262,6 +262,6 @@ func isUUID(s string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
