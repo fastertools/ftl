@@ -123,7 +123,7 @@ func TestDetectConfigFormat(t *testing.T) {
 			name: "go config",
 			files: map[string]string{
 				"main.go": `package main
-import "github.com/fastertools/ftl/pkg/synthesis"
+import "github.com/fastertools/ftl/synthesis"
 func main() {
 	cdk := synthesis.NewCDK()
 }`,
@@ -432,7 +432,7 @@ func TestUpdateFTLConfig_UnsupportedFormats(t *testing.T) {
 			name:      "go config",
 			format:    "go",
 			setupFile: "main.go",
-			content:   `package main; import "github.com/fastertools/ftl/pkg/synthesis"; func main() { synthesis.NewCDK() }`,
+			content:   `package main; import "github.com/fastertools/ftl/synthesis"; func main() { synthesis.NewCDK() }`,
 			errMsg:    "go-based configurations require manual",
 		},
 		{

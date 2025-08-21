@@ -9,7 +9,6 @@ on:
         type: choice
         options:
           - cli
-          - pkg
           - sdk-rust
           - sdk-typescript
           - sdk-python
@@ -62,7 +61,7 @@ jobs:
           python-version: '3.10'
       
       - name: Setup Go
-        if: inputs.component == 'sdk-go' || inputs.component == 'cli' || inputs.component == 'pkg'
+        if: inputs.component == 'sdk-go' || inputs.component == 'cli'
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -120,9 +119,6 @@ jobs:
           case "$COMPONENT" in
             cli)
               CURRENT_VERSION=$(jq -r '.ftlCli' "$VERSIONS_FILE")
-              ;;
-            pkg)
-              CURRENT_VERSION=$(jq -r '.pkg' "$VERSIONS_FILE")
               ;;
             sdk-rust)
               CURRENT_VERSION=$(jq -r '.sdk.rust' "$VERSIONS_FILE")
@@ -188,13 +184,6 @@ jobs:
               jq --arg version "$NEW_VERSION" '.ftlCli = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Format the JSON file nicely
-              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
-              
-              git add "$VERSIONS_FILE"
-              ;;
-            pkg)
-              # Update versions.json for pkg
-              jq --arg version "$NEW_VERSION" '.pkg = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               git add "$VERSIONS_FILE"
@@ -364,10 +353,6 @@ jobs:
             cli)
               TAG="cli-v${NEW_VERSION}"
               TITLE="release: FTL CLI v${NEW_VERSION}"
-              ;;
-            pkg)
-              TAG="pkg/v${NEW_VERSION}"
-              TITLE="release: Go pkg v${NEW_VERSION}"
               ;;
             sdk-rust)
               TAG="sdk-rust-v${NEW_VERSION}"

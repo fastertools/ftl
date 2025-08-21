@@ -33,7 +33,7 @@ func TestIsUUID(t *testing.T) {
 			input:    "AbCdEf01-1234-5678-9012-345678901234",
 			expected: true,
 		},
-		
+
 		// Invalid UUIDs - wrong format
 		{
 			name:     "app name instead of UUID",
@@ -100,8 +100,8 @@ func TestIsUUID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isUUID(tt.input)
-			assert.Equal(t, tt.expected, result, 
-				"isUUID(%q) returned %v, expected %v", 
+			assert.Equal(t, tt.expected, result,
+				"isUUID(%q) returned %v, expected %v",
 				tt.input, result, tt.expected)
 		})
 	}
@@ -133,12 +133,12 @@ func TestLogsCommand_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := &LogsOptions{}
-			
+
 			// Parse args
 			if len(tt.args) > 0 {
 				opts.AppID = tt.args[0]
 			}
-			
+
 			// Would need to test with actual command execution
 			// This is a placeholder for structure
 			if opts.AppID == "" && tt.expectError != "" {
@@ -151,12 +151,12 @@ func TestLogsCommand_Validation(t *testing.T) {
 func TestLogsCommand_TimeRangeFormats(t *testing.T) {
 	validTimeRanges := []string{
 		"30m",
-		"1h", 
+		"1h",
 		"7d",
 		"2024-01-15T10:00:00Z", // RFC3339
 		"1705315200",           // Unix timestamp
 	}
-	
+
 	for _, timeRange := range validTimeRanges {
 		t.Run("time_range_"+timeRange, func(t *testing.T) {
 			// This tests that the time range format is valid

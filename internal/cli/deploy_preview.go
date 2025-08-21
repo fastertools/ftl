@@ -9,7 +9,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 
-	"github.com/fastertools/ftl/pkg/validation"
+	"github.com/fastertools/ftl/validation"
 )
 
 // DeploymentPreview represents the deployment preview information

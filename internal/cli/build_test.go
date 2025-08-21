@@ -173,7 +173,7 @@ func TestBuildCommand_WithGoConfig(t *testing.T) {
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl/synthesis"
 )
 
 func main() {

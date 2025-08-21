@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fastertools/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl/synthesis"
 	"github.com/spf13/cobra"
 )
 

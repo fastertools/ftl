@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"cuelang.org/go/cue"
-	"github.com/fastertools/ftl/pkg/policy"
-	"github.com/fastertools/ftl/pkg/synthesis"
-	"github.com/fastertools/ftl/pkg/validation"
+	"github.com/fastertools/ftl/policy"
+	"github.com/fastertools/ftl/synthesis"
+	"github.com/fastertools/ftl/validation"
 )
 
 const (

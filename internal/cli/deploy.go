@@ -18,8 +18,8 @@ import (
 	"github.com/fastertools/ftl/internal/auth"
 	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/internal/deploy"
-	"github.com/fastertools/ftl/pkg/oci"
-	"github.com/fastertools/ftl/pkg/validation"
+	"github.com/fastertools/ftl/oci"
+	"github.com/fastertools/ftl/validation"
 )
 
 // DeployOptions holds options for the deploy command

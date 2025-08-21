@@ -13,7 +13,7 @@ This polyglot approach is enabled by WebAssembly and the Component Model, which 
 ## Project Structure
 
 ```
-ftl-cli/
+ftl/
 ├── cmd/ftl/                 # Go CLI entry point
 │   └── main.go             # Main application
 │

@@ -998,7 +998,7 @@ package scaffold
 				"fmt"
 				"log"
 			
-				"github.com/fastertools/ftl/pkg/cdk"
+				"github.com/fastertools/ftl/cdk"
 			)
 			
 			func main() {
@@ -1039,7 +1039,7 @@ package scaffold
 			require github.com/fastertools/ftl v\(_versions.ftl_cli)
 			
 			// For local development, uncomment and adjust the path:
-			// replace github.com/fastertools/ftl => ../path/to/ftl-cli
+			// replace github.com/fastertools/ftl => ../path/to/ftl
 			"""
 		
 		".gitignore": #CommonGitignore

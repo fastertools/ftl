@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fastertools/ftl/pkg/spin"
-	"github.com/fastertools/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl/spin"
+	"github.com/fastertools/ftl/synthesis"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +16,7 @@ func newUpCmd() *cobra.Command {
 	var watch bool
 	var skipSynth bool
 	var configFile string
-	
+
 	// Spin up specific flags
 	var componentIDs []string
 	var cacheDir string
@@ -109,102 +109,102 @@ func newUpCmd() *cobra.Command {
 
 			// Build options array for spin up/watch command
 			var spinOptions []string
-			
+
 			// Add component IDs
 			for _, id := range componentIDs {
 				spinOptions = append(spinOptions, "--component-id", id)
 			}
-			
+
 			// Add cache directory
 			if cacheDir != "" {
 				spinOptions = append(spinOptions, "--cache-dir", cacheDir)
 			}
-			
+
 			// Add direct mounts flag
 			if directMounts {
 				spinOptions = append(spinOptions, "--direct-mounts")
 			}
-			
+
 			// Add environment variables
 			for _, e := range env {
 				spinOptions = append(spinOptions, "--env", e)
 			}
-			
+
 			// Add from flag
 			if from != "" {
 				spinOptions = append(spinOptions, "--from", from)
 			}
-			
+
 			// Add insecure flag
 			if insecure {
 				spinOptions = append(spinOptions, "--insecure")
 			}
-			
+
 			// Add temp directory
 			if temp != "" {
 				spinOptions = append(spinOptions, "--temp", temp)
 			}
-			
+
 			// Add transient write flag
 			if allowTransientWrite {
 				spinOptions = append(spinOptions, "--allow-transient-write")
 			}
-			
+
 			// Add cache file
 			if cache != "" {
 				spinOptions = append(spinOptions, "--cache", cache)
 			}
-			
+
 			// Add disable cache flag
 			if disableCache {
 				spinOptions = append(spinOptions, "--disable-cache")
 			}
-			
+
 			// Add disable pooling flag
 			if disablePooling {
 				spinOptions = append(spinOptions, "--disable-pooling")
 			}
-			
+
 			// Add follow components
 			for _, f := range follow {
 				spinOptions = append(spinOptions, "--follow", f)
 			}
-			
+
 			// Add key-value pairs
 			for _, kv := range keyValue {
 				spinOptions = append(spinOptions, "--key-value", kv)
 			}
-			
+
 			// Add log directory
 			if logDir != "" {
 				spinOptions = append(spinOptions, "--log-dir", logDir)
 			}
-			
+
 			// Add max instance memory
 			if maxInstanceMemory != "" {
 				spinOptions = append(spinOptions, "--max-instance-memory", maxInstanceMemory)
 			}
-			
+
 			// Add quiet flag
 			if quiet {
 				spinOptions = append(spinOptions, "--quiet")
 			}
-			
+
 			// Add runtime config file
 			if runtimeConfigFile != "" {
 				spinOptions = append(spinOptions, "--runtime-config-file", runtimeConfigFile)
 			}
-			
+
 			// Add SQLite statements
 			for _, sql := range sqlite {
 				spinOptions = append(spinOptions, "--sqlite", sql)
 			}
-			
+
 			// Add state directory
 			if stateDir != "" {
 				spinOptions = append(spinOptions, "--state-dir", stateDir)
 			}
-			
+
 			// Add listen address
 			if listen != "" {
 				spinOptions = append(spinOptions, "--listen", listen)
@@ -241,7 +241,7 @@ func newUpCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&from, "from", "f", "", "The application to run. This may be a manifest (spin.toml) file, a directory containing a spin.toml file, a remote registry reference, or a Wasm module (a .wasm file). If omitted, it defaults to \"spin.toml\"")
 	cmd.Flags().BoolVarP(&insecure, "insecure", "k", false, "Ignore server certificate errors from a registry")
 	cmd.Flags().StringVar(&temp, "temp", "", "Temporary directory for the static assets of the components")
-	
+
 	// Trigger options
 	cmd.Flags().BoolVar(&allowTransientWrite, "allow-transient-write", false, "Set the static assets of the components in the temporary directory as writable")
 	cmd.Flags().StringVar(&cache, "cache", "", "Wasmtime cache configuration file")
