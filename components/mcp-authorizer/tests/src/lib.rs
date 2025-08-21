@@ -20,6 +20,7 @@ mod policy_complex_tests;
 mod policy_component_tests;
 mod policy_data_tests;
 mod policy_mcp_tool_tests;
+mod policy_org_mode_tests;
 mod policy_private_mode_tests;
 mod policy_test_helpers;
 mod provider_config_tests;

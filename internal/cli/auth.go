@@ -274,6 +274,15 @@ func newAuthStatusCmd() *cobra.Command {
 			// Get status
 			status := manager.Status()
 
+			// If --show-token is used, just output the token and nothing else
+			if showToken {
+				if !status.LoggedIn || status.Credentials == nil {
+					return fmt.Errorf("not logged in")
+				}
+				fmt.Print(status.Credentials.AccessToken)
+				return nil
+			}
+
 			// Display status
 			color.Cyan("→ Authentication Status\n")
 			fmt.Println()
@@ -338,19 +347,12 @@ func newAuthStatusCmd() *cobra.Command {
 				if creds.RefreshToken != "" {
 					color.Green("Refresh Token: Available")
 				}
-
-				// Show actual token if requested
-				if showToken {
-					fmt.Println()
-					fmt.Println("Access Token:")
-					fmt.Println(creds.AccessToken)
-				}
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&showToken, "show-token", false, "Display the actual access token")
+	cmd.Flags().BoolVar(&showToken, "show-token", false, "Output only the access token (for use in scripts)")
 	return cmd
 }

@@ -81,7 +81,12 @@ func (m *M2MManager) ExchangeCredentials(ctx context.Context, config *M2MConfig)
 	}
 
 	// Construct token endpoint URL
-	tokenURL := fmt.Sprintf("%s/oauth2/token", strings.TrimSuffix(config.Issuer, "/"))
+	issuer := config.Issuer
+	// Ensure issuer has https:// scheme
+	if !strings.HasPrefix(issuer, "http://") && !strings.HasPrefix(issuer, "https://") {
+		issuer = "https://" + issuer
+	}
+	tokenURL := fmt.Sprintf("%s/oauth2/token", strings.TrimSuffix(issuer, "/"))
 
 	// Prepare request body
 	data := url.Values{}
