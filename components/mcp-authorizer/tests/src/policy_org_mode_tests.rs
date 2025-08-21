@@ -37,9 +37,12 @@ allow if {
     }"#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        policy_data,
+    );
 
     // Test 1: Org member should have access
     let member_token = create_policy_test_token_with_key(
@@ -56,17 +59,13 @@ allow if {
             format!("Bearer {}", member_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
 
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(
-        response.status(),
-        200,
-        "Org member should have access"
-    );
+    assert_eq!(response.status(), 200, "Org member should have access");
 
     // Test 2: User from DIFFERENT org should be DENIED
     let other_org_user_token = create_policy_test_token_with_key(
@@ -83,27 +82,26 @@ allow if {
             format!("Bearer {}", other_org_user_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
 
     let response = spin_test_sdk::perform_request(request);
     let status = response.status();
-    
+
     // Debug: Print response if not 401
     if status != 401 {
         let body = response.body().unwrap_or_default();
         let body_str = String::from_utf8_lossy(&body);
-        eprintln!("SECURITY ISSUE: User from different org got status: {}", status);
+        eprintln!(
+            "SECURITY ISSUE: User from different org got status: {}",
+            status
+        );
         eprintln!("Response body: {}", body_str);
     }
-    
-    assert_eq!(
-        status,
-        401,
-        "User from different org should be DENIED"
-    );
+
+    assert_eq!(status, 401, "User from different org should be DENIED");
 
     // Test 3: Machine from correct org should have access
     let machine_token = create_policy_test_token_with_key(
@@ -111,7 +109,10 @@ allow if {
         "client_01K29ET9RWPE8WS2J9RFFW5F55",
         vec![],
         vec![
-            ("org_id", serde_json::json!("org_01K1HVQRBFJ9J7D12G3TPQTX55")), // Matching org_id
+            (
+                "org_id",
+                serde_json::json!("org_01K1HVQRBFJ9J7D12G3TPQTX55"),
+            ), // Matching org_id
         ],
     );
 
@@ -122,7 +123,7 @@ allow if {
             format!("Bearer {}", machine_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -151,7 +152,7 @@ allow if {
             format!("Bearer {}", wrong_org_machine_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -193,9 +194,12 @@ allow if {
     }"#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        policy_data,
+    );
 
     // User should be denied (empty members list)
     let user_token = create_policy_test_token_with_key(
@@ -207,12 +211,9 @@ allow if {
 
     let headers = http::types::Headers::new();
     headers
-        .append(
-            "authorization",
-            format!("Bearer {}", user_token).as_bytes(),
-        )
+        .append("authorization", format!("Bearer {}", user_token).as_bytes())
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -229,9 +230,10 @@ allow if {
         &private_key,
         "client_01K29ET9RWPE8WS2J9RFFW5F55",
         vec![],
-        vec![
-            ("org_id", serde_json::json!("org_01K1HVQRBFJ9J7D12G3TPQTX55")),
-        ],
+        vec![(
+            "org_id",
+            serde_json::json!("org_01K1HVQRBFJ9J7D12G3TPQTX55"),
+        )],
     );
 
     let headers = http::types::Headers::new();
@@ -241,7 +243,7 @@ allow if {
             format!("Bearer {}", machine_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();

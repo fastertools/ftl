@@ -24,10 +24,13 @@ allow if {
     let policy_data = r#"{"owner":"user_01JZM9BA77AEBQ1DTDPP2PMHG6"}"#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     // Set the exact policy and data as seen in deployment
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        policy_data,
+    );
 
     // Test 1: Owner should have access
     let owner_token = create_policy_test_token_with_key(
@@ -45,11 +48,11 @@ allow if {
         )
         .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
-    
+
     // MCP tools/list request body
     let body = r#"{"jsonrpc":"2.0","method":"tools/list","id":1}"#;
     let body_stream = request.body().unwrap();
@@ -57,7 +60,7 @@ allow if {
 
     let response = spin_test_sdk::perform_request(request);
     let status = response.status();
-    
+
     // Debug: Print response if not 200
     if status != 200 {
         let body = response.body().unwrap_or_default();
@@ -65,20 +68,15 @@ allow if {
         eprintln!("Response status: {}", status);
         eprintln!("Response body: {}", body_str);
     }
-    
+
     assert_eq!(
-        status,
-        200,
+        status, 200,
         "Owner user_01JZM9BA77AEBQ1DTDPP2PMHG6 should have access"
     );
 
     // Test 2: Different user should be denied
-    let other_token = create_policy_test_token_with_key(
-        &private_key,
-        "user_01DIFFERENT_USER_ID",
-        vec![],
-        vec![],
-    );
+    let other_token =
+        create_policy_test_token_with_key(&private_key, "user_01DIFFERENT_USER_ID", vec![], vec![]);
 
     let headers = http::types::Headers::new();
     headers
@@ -88,20 +86,16 @@ allow if {
         )
         .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
-    
+
     let body_stream = request.body().unwrap();
     body_stream.write_bytes(body.as_bytes());
 
     let response = spin_test_sdk::perform_request(request);
-    assert_eq!(
-        response.status(),
-        401,
-        "Non-owner should be denied access"
-    );
+    assert_eq!(response.status(), 401, "Non-owner should be denied access");
 }
 
 #[spin_test]
@@ -122,9 +116,12 @@ allow if {
     let policy_data = r#"{"owner":"user_01JZM9BA77AEBQ1DTDPP2PMHG6"}"#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        policy_data,
+    );
 
     // Create token with WorkOS-style claims (no org_id for user tokens)
     let owner_token = create_policy_test_token_with_key(
@@ -146,7 +143,7 @@ allow if {
             format!("Bearer {}", owner_token).as_bytes(),
         )
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
@@ -187,10 +184,13 @@ allow if {
     ];
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     for (policy_data, sub, should_allow) in test_cases {
         spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-        spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+        spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+            "mcp_policy_data",
+            policy_data,
+        );
 
         let token = create_policy_test_token_with_key(&private_key, sub, vec![], vec![]);
 
@@ -198,14 +198,14 @@ allow if {
         headers
             .append("authorization", format!("Bearer {}", token).as_bytes())
             .unwrap();
-        
+
         let request = http::types::OutgoingRequest::new(headers);
         request.set_method(&http::types::Method::Get).unwrap();
         request.set_path_with_query(Some("/mcp")).unwrap();
 
         let response = spin_test_sdk::perform_request(request);
         let expected_status = if should_allow { 200 } else { 401 };
-        
+
         assert_eq!(
             response.status(),
             expected_status,
@@ -231,10 +231,13 @@ allow if {
 "#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     // Test with malformed JSON in policy_data
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", "not valid json");
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        "not valid json",
+    );
 
     let token = create_policy_test_token_with_key(
         &private_key,
@@ -247,13 +250,13 @@ allow if {
     headers
         .append("authorization", format!("Bearer {}", token).as_bytes())
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
 
     let response = spin_test_sdk::perform_request(request);
-    
+
     // Should return 500 for configuration error
     assert_eq!(
         response.status(),
@@ -276,7 +279,7 @@ allow if {
 "#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     // Set policy but no policy_data (data.owner will be undefined)
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
     // Not setting mcp_policy_data
@@ -292,13 +295,13 @@ allow if {
     headers
         .append("authorization", format!("Bearer {}", token).as_bytes())
         .unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Get).unwrap();
     request.set_path_with_query(Some("/mcp")).unwrap();
 
     let response = spin_test_sdk::perform_request(request);
-    
+
     // Should deny access since data.owner is undefined
     assert_eq!(
         response.status(),
@@ -324,9 +327,12 @@ allow if {
     let policy_data = r#"{"owner":"user_01JZM9BA77AEBQ1DTDPP2PMHG6"}"#;
 
     let (private_key, _public_key) = setup_test_jwt_validation();
-    
+
     spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy", policy);
-    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set("mcp_policy_data", policy_data);
+    spin_test_sdk::bindings::fermyon::spin_test_virt::variables::set(
+        "mcp_policy_data",
+        policy_data,
+    );
 
     // Owner making a tool call
     let owner_token = create_policy_test_token_with_key(
@@ -355,17 +361,17 @@ allow if {
         )
         .unwrap();
     headers.append("content-type", b"application/json").unwrap();
-    
+
     let request = http::types::OutgoingRequest::new(headers);
     request.set_method(&http::types::Method::Post).unwrap();
     request.set_path_with_query(Some("/mcp/x/graph")).unwrap();
-    
+
     let body_stream = request.body().unwrap();
     body_stream.write_bytes(body.as_bytes());
 
     let response = spin_test_sdk::perform_request(request);
     let status = response.status();
-    
+
     // Debug: Print response if not 200
     if status != 200 {
         let body = response.body().unwrap_or_default();
@@ -373,10 +379,6 @@ allow if {
         eprintln!("Tool call response status: {}", status);
         eprintln!("Tool call response body: {}", body_str);
     }
-    
-    assert_eq!(
-        status,
-        200,
-        "Owner should be able to call tools"
-    );
+
+    assert_eq!(status, 200, "Owner should be able to call tools");
 }
