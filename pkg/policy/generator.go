@@ -77,7 +77,7 @@ func (g *Generator) generatePrivate(ctx *Context) (*Policy, error) {
 # Private mode: Only the owner can access
 default allow = false
 
-allow {
+allow if {
 	input.token.sub == data.owner
 }
 `
@@ -103,13 +103,13 @@ func (g *Generator) generateOrg(ctx *Context) (*Policy, error) {
 default allow = false
 
 # Allow org members (user tokens without org_id claim)
-allow {
+allow if {
 	not input.token.claims.org_id
 	input.token.sub == data.members[_]
 }
 
 # Allow machines from the same org (machine tokens with org_id claim)
-allow {
+allow if {
 	input.token.claims.org_id
 	input.token.claims.org_id == data.org_id
 }

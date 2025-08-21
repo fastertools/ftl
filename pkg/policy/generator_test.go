@@ -295,7 +295,7 @@ func TestPolicySemantics(t *testing.T) {
 					t.Error("Default should be false (deny by default)")
 				}
 			}
-			if strings.HasPrefix(line, "allow {") || line == "allow {" {
+			if strings.HasPrefix(line, "allow if {") || line == "allow if {" {
 				foundAllow = true
 			}
 		}
@@ -332,7 +332,7 @@ func TestPolicySemantics(t *testing.T) {
 		}
 
 		// Check both allow blocks exist
-		allowCount := strings.Count(policy.Source, "allow {")
+		allowCount := strings.Count(policy.Source, "allow if {")
 		if allowCount < 2 {
 			t.Errorf("Expected at least 2 allow blocks, found %d", allowCount)
 		}
