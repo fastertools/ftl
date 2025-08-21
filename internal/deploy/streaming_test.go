@@ -158,7 +158,7 @@ func TestStreamingDeployHTTPError(t *testing.T) {
 	// Create a test server that returns a 403 error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprintf(w, `{"message": "The request signature we calculated does not match"}`)
+		_, _ = fmt.Fprintf(w, `{"message": "The request signature we calculated does not match"}`)
 	}))
 	defer server.Close()
 
@@ -222,15 +222,15 @@ func TestStreamingDeployMalformedJSON(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 
 		// Send valid event
-		fmt.Fprintln(w, `{"type":"progress","message":"Starting"}`)
+		_, _ = fmt.Fprintln(w, `{"type":"progress","message":"Starting"}`)
 		w.(http.Flusher).Flush()
 
 		// Send malformed JSON (should be logged but not fail)
-		fmt.Fprintln(w, `{malformed json}`)
+		_, _ = fmt.Fprintln(w, `{malformed json}`)
 		w.(http.Flusher).Flush()
 
 		// Send completion event
-		fmt.Fprintln(w, `{"type":"complete","message":"Done"}`)
+		_, _ = fmt.Fprintln(w, `{"type":"complete","message":"Done"}`)
 		w.(http.Flusher).Flush()
 	}))
 	defer server.Close()

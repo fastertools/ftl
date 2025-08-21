@@ -209,10 +209,10 @@ func runOrgList(ctx context.Context, refresh bool) error {
 			}
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", current, orgID, name, lastUsed)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", current, orgID, name, lastUsed)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 
 	if currentOrg == "" {
 		fmt.Println()

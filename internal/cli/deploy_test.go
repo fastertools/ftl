@@ -559,7 +559,7 @@ func TestWASMOCIArtifactSpec(t *testing.T) {
 		// Verify layer content matches original WASM
 		layerReader, err := layer.Uncompressed()
 		require.NoError(t, err)
-		defer layerReader.Close()
+		defer func() { _ = layerReader.Close() }()
 
 		layerContent, err := io.ReadAll(layerReader)
 		require.NoError(t, err)

@@ -156,7 +156,7 @@ func (d *StreamingDeployer) Deploy(
 	if err != nil {
 		return fmt.Errorf("send deployment request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check for non-200 status
 	if resp.StatusCode != http.StatusOK {

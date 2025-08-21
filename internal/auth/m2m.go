@@ -108,7 +108,7 @@ func (m *M2MManager) ExchangeCredentials(ctx context.Context, config *M2MConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange credentials: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)

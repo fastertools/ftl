@@ -15,13 +15,13 @@ func TestConfigLoadSave(t *testing.T) {
 	oldUserConfig := os.Getenv("XDG_CONFIG_HOME")
 
 	// Set test environment
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer func() {
-		os.Setenv("HOME", oldHome)
+		_ = os.Setenv("HOME", oldHome)
 		if oldUserConfig != "" {
-			os.Setenv("XDG_CONFIG_HOME", oldUserConfig)
+			_ = os.Setenv("XDG_CONFIG_HOME", oldUserConfig)
 		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
+			_ = os.Unsetenv("XDG_CONFIG_HOME")
 		}
 	}()
 
@@ -73,8 +73,8 @@ func TestConfigLoadSave(t *testing.T) {
 func TestOrganizationManagement(t *testing.T) {
 	// Use temp directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	// Reset singleton
 	instance = nil
@@ -117,8 +117,8 @@ func TestOrganizationManagement(t *testing.T) {
 func TestDefaultEnvironment(t *testing.T) {
 	// Use temp directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	// Reset singleton
 	instance = nil
@@ -148,8 +148,8 @@ func TestDefaultEnvironment(t *testing.T) {
 func TestConcurrency(t *testing.T) {
 	// Use temp directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	// Reset singleton
 	instance = nil

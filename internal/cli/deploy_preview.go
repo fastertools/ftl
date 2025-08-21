@@ -122,14 +122,14 @@ func ShowDeploymentPreview(preview *DeploymentPreview) {
 			if comp.IsLocal {
 				sourceIcon = "💻"
 			}
-			fmt.Fprintf(w, "  %s\t%s\t%s %s\t%s\n",
+			_, _ = fmt.Fprintf(w, "  %s\t%s\t%s %s\t%s\n",
 				comp.Name,
 				comp.Type,
 				sourceIcon,
 				comp.Source,
 				comp.Size)
 		}
-		w.Flush()
+		_ = w.Flush()
 	}
 
 	// Variables Section (if any)

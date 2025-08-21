@@ -293,7 +293,7 @@ func TestWASMOCIImage_IntegrationWithRealConfig(t *testing.T) {
 
 	reader, err := layers[0].Uncompressed()
 	require.NoError(t, err)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	retrievedContent, err := io.ReadAll(reader)
 	require.NoError(t, err)

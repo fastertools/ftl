@@ -65,7 +65,7 @@ func runGoConfig(goFile string) (string, error) {
 	// The Go program should output the spin.toml manifest
 	manifest := stdout.String()
 	if manifest == "" {
-		return "", fmt.Errorf("Go config produced no output")
+		return "", fmt.Errorf("go config produced no output")
 	}
 
 	return manifest, nil

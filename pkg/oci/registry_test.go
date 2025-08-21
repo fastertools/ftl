@@ -82,7 +82,7 @@ func TestWASMPusher_CreateWASMImage(t *testing.T) {
 	// Verify layer content
 	reader, err := layers[0].Uncompressed()
 	require.NoError(t, err)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	content, err := io.ReadAll(reader)
 	require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestWASMPusher_Push_ErrorCases(t *testing.T) {
 	// Create a temp file for the second test case
 	tempFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
-	tempFile.Close()
+	_ = tempFile.Close()
 	defer os.Remove(tempFile.Name())
 
 	tests := []struct {

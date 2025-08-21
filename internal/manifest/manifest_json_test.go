@@ -100,12 +100,12 @@ func TestJSONSupport(t *testing.T) {
 
 	t.Run("LoadAuto", func(t *testing.T) {
 		testDir := filepath.Join(tmpDir, "auto-test")
-		os.MkdirAll(testDir, 0755)
+		_ = os.MkdirAll(testDir, 0755)
 
 		// Save current dir and change to test dir
 		oldDir, _ := os.Getwd()
-		os.Chdir(testDir)
-		defer os.Chdir(oldDir)
+		_ = os.Chdir(testDir)
+		defer func() { _ = os.Chdir(oldDir) }()
 
 		// Test with JSON
 		jsonData := `{
@@ -122,7 +122,7 @@ func TestJSONSupport(t *testing.T) {
 				}
 			]
 		}`
-		os.WriteFile("ftl.json", []byte(jsonData), 0644)
+		_ = os.WriteFile("ftl.json", []byte(jsonData), 0644)
 
 		loaded, err := LoadAuto()
 		if err != nil {
@@ -139,7 +139,7 @@ version: 2.0.0
 components:
   - id: comp2
     source: ./local`
-		os.WriteFile("ftl.yaml", []byte(yamlData), 0644)
+		_ = os.WriteFile("ftl.yaml", []byte(yamlData), 0644)
 
 		loaded, err = LoadAuto()
 		if err != nil {

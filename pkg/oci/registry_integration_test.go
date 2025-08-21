@@ -40,7 +40,7 @@ func TestWASMPuller_Pull_Integration(t *testing.T) {
 	// Create a temp file for pushing
 	tmpFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	err = os.WriteFile(tmpFile.Name(), wasmContent, 0644)
 	require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestWASMPusher_Push_Integration(t *testing.T) {
 	// Create a test WASM file with specific content
 	tmpFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	wasmContent := []byte("test wasm content for push")
 	err = os.WriteFile(tmpFile.Name(), wasmContent, 0644)
@@ -173,7 +173,7 @@ func TestWASMPusher_Push_Integration(t *testing.T) {
 	// Verify layer content
 	reader, err := layers[0].Uncompressed()
 	require.NoError(t, err)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	pulledContent, err := io.ReadAll(reader)
 	require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestWASMPuller_Pull_CacheCorruption(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	err = os.WriteFile(tmpFile.Name(), wasmContent, 0644)
 	require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestWASMPuller_Pull_CacheWriteError(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	err = os.WriteFile(tmpFile.Name(), wasmContent, 0644)
 	require.NoError(t, err)
