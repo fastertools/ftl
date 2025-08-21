@@ -72,6 +72,11 @@ jobs:
         with:
           cache-key: prepare-release-v189
       
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+      
       - name: Determine version
         id: version
         run: |
@@ -86,6 +91,14 @@ jobs:
             
             IFS='.' read -r major minor patch <<< "$current"
             
+            # Handle alpha/beta/rc versions
+            if [[ "$current" == *"-"* ]]; then
+              # Extract base version and prerelease
+              base_version="${current%%-*}"
+              prerelease="${current#*-}"
+              IFS='.' read -r major minor patch <<< "$base_version"
+            fi
+            
             case "$type" in
               major)
                 echo "$((major + 1)).0.0"
@@ -99,45 +112,40 @@ jobs:
             esac
           }
           
+          # Read versions.json
+          VERSIONS_FILE="internal/scaffold/versions.json"
+          
           # Get current version based on component
           case "$COMPONENT" in
             cli)
-              # For Go CLI, get version from latest tag or use 0.0.0 if no tags exist
-              LATEST_TAG=$(git tag --list "v*" --sort=-version:refname | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
-              if [ -z "$LATEST_TAG" ]; then
-                CURRENT_VERSION="0.0.0"
-              else
-                CURRENT_VERSION=${LATEST_TAG#v}
-              fi
+              CURRENT_VERSION=$(jq -r '.ftlCli' "$VERSIONS_FILE")
               ;;
             sdk-rust)
-              CURRENT_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+              CURRENT_VERSION=$(jq -r '.sdk.rust' "$VERSIONS_FILE")
               ;;
             sdk-typescript)
-              CURRENT_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+              CURRENT_VERSION=$(jq -r '.sdk.typescript' "$VERSIONS_FILE")
               ;;
             sdk-python)
-              CURRENT_VERSION=$(grep '^version = ' sdk/python/pyproject.toml | cut -d'"' -f2)
+              CURRENT_VERSION=$(jq -r '.sdk.python' "$VERSIONS_FILE")
               ;;
             sdk-go)
-              # Go modules use tags, so we need to check the latest tag for this SDK
-              LATEST_TAG=$(git tag --list "sdk-go-v*" --sort=-version:refname | head -1)
-              if [ -z "$LATEST_TAG" ]; then
-                CURRENT_VERSION="0.0.0"
-              else
-                CURRENT_VERSION=${LATEST_TAG#sdk-go-v}
-              fi
+              CURRENT_VERSION=$(jq -r '.sdk.go' "$VERSIONS_FILE")
               ;;
             mcp-authorizer|mcp-gateway)
+              # Components currently use their Cargo.toml version
               CURRENT_VERSION=$(grep '^version' "components/${COMPONENT}/Cargo.toml" | head -1 | cut -d'"' -f2)
               ;;
           esac
+          
+          # Strip any alpha/beta/rc suffix for version bumping
+          BASE_VERSION="${CURRENT_VERSION%%-*}"
           
           # Determine new version
           if [ -n "$CUSTOM_VERSION" ]; then
             NEW_VERSION="$CUSTOM_VERSION"
           else
-            NEW_VERSION=$(bump_version "$CURRENT_VERSION" "$VERSION_TYPE")
+            NEW_VERSION=$(bump_version "$BASE_VERSION" "$VERSION_TYPE")
           fi
           
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
@@ -168,14 +176,24 @@ jobs:
         run: |
           COMPONENT="${{ inputs.component }}"
           NEW_VERSION="${{ steps.version.outputs.new }}"
+          VERSIONS_FILE="internal/scaffold/versions.json"
           
           case "$COMPONENT" in
             cli)
-              # For Go CLI, just create a version file that can be used during build
-              echo "$NEW_VERSION" > VERSION
-              git add VERSION
+              # Update versions.json for CLI
+              jq --arg version "$NEW_VERSION" '.ftlCli = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              # Format the JSON file nicely
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              git add "$VERSIONS_FILE"
               ;;
             sdk-rust)
+              # Update versions.json
+              jq --arg version "$NEW_VERSION" '.sdk.rust = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              # Update Cargo.toml files
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/rust/Cargo.toml
               
               # Also update the macros crate version to match
@@ -189,26 +207,39 @@ jobs:
               fi
               
               # Update Cargo.lock - use workspace flag to avoid scanning subdirectories
-              cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION"
-              cargo update --workspace -p ftl-sdk-macros --precise "$NEW_VERSION"
+              cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION" || true
+              cargo update --workspace -p ftl-sdk-macros --precise "$NEW_VERSION" || true
               
-              # Note: We do NOT update templates here because the new version isn't published yet
-              # Templates will be updated in a follow-up PR after the SDK is published
+              git add "$VERSIONS_FILE" sdk/rust/Cargo.toml sdk/rust-macros/Cargo.toml Cargo.lock
               ;;
             sdk-typescript)
+              # Update versions.json
+              jq --arg version "$NEW_VERSION" '.sdk.typescript = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
+              # Update package.json
               cd sdk/typescript
               npm version "$NEW_VERSION" --no-git-tag-version
               # Update package-lock.json
               npm install --package-lock-only
               cd ../..
+              
+              git add "$VERSIONS_FILE" sdk/typescript/package.json sdk/typescript/package-lock.json
               ;;
             sdk-python)
+              # Update versions.json
+              jq --arg version "$NEW_VERSION" '.sdk.python = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              
               # Update version in pyproject.toml
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" sdk/python/pyproject.toml
+              
+              git add "$VERSIONS_FILE" sdk/python/pyproject.toml
               ;;
             sdk-go)
-              # Go modules use tags for versioning, but we update the README to track version
-              echo "Go SDK will be tagged as sdk-go-v${NEW_VERSION}"
+              # Update versions.json
+              jq --arg version "$NEW_VERSION" '.sdk.go = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update version in README.md
               if grep -q "^Version: " sdk/go/README.md; then
@@ -216,7 +247,6 @@ jobs:
                 sed -i "s/^Version: .*/Version: ${NEW_VERSION}/" sdk/go/README.md
               else
                 # Add version line after the title if it doesn't exist
-                # Using a more YAML-friendly approach
                 awk 'NR==2 {print; print "Version: '"${NEW_VERSION}"'\n"} NR!=2' sdk/go/README.md > sdk/go/README.md.tmp && mv sdk/go/README.md.tmp sdk/go/README.md
               fi
               
@@ -224,15 +254,22 @@ jobs:
               cd sdk/go
               go mod tidy
               cd ../..
+              
+              git add "$VERSIONS_FILE" sdk/go/README.md sdk/go/go.mod sdk/go/go.sum
               ;;
             mcp-authorizer|mcp-gateway)
+              # Components don't have entries in versions.json yet, but we should add them
+              # For now, just update their Cargo.toml
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
-              # Update Cargo.lock - components use ftl- prefix in package names
-              cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}"
               
-              # Update example ftl.toml files to use the new version
+              # Update Cargo.lock - components use ftl- prefix in package names
+              cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}" || true
+              
+              git add "components/${COMPONENT}/Cargo.toml" Cargo.lock
+              
+              # Update component versions in examples if they exist
               echo "Updating component references in examples..."
-              find examples -name "ftl.toml" -type f | while read -r file; do
+              find examples -name "ftl.toml" -type f 2>/dev/null | while read -r file; do
                 # Update gateway versions
                 if [ "${COMPONENT}" = "mcp-gateway" ]; then
                   echo "Updating gateway version to ${NEW_VERSION} in $file"
@@ -243,22 +280,46 @@ jobs:
                   echo "Updating authorizer version to ${NEW_VERSION} in $file"
                   sed -i "s|^authorizer = \"ghcr.io/fastertools/mcp-authorizer:[^\"]*\"|authorizer = \"ghcr.io/fastertools/mcp-authorizer:${NEW_VERSION}\"|" "$file"
                 fi
+                git add "$file" 2>/dev/null || true
               done
-              
-              # Note: Component references in scaffolded projects are handled at generation time
-              echo "Component version ${NEW_VERSION} will be used for new projects"
               ;;
           esac
       
-      - name: Store release info
-        id: release_info
+      - name: Update CHANGELOG if exists
         run: |
           COMPONENT="${{ inputs.component }}"
           NEW_VERSION="${{ steps.version.outputs.new }}"
           
-          # Store component info for PR body
-          echo "COMPONENT=$COMPONENT" >> $GITHUB_ENV
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          # Determine changelog path
+          case "$COMPONENT" in
+            cli)
+              CHANGELOG="CHANGELOG.md"
+              ;;
+            sdk-*)
+              SDK_NAME="${COMPONENT#sdk-}"
+              CHANGELOG="sdk/${SDK_NAME}/CHANGELOG.md"
+              ;;
+            mcp-*)
+              CHANGELOG="components/${COMPONENT}/CHANGELOG.md"
+              ;;
+          esac
+          
+          # Update changelog if it exists
+          if [ -f "$CHANGELOG" ]; then
+            echo "Updating $CHANGELOG"
+            
+            # Create new changelog entry
+            DATE=$(date +%Y-%m-%d)
+            ENTRY="## [$NEW_VERSION] - $DATE"
+            
+            # Insert after the header (usually # Changelog or # Change Log)
+            awk -v entry="$ENTRY" '
+              /^# / { print; print ""; print entry; print ""; print "### Added"; print ""; print "### Changed"; print ""; print "### Fixed"; print ""; next }
+              { print }
+            ' "$CHANGELOG" > "$CHANGELOG.tmp" && mv "$CHANGELOG.tmp" "$CHANGELOG"
+            
+            git add "$CHANGELOG"
+          fi
       
       - name: Commit changes
         run: |
@@ -288,7 +349,7 @@ jobs:
           case "$COMPONENT" in
             cli)
               TAG="cli-v${NEW_VERSION}"
-              TITLE="release: CLI v${NEW_VERSION}"
+              TITLE="release: FTL CLI v${NEW_VERSION}"
               ;;
             sdk-rust)
               TAG="sdk-rust-v${NEW_VERSION}"
@@ -319,10 +380,11 @@ jobs:
           
           ### 📋 Checklist
           
-          - [ ] Version bumped correctly
-          - [ ] Changes are ready for release
+          - [ ] Version bumped correctly in \`internal/scaffold/versions.json\`
+          - [ ] Package-specific version files updated
           - [ ] All tests passing
           - [ ] Documentation updated if needed
+          - [ ] CHANGELOG updated (if applicable)
           
           ### 📝 Release Notes
           
@@ -335,16 +397,42 @@ jobs:
           3. The release workflow will then:
              - Build and publish artifacts
              - Create GitHub release
-             - Publish to package registries
+             - Publish to package registries (crates.io, npm, PyPI, etc.)
           
           ### ⚠️ Important
           
           - Ensure all CI checks pass before merging
-          - Review the included changes
-          - Verify version numbers are correct
+          - Review the included changes carefully
+          - Verify version numbers are correct in all files
           - **DO NOT** manually create the tag - it will be created automatically when merged
+          
+          ### 📦 Affected Files
+          
+          - \`internal/scaffold/versions.json\` - Central version registry
           EOF
           )
+          
+          # Add component-specific files to PR body
+          case "$COMPONENT" in
+            cli)
+              PR_BODY="$PR_BODY"$'\n'"- CLI version in scaffold templates"
+              ;;
+            sdk-rust)
+              PR_BODY="$PR_BODY"$'\n'"- \`sdk/rust/Cargo.toml\`"$'\n'"- \`sdk/rust-macros/Cargo.toml\`"
+              ;;
+            sdk-typescript)
+              PR_BODY="$PR_BODY"$'\n'"- \`sdk/typescript/package.json\`"
+              ;;
+            sdk-python)
+              PR_BODY="$PR_BODY"$'\n'"- \`sdk/python/pyproject.toml\`"
+              ;;
+            sdk-go)
+              PR_BODY="$PR_BODY"$'\n'"- \`sdk/go/README.md\` (version tracking)"
+              ;;
+            mcp-*)
+              PR_BODY="$PR_BODY"$'\n'"- \`components/${COMPONENT}/Cargo.toml\`"
+              ;;
+          esac
           
           gh pr create \
             --title "$TITLE" \

@@ -33,7 +33,7 @@ jobs:
             
             # Normalize component name to tag format
             case "$COMPONENT" in
-              "CLI")
+              "FTL CLI")
                 TAG="cli-v${VERSION}"
                 ;;
               "Rust SDK")
