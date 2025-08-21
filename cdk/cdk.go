@@ -5,7 +5,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/fastertools/ftl/pkg/synthesis"
+	"github.com/fastertools/ftl/synthesis"
 )
 
 // CDK provides a Go-based Cloud Development Kit for FTL/Spin applications.
