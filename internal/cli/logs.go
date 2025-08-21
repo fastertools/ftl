@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
@@ -201,8 +202,9 @@ func runLogs(ctx context.Context, opts *LogsOptions) error {
 		return nil
 	}
 
-	// Print metadata
-	fmt.Printf("\n%s Logs for app %s %s\n", infoColor.Sprint("▶"), successColor.Sprint(appID), infoColor.Sprintf("(last %.0f lines from %s)", logsResp.Metadata.Tail, logsResp.Metadata.Since))
+	// Print metadata using color package directly like deploy.go does
+	fmt.Println()
+	color.Cyan("▶ Logs for app %s (last %.0f lines from %s)", appID, logsResp.Metadata.Tail, logsResp.Metadata.Since)
 	fmt.Println(strings.Repeat("─", 80))
 	
 	// Print the logs
@@ -255,7 +257,8 @@ func isUUID(s string) bool {
 		if i == 8 || i == 13 || i == 18 || i == 23 {
 			continue
 		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		// Character must be a valid hex digit (0-9, a-f, A-F)
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			return false
 		}
 	}
