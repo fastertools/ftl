@@ -2,7 +2,7 @@
 
 # Default target
 build:
-	spin build
+	cargo build --target wasm32-wasip1 --release --target-dir ./target
 
 # Run tests
 test:

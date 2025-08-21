@@ -39,7 +39,7 @@ source = "target/wasm32-wasip1/release/mcp_authorizer.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*"]
 key_value_stores = ["default"]
 [component.mcp-authorizer.build]
-command = "cargo build --target wasm32-wasip1 --release --target-dir ./target"
+command = "cargo build --target wasm32-wasip1 --profile dev --target-dir ./target"
 workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
 [component.mcp-authorizer.variables]

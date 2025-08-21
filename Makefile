@@ -66,8 +66,8 @@ build-components:
 test-components:
 	@echo "🧪 Testing WebAssembly components..."
 	@if command -v spin >/dev/null 2>&1; then \
-		cd components/mcp-authorizer && spin build && spin test; \
-		cd ../mcp-gateway && spin build && spin test; \
+		cd components/mcp-authorizer && spin test; \
+		cd ../mcp-gateway && spin test; \
 	else \
 		echo "⚠️  spin not installed"; \
 		echo "   Install from: https://developer.fermyon.com/spin/install"; \
