@@ -178,7 +178,7 @@ components:
 				if !strings.Contains(result.SpinTOML, "mcp-authorizer") {
 					t.Error("SpinTOML should contain mcp-authorizer for org app")
 				}
-				// The allowed_subjects should be passed through to CUE
+				// Platform injects policy data with allowed subjects
 				if result.Metadata.AccessMode != "org" {
 					t.Errorf("expected access mode 'org', got %s", result.Metadata.AccessMode)
 				}
@@ -188,14 +188,13 @@ components:
 			},
 		},
 		{
-			name:   "org access with allowed roles",
+			name:   "org access with deployment context",
 			config: DefaultConfig(),
 			request: ProcessRequest{
 				Format: "yaml",
 				ConfigData: []byte(`
-name: org-roles-app
+name: org-app
 access: org
-allowed_roles: ["admin", "developer"]
 components:
   - id: admin-service
     source:
@@ -203,8 +202,12 @@ components:
       package: test/admin
       version: v1.0.0
 `),
-				// Platform would compute this by calling WorkOS and filtering by roles
+				// Platform provides org members
 				AllowedSubjects: []string{"admin_user_001", "dev_user_002"},
+				DeploymentContext: &DeploymentContext{
+					ActorType: "user",
+					OrgID:     "org_123",
+				},
 			},
 			wantErr: false,
 			checks: func(t *testing.T, result *ProcessResult) {

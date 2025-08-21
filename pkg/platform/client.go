@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"cuelang.org/go/cue"
+	"github.com/fastertools/ftl-cli/pkg/policy"
 	"github.com/fastertools/ftl-cli/pkg/synthesis"
 	"github.com/fastertools/ftl-cli/pkg/validation"
 )
@@ -17,9 +18,10 @@ const (
 
 // Processor handles FTL application processing for platform deployments.
 type Processor struct {
-	config      Config
-	validator   *validation.Validator
-	synthesizer *synthesis.Synthesizer
+	config         Config
+	validator      *validation.Validator
+	synthesizer    *synthesis.Synthesizer
+	policyGenerator *policy.Generator
 }
 
 // Config defines platform-specific settings.
@@ -59,9 +61,10 @@ func DefaultConfig() Config {
 // NewProcessor creates a new platform processor.
 func NewProcessor(config Config) *Processor {
 	return &Processor{
-		config:      config,
-		validator:   validation.New(),
-		synthesizer: synthesis.NewSynthesizer(),
+		config:          config,
+		validator:       validation.New(),
+		synthesizer:     synthesis.NewSynthesizer(),
+		policyGenerator: policy.New(),
 	}
 }
 
@@ -166,23 +169,70 @@ func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
 		}
 	}
 
-	// 3. Handle access mode and inject allowed subjects for private/org modes
+	// 3. Handle access mode
 	accessMode := validatedApp.Access
 	if accessMode == "" {
 		accessMode = "public"
 	}
 
-	// Inject allowed subjects for modes that use WorkOS
-	subjectsInjected := 0
-	if (accessMode == "private" || accessMode == "org") && len(req.AllowedSubjects) > 0 {
-		validatedApp.AllowedSubjects = req.AllowedSubjects
-		subjectsInjected = len(req.AllowedSubjects)
+	// Track subjects injected for metadata
+	subjectsInjected := len(req.AllowedSubjects)
+
+	// 4. Generate Rego policy based on access mode
+	var authPolicy *policy.Policy
+
+	switch accessMode {
+	case "private":
+		// Private mode: Only allow the app owner
+		if len(req.AllowedSubjects) > 0 {
+			ctx := &policy.Context{
+				OwnerSubject: req.AllowedSubjects[0], // Platform provides single owner
+			}
+			authPolicy, err = p.policyGenerator.Generate(policy.ModePrivate, ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate private policy: %w", err)
+			}
+		}
+
+	case "org":
+		// Org mode: Organization members and machines
+		if req.DeploymentContext != nil && req.DeploymentContext.OrgID != "" {
+			ctx := &policy.Context{
+				OrgMembers: req.AllowedSubjects,
+				OrgID:      req.DeploymentContext.OrgID,
+				ActorType:  req.DeploymentContext.ActorType,
+			}
+			authPolicy, err = p.policyGenerator.Generate(policy.ModeOrg, ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate org policy: %w", err)
+			}
+		}
+
+	case "custom":
+		// Custom mode: User provides policy via auth config
+		// No platform policy generation needed
+
+	case "public":
+		// Public mode: No auth, no policy needed
 	}
 
 	// 5. Prepare platform overrides
 	overrides := map[string]interface{}{
 		"gateway_version":    p.config.GatewayVersion,
 		"authorizer_version": p.config.AuthorizerVersion,
+	}
+
+	// Add authorization policy if generated
+	if authPolicy != nil {
+		overrides["authorization_policy"] = authPolicy.Source
+		
+		policyDataJSON, err := authPolicy.ToJSON()
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize policy data: %w", err)
+		}
+		if policyDataJSON != "" {
+			overrides["authorization_policy_data"] = policyDataJSON
+		}
 	}
 
 	// Add deployment context if provided

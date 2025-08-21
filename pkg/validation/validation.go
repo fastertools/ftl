@@ -138,6 +138,26 @@ func ExtractApplication(v cue.Value) (*Application, error) {
 		if audience, err := authValue.LookupPath(cue.ParsePath("jwt_audience")).String(); err == nil {
 			auth.JWTAudience = audience
 		}
+		if jwksURI, err := authValue.LookupPath(cue.ParsePath("jwt_jwks_uri")).String(); err == nil {
+			auth.JWTJwksURI = jwksURI
+		}
+		if policy, err := authValue.LookupPath(cue.ParsePath("policy")).String(); err == nil {
+			auth.Policy = policy
+		}
+		// Policy data can be string or object
+		policyDataValue := authValue.LookupPath(cue.ParsePath("policy_data"))
+		if policyDataValue.Exists() {
+			// Try as string first
+			if str, err := policyDataValue.String(); err == nil {
+				auth.PolicyData = str
+			} else {
+				// Try to decode as interface{}
+				var data interface{}
+				if err := policyDataValue.Decode(&data); err == nil {
+					auth.PolicyData = data
+				}
+			}
+		}
 		app.Auth = auth
 	}
 
@@ -153,40 +173,6 @@ func ExtractApplication(v cue.Value) (*Application, error) {
 		}
 	}
 
-	// Extract allowed_roles for org access mode
-	if app.Access == "org" {
-		rolesIter, err := v.LookupPath(cue.ParsePath("allowed_roles")).List()
-		if err == nil {
-			for rolesIter.Next() {
-				if role, err := rolesIter.Value().String(); err == nil {
-					app.AllowedRoles = append(app.AllowedRoles, role)
-				}
-			}
-		}
-
-		// Extract allowed_subjects (usually injected by platform)
-		subjectsIter, err := v.LookupPath(cue.ParsePath("allowed_subjects")).List()
-		if err == nil {
-			for subjectsIter.Next() {
-				if subject, err := subjectsIter.Value().String(); err == nil {
-					app.AllowedSubjects = append(app.AllowedSubjects, subject)
-				}
-			}
-		}
-	}
-
-	// Extract required_claims for any access mode (private, org, custom)
-	requiredClaimsValue := v.LookupPath(cue.ParsePath("required_claims"))
-	if requiredClaimsValue.Exists() && requiredClaimsValue.Kind() != cue.NullKind {
-		// Convert CUE value to Go interface{}
-		var claims interface{}
-		if err := requiredClaimsValue.Decode(&claims); err == nil {
-			// Convert to map[string]interface{} if it's a map
-			if claimsMap, ok := claims.(map[string]interface{}); ok {
-				app.RequiredClaims = claimsMap
-			}
-		}
-	}
 
 	return app, nil
 }
@@ -262,10 +248,7 @@ type Application struct {
 	Access          string            `json:"access,omitempty"`
 	Auth            *AuthConfig       `json:"auth,omitempty"`
 	Components      []*Component      `json:"components,omitempty"`
-	Variables       map[string]string      `json:"variables,omitempty"`
-	AllowedRoles    []string               `json:"allowed_roles,omitempty"`    // For org access mode - optional role filter
-	AllowedSubjects []string               `json:"allowed_subjects,omitempty"` // For org access mode - list of allowed user subjects
-	RequiredClaims  map[string]interface{} `json:"required_claims,omitempty"`  // For private/org modes - required JWT claim validations
+	Variables  map[string]string `json:"variables,omitempty"`
 }
 
 // Component represents a validated component
@@ -327,6 +310,9 @@ type BuildConfig struct {
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	JWTIssuer   string `json:"jwt_issuer,omitempty"`
-	JWTAudience string `json:"jwt_audience,omitempty"`
+	JWTIssuer   string      `json:"jwt_issuer,omitempty"`
+	JWTAudience string      `json:"jwt_audience,omitempty"`
+	JWTJwksURI  string      `json:"jwt_jwks_uri,omitempty"`
+	Policy      string      `json:"policy,omitempty"`
+	PolicyData  interface{} `json:"policy_data,omitempty"` // Can be string or map
 }

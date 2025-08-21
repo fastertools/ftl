@@ -15,20 +15,13 @@ import (
 	version:      string | *"0.1.0"
 	description:  string | *""
 	components:   [...#Component] | *[]
-	// Access modes:
-	// - public: No authentication required
-	// - private: FTL auth, user-only access
-	// - org: FTL auth, org-level access (or M2M tokens scoped to org)
-	// - custom: User provides all auth configuration
+	// Access modes (all use Rego policies):
+	// - public: No authentication, allow-all policy
+	// - private: Platform auth, owner-only policy
+	// - org: Platform auth, organization-member policy
+	// - custom: User-provided auth and policy
 	access:       "public" | "private" | "org" | "custom" | *"public"
 	auth?:        #AuthConfig  // Required only for "custom" access
-	// For org access mode - optional role filter
-	allowed_roles?: [...string]
-	// For org access mode - list of allowed user subjects
-	allowed_subjects?: [...string]
-	// For private/org modes - required claim validations
-	// Example: {"role": "admin", "department": "engineering"}
-	required_claims?: {[string]: _}
 }
 
 #Component: {
@@ -53,11 +46,16 @@ import (
 }
 
 #AuthConfig: {
-	// For custom access mode - provide your JWT configuration
+	// JWT configuration
 	jwt_issuer!: string
 	jwt_audience!: string
-	// Optional: Required scopes for token validation
-	jwt_required_scopes?: [...string]
+	jwt_jwks_uri?: string  // Optional: JWKS endpoint for key discovery
+	
+	// Rego authorization policy (required for custom mode)
+	policy!: string
+	
+	// Policy data (optional) - can be string JSON or object
+	policy_data?: string | {[string]: _}
 }
 
 // ===========================================================================
@@ -75,6 +73,10 @@ import (
 		// Claims to forward as headers (claim_name -> header_name)
 		forward_claims?: {[string]: string}
 	}
+	// Platform-injected Rego policy for authorization
+	authorization_policy?: string
+	// Platform-injected policy data (e.g., allowed subjects)
+	authorization_policy_data?: string | {[string]: _}
 }
 
 #InputTransform: {
@@ -106,16 +108,6 @@ import (
 		// Pass through auth if present
 		if input.auth != _|_ {
 			auth: input.auth
-		}
-		
-		// Pass through allowed_subjects if present
-		if input.allowed_subjects != _|_ {
-			allowed_subjects: input.allowed_subjects
-		}
-		
-		// Pass through required_claims if present
-		if input.required_claims != _|_ {
-			required_claims: input.required_claims
 		}
 	}
 	
@@ -211,86 +203,47 @@ import (
 					variables: {
 						mcp_gateway_url: "http://mcp-gateway.spin.internal"
 						
-						// JWT configuration based on access mode
-						if input.access == "private" {
-							// For "private" mode - use FTL platform auth
+						// JWT configuration
+						if input.access == "private" || input.access == "org" {
+							// Platform-managed auth
 							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
 							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
 							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
-							
-							// For private mode, inject allowed subjects if provided
-							if input.allowed_subjects != _|_ {
-								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
-							}
-							
-							// User-specified required claims
-							if input.required_claims != _|_ {
-								mcp_auth_required_claims: json.Marshal(input.required_claims)
-							}
-						}
-						
-						if input.access == "org" {
-							// For "org" mode - use FTL platform auth
-							mcp_jwt_issuer: "https://divine-lion-50-staging.authkit.app"
-							mcp_jwt_audience: "client_01JZM53FW3WYV08AFC4QWQ3BNB"
-							mcp_jwt_jwks_uri: "https://divine-lion-50-staging.authkit.app/oauth2/jwks"
-							
-							// For org mode, inject allowed subjects if provided
-							if input.allowed_subjects != _|_ {
-								mcp_auth_allowed_subjects: strings.Join(input.allowed_subjects, ",")
-							}
-							
-							// Handle required claims for org mode
-							// We need to merge user-specified claims with M2M org_id if present
-							// Start with user-specified claims
-							if input.required_claims != _|_ {
-								// Check if we have M2M context with org_id
-								if platform.deployment_context != _|_ {
-									if platform.deployment_context.actor_type == "machine" {
-										if platform.deployment_context.org_id != _|_ {
-											// Merge user claims with org_id requirement
-											_merged_claims: input.required_claims & {
-												org_id: platform.deployment_context.org_id
-											}
-											mcp_auth_required_claims: json.Marshal(_merged_claims)
-										}
-									}
-									if platform.deployment_context.actor_type != "machine" {
-										// User deployment - just use user-specified claims
-										mcp_auth_required_claims: json.Marshal(input.required_claims)
-									}
-								}
-								if platform.deployment_context == _|_ {
-									// No deployment context - just use user-specified claims
-									mcp_auth_required_claims: json.Marshal(input.required_claims)
-								}
-							}
-							if input.required_claims == _|_ {
-								// No user claims, check if we need M2M org_id
-								if platform.deployment_context != _|_ {
-									if platform.deployment_context.actor_type == "machine" {
-										if platform.deployment_context.org_id != _|_ {
-											// Just inject org_id requirement for M2M
-											mcp_auth_required_claims: json.Marshal({org_id: platform.deployment_context.org_id})
-										}
-									}
-								}
-							}
 						}
 						
 						if input.access == "custom" {
-							// For "custom" mode - user must provide auth config
-							mcp_jwt_issuer: input.auth.jwt_issuer | *"https://divine-lion-50-staging.authkit.app"
-							mcp_jwt_audience: input.auth.jwt_audience | *input.name
+							// User-provided auth
+							mcp_jwt_issuer: input.auth.jwt_issuer
+							mcp_jwt_audience: input.auth.jwt_audience
+							if input.auth.jwt_jwks_uri != _|_ {
+								mcp_jwt_jwks_uri: input.auth.jwt_jwks_uri
+							}
 						}
 						
-						// Forward claims as headers if specified by platform
-						if platform.deployment_context != _|_ {
-							if platform.deployment_context.forward_claims != _|_ {
-								// Convert the claim->header mapping to JSON string
-								// The mcp-authorizer expects a JSON object like: {"sub": "X-User-ID", "org_id": "X-Org-ID"}
-								_claims_map: platform.deployment_context.forward_claims
-								mcp_auth_forward_claims: json.Marshal(_claims_map)
+						// Rego policy - ALL authenticated modes use policies
+						// Platform provides policy for private/org, user provides for custom
+						if platform.authorization_policy != _|_ {
+							mcp_policy: platform.authorization_policy
+						}
+						if input.access == "custom" && input.auth.policy != _|_ {
+							mcp_policy: input.auth.policy
+						}
+						
+						// Policy data - from platform or user
+						if platform.authorization_policy_data != _|_ {
+							if (platform.authorization_policy_data & string) != _|_ {
+								mcp_policy_data: platform.authorization_policy_data
+							}
+							if (platform.authorization_policy_data & {[string]: _}) != _|_ {
+								mcp_policy_data: json.Marshal(platform.authorization_policy_data)
+							}
+						}
+						if input.access == "custom" && input.auth.policy_data != _|_ {
+							if (input.auth.policy_data & string) != _|_ {
+								mcp_policy_data: input.auth.policy_data
+							}
+							if (input.auth.policy_data & {[string]: _}) != _|_ {
+								mcp_policy_data: json.Marshal(input.auth.policy_data)
 							}
 						}
 					}
