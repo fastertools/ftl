@@ -114,8 +114,8 @@ func ShowDeploymentPreview(preview *DeploymentPreview) {
 
 	if len(preview.Components) > 0 {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  NAME\tTYPE\tSOURCE\tSIZE")
-		fmt.Fprintln(w, "  ────\t────\t──────\t────")
+		_, _ = fmt.Fprintln(w, "  NAME\tTYPE\tSOURCE\tSIZE")
+		_, _ = fmt.Fprintln(w, "  ────\t────\t──────\t────")
 
 		for _, comp := range preview.Components {
 			sourceIcon := "📦"

@@ -133,7 +133,7 @@ func TestJSONSupport(t *testing.T) {
 		}
 
 		// Clean up and test with YAML
-		os.Remove("ftl.json")
+		_ = os.Remove("ftl.json")
 		yamlData := `name: yaml-app
 version: 2.0.0
 components:

@@ -266,7 +266,7 @@ func TestStreamingDeployIncompleteStream(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 
 		// Send progress but no completion
-		fmt.Fprintln(w, `{"type":"progress","message":"Starting deployment"}`)
+		_, _ = fmt.Fprintln(w, `{"type":"progress","message":"Starting deployment"}`)
 		w.(http.Flusher).Flush()
 
 		// Abruptly close connection

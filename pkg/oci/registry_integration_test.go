@@ -107,8 +107,8 @@ func TestWASMPuller_CacheDirectoryCreation(t *testing.T) {
 	t.Run("with HOME", func(t *testing.T) {
 		tempHome := t.TempDir()
 		oldHome := os.Getenv("HOME")
-		os.Setenv("HOME", tempHome)
-		defer os.Setenv("HOME", oldHome)
+		_ = os.Setenv("HOME", tempHome)
+		defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 		puller := NewWASMPuller()
 		assert.NotNil(t, puller)
@@ -120,8 +120,8 @@ func TestWASMPuller_CacheDirectoryCreation(t *testing.T) {
 	// Test with HOME unset (will use .cache/ftl/wasm relative to current dir)
 	t.Run("without HOME", func(t *testing.T) {
 		oldHome := os.Getenv("HOME")
-		os.Unsetenv("HOME")
-		defer os.Setenv("HOME", oldHome)
+		_ = os.Unsetenv("HOME")
+		defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 		puller := NewWASMPuller()
 		assert.NotNil(t, puller)

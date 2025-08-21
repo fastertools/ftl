@@ -121,7 +121,7 @@ func TestRegistrySourceYAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if err := os.WriteFile(tmpFile.Name(), data, 0600); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)

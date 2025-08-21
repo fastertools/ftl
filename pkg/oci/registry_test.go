@@ -226,7 +226,7 @@ func TestWASMPusher_Push_ErrorCases(t *testing.T) {
 	tempFile, err := os.CreateTemp("", "test*.wasm")
 	require.NoError(t, err)
 	_ = tempFile.Close()
-	defer os.Remove(tempFile.Name())
+	defer func() { _ = os.Remove(tempFile.Name()) }()
 
 	tests := []struct {
 		name        string
