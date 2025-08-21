@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,8 +51,13 @@ func NewWASMPullerWithCache(cacheDir string) *WASMPuller {
 // Pull downloads a WASM component from a registry
 // Parameters are now explicit instead of using a types package
 func (p *WASMPuller) Pull(ctx context.Context, registry, packageName, version string) (string, error) {
-	// Construct the OCI reference
-	ref := fmt.Sprintf("%s/%s:%s", registry, packageName, version)
+	// Convert Spin-style package name (namespace:package) to OCI format (namespace/package)
+	// This handles cases like "bowlofarugula:fluid" -> "bowlofarugula/fluid"
+	ociPackageName := strings.Replace(packageName, ":", "/", 1)
+
+	// Construct the OCI reference using : for version tag
+	// Format: registry/namespace/package:version
+	ref := fmt.Sprintf("%s/%s:%s", registry, ociPackageName, version)
 
 	// Parse the reference
 	tag, err := name.ParseReference(ref)

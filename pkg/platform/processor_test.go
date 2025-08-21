@@ -22,8 +22,8 @@ components:
   - id: tool1
     source:
       registry: ghcr.io
-      package: test/tool
-      version: v1.0.0
+      package: test:tool
+      version: 1.0.0
 `),
 		}
 
@@ -48,8 +48,8 @@ components:
   - id: secure-tool
     source:
       registry: ghcr.io
-      package: test/secure
-      version: v1.0.0
+      package: test:secure
+      version: 1.0.0
 `),
 			AllowedSubjects: []string{"user_owner_123"},
 		}
@@ -62,21 +62,21 @@ components:
 		assert.Equal(t, "private", result.Metadata.AccessMode)
 		assert.True(t, result.Metadata.InjectedAuthorizer)
 		assert.Contains(t, result.SpinTOML, "mcp-authorizer")
-		
+
 		// Parse and verify policy variables
 		var manifest map[string]interface{}
 		require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-		
+
 		components := manifest["component"].(map[string]interface{})
 		authorizer := components["mcp-authorizer"].(map[string]interface{})
 		variables := authorizer["variables"].(map[string]interface{})
-		
+
 		// Check that policy is injected
 		policy, ok := variables["mcp_policy"].(string)
 		assert.True(t, ok, "mcp_policy should be set")
 		assert.Contains(t, policy, "package mcp.authorization")
 		assert.Contains(t, policy, "input.token.sub == data.owner")
-		
+
 		// Check that policy data is injected
 		policyData, ok := variables["mcp_policy_data"].(string)
 		assert.True(t, ok, "mcp_policy_data should be set")
@@ -93,8 +93,8 @@ components:
   - id: org-tool
     source:
       registry: ghcr.io
-      package: test/org-tool
-      version: v1.0.0
+      package: test:org-tool
+      version: 1.0.0
 `),
 			AllowedSubjects: []string{"user_alice", "user_bob", "user_charlie"},
 			DeploymentContext: &DeploymentContext{
@@ -109,21 +109,21 @@ components:
 
 		assert.Equal(t, "org", result.Metadata.AccessMode)
 		assert.True(t, result.Metadata.InjectedAuthorizer)
-		
+
 		// Parse and verify
 		var manifest map[string]interface{}
 		require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-		
+
 		components := manifest["component"].(map[string]interface{})
 		authorizer := components["mcp-authorizer"].(map[string]interface{})
 		variables := authorizer["variables"].(map[string]interface{})
-		
+
 		// Check policy handles both users and machines
 		policy, ok := variables["mcp_policy"].(string)
 		assert.True(t, ok)
-		assert.Contains(t, policy, "not input.token.claims.org_id") // User check
+		assert.Contains(t, policy, "not input.token.claims.org_id")            // User check
 		assert.Contains(t, policy, "input.token.claims.org_id == data.org_id") // Machine check
-		
+
 		// Check policy data has both members and org_id
 		policyData, ok := variables["mcp_policy_data"].(string)
 		assert.True(t, ok)
@@ -143,8 +143,8 @@ components:
   - id: ci-tool
     source:
       registry: ghcr.io
-      package: test/ci-tool
-      version: v1.0.0
+      package: test:ci-tool
+      version: 1.0.0
 `),
 			// Machine deployments might not have user members yet
 			AllowedSubjects: []string{},
@@ -160,15 +160,15 @@ components:
 
 		assert.Equal(t, "org", result.Metadata.AccessMode)
 		assert.True(t, result.Metadata.InjectedAuthorizer)
-		
+
 		// Verify policy data includes org_id even without members
 		var manifest map[string]interface{}
 		require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-		
+
 		components := manifest["component"].(map[string]interface{})
 		authorizer := components["mcp-authorizer"].(map[string]interface{})
 		variables := authorizer["variables"].(map[string]interface{})
-		
+
 		policyData, ok := variables["mcp_policy_data"].(string)
 		assert.True(t, ok)
 		assert.Contains(t, policyData, "org_machine123")
@@ -197,8 +197,8 @@ components:
   - id: custom-tool
     source:
       registry: ghcr.io
-      package: test/custom
-      version: v1.0.0
+      package: test:custom
+      version: 1.0.0
 `),
 		}
 
@@ -208,24 +208,24 @@ components:
 
 		assert.Equal(t, "custom", result.Metadata.AccessMode)
 		assert.True(t, result.Metadata.InjectedAuthorizer)
-		
+
 		// Verify custom auth config is passed through
 		assert.Contains(t, result.SpinTOML, "custom-auth.example.com")
 		assert.Contains(t, result.SpinTOML, "custom-api")
-		
+
 		// Parse and verify custom policy
 		var manifest map[string]interface{}
 		require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-		
+
 		components := manifest["component"].(map[string]interface{})
 		authorizer := components["mcp-authorizer"].(map[string]interface{})
 		variables := authorizer["variables"].(map[string]interface{})
-		
+
 		// Check custom policy is passed through
 		policy, ok := variables["mcp_policy"].(string)
 		assert.True(t, ok)
 		assert.Contains(t, policy, "input.token.claims.role == \"admin\"")
-		
+
 		// Check custom policy data
 		policyData, ok := variables["mcp_policy_data"].(string)
 		assert.True(t, ok)
@@ -246,26 +246,26 @@ components:
   - id: tool
     source:
       registry: ghcr.io
-      package: test/tool
-      version: v1.0.0
+      package: test:tool
+      version: 1.0.0
 `),
 			AllowedSubjects: []string{}, // No owner provided
 		}
 
 		result, err := processor.Process(req)
 		require.NoError(t, err)
-		
+
 		// Should still inject authorizer but no policy
 		assert.True(t, result.Metadata.InjectedAuthorizer)
-		
+
 		// Policy shouldn't be generated without an owner
 		var manifest map[string]interface{}
 		require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-		
+
 		components := manifest["component"].(map[string]interface{})
 		authorizer := components["mcp-authorizer"].(map[string]interface{})
 		variables := authorizer["variables"].(map[string]interface{})
-		
+
 		// Should not have policy without owner
 		_, hasPolicy := variables["mcp_policy"]
 		assert.False(t, hasPolicy, "Should not generate policy without owner")
@@ -281,8 +281,8 @@ components:
   - id: tool
     source:
       registry: ghcr.io
-      package: test/tool
-      version: v1.0.0
+      package: test:tool
+      version: 1.0.0
 `),
 			AllowedSubjects: []string{"user_1"},
 			// No deployment context
@@ -290,7 +290,7 @@ components:
 
 		result, err := processor.Process(req)
 		require.NoError(t, err)
-		
+
 		// Should still work but without org_id in policy data
 		assert.True(t, result.Metadata.InjectedAuthorizer)
 	})
@@ -304,14 +304,14 @@ components:
   - id: tool
     source:
       registry: ghcr.io
-      package: test/tool
-      version: v1.0.0
+      package: test:tool
+      version: 1.0.0
 `),
 		}
 
 		result, err := processor.Process(req)
 		require.NoError(t, err)
-		
+
 		// Should default to public
 		assert.Equal(t, "public", result.Metadata.AccessMode)
 		assert.False(t, result.Metadata.InjectedAuthorizer)
@@ -350,8 +350,8 @@ components:
   - id: tool
     source:
       registry: evil.registry.com
-      package: bad/tool
-      version: v1.0.0
+      package: bad:tool
+      version: 1.0.0
 `),
 			}
 
@@ -369,8 +369,8 @@ components:
   - id: tool
     source:
       registry: ghcr.io
-      package: good/tool
-      version: v1.0.0
+      package: good:tool
+      version: 1.0.0
 `),
 			}
 
@@ -395,13 +395,13 @@ components:
   - id: tool1
     source:
       registry: ghcr.io
-      package: test/tool1
-      version: v1.0.0
+      package: test:tool1
+      version: 1.0.0
   - id: tool2
     source:
       registry: ghcr.io
-      package: test/tool2
-      version: v1.0.0
+      package: test:tool2
+      version: 1.0.0
 `),
 		AllowedSubjects: []string{"user_1", "user_2", "user_3"},
 		DeploymentContext: &DeploymentContext{
@@ -428,29 +428,29 @@ func TestProcessorPolicyGeneration(t *testing.T) {
 
 	t.Run("Verify Policy Content", func(t *testing.T) {
 		testCases := []struct {
-			name           string
-			accessMode     string
+			name            string
+			accessMode      string
 			allowedSubjects []string
-			deploymentCtx  *DeploymentContext
-			validatePolicy func(t *testing.T, policy string, policyData string)
+			deploymentCtx   *DeploymentContext
+			validatePolicy  func(t *testing.T, policy string, policyData string)
 		}{
 			{
-				name:           "Private Policy Structure",
-				accessMode:     "private",
+				name:            "Private Policy Structure",
+				accessMode:      "private",
 				allowedSubjects: []string{"owner_123"},
 				validatePolicy: func(t *testing.T, policy string, policyData string) {
 					// Check policy structure
 					assert.Contains(t, policy, "package mcp.authorization")
 					assert.Contains(t, policy, "default allow = false")
 					assert.Contains(t, policy, "data.owner")
-					
+
 					// Check data
 					assert.Contains(t, policyData, "owner_123")
 				},
 			},
 			{
-				name:           "Org Policy Dual Mode",
-				accessMode:     "org",
+				name:            "Org Policy Dual Mode",
+				accessMode:      "org",
 				allowedSubjects: []string{"user_a", "user_b"},
 				deploymentCtx: &DeploymentContext{
 					ActorType: "user",
@@ -461,7 +461,7 @@ func TestProcessorPolicyGeneration(t *testing.T) {
 					assert.Contains(t, policy, "not input.token.claims.org_id")
 					assert.Contains(t, policy, "data.members[_]")
 					assert.Contains(t, policy, "input.token.claims.org_id == data.org_id")
-					
+
 					// Check data has both
 					assert.Contains(t, policyData, "org_dual")
 					assert.Contains(t, policyData, "user_a")
@@ -479,8 +479,8 @@ components:
   - id: tool
     source:
       registry: ghcr.io
-      package: test/tool
-      version: v1.0.0
+      package: test:tool
+      version: 1.0.0
 `
 				req := ProcessRequest{
 					Format:            "yaml",
@@ -495,14 +495,14 @@ components:
 				// Extract policy from result
 				var manifest map[string]interface{}
 				require.NoError(t, toml.Unmarshal([]byte(result.SpinTOML), &manifest))
-				
+
 				components := manifest["component"].(map[string]interface{})
 				authorizer := components["mcp-authorizer"].(map[string]interface{})
 				variables := authorizer["variables"].(map[string]interface{})
-				
+
 				policy, _ := variables["mcp_policy"].(string)
 				policyData, _ := variables["mcp_policy_data"].(string)
-				
+
 				tc.validatePolicy(t, policy, policyData)
 			})
 		}

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package policy
@@ -117,7 +118,7 @@ func TestPolicyEvaluation(t *testing.T) {
 						"sub": "machine_deploy_bot",
 						"iss": "https://auth.example.com",
 						"claims": map[string]interface{}{
-							"org_id": "org_abc123",
+							"org_id":  "org_abc123",
 							"purpose": "deployment",
 						},
 					},
@@ -131,7 +132,7 @@ func TestPolicyEvaluation(t *testing.T) {
 						"sub": "machine_evil_bot",
 						"iss": "https://auth.example.com",
 						"claims": map[string]interface{}{
-							"org_id": "org_different",
+							"org_id":  "org_different",
 							"purpose": "deployment",
 						},
 					},

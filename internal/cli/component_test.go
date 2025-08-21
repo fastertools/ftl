@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/fastertools/ftl-cli/internal/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -35,7 +36,7 @@ func TestLoadAndSaveComponentManifest(t *testing.T) {
 	manifestPath := filepath.Join(tmpDir, "ftl.yaml")
 
 	// Create test manifest with flat structure
-	manifest := map[interface{}]interface{}{
+	testManifest := map[interface{}]interface{}{
 		"name":        "test-app",
 		"version":     "0.1.0",
 		"description": "Test application",
@@ -54,29 +55,18 @@ func TestLoadAndSaveComponentManifest(t *testing.T) {
 	}
 
 	// Save manifest
-	data, err := yaml.Marshal(manifest)
+	data, err := yaml.Marshal(testManifest)
 	require.NoError(t, err)
 	err = os.WriteFile(manifestPath, data, 0600)
 	require.NoError(t, err)
 
-	// Load and verify
-	loaded, err := loadComponentManifest(manifestPath)
+	// Load and verify using new manifest package
+	loaded, err := manifest.Load(manifestPath)
 	require.NoError(t, err)
-	assert.Equal(t, "test-app", loaded["name"])
-	assert.Equal(t, "0.1.0", loaded["version"])
-	components, ok := loaded["components"].([]interface{})
-	require.True(t, ok, "components should be a slice")
-	assert.Len(t, components, 1)
-
-	// Handle both map[string]interface{} and map[interface{}]interface{}
-	var firstCompID string
-	switch comp := components[0].(type) {
-	case map[string]interface{}:
-		firstCompID = comp["id"].(string)
-	case map[interface{}]interface{}:
-		firstCompID = comp["id"].(string)
-	}
-	assert.Equal(t, "test-component", firstCompID)
+	assert.Equal(t, "test-app", loaded.Name)
+	assert.Equal(t, "0.1.0", loaded.Version)
+	assert.Len(t, loaded.Components, 1)
+	assert.Equal(t, "test-component", loaded.Components[0].ID)
 }
 
 func TestAddComponentValidation(t *testing.T) {
@@ -121,13 +111,13 @@ func TestAddComponentValidation(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			manifest := map[interface{}]interface{}{
+			testManifest := map[interface{}]interface{}{
 				"name":       "test-app",
 				"version":    "0.1.0",
 				"components": []interface{}{},
 				"access":     "public",
 			}
-			data, _ := yaml.Marshal(manifest)
+			data, _ := yaml.Marshal(testManifest)
 			_ = os.WriteFile("ftl.yaml", data, 0600)
 
 			// Test add component
@@ -138,20 +128,10 @@ func TestAddComponentValidation(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Verify component was added
-				updated, err := loadManifest("ftl.yaml")
+				updated, err := manifest.Load("ftl.yaml")
 				require.NoError(t, err)
-				components := updated["components"].([]interface{})
-				assert.Len(t, components, 1)
-
-				// Handle both map types
-				var compID string
-				switch comp := components[0].(type) {
-				case map[string]interface{}:
-					compID = comp["id"].(string)
-				case map[interface{}]interface{}:
-					compID = comp["id"].(string)
-				}
-				assert.Equal(t, tt.opts.Name, compID)
+				assert.Len(t, updated.Components, 1)
+				assert.Equal(t, tt.opts.Name, updated.Components[0].ID)
 			}
 		})
 	}
@@ -162,7 +142,7 @@ func TestRemoveComponentDirect(t *testing.T) {
 	manifestPath := filepath.Join(tmpDir, "ftl.yaml")
 
 	// Create manifest with multiple components
-	manifest := map[interface{}]interface{}{
+	testManifest := map[interface{}]interface{}{
 		"name":    "test-app",
 		"version": "0.1.0",
 		"components": []interface{}{
@@ -177,7 +157,7 @@ func TestRemoveComponentDirect(t *testing.T) {
 	// Find and remove component
 	found := false
 	newComponents := []interface{}{}
-	components := manifest["components"].([]interface{})
+	components := testManifest["components"].([]interface{})
 	for _, c := range components {
 		comp := c.(map[interface{}]interface{})
 		if comp["id"] == "component-2" {
@@ -191,29 +171,21 @@ func TestRemoveComponentDirect(t *testing.T) {
 	assert.Len(t, newComponents, 2)
 
 	// Update manifest
-	manifest["components"] = newComponents
+	testManifest["components"] = newComponents
 
 	// Save and verify
-	data, _ := yaml.Marshal(manifest)
+	data, _ := yaml.Marshal(testManifest)
 	_ = os.WriteFile(manifestPath, data, 0600)
 
 	// Load and check
-	loaded, err := loadComponentManifest(manifestPath)
+	loaded, err := manifest.Load(manifestPath)
 	require.NoError(t, err)
-	loadedComponents := loaded["components"].([]interface{})
-	assert.Len(t, loadedComponents, 2)
+	assert.Len(t, loaded.Components, 2)
 
 	// Check remaining components
 	ids := []string{}
-	for _, c := range loadedComponents {
-		var id string
-		switch comp := c.(type) {
-		case map[string]interface{}:
-			id = comp["id"].(string)
-		case map[interface{}]interface{}:
-			id = comp["id"].(string)
-		}
-		ids = append(ids, id)
+	for _, c := range loaded.Components {
+		ids = append(ids, c.ID)
 	}
 	assert.Contains(t, ids, "component-1")
 	assert.Contains(t, ids, "component-3")

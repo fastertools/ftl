@@ -100,7 +100,7 @@ func TestGenerateOrgPolicy(t *testing.T) {
 				if p.Data["org_id"] != "org_abc123" {
 					t.Errorf("Expected org_id to be org_abc123, got %v", p.Data["org_id"])
 				}
-				
+
 				members, ok := p.Data["members"].([]string)
 				if !ok {
 					t.Fatal("Expected members to be []string")
@@ -276,11 +276,11 @@ func TestPolicySemantics(t *testing.T) {
 
 		// Validate it's valid Rego syntax (basic checks)
 		lines := strings.Split(policy.Source, "\n")
-		
+
 		foundPackage := false
 		foundDefault := false
 		foundAllow := false
-		
+
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "package ") {

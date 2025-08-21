@@ -31,12 +31,14 @@ import (
 	variables?: {[string]: string}
 }
 
-#ComponentSource: #LocalSource | #RegistrySource
-#LocalSource: string
+// Component source exactly matches Spin's format - no transformation needed
+#ComponentSource: string | #RegistrySource  // string for local paths, registry for remote
 #RegistrySource: {
 	registry!: string
-	package!:  string
-	version!:  string
+	// Package must be in "namespace:name" format to match Spin's requirements
+	// Allow alphanumeric, hyphens, underscores in both namespace and package name
+	package!:  string & =~"^[a-zA-Z0-9][a-zA-Z0-9_-]*:[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+	version!:  string & =~"^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$"
 }
 
 #BuildConfig: {
@@ -155,13 +157,16 @@ import (
 			// Only the following fields are copied from user configuration:
 			for comp in input.components {
 				"\(comp.id)": {
+					// Pass through source directly - no transformation needed
 					source: comp.source
+					
 					// Only include build for local sources (string type)
 					if (comp.source & string) != _|_ {
 						if comp.build.command != "" {
 							build: comp.build  
 						}
 					}
+					
 					if comp.variables != _|_ {
 						variables: comp.variables
 					}

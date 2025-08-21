@@ -113,8 +113,8 @@ func TestSynthesizer_WithOverrides(t *testing.T) {
 				"id": "api",
 				"source": map[string]interface{}{
 					"registry": "ghcr.io",
-					"package":  "test/api",
-					"version":  "v2.0.0",
+					"package":  "test:api",
+					"version":  "2.0.0",
 				},
 			},
 		},

@@ -18,9 +18,9 @@ const (
 
 // Processor handles FTL application processing for platform deployments.
 type Processor struct {
-	config         Config
-	validator      *validation.Validator
-	synthesizer    *synthesis.Synthesizer
+	config          Config
+	validator       *validation.Validator
+	synthesizer     *synthesis.Synthesizer
 	policyGenerator *policy.Generator
 }
 
@@ -225,7 +225,7 @@ func (p *Processor) Process(req ProcessRequest) (*ProcessResult, error) {
 	// Add authorization policy if generated
 	if authPolicy != nil {
 		overrides["authorization_policy"] = authPolicy.Source
-		
+
 		policyDataJSON, err := authPolicy.ToJSON()
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize policy data: %w", err)

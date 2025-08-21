@@ -2,13 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/fastertools/ftl-cli/internal/manifest"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func newComponentCmd() *cobra.Command {
@@ -39,17 +37,13 @@ func newComponentListCmd() *cobra.Command {
 }
 
 func listComponents() error {
-	// Load manifest
-	manifest, err := loadComponentManifest("ftl.yaml")
+	// Load manifest (tries ftl.yaml, ftl.yml, ftl.json)
+	m, err := manifest.LoadAuto()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found. Run 'ftl init' first")
-		}
-		return err
+		return fmt.Errorf("failed to load manifest: %w", err)
 	}
 
-	components, ok := manifest["components"].([]interface{})
-	if !ok || len(components) == 0 {
+	if len(m.Components) == 0 {
 		fmt.Println("No components found.")
 		fmt.Println()
 		fmt.Println("Add a component with:")
@@ -62,31 +56,40 @@ func listComponents() error {
 	fmt.Println()
 
 	// List components
-	for _, c := range components {
-		comp := c.(map[interface{}]interface{})
-		fmt.Printf("  • %s\n", comp["id"])
+	for _, comp := range m.Components {
+		fmt.Printf("  • %s\n", comp.ID)
 
 		// Show source info
-		switch src := comp["source"].(type) {
+		switch src := comp.Source.(type) {
 		case string:
 			fmt.Printf("    Source: %s\n", src)
-		case map[interface{}]interface{}:
-			if registry, ok := src["registry"]; ok {
+		case manifest.SourceRegistry:
+			fmt.Printf("    Source: %s/%s:%s\n",
+				src.Registry, src.Package, src.Version)
+		case map[string]interface{}:
+			// Handle case where source is still a map (shouldn't happen with proper unmarshaling)
+			if registry, ok := src["registry"].(string); ok {
 				fmt.Printf("    Source: %s/%s:%s\n",
 					registry, src["package"], src["version"])
 			}
+		case map[interface{}]interface{}:
+			// Handle case where source is still a map (shouldn't happen with proper unmarshaling)
+			if registry, ok := src["registry"].(string); ok {
+				fmt.Printf("    Source: %s/%s:%s\n",
+					registry, src["package"], src["version"])
+			}
+		default:
+			fmt.Printf("    Source: %v (type: %T)\n", src, src)
 		}
 
 		// Show build info if present
-		if build, ok := comp["build"].(map[interface{}]interface{}); ok {
-			if cmd, ok := build["command"]; ok {
-				fmt.Printf("    Build: %s\n", cmd)
-			}
+		if comp.Build != nil {
+			fmt.Printf("    Build: %s\n", comp.Build.Command)
 		}
 
 		// Show variables if present
-		if vars, ok := comp["variables"].(map[interface{}]interface{}); ok && len(vars) > 0 {
-			fmt.Printf("    Variables: %d configured\n", len(vars))
+		if len(comp.Variables) > 0 {
+			fmt.Printf("    Variables: %d configured\n", len(comp.Variables))
 		}
 
 		fmt.Println()
@@ -111,26 +114,21 @@ func newComponentRemoveCmd() *cobra.Command {
 }
 
 func removeComponent(name string) error {
-	// Load manifest
-	manifest, err := loadComponentManifest("ftl.yaml")
+	// Load manifest (tries ftl.yaml, ftl.yml, ftl.json)
+	m, err := manifest.LoadAuto()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("ftl.yaml not found")
-		}
-		return err
+		return fmt.Errorf("failed to load manifest: %w", err)
 	}
 
-	components, ok := manifest["components"].([]interface{})
-	if !ok || len(components) == 0 {
+	if len(m.Components) == 0 {
 		return fmt.Errorf("no components to remove")
 	}
 
 	// If no name provided, show interactive selection
 	if name == "" {
 		var options []string
-		for _, c := range components {
-			comp := c.(map[interface{}]interface{})
-			options = append(options, comp["id"].(string))
+		for _, comp := range m.Components {
+			options = append(options, comp.ID)
 		}
 
 		prompt := &survey.Select{
@@ -142,19 +140,8 @@ func removeComponent(name string) error {
 		}
 	}
 
-	// Find and remove component
-	found := false
-	newComponents := []interface{}{}
-	for _, c := range components {
-		comp := c.(map[interface{}]interface{})
-		if comp["id"] == name {
-			found = true
-			continue
-		}
-		newComponents = append(newComponents, c)
-	}
-
-	if !found {
+	// Check if component exists
+	if _, idx := m.FindComponent(name); idx == -1 {
 		return fmt.Errorf("component '%s' not found", name)
 	}
 
@@ -173,11 +160,13 @@ func removeComponent(name string) error {
 		return nil
 	}
 
-	// Update manifest
-	manifest["components"] = newComponents
+	// Remove component
+	if err := m.RemoveComponent(name); err != nil {
+		return err
+	}
 
-	// Save manifest
-	if err := saveComponentManifest("ftl.yaml", manifest); err != nil {
+	// Save manifest (to the same file format)
+	if err := m.SaveAuto(); err != nil {
 		return fmt.Errorf("failed to save manifest: %w", err)
 	}
 
@@ -185,26 +174,4 @@ func removeComponent(name string) error {
 	return nil
 }
 
-func loadComponentManifest(path string) (map[interface{}]interface{}, error) {
-	// Clean the path to prevent directory traversal
-	path = filepath.Clean(path)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifest map[interface{}]interface{}
-	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest: %w", err)
-	}
-
-	return manifest, nil
-}
-
-func saveComponentManifest(path string, manifest map[interface{}]interface{}) error {
-	data, err := yaml.Marshal(manifest)
-	if err != nil {
-		return fmt.Errorf("failed to marshal manifest: %w", err)
-	}
-	return os.WriteFile(path, data, 0600)
-}
+// Removed - now using manifest package

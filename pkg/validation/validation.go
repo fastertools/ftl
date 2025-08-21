@@ -173,7 +173,6 @@ func ExtractApplication(v cue.Value) (*Application, error) {
 		}
 	}
 
-
 	return app, nil
 }
 
@@ -242,13 +241,13 @@ func extractComponent(v cue.Value) (*Component, error) {
 // Application represents a validated FTL application
 // These are strongly-typed, validated structures derived from CUE
 type Application struct {
-	Name            string            `json:"name,omitempty"`
-	Version         string            `json:"version,omitempty"`
-	Description     string            `json:"description,omitempty"`
-	Access          string            `json:"access,omitempty"`
-	Auth            *AuthConfig       `json:"auth,omitempty"`
-	Components      []*Component      `json:"components,omitempty"`
-	Variables  map[string]string `json:"variables,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Version     string            `json:"version,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Access      string            `json:"access,omitempty"`
+	Auth        *AuthConfig       `json:"auth,omitempty"`
+	Components  []*Component      `json:"components,omitempty"`
+	Variables   map[string]string `json:"variables,omitempty"`
 }
 
 // Component represents a validated component

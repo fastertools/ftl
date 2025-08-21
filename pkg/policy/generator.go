@@ -138,11 +138,11 @@ func (p *Policy) ToJSON() (string, error) {
 	if p == nil || p.Data == nil {
 		return "", nil
 	}
-	
+
 	bytes, err := json.Marshal(p.Data)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal policy data: %w", err)
 	}
-	
+
 	return string(bytes), nil
 }

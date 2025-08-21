@@ -25,8 +25,8 @@ components:
   - id: api
     source:
       registry: ghcr.io
-      package: test/api
-      version: v1.0.0
+      package: test:api
+      version: 1.0.0
 `),
 			},
 			wantErr: false,
@@ -65,8 +65,8 @@ components:
   - id: backend
     source:
       registry: ghcr.io
-      package: test/backend
-      version: v2.0.0
+      package: test:backend
+      version: 2.0.0
 `),
 			},
 			wantErr: false,
@@ -137,8 +137,8 @@ components:
   - id: user-service
     source:
       registry: ghcr.io
-      package: test/service
-      version: v1.0.0
+      package: test:service
+      version: 1.0.0
 `),
 				// Platform provides the authenticated user for private mode
 				AllowedSubjects: []string{"user_authenticated_123"},
@@ -168,8 +168,8 @@ components:
   - id: org-service
     source:
       registry: ghcr.io
-      package: test/service
-      version: v1.0.0
+      package: test:service
+      version: 1.0.0
 `),
 				AllowedSubjects: []string{"user_123", "user_456"},
 			},
@@ -199,8 +199,8 @@ components:
   - id: admin-service
     source:
       registry: ghcr.io
-      package: test/admin
-      version: v1.0.0
+      package: test:admin
+      version: 1.0.0
 `),
 				// Platform provides org members
 				AllowedSubjects: []string{"admin_user_001", "dev_user_002"},

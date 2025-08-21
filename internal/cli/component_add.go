@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/fastertools/ftl-cli/internal/manifest"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 // AddComponentOptions holds options for adding a component
@@ -37,7 +37,7 @@ func newComponentAddCmd() *cobra.Command {
   ftl component add my-component --source ./my-component
 
   # Add a component from a registry
-  ftl component add my-component --registry ghcr.io/user:package:version
+  ftl component add my-component --registry ghcr.io/namespace:package@version
 
   # Add a component from a template
   ftl component add my-component --template go-http`,
@@ -50,7 +50,7 @@ func newComponentAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&opts.Source, "source", "s", "", "Path to component source")
-	cmd.Flags().StringVarP(&opts.Registry, "registry", "r", "", "Registry source (format: registry/package:version)")
+	cmd.Flags().StringVarP(&opts.Registry, "registry", "r", "", "Registry source (format: registry/namespace:package@version)")
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Component description")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Use a template (go-http, rust-wasm, js-http, python-http)")
 	cmd.Flags().StringVarP(&opts.Build, "build", "b", "", "Build command")
@@ -59,10 +59,10 @@ func newComponentAddCmd() *cobra.Command {
 }
 
 func runComponentAdd(opts *AddComponentOptions) error {
-	// Load existing manifest
-	manifest, err := loadManifest("ftl.yaml")
+	// Load existing manifest (tries ftl.yaml, ftl.yml, ftl.json)
+	m, err := manifest.LoadAuto()
 	if err != nil {
-		return fmt.Errorf("failed to load ftl.yaml: %w", err)
+		return fmt.Errorf("failed to load manifest: %w", err)
 	}
 
 	// Get component name if not provided
@@ -76,16 +76,12 @@ func runComponentAdd(opts *AddComponentOptions) error {
 	}
 
 	// Validate name doesn't already exist
-	components, _ := manifest["components"].([]interface{})
-	for _, c := range components {
-		comp := c.(map[interface{}]interface{})
-		if comp["id"] == opts.Name {
-			return fmt.Errorf("component '%s' already exists", opts.Name)
-		}
+	if existing, _ := m.FindComponent(opts.Name); existing != nil {
+		return fmt.Errorf("component '%s' already exists", opts.Name)
 	}
 
 	// Determine source type
-	var component map[string]interface{}
+	var component manifest.Component
 	if opts.Template != "" {
 		component = createFromTemplate(opts)
 	} else if opts.Registry != "" {
@@ -101,13 +97,12 @@ func runComponentAdd(opts *AddComponentOptions) error {
 	}
 
 	// Add to manifest
-	if components == nil {
-		components = []interface{}{}
+	if err := m.AddComponent(component); err != nil {
+		return err
 	}
-	manifest["components"] = append(components, component)
 
-	// Save manifest
-	if err := saveManifest("ftl.yaml", manifest); err != nil {
+	// Save manifest (to the same file format)
+	if err := m.SaveAuto(); err != nil {
 		return fmt.Errorf("failed to save manifest: %w", err)
 	}
 
@@ -120,36 +115,43 @@ func runComponentAdd(opts *AddComponentOptions) error {
 	return nil
 }
 
-func createFromTemplate(opts *AddComponentOptions) map[string]interface{} {
-	comp := make(map[string]interface{})
-	comp["id"] = opts.Name
+func createFromTemplate(opts *AddComponentOptions) manifest.Component {
+	comp := manifest.Component{
+		ID: opts.Name,
+	}
 
 	// Set source based on template
 	templateDir := fmt.Sprintf("components/%s", opts.Name)
-	comp["source"] = templateDir
+	comp.Source = templateDir
 
 	// Set build command based on template type
-	build := make(map[string]interface{})
+	var build *manifest.BuildConfig
 	switch opts.Template {
 	case "go-http":
-		build["command"] = "tinygo build -target=wasip2 -o " + opts.Name + ".wasm main.go"
-		build["watch"] = []string{"**/*.go", "go.mod"}
+		build = &manifest.BuildConfig{
+			Command: "tinygo build -target=wasip2 -o " + opts.Name + ".wasm main.go",
+			Watch:   []string{"**/*.go", "go.mod"},
+		}
 	case "rust-wasm":
-		build["command"] = "cargo build --target wasm32-wasip2 --release"
-		build["workdir"] = templateDir
-		build["watch"] = []string{"src/**/*.rs", "Cargo.toml"}
+		build = &manifest.BuildConfig{
+			Command: "cargo build --target wasm32-wasip2 --release",
+			Workdir: templateDir,
+			Watch:   []string{"src/**/*.rs", "Cargo.toml"},
+		}
 	case "js-http":
-		build["command"] = "npm run build"
-		build["workdir"] = templateDir
-		build["watch"] = []string{"src/**/*.js", "package.json"}
+		build = &manifest.BuildConfig{
+			Command: "npm run build",
+			Workdir: templateDir,
+			Watch:   []string{"src/**/*.js", "package.json"},
+		}
 	case "python-http":
-		build["command"] = "componentize-py -w spin-http componentize -o " + opts.Name + ".wasm app"
-		build["workdir"] = templateDir
-		build["watch"] = []string{"**/*.py"}
+		build = &manifest.BuildConfig{
+			Command: "componentize-py -w spin-http componentize -o " + opts.Name + ".wasm app",
+			Workdir: templateDir,
+			Watch:   []string{"**/*.py"},
+		}
 	}
-	if len(build) > 0 {
-		comp["build"] = build
-	}
+	comp.Build = build
 
 	// Create the template directory and files
 	if err := createTemplateFiles(templateDir, opts.Template, opts.Name); err != nil {
@@ -160,58 +162,87 @@ func createFromTemplate(opts *AddComponentOptions) map[string]interface{} {
 	return comp
 }
 
-func createFromRegistry(opts *AddComponentOptions) map[string]interface{} {
-	comp := make(map[string]interface{})
-	comp["id"] = opts.Name
+func createFromRegistry(opts *AddComponentOptions) manifest.Component {
+	comp := manifest.Component{
+		ID: opts.Name,
+	}
 
-	// Parse registry string (format: registry/package:version)
-	parts := strings.Split(opts.Registry, "/")
-	if len(parts) != 2 {
+	// Parse registry string
+	// Format: registry/namespace:package@version
+	// Examples:
+	//   - ghcr.io/fastertools:geo@0.0.1
+	//   - docker.io/library:nginx@latest
+	//   - myregistry.com/myorg:mypackage@1.0.0
+	registryStr := opts.Registry
+
+	// Find the @ to separate version
+	atIndex := strings.LastIndex(registryStr, "@")
+	if atIndex == -1 {
+		color.Yellow("⚠ Invalid format. Expected: registry/namespace:package@version")
+		comp.Source = opts.Registry
+		return comp
+	}
+
+	mainPart := registryStr[:atIndex]
+	version := registryStr[atIndex+1:]
+
+	// Split mainPart into registry/namespace and package
+	// Look for the last slash to separate registry from namespace:package
+	slashIndex := strings.Index(mainPart, "/")
+	if slashIndex == -1 {
 		color.Yellow("⚠ Invalid registry format. Using as-is.")
-		comp["source"] = opts.Registry
+		comp.Source = opts.Registry
 		return comp
 	}
 
-	registry := parts[0]
-	remainder := parts[1]
+	registry := mainPart[:slashIndex]
+	namespacePackage := mainPart[slashIndex+1:]
 
-	// Split package:version
-	packageParts := strings.Split(remainder, ":")
-	if len(packageParts) != 2 {
-		color.Yellow("⚠ Invalid package format. Using as-is.")
-		comp["source"] = opts.Registry
+	// Split namespace:package
+	colonIndex := strings.Index(namespacePackage, ":")
+	if colonIndex == -1 {
+		// If no colon, treat the whole thing as the package (no namespace)
+		source := manifest.SourceRegistry{
+			Registry: registry,
+			Package:  namespacePackage,
+			Version:  version,
+		}
+		comp.Source = source
 		return comp
 	}
 
-	source := make(map[string]interface{})
-	source["registry"] = registry
-	source["package"] = packageParts[0]
-	source["version"] = packageParts[1]
-	comp["source"] = source
+	// Store as namespace:package in the Package field (Spin's format)
+	source := manifest.SourceRegistry{
+		Registry: registry,
+		Package:  namespacePackage, // Already in namespace:package format
+		Version:  version,
+	}
+	comp.Source = source
 
 	return comp
 }
 
-func createFromLocal(opts *AddComponentOptions) map[string]interface{} {
-	comp := make(map[string]interface{})
-	comp["id"] = opts.Name
-	comp["source"] = opts.Source
+func createFromLocal(opts *AddComponentOptions) manifest.Component {
+	comp := manifest.Component{
+		ID:     opts.Name,
+		Source: opts.Source,
+	}
 
 	// Check if it needs build config
 	info, err := os.Stat(opts.Source)
 	if err == nil && (info.IsDir() || !strings.HasSuffix(opts.Source, ".wasm")) {
 		// It's source code, needs build
 		if opts.Build != "" {
-			build := make(map[string]interface{})
-			build["command"] = opts.Build
-			comp["build"] = build
+			comp.Build = &manifest.BuildConfig{
+				Command: opts.Build,
+			}
 		}
 	}
 
 	return comp
 }
 
-func createInteractive(opts *AddComponentOptions) (map[string]interface{}, error) {
+func createInteractive(opts *AddComponentOptions) (manifest.Component, error) {
 	// Ask for source type
 	sourceType := ""
 	sourcePrompt := &survey.Select{
@@ -219,7 +250,7 @@ func createInteractive(opts *AddComponentOptions) (map[string]interface{}, error
 		Options: []string{"Local path", "Registry", "Create from template"},
 	}
 	if err := survey.AskOne(sourcePrompt, &sourceType); err != nil {
-		return nil, err
+		return manifest.Component{}, err
 	}
 
 	switch sourceType {
@@ -229,16 +260,16 @@ func createInteractive(opts *AddComponentOptions) (map[string]interface{}, error
 			Default: fmt.Sprintf("./components/%s", opts.Name),
 		}
 		if err := survey.AskOne(pathPrompt, &opts.Source); err != nil {
-			return nil, err
+			return manifest.Component{}, err
 		}
 		return createFromLocal(opts), nil
 
 	case "Registry":
 		regPrompt := &survey.Input{
-			Message: "Registry source (registry/package:version):",
+			Message: "Registry source (registry/namespace:package@version):",
 		}
 		if err := survey.AskOne(regPrompt, &opts.Registry); err != nil {
-			return nil, err
+			return manifest.Component{}, err
 		}
 		return createFromRegistry(opts), nil
 
@@ -248,12 +279,12 @@ func createInteractive(opts *AddComponentOptions) (map[string]interface{}, error
 			Options: []string{"go-http", "rust-wasm", "js-http", "python-http"},
 		}
 		if err := survey.AskOne(templatePrompt, &opts.Template); err != nil {
-			return nil, err
+			return manifest.Component{}, err
 		}
 		return createFromTemplate(opts), nil
 	}
 
-	return nil, fmt.Errorf("invalid source type")
+	return manifest.Component{}, fmt.Errorf("invalid source type")
 }
 
 func createTemplateFiles(dir, template, name string) error {
@@ -338,35 +369,4 @@ fn handle_request(_req: Request) -> anyhow::Result<impl IntoResponse> {
 	return nil
 }
 
-func loadManifest(path string) (map[interface{}]interface{}, error) {
-	// Clean the path to prevent directory traversal
-	path = filepath.Clean(path)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Create a new manifest if it doesn't exist
-			return map[interface{}]interface{}{
-				"name":       "app",
-				"version":    "0.1.0",
-				"components": []interface{}{},
-				"access":     "public",
-			}, nil
-		}
-		return nil, err
-	}
-
-	var manifest map[interface{}]interface{}
-	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest: %w", err)
-	}
-
-	return manifest, nil
-}
-
-func saveManifest(path string, manifest map[interface{}]interface{}) error {
-	data, err := yaml.Marshal(manifest)
-	if err != nil {
-		return fmt.Errorf("failed to marshal manifest: %w", err)
-	}
-	return os.WriteFile(path, data, 0600)
-}
+// Removed - now using manifest package
