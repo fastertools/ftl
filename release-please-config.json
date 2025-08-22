@@ -43,6 +43,13 @@
         "ftl-sdk-typescript"
       ],
       "merge": false
+    },
+    {
+      "type": "linked-versions",
+      "groupName": "rust-crates",
+      "components": ["sdk-rust"],
+      "packages": ["sdk/rust", "sdk/rust-macros"],
+      "merge": false
     }
   ],
   "packages": {
