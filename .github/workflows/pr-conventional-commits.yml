@@ -248,7 +248,7 @@ jobs:
   check-release-notes:
     name: Check Release Notes
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
