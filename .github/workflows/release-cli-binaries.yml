@@ -150,172 +150,104 @@ jobs:
           echo "---"
           cat checksums.txt
 
-      - name: Generate installation script
+      - name: Copy and update installation script
         run: |
-          VERSION="${{ inputs.version }}"
-          TAG="${{ inputs.tag }}"
-          cat > release/install.sh << EOF
-#!/usr/bin/env bash
-set -euo pipefail
-
-# FTL CLI Installation Script
-# Version: ${VERSION}
-
-VERSION="${VERSION}"
-BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${TAG}"
-
-# Detect OS and architecture
-OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-ARCH="$(uname -m)"
-
-case "${ARCH}" in
-    x86_64|amd64)
-        ARCH="amd64"
-        ;;
-    aarch64|arm64)
-        ARCH="arm64"
-        ;;
-    *)
-        echo "Unsupported architecture: ${ARCH}"
-        exit 1
-        ;;
-esac
-
-case "${OS}" in
-    linux|darwin)
-        ;;
-    *)
-        echo "Unsupported OS: ${OS}"
-        exit 1
-        ;;
-esac
-
-# Download URL
-FILENAME="ftl-${VERSION}-${OS}-${ARCH}.tar.gz"
-DOWNLOAD_URL="${BASE_URL}/${FILENAME}"
-
-echo "Downloading FTL CLI ${VERSION} for ${OS}-${ARCH}..."
-echo "URL: ${DOWNLOAD_URL}"
-
-# Create temporary directory
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "${TMP_DIR}"' EXIT
-
-# Download and extract
-cd "${TMP_DIR}"
-if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "${DOWNLOAD_URL}" -o "${FILENAME}"
-elif command -v wget >/dev/null 2>&1; then
-    wget -q "${DOWNLOAD_URL}" -O "${FILENAME}"
-else
-    echo "Neither curl nor wget found. Please install one of them."
-    exit 1
-fi
-
-# Extract
-tar -xzf "${FILENAME}"
-
-# Install
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-if [[ ! -w "${INSTALL_DIR}" ]]; then
-    echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-    sudo mv "ftl-${VERSION}/ftl" "${INSTALL_DIR}/ftl"
-    sudo chmod +x "${INSTALL_DIR}/ftl"
-else
-    echo "Installing to ${INSTALL_DIR}..."
-    mv "ftl-${VERSION}/ftl" "${INSTALL_DIR}/ftl"
-    chmod +x "${INSTALL_DIR}/ftl"
-fi
-
-echo "FTL CLI ${VERSION} installed successfully!"
-echo "Run 'ftl version' to verify the installation."
-EOF
+          # Copy the existing install script
+          cp install.sh release/install.sh
+          
+          # Update the script with the release version
+          # The script will fetch the latest release by default,
+          # but we can add a version comment
+          sed -i "1a\\# Version: ${{ inputs.version }}" release/install.sh
+          
           chmod +x release/install.sh
 
       - name: Create release notes
         run: |
           VERSION="${{ inputs.version }}"
           TAG="${{ inputs.tag }}"
-          cat > release/notes.md << EOF
-## Installation
-
-### Quick Install (Linux/macOS)
-
-\`\`\`bash
-curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${TAG}/install.sh | bash
-\`\`\`
-
-### Manual Installation
-
-1. Download the appropriate archive for your platform:
-   - Linux AMD64: \`ftl-${VERSION}-linux-amd64.tar.gz\`
-   - Linux ARM64: \`ftl-${VERSION}-linux-arm64.tar.gz\`
-   - macOS AMD64: \`ftl-${VERSION}-darwin-amd64.tar.gz\`
-   - macOS ARM64: \`ftl-${VERSION}-darwin-arm64.tar.gz\`
-
-2. Extract the archive:
-   \`\`\`bash
-   tar -xzf ftl-${VERSION}-<os>-<arch>.tar.gz
-   \`\`\`
-
-3. Move the binary to your PATH:
-   \`\`\`bash
-   sudo mv ftl-${VERSION}/ftl /usr/local/bin/ftl
-   \`\`\`
-
-4. Verify the installation:
-   \`\`\`bash
-   ftl version
-   \`\`\`
-
-### Verify Checksums
-
-Download the \`checksums.txt\` file and verify your download:
-
-\`\`\`bash
-# Linux
-sha256sum -c checksums.txt --ignore-missing
-
-# macOS
-shasum -a 256 -c checksums.txt --ignore-missing
-\`\`\`
-
-## What's Changed
-
-See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/cmd/ftl/CHANGELOG.md) for details.
-
-## Docker Images
-
-Docker images are available at:
-- \`ghcr.io/fastertools/ftl:${VERSION}\`
-- \`ghcr.io/fastertools/ftl:latest\`
-
-## Homebrew
-
-Update to the latest version:
-\`\`\`bash
-brew update && brew upgrade ftl
-\`\`\`
-
-## Getting Started
-
-\`\`\`bash
-# Create a new FTL project
-ftl init my-project
-
-# Add a component
-cd my-project
-ftl component add my-component
-
-# Run locally
-ftl up
-
-# Deploy to FTL Engine
-ftl deploy
-\`\`\`
-
-For more information, see the [documentation](https://docs.fastertools.ai).
-EOF
+          
+          # Create release notes using printf to avoid heredoc issues
+          {
+            echo "## Installation"
+            echo ""
+            echo "### Quick Install (Linux/macOS)"
+            echo ""
+            echo '```bash'
+            echo "curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${TAG}/install.sh | bash"
+            echo '```'
+            echo ""
+            echo "### Manual Installation"
+            echo ""
+            echo "1. Download the appropriate archive for your platform:"
+            echo "   - Linux AMD64: \`ftl-${VERSION}-linux-amd64.tar.gz\`"
+            echo "   - Linux ARM64: \`ftl-${VERSION}-linux-arm64.tar.gz\`"
+            echo "   - macOS AMD64: \`ftl-${VERSION}-darwin-amd64.tar.gz\`"
+            echo "   - macOS ARM64: \`ftl-${VERSION}-darwin-arm64.tar.gz\`"
+            echo ""
+            echo "2. Extract the archive:"
+            echo '   ```bash'
+            echo "   tar -xzf ftl-${VERSION}-<os>-<arch>.tar.gz"
+            echo '   ```'
+            echo ""
+            echo "3. Move the binary to your PATH:"
+            echo '   ```bash'
+            echo "   sudo mv ftl-${VERSION}/ftl /usr/local/bin/ftl"
+            echo '   ```'
+            echo ""
+            echo "4. Verify the installation:"
+            echo '   ```bash'
+            echo "   ftl version"
+            echo '   ```'
+            echo ""
+            echo "### Verify Checksums"
+            echo ""
+            echo "Download the \`checksums.txt\` file and verify your download:"
+            echo ""
+            echo '```bash'
+            echo "# Linux"
+            echo "sha256sum -c checksums.txt --ignore-missing"
+            echo ""
+            echo "# macOS"
+            echo "shasum -a 256 -c checksums.txt --ignore-missing"
+            echo '```'
+            echo ""
+            echo "## What's Changed"
+            echo ""
+            echo "See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/cmd/ftl/CHANGELOG.md) for details."
+            echo ""
+            echo "## Docker Images"
+            echo ""
+            echo "Docker images are available at:"
+            echo "- \`ghcr.io/fastertools/ftl:${VERSION}\`"
+            echo "- \`ghcr.io/fastertools/ftl:latest\`"
+            echo ""
+            echo "## Homebrew"
+            echo ""
+            echo "Update to the latest version:"
+            echo '```bash'
+            echo "brew update && brew upgrade ftl"
+            echo '```'
+            echo ""
+            echo "## Getting Started"
+            echo ""
+            echo '```bash'
+            echo "# Create a new FTL project"
+            echo "ftl init my-project"
+            echo ""
+            echo "# Add a component"
+            echo "cd my-project"
+            echo "ftl component add my-component"
+            echo ""
+            echo "# Run locally"
+            echo "ftl up"
+            echo ""
+            echo "# Deploy to FTL Engine"
+            echo "ftl deploy"
+            echo '```'
+            echo ""
+            echo "For more information, see the [documentation](https://docs.fastertools.ai)."
+          } > release/notes.md
 
       - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
