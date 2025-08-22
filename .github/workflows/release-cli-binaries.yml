@@ -152,15 +152,17 @@ jobs:
 
       - name: Generate installation script
         run: |
-          cat > release/install.sh << 'EOF'
+          VERSION="${{ inputs.version }}"
+          TAG="${{ inputs.tag }}"
+          cat > release/install.sh << EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
 # FTL CLI Installation Script
-# Version: ${{ inputs.version }}
+# Version: ${VERSION}
 
-VERSION="${{ inputs.version }}"
-BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}"
+VERSION="${VERSION}"
+BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${TAG}"
 
 # Detect OS and architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -232,49 +234,51 @@ EOF
 
       - name: Create release notes
         run: |
-          cat > release/notes.md << 'EOF'
+          VERSION="${{ inputs.version }}"
+          TAG="${{ inputs.tag }}"
+          cat > release/notes.md << EOF
 ## Installation
 
 ### Quick Install (Linux/macOS)
 
-```bash
-curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}/install.sh | bash
-```
+\`\`\`bash
+curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${TAG}/install.sh | bash
+\`\`\`
 
 ### Manual Installation
 
 1. Download the appropriate archive for your platform:
-   - Linux AMD64: `ftl-${{ inputs.version }}-linux-amd64.tar.gz`
-   - Linux ARM64: `ftl-${{ inputs.version }}-linux-arm64.tar.gz`
-   - macOS AMD64: `ftl-${{ inputs.version }}-darwin-amd64.tar.gz`
-   - macOS ARM64: `ftl-${{ inputs.version }}-darwin-arm64.tar.gz`
+   - Linux AMD64: \`ftl-${VERSION}-linux-amd64.tar.gz\`
+   - Linux ARM64: \`ftl-${VERSION}-linux-arm64.tar.gz\`
+   - macOS AMD64: \`ftl-${VERSION}-darwin-amd64.tar.gz\`
+   - macOS ARM64: \`ftl-${VERSION}-darwin-arm64.tar.gz\`
 
 2. Extract the archive:
-   ```bash
-   tar -xzf ftl-${{ inputs.version }}-<os>-<arch>.tar.gz
-   ```
+   \`\`\`bash
+   tar -xzf ftl-${VERSION}-<os>-<arch>.tar.gz
+   \`\`\`
 
 3. Move the binary to your PATH:
-   ```bash
-   sudo mv ftl-${{ inputs.version }}/ftl /usr/local/bin/ftl
-   ```
+   \`\`\`bash
+   sudo mv ftl-${VERSION}/ftl /usr/local/bin/ftl
+   \`\`\`
 
 4. Verify the installation:
-   ```bash
+   \`\`\`bash
    ftl version
-   ```
+   \`\`\`
 
 ### Verify Checksums
 
-Download the `checksums.txt` file and verify your download:
+Download the \`checksums.txt\` file and verify your download:
 
-```bash
+\`\`\`bash
 # Linux
 sha256sum -c checksums.txt --ignore-missing
 
 # macOS
 shasum -a 256 -c checksums.txt --ignore-missing
-```
+\`\`\`
 
 ## What's Changed
 
@@ -283,19 +287,19 @@ See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/cmd/ftl/CHA
 ## Docker Images
 
 Docker images are available at:
-- `ghcr.io/fastertools/ftl:${{ inputs.version }}`
-- `ghcr.io/fastertools/ftl:latest`
+- \`ghcr.io/fastertools/ftl:${VERSION}\`
+- \`ghcr.io/fastertools/ftl:latest\`
 
 ## Homebrew
 
 Update to the latest version:
-```bash
+\`\`\`bash
 brew update && brew upgrade ftl
-```
+\`\`\`
 
 ## Getting Started
 
-```bash
+\`\`\`bash
 # Create a new FTL project
 ftl init my-project
 
@@ -308,9 +312,9 @@ ftl up
 
 # Deploy to FTL Engine
 ftl deploy
-```
+\`\`\`
 
-For more information, see the [documentation](https://docs.fastertools.com).
+For more information, see the [documentation](https://docs.fastertools.ai).
 EOF
 
       - name: Update GitHub Release
@@ -469,7 +473,7 @@ EOF
           # Commit and push if token is available
           if [[ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]]; then
             git config user.name "FTL Release Bot"
-            git config user.email "releases@fastertools.com"
+            git config user.email "releases@fastertools.ai"
             git add Formula/ftl.rb
             git commit -m "chore: update ftl to v${VERSION}"
             git push

@@ -108,7 +108,7 @@ jobs:
           
           # Create the Go module tag
           git config user.name "FTL Release Bot"
-          git config user.email "releases@fastertools.com"
+          git config user.email "releases@fastertools.ai"
           
           # Check if tag already exists
           if git rev-parse "${MODULE_TAG}" >/dev/null 2>&1; then
