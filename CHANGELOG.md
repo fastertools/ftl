@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0 (2025-08-22)
+
+## What's Changed
+* feat: update component readme for release testing by @bowlofarugula in https://github.com/fastertools/ftl/pull/291
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.11.3...v0.12.0
+
 ## 0.11.3 (2025-08-22)
 
 **Full Changelog**: https://github.com/fastertools/ftl/compare/v0.11.2...v0.11.3
