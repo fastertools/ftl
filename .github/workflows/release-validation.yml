@@ -198,20 +198,18 @@ jobs:
             exit 1
           fi
           
-          # Check Rust macros version compatibility (major.minor only)
+          # Check Rust macros version matches exactly
           MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-          SDK_MAJOR_MINOR=$(echo "$CARGO_VERSION" | cut -d'.' -f1-2)
-          MACROS_MAJOR_MINOR=$(echo "$MACROS_VERSION" | cut -d'.' -f1-2)
           
-          if [[ "$SDK_MAJOR_MINOR" != "$MACROS_MAJOR_MINOR" ]]; then
-            echo "❌ Rust macros version incompatible:"
-            echo "   SDK version: $CARGO_VERSION (major.minor: $SDK_MAJOR_MINOR)"
-            echo "   Macros version: $MACROS_VERSION (major.minor: $MACROS_MAJOR_MINOR)"
-            echo "   These crates must maintain major.minor compatibility"
+          if [[ "$MANIFEST_VERSION" != "$MACROS_VERSION" ]]; then
+            echo "❌ Rust macros version mismatch:"
+            echo "   Expected: $MANIFEST_VERSION"
+            echo "   Actual: $MACROS_VERSION"
+            echo "   These crates must have the same version"
             exit 1
           fi
           
-          echo "✅ Rust crate versions compatible"
+          echo "✅ Rust crate versions consistent"
           echo "   SDK: $CARGO_VERSION"
           echo "   Macros: $MACROS_VERSION"
 
