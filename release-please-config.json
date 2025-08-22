@@ -24,7 +24,8 @@
     {
       "type": "cargo-workspace",
       "merge": false,
-      "updateAllPackages": true
+      "updateAllPackages": true,
+      "considerAllArtifacts": true
     },
     {
       "type": "node-workspace",
@@ -105,6 +106,14 @@
           "jsonpath": "$.sdk.rust"
         }
       ]
+    },
+    "sdk/rust-macros": {
+      "release-type": "rust",
+      "component": "sdk-rust",
+      "changelog-path": "sdk/rust/CHANGELOG.md",
+      "include-component-in-tag": false,
+      "package-name": "ftl-sdk-macros",
+      "skip-github-release": true
     },
     "sdk/python": {
       "release-type": "python",
