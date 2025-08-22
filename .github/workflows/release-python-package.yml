@@ -1,0 +1,511 @@
+name: Release Python Package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+    secrets:
+      PYPI_API_TOKEN:
+        required: false
+        description: 'PyPI API token for publishing'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install toml packaging
+
+      - name: Validate versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check pyproject.toml version
+          python -c "
+          import toml
+          config = toml.load('sdk/python/pyproject.toml')
+          version = config['project']['version']
+          expected = '${VERSION}'
+          if version != expected:
+              print(f'Version mismatch in pyproject.toml: {version} != {expected}')
+              exit(1)
+          print(f'pyproject.toml version validated: {version}')
+          "
+          
+          # Check __init__.py version if it exists
+          if [[ -f "sdk/python/ftl_sdk/__init__.py" ]]; then
+            INIT_VERSION=$(grep -E "__version__ = ['\"]" sdk/python/ftl_sdk/__init__.py | cut -d'"' -f2 || cut -d"'" -f2)
+            if [[ "${INIT_VERSION}" != "${VERSION}" ]]; then
+              echo "Version mismatch in __init__.py: ${INIT_VERSION} != ${VERSION}"
+              exit 1
+            fi
+            echo "__init__.py version validated: ${INIT_VERSION}"
+          fi
+          
+          # Check versions.json
+          JSON_VERSION=$(jq -r '.sdk.python' internal/scaffold/versions.json)
+          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            exit 1
+          fi
+          echo "versions.json version validated: ${JSON_VERSION}"
+
+  test-package:
+    name: Test Python Package
+    needs: validate-version
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dependencies
+        run: |
+          cd sdk/python
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run linting
+        run: |
+          cd sdk/python
+          
+          # Run ruff for linting
+          if command -v ruff >/dev/null 2>&1; then
+            ruff check .
+            ruff format --check .
+          fi
+          
+          # Run mypy for type checking
+          if command -v mypy >/dev/null 2>&1; then
+            mypy ftl_sdk
+          fi
+
+      - name: Run tests
+        run: |
+          cd sdk/python
+          
+          # Run pytest with coverage
+          if command -v pytest >/dev/null 2>&1; then
+            pytest tests/ -v --cov=ftl_sdk --cov-report=term-missing
+          else
+            python -m unittest discover tests/
+          fi
+
+      - name: Test documentation build
+        run: |
+          cd sdk/python
+          
+          # Install doc dependencies
+          pip install sphinx sphinx-rtd-theme
+          
+          # Build documentation
+          if [[ -d "docs" ]]; then
+            cd docs
+            make html
+            echo "Documentation built successfully"
+          fi
+
+  build-distribution:
+    name: Build Distribution Packages
+    needs: test-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: |
+          cd sdk/python
+          
+          # Clean any previous builds
+          rm -rf dist/ build/ *.egg-info
+          
+          # Build source distribution and wheel
+          python -m build
+          
+          # List built packages
+          ls -la dist/
+          
+          # Verify package contents
+          python -m zipfile -l dist/*.whl
+          tar -tzf dist/*.tar.gz | head -20
+
+      - name: Check package with twine
+        run: |
+          cd sdk/python
+          
+          # Check package metadata
+          twine check dist/*
+          
+          # Show package info
+          python -m twine check --verbose dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: sdk/python/dist/
+          retention-days: 7
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build-distribution
+    runs-on: ubuntu-latest
+    environment: test-pypi
+    if: ${{ vars.ENABLE_TEST_PYPI == 'true' }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to TestPyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          if [[ -n "${TWINE_PASSWORD}" ]]; then
+            twine upload --repository testpypi dist/*
+            echo "Published to TestPyPI"
+          else
+            echo "Skipping TestPyPI upload (no TEST_PYPI_API_TOKEN)"
+          fi
+
+      - name: Test installation from TestPyPI
+        if: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          # Wait for package to be available
+          sleep 30
+          
+          # Create virtual environment
+          python -m venv test-env
+          source test-env/bin/activate
+          
+          # Install from TestPyPI
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ftl-sdk==${{ inputs.version }}
+          
+          # Test import
+          python -c "import ftl_sdk; print(f'Successfully imported ftl_sdk {ftl_sdk.__version__}')"
+          
+          deactivate
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-distribution, publish-testpypi]
+    if: always() && needs.build-distribution.result == 'success'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to PyPI (API Token)
+        if: ${{ secrets.PYPI_API_TOKEN }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload dist/*
+          echo "Published to PyPI using API token"
+
+      - name: Publish to PyPI (Trusted Publishing)
+        if: ${{ !secrets.PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verify-metadata: true
+          skip-existing: true
+          verbose: true
+
+  verify-publication:
+    name: Verify PyPI Publication
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for PyPI to index
+        run: |
+          echo "Waiting for PyPI to index the package..."
+          sleep 60
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Verify package on PyPI
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check if package is available
+          pip index versions ftl-sdk | grep -q "${VERSION}" || {
+            echo "Version ${VERSION} not found on PyPI yet, waiting..."
+            sleep 30
+            pip index versions ftl-sdk | grep -q "${VERSION}" || {
+              echo "Warning: Version ${VERSION} not immediately available on PyPI"
+            }
+          }
+          
+          echo "Package ftl-sdk ${VERSION} is available on PyPI"
+
+      - name: Test installation
+        run: |
+          # Create virtual environment
+          python -m venv test-env
+          source test-env/bin/activate
+          
+          # Install from PyPI
+          pip install ftl-sdk==${{ inputs.version }}
+          
+          # Test import and version
+          python -c "
+          import ftl_sdk
+          assert ftl_sdk.__version__ == '${{ inputs.version }}', f'Version mismatch: {ftl_sdk.__version__}'
+          print(f'Successfully installed and imported ftl_sdk {ftl_sdk.__version__}')
+          "
+          
+          # Test basic functionality
+          python -c "
+          from ftl_sdk import FtlClient
+          print('FtlClient imported successfully')
+          "
+          
+          deactivate
+          
+          echo "✓ Package installation and import successful"
+
+  create-docs:
+    name: Generate Documentation
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd sdk/python
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+
+      - name: Build documentation
+        run: |
+          cd sdk/python
+          
+          # Create docs directory if it doesn't exist
+          mkdir -p docs
+          
+          # Generate API documentation
+          if [[ ! -f "docs/conf.py" ]]; then
+            cat > docs/conf.py << 'EOF'
+          import os
+          import sys
+          sys.path.insert(0, os.path.abspath('..'))
+          
+          project = 'FTL Python SDK'
+          copyright = '2024, FasterTools'
+          author = 'FasterTools'
+          version = '${{ inputs.version }}'
+          release = version
+          
+          extensions = [
+              'sphinx.ext.autodoc',
+              'sphinx.ext.napoleon',
+              'sphinx.ext.viewcode',
+              'sphinx_autodoc_typehints',
+          ]
+          
+          templates_path = ['_templates']
+          exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+          
+          html_theme = 'sphinx_rtd_theme'
+          html_static_path = ['_static']
+          EOF
+          fi
+          
+          # Create index if it doesn't exist
+          if [[ ! -f "docs/index.rst" ]]; then
+            cat > docs/index.rst << 'EOF'
+          FTL Python SDK Documentation
+          ============================
+          
+          Version ${{ inputs.version }}
+          
+          .. toctree::
+             :maxdepth: 2
+             :caption: Contents:
+          
+             api
+          
+          Installation
+          -----------
+          
+          .. code-block:: bash
+          
+             pip install ftl-sdk
+          
+          Quick Start
+          ----------
+          
+          .. code-block:: python
+          
+             from ftl_sdk import FtlClient
+             
+             client = FtlClient()
+             # Use the client...
+          
+          Indices and tables
+          ==================
+          
+          * :ref:`genindex`
+          * :ref:`modindex`
+          * :ref:`search`
+          EOF
+          fi
+          
+          # Build HTML documentation
+          cd docs
+          make html || sphinx-build -b html . _build/html
+          
+          echo "Documentation built successfully"
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-sdk-docs
+          path: sdk/python/docs/_build/html/
+          retention-days: 30
+
+  notify-downstream:
+    name: Notify Downstream Projects
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create notification issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ inputs.version }}';
+            const title = `Python SDK v${version} Released`;
+            const body = `
+            ## FTL Python SDK v${version} has been released
+            
+            ### What's New
+            See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/sdk/python/CHANGELOG.md) for details.
+            
+            ### Installation
+            
+            \`\`\`bash
+            pip install ftl-sdk==${version}
+            \`\`\`
+            
+            Or update your \`requirements.txt\`:
+            \`\`\`
+            ftl-sdk==${version}
+            \`\`\`
+            
+            Or update your \`pyproject.toml\`:
+            \`\`\`toml
+            [project]
+            dependencies = [
+                "ftl-sdk==${version}",
+            ]
+            \`\`\`
+            
+            ### Documentation
+            - [PyPI Package](https://pypi.org/project/ftl-sdk/${version}/)
+            - [Documentation](https://ftl-sdk.readthedocs.io/en/v${version}/)
+            
+            ### Template Updates
+            Project templates have been automatically updated to use v${version}.
+            `;
+            
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['release', 'python-sdk', 'announcement']
+              });
+            } catch (error) {
+              console.log('Could not create issue:', error.message);
+            }

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  # Trigger CI on release PRs created by release-please
+  pull_request_target:
+    types: [opened, synchronize]
+    paths:
+      - '.release-please-manifest.json'
+      - 'release-please-config.json'
 
 env:
   # Go environment

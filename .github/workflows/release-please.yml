@@ -1,0 +1,260 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+  id-token: write
+  issues: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      # Root release
+      root_released: ${{ steps.release.outputs['--release_created'] }}
+      root_version: ${{ steps.release.outputs['--version'] }}
+      root_tag: ${{ steps.release.outputs['--tag_name'] }}
+      # CLI release
+      cli_released: ${{ steps.release.outputs['cmd/ftl--release_created'] }}
+      cli_version: ${{ steps.release.outputs['cmd/ftl--version'] }}
+      cli_tag: ${{ steps.release.outputs['cmd/ftl--tag_name'] }}
+      # SDK releases
+      go_sdk_released: ${{ steps.release.outputs['sdk/go--release_created'] }}
+      go_sdk_version: ${{ steps.release.outputs['sdk/go--version'] }}
+      go_sdk_tag: ${{ steps.release.outputs['sdk/go--tag_name'] }}
+      rust_sdk_released: ${{ steps.release.outputs['sdk/rust--release_created'] }}
+      rust_sdk_version: ${{ steps.release.outputs['sdk/rust--version'] }}
+      rust_sdk_tag: ${{ steps.release.outputs['sdk/rust--tag_name'] }}
+      python_sdk_released: ${{ steps.release.outputs['sdk/python--release_created'] }}
+      python_sdk_version: ${{ steps.release.outputs['sdk/python--version'] }}
+      python_sdk_tag: ${{ steps.release.outputs['sdk/python--tag_name'] }}
+      typescript_sdk_released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
+      typescript_sdk_version: ${{ steps.release.outputs['sdk/typescript--version'] }}
+      typescript_sdk_tag: ${{ steps.release.outputs['sdk/typescript--tag_name'] }}
+      # Component releases
+      mcp_gateway_released: ${{ steps.release.outputs['components/mcp-gateway--release_created'] }}
+      mcp_gateway_version: ${{ steps.release.outputs['components/mcp-gateway--version'] }}
+      mcp_gateway_tag: ${{ steps.release.outputs['components/mcp-gateway--tag_name'] }}
+      mcp_authorizer_released: ${{ steps.release.outputs['components/mcp-authorizer--release_created'] }}
+      mcp_authorizer_version: ${{ steps.release.outputs['components/mcp-authorizer--version'] }}
+      mcp_authorizer_tag: ${{ steps.release.outputs['components/mcp-authorizer--tag_name'] }}
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID || '' }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY || '' }}
+        if: ${{ vars.RELEASE_PLEASE_APP_ID != '' }}
+
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4.1.3
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: ${{ github.ref_name }}
+
+      - name: Output Release Info
+        if: ${{ steps.release.outputs.releases_created }}
+        run: |
+          echo "Releases created: ${{ steps.release.outputs.releases_created }}"
+          echo "CLI released: ${{ steps.release.outputs['cmd/ftl--release_created'] }}"
+          echo "Go SDK released: ${{ steps.release.outputs['sdk/go--release_created'] }}"
+          echo "Rust SDK released: ${{ steps.release.outputs['sdk/rust--release_created'] }}"
+          echo "Python SDK released: ${{ steps.release.outputs['sdk/python--release_created'] }}"
+          echo "TypeScript SDK released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}"
+          echo "MCP Gateway released: ${{ steps.release.outputs['components/mcp-gateway--release_created'] }}"
+          echo "MCP Authorizer released: ${{ steps.release.outputs['components/mcp-authorizer--release_created'] }}"
+
+  # CLI Release
+  release-cli:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.cli_released == 'true' }}
+    uses: ./.github/workflows/release-cli-binaries.yml
+    with:
+      version: ${{ needs.release-please.outputs.cli_version }}
+      tag: ${{ needs.release-please.outputs.cli_tag }}
+    secrets: inherit
+
+  # Go SDK Release
+  release-go-sdk:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.go_sdk_released == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Go module tag
+        run: |
+          VERSION="${{ needs.release-please.outputs.go_sdk_version }}"
+          MODULE_TAG="sdk/go/v${VERSION}"
+          
+          # Create the Go module tag
+          git config user.name "FTL Release Bot"
+          git config user.email "releases@fastertools.com"
+          
+          # Check if tag already exists
+          if git rev-parse "${MODULE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${MODULE_TAG} already exists"
+          else
+            git tag -a "${MODULE_TAG}" -m "Release Go SDK v${VERSION}" HEAD
+            git push origin "${MODULE_TAG}"
+            echo "Created and pushed tag: ${MODULE_TAG}"
+          fi
+
+      - name: Notify Go proxy
+        run: |
+          VERSION="${{ needs.release-please.outputs.go_sdk_version }}"
+          MODULE_PATH="github.com/fastertools/ftl-cli/sdk/go"
+          
+          # Request the Go proxy to fetch the new version
+          curl -sS "https://proxy.golang.org/${MODULE_PATH}/@v/v${VERSION}.info" > /dev/null || true
+          curl -sS "https://sum.golang.org/lookup/${MODULE_PATH}@v${VERSION}" > /dev/null || true
+          
+          echo "Notified Go proxy about new version v${VERSION}"
+
+  # Rust SDK Release
+  release-rust-sdk:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.rust_sdk_released == 'true' }}
+    uses: ./.github/workflows/release-rust-crates.yml
+    with:
+      version: ${{ needs.release-please.outputs.rust_sdk_version }}
+      tag: ${{ needs.release-please.outputs.rust_sdk_tag }}
+    secrets: inherit
+
+  # Python SDK Release
+  release-python-sdk:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.python_sdk_released == 'true' }}
+    uses: ./.github/workflows/release-python-package.yml
+    with:
+      version: ${{ needs.release-please.outputs.python_sdk_version }}
+      tag: ${{ needs.release-please.outputs.python_sdk_tag }}
+    secrets: inherit
+
+  # TypeScript SDK Release
+  release-typescript-sdk:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.typescript_sdk_released == 'true' }}
+    uses: ./.github/workflows/release-npm-package.yml
+    with:
+      version: ${{ needs.release-please.outputs.typescript_sdk_version }}
+      tag: ${{ needs.release-please.outputs.typescript_sdk_tag }}
+    secrets: inherit
+
+  # WASM Component Releases
+  release-mcp-gateway:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.mcp_gateway_released == 'true' }}
+    uses: ./.github/workflows/release-wasm-component.yml
+    with:
+      component: mcp-gateway
+      version: ${{ needs.release-please.outputs.mcp_gateway_version }}
+      tag: ${{ needs.release-please.outputs.mcp_gateway_tag }}
+    secrets: inherit
+
+  release-mcp-authorizer:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.mcp_authorizer_released == 'true' }}
+    uses: ./.github/workflows/release-wasm-component.yml
+    with:
+      component: mcp-authorizer
+      version: ${{ needs.release-please.outputs.mcp_authorizer_version }}
+      tag: ${{ needs.release-please.outputs.mcp_authorizer_tag }}
+    secrets: inherit
+
+  # Post-release validation
+  validate-releases:
+    needs: 
+      - release-please
+      - release-cli
+      - release-go-sdk
+      - release-rust-sdk
+      - release-python-sdk
+      - release-typescript-sdk
+      - release-mcp-gateway
+      - release-mcp-authorizer
+    if: always() && needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate release artifacts
+        run: |
+          echo "Validating release artifacts..."
+          
+          # Check if all expected releases completed successfully
+          if [[ "${{ needs.release-cli.result }}" == "failure" ]]; then
+            echo "CLI release failed"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.release-rust-sdk.result }}" == "failure" ]]; then
+            echo "Rust SDK release failed"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.release-python-sdk.result }}" == "failure" ]]; then
+            echo "Python SDK release failed"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.release-typescript-sdk.result }}" == "failure" ]]; then
+            echo "TypeScript SDK release failed"
+            exit 1
+          fi
+          
+          echo "All releases completed successfully"
+
+      - name: Create release summary
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releases = [];
+            
+            if ('${{ needs.release-please.outputs.cli_released }}' === 'true') {
+              releases.push(`CLI v${{ needs.release-please.outputs.cli_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') {
+              releases.push(`Go SDK v${{ needs.release-please.outputs.go_sdk_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') {
+              releases.push(`Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') {
+              releases.push(`Python SDK v${{ needs.release-please.outputs.python_sdk_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') {
+              releases.push(`TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.mcp_gateway_released }}' === 'true') {
+              releases.push(`MCP Gateway v${{ needs.release-please.outputs.mcp_gateway_version }}`);
+            }
+            if ('${{ needs.release-please.outputs.mcp_authorizer_released }}' === 'true') {
+              releases.push(`MCP Authorizer v${{ needs.release-please.outputs.mcp_authorizer_version }}`);
+            }
+            
+            if (releases.length > 0) {
+              const summary = `## Release Summary\n\nSuccessfully released:\n${releases.map(r => `- ${r}`).join('\n')}`;
+              await core.summary.addRaw(summary).write();
+            }

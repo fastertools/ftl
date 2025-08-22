@@ -1,0 +1,479 @@
+name: Release CLI Binaries
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+
+env:
+  GO_VERSION: '1.23'
+  CGO_ENABLED: '0'
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-latest, goos: linux, goarch: amd64}
+          - {runner: ubuntu-latest, goos: linux, goarch: arm64}
+          - {runner: macos-14, goos: darwin, goarch: amd64}
+          - {runner: macos-14, goos: darwin, goarch: arm64}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Verify version consistency
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check that versions.json matches the release version
+          JSON_VERSION=$(jq -r '.ftlCli' internal/scaffold/versions.json)
+          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch: versions.json has ${JSON_VERSION}, expected ${VERSION}"
+            exit 1
+          fi
+          
+          echo "Version ${VERSION} verified"
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          OUTPUT="ftl-${GOOS}-${GOARCH}"
+          
+          # Build with version information embedded
+          go build \
+            -trimpath \
+            -ldflags="-s -w -X github.com/fastertools/ftl-cli/internal/version.Version=${VERSION} -X github.com/fastertools/ftl-cli/internal/version.GitCommit=$(git rev-parse HEAD) -X github.com/fastertools/ftl-cli/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o "${OUTPUT}" \
+            ./cmd/ftl
+          
+          # Verify binary was created
+          if [[ ! -f "${OUTPUT}" ]]; then
+            echo "Failed to create binary: ${OUTPUT}"
+            exit 1
+          fi
+          
+          # Test binary runs (only on matching platform)
+          if [[ "${RUNNER_OS}" == "Linux" && "${GOOS}" == "linux" ]] || [[ "${RUNNER_OS}" == "macOS" && "${GOOS}" == "darwin" ]]; then
+            if [[ "${GOARCH}" == "${RUNNER_ARCH}" ]] || [[ "${GOARCH}" == "amd64" && "${RUNNER_ARCH}" == "X64" ]] || [[ "${GOARCH}" == "arm64" && "${RUNNER_ARCH}" == "ARM64" ]]; then
+              ./"${OUTPUT}" version
+            fi
+          fi
+          
+          echo "Binary built: ${OUTPUT}"
+
+      - name: Create release archive
+        run: |
+          BINARY="ftl-${{ matrix.goos }}-${{ matrix.goarch }}"
+          ARCHIVE="ftl-${{ inputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz"
+          
+          # Create a directory with the binary and docs
+          mkdir -p "ftl-${{ inputs.version }}"
+          cp "${BINARY}" "ftl-${{ inputs.version }}/ftl"
+          cp README.md "ftl-${{ inputs.version }}/" || true
+          cp LICENSE "ftl-${{ inputs.version }}/" || true
+          
+          # Create tarball
+          tar -czf "${ARCHIVE}" "ftl-${{ inputs.version }}"
+          
+          # Generate checksum
+          if [[ "${{ matrix.goos }}" == "darwin" ]]; then
+            shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          else
+            sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          fi
+          
+          echo "Archive created: ${ARCHIVE}"
+          cat "${ARCHIVE}.sha256"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ftl-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            ftl-${{ inputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+            ftl-${{ inputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz.sha256
+          retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          # Move all artifacts to release directory
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.sha256" \) -exec mv {} release/ \;
+          
+          # Create combined checksums file
+          cd release
+          cat *.sha256 > checksums.txt
+          rm *.sha256
+          
+          # List all files for release
+          ls -la
+          echo "---"
+          cat checksums.txt
+
+      - name: Generate installation script
+        run: |
+          cat > release/install.sh << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# FTL CLI Installation Script
+# Version: ${{ inputs.version }}
+
+VERSION="${{ inputs.version }}"
+BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}"
+
+# Detect OS and architecture
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+
+case "${ARCH}" in
+    x86_64|amd64)
+        ARCH="amd64"
+        ;;
+    aarch64|arm64)
+        ARCH="arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: ${ARCH}"
+        exit 1
+        ;;
+esac
+
+case "${OS}" in
+    linux|darwin)
+        ;;
+    *)
+        echo "Unsupported OS: ${OS}"
+        exit 1
+        ;;
+esac
+
+# Download URL
+FILENAME="ftl-${VERSION}-${OS}-${ARCH}.tar.gz"
+DOWNLOAD_URL="${BASE_URL}/${FILENAME}"
+
+echo "Downloading FTL CLI ${VERSION} for ${OS}-${ARCH}..."
+echo "URL: ${DOWNLOAD_URL}"
+
+# Create temporary directory
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+# Download and extract
+cd "${TMP_DIR}"
+if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${DOWNLOAD_URL}" -o "${FILENAME}"
+elif command -v wget >/dev/null 2>&1; then
+    wget -q "${DOWNLOAD_URL}" -O "${FILENAME}"
+else
+    echo "Neither curl nor wget found. Please install one of them."
+    exit 1
+fi
+
+# Extract
+tar -xzf "${FILENAME}"
+
+# Install
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+if [[ ! -w "${INSTALL_DIR}" ]]; then
+    echo "Installing to ${INSTALL_DIR} (requires sudo)..."
+    sudo mv "ftl-${VERSION}/ftl" "${INSTALL_DIR}/ftl"
+    sudo chmod +x "${INSTALL_DIR}/ftl"
+else
+    echo "Installing to ${INSTALL_DIR}..."
+    mv "ftl-${VERSION}/ftl" "${INSTALL_DIR}/ftl"
+    chmod +x "${INSTALL_DIR}/ftl"
+fi
+
+echo "FTL CLI ${VERSION} installed successfully!"
+echo "Run 'ftl version' to verify the installation."
+EOF
+          chmod +x release/install.sh
+
+      - name: Create release notes
+        run: |
+          cat > release/notes.md << 'EOF'
+## Installation
+
+### Quick Install (Linux/macOS)
+
+```bash
+curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}/install.sh | bash
+```
+
+### Manual Installation
+
+1. Download the appropriate archive for your platform:
+   - Linux AMD64: `ftl-${{ inputs.version }}-linux-amd64.tar.gz`
+   - Linux ARM64: `ftl-${{ inputs.version }}-linux-arm64.tar.gz`
+   - macOS AMD64: `ftl-${{ inputs.version }}-darwin-amd64.tar.gz`
+   - macOS ARM64: `ftl-${{ inputs.version }}-darwin-arm64.tar.gz`
+
+2. Extract the archive:
+   ```bash
+   tar -xzf ftl-${{ inputs.version }}-<os>-<arch>.tar.gz
+   ```
+
+3. Move the binary to your PATH:
+   ```bash
+   sudo mv ftl-${{ inputs.version }}/ftl /usr/local/bin/ftl
+   ```
+
+4. Verify the installation:
+   ```bash
+   ftl version
+   ```
+
+### Verify Checksums
+
+Download the `checksums.txt` file and verify your download:
+
+```bash
+# Linux
+sha256sum -c checksums.txt --ignore-missing
+
+# macOS
+shasum -a 256 -c checksums.txt --ignore-missing
+```
+
+## What's Changed
+
+See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/cmd/ftl/CHANGELOG.md) for details.
+
+## Docker Images
+
+Docker images are available at:
+- `ghcr.io/fastertools/ftl:${{ inputs.version }}`
+- `ghcr.io/fastertools/ftl:latest`
+
+## Homebrew
+
+Update to the latest version:
+```bash
+brew update && brew upgrade ftl
+```
+
+## Getting Started
+
+```bash
+# Create a new FTL project
+ftl init my-project
+
+# Add a component
+cd my-project
+ftl component add my-component
+
+# Run locally
+ftl up
+
+# Deploy to FTL Engine
+ftl deploy
+```
+
+For more information, see the [documentation](https://docs.fastertools.com).
+EOF
+
+      - name: Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: FTL CLI v${{ inputs.version }}
+          body_path: release/notes.md
+          files: |
+            release/*.tar.gz
+            release/checksums.txt
+            release/install.sh
+          draft: false
+          prerelease: false
+          make_latest: true
+
+  docker-release:
+    name: Build and Push Docker Images
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download Linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ftl-linux-*
+          path: artifacts
+
+      - name: Extract binaries
+        run: |
+          mkdir -p binaries
+          for archive in artifacts/ftl-linux-*/ftl-*.tar.gz; do
+            tar -xzf "${archive}" -C binaries --strip-components=1
+          done
+          
+          # Rename to platform-specific names
+          mv binaries/ftl binaries/ftl-linux-amd64 || true
+          ls -la binaries/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile << 'EOF'
+FROM gcr.io/distroless/static-debian12:nonroot
+
+ARG TARGETARCH
+
+COPY ftl-linux-${TARGETARCH} /usr/local/bin/ftl
+
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/ftl"]
+CMD ["--help"]
+EOF
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: binaries
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/fastertools/ftl:${{ inputs.version }}
+            ghcr.io/fastertools/ftl:latest
+          labels: |
+            org.opencontainers.image.title=FTL CLI
+            org.opencontainers.image.description=Fast, secure, and portable MCP tools
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.source=https://github.com/fastertools/ftl-cli
+            org.opencontainers.image.licenses=Apache-2.0
+
+  homebrew-update:
+    name: Update Homebrew Formula
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout homebrew-tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: fastertools/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Formula
+        run: |
+          cd homebrew-tap
+          
+          VERSION="${{ inputs.version }}"
+          BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}"
+          
+          # Download checksums
+          curl -fsSL "${BASE_URL}/checksums.txt" -o checksums.txt
+          
+          # Extract checksums
+          LINUX_AMD64_SHA=$(grep "linux-amd64" checksums.txt | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(grep "linux-arm64" checksums.txt | cut -d' ' -f1)
+          DARWIN_AMD64_SHA=$(grep "darwin-amd64" checksums.txt | cut -d' ' -f1)
+          DARWIN_ARM64_SHA=$(grep "darwin-arm64" checksums.txt | cut -d' ' -f1)
+          
+          # Update formula
+          cat > Formula/ftl.rb << EOF
+class Ftl < Formula
+  desc "Fast, secure, and portable MCP tools"
+  homepage "https://github.com/fastertools/ftl-cli"
+  version "${VERSION}"
+  license "Apache-2.0"
+
+  on_macos do
+    on_intel do
+      url "${BASE_URL}/ftl-${VERSION}-darwin-amd64.tar.gz"
+      sha256 "${DARWIN_AMD64_SHA}"
+    end
+    on_arm do
+      url "${BASE_URL}/ftl-${VERSION}-darwin-arm64.tar.gz"
+      sha256 "${DARWIN_ARM64_SHA}"
+    end
+  end
+
+  on_linux do
+    on_intel do
+      url "${BASE_URL}/ftl-${VERSION}-linux-amd64.tar.gz"
+      sha256 "${LINUX_AMD64_SHA}"
+    end
+    on_arm do
+      url "${BASE_URL}/ftl-${VERSION}-linux-arm64.tar.gz"
+      sha256 "${LINUX_ARM64_SHA}"
+    end
+  end
+
+  def install
+    bin.install "ftl"
+  end
+
+  test do
+    system "#{bin}/ftl", "version"
+  end
+end
+EOF
+          
+          # Commit and push if token is available
+          if [[ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]]; then
+            git config user.name "FTL Release Bot"
+            git config user.email "releases@fastertools.com"
+            git add Formula/ftl.rb
+            git commit -m "chore: update ftl to v${VERSION}"
+            git push
+          else
+            echo "Homebrew formula updated locally but not pushed (no HOMEBREW_TAP_TOKEN)"
+            cat Formula/ftl.rb
+          fi

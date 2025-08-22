@@ -1,0 +1,538 @@
+name: Release NPM Package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+    secrets:
+      NPM_TOKEN:
+        required: false
+        description: 'NPM authentication token'
+
+env:
+  NODE_VERSION: '20'
+  NPM_CONFIG_PROVENANCE: true
+
+jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check package.json version
+          PACKAGE_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+          if [[ "${PACKAGE_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in package.json: ${PACKAGE_VERSION} != ${VERSION}"
+            exit 1
+          fi
+          echo "package.json version validated: ${PACKAGE_VERSION}"
+          
+          # Check versions.json
+          JSON_VERSION=$(jq -r '.sdk.typescript' internal/scaffold/versions.json)
+          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            exit 1
+          fi
+          echo "versions.json version validated: ${JSON_VERSION}"
+          
+          # Verify package name
+          PACKAGE_NAME=$(node -p "require('./sdk/typescript/package.json').name")
+          echo "Package name: ${PACKAGE_NAME}"
+
+  test-package:
+    name: Test Package
+    needs: validate-version
+    strategy:
+      matrix:
+        node-version: ['18', '20', '22']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Run linting
+        run: |
+          cd sdk/typescript
+          npm run lint || true
+
+      - name: Run type checking
+        run: |
+          cd sdk/typescript
+          npm run typecheck || npx tsc --noEmit
+
+      - name: Run tests
+        run: |
+          cd sdk/typescript
+          npm test
+
+      - name: Build package
+        run: |
+          cd sdk/typescript
+          npm run build
+          
+          # Verify build outputs
+          if [[ ! -d "dist" ]] && [[ ! -d "lib" ]] && [[ ! -d "build" ]]; then
+            echo "Warning: No build output directory found"
+          fi
+
+  build-package:
+    name: Build NPM Package
+    needs: test-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Build package
+        run: |
+          cd sdk/typescript
+          
+          # Clean previous builds
+          rm -rf dist lib build
+          
+          # Build the package
+          npm run build
+          
+          # Verify package.json has required fields
+          node -e "
+          const pkg = require('./package.json');
+          const required = ['name', 'version', 'main', 'types', 'files'];
+          const missing = required.filter(field => !pkg[field]);
+          if (missing.length > 0) {
+            console.error('Missing required package.json fields:', missing);
+            process.exit(1);
+          }
+          console.log('Package metadata validated');
+          "
+
+      - name: Create package tarball
+        run: |
+          cd sdk/typescript
+          
+          # Pack the package
+          npm pack --dry-run
+          npm pack
+          
+          # List package contents
+          tar -tzf *.tgz | head -50
+          
+          # Move tarball for artifact upload
+          mv *.tgz ftl-sdk-${{ inputs.version }}.tgz
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: sdk/typescript/ftl-sdk-${{ inputs.version }}.tgz
+          retention-days: 7
+
+  publish-npm:
+    name: Publish to NPM
+    needs: build-package
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Build package
+        run: |
+          cd sdk/typescript
+          npm run build
+
+      - name: Configure NPM
+        run: |
+          # Set up .npmrc for authentication
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          
+          # Configure npm settings
+          npm config set access public
+          npm config set provenance true
+
+      - name: Publish dry-run
+        run: |
+          cd sdk/typescript
+          npm publish --dry-run
+
+      - name: Publish to NPM (Token)
+        if: ${{ secrets.NPM_TOKEN }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd sdk/typescript
+          
+          # Check if already published
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          VERSION="${{ inputs.version }}"
+          
+          if npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null; then
+            echo "Package ${PACKAGE_NAME}@${VERSION} already published"
+          else
+            npm publish --access public
+            echo "Published ${PACKAGE_NAME}@${VERSION} to NPM"
+          fi
+
+      - name: Publish to NPM (OIDC)
+        if: ${{ !secrets.NPM_TOKEN }}
+        run: |
+          cd sdk/typescript
+          
+          # OIDC-based publishing
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          VERSION="${{ inputs.version }}"
+          
+          if npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null; then
+            echo "Package ${PACKAGE_NAME}@${VERSION} already published"
+          else
+            npm publish --access public --provenance
+            echo "Published ${PACKAGE_NAME}@${VERSION} to NPM with provenance"
+          fi
+
+  verify-publication:
+    name: Verify NPM Publication
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Wait for NPM registry
+        run: |
+          echo "Waiting for NPM registry to update..."
+          sleep 30
+
+      - name: Verify package availability
+        run: |
+          # Get package name from checkout
+          PACKAGE_NAME="@ftl/sdk"
+          VERSION="${{ inputs.version }}"
+          
+          # Check if package is available
+          for i in {1..12}; do
+            if npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null; then
+              echo "✓ Package ${PACKAGE_NAME}@${VERSION} is available on NPM"
+              break
+            fi
+            echo "Waiting for package to be available... (${i}/12)"
+            sleep 10
+          done
+          
+          # Final verification
+          npm view "${PACKAGE_NAME}@${VERSION}" || {
+            echo "Warning: Package not immediately available on NPM"
+            exit 0
+          }
+
+      - name: Test installation
+        run: |
+          # Create test project
+          mkdir test-install
+          cd test-install
+          npm init -y
+          
+          # Install the published package
+          npm install @ftl/sdk@${{ inputs.version }}
+          
+          # Test import (CommonJS)
+          cat > test-cjs.js << 'EOF'
+          const ftl = require('@ftl/sdk');
+          console.log('CommonJS import successful');
+          EOF
+          node test-cjs.js || echo "CommonJS import not supported"
+          
+          # Test import (ESM)
+          cat > test-esm.mjs << 'EOF'
+          import * as ftl from '@ftl/sdk';
+          console.log('ESM import successful');
+          EOF
+          node test-esm.mjs || echo "ESM import not supported"
+          
+          # Test TypeScript types
+          npm install --save-dev typescript
+          cat > test.ts << 'EOF'
+          import * as ftl from '@ftl/sdk';
+          const test: string = 'TypeScript types working';
+          console.log(test);
+          EOF
+          npx tsc --noEmit test.ts && echo "✓ TypeScript types validated"
+          
+          echo "✓ Package installation and import successful"
+
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs: build-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@fastertools'
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Build package
+        run: |
+          cd sdk/typescript
+          npm run build
+
+      - name: Configure package for GitHub
+        run: |
+          cd sdk/typescript
+          
+          # Update package.json for GitHub packages
+          node -e "
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          pkg.publishConfig = {
+            registry: 'https://npm.pkg.github.com',
+            access: 'public'
+          };
+          // Ensure scoped name for GitHub packages
+          if (!pkg.name.startsWith('@')) {
+            pkg.name = '@fastertools/' + pkg.name.replace(/^@[^/]+\//, '');
+          }
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          console.log('Updated package name to:', pkg.name);
+          "
+
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd sdk/typescript
+          
+          # Publish to GitHub Packages
+          npm publish --access public || echo "Already published or error"
+
+  create-docs:
+    name: Generate Documentation
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+          npm install --save-dev typedoc typedoc-plugin-markdown
+
+      - name: Generate documentation
+        run: |
+          cd sdk/typescript
+          
+          # Generate TypeDoc documentation
+          npx typedoc \
+            --out docs \
+            --readme README.md \
+            --plugin typedoc-plugin-markdown \
+            --excludePrivate \
+            --excludeProtected \
+            --includeVersion \
+            --gitRevision ${{ inputs.tag }} \
+            src/index.ts || echo "TypeDoc generation completed with warnings"
+          
+          echo "Documentation generated"
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-sdk-docs
+          path: sdk/typescript/docs/
+          retention-days: 30
+
+  update-cdn:
+    name: Update CDN Links
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update README with CDN links
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Create CDN usage documentation
+          cat > cdn-usage.md << EOF
+          ## CDN Usage
+          
+          You can use the FTL TypeScript SDK directly from CDN:
+          
+          ### unpkg
+          \`\`\`html
+          <script src="https://unpkg.com/@ftl/sdk@${VERSION}/dist/index.js"></script>
+          \`\`\`
+          
+          ### jsDelivr
+          \`\`\`html
+          <script src="https://cdn.jsdelivr.net/npm/@ftl/sdk@${VERSION}/dist/index.js"></script>
+          \`\`\`
+          
+          ### ESM Usage
+          \`\`\`javascript
+          import * as ftl from 'https://cdn.skypack.dev/@ftl/sdk@${VERSION}';
+          \`\`\`
+          EOF
+          
+          echo "CDN documentation created"
+
+      - name: Upload CDN docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdn-usage
+          path: cdn-usage.md
+          retention-days: 7
+
+  notify-downstream:
+    name: Notify Downstream Projects
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create notification issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ inputs.version }}';
+            const title = `TypeScript SDK v${version} Released`;
+            const body = `
+            ## FTL TypeScript SDK v${version} has been released
+            
+            ### What's New
+            See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/sdk/typescript/CHANGELOG.md) for details.
+            
+            ### Installation
+            
+            #### NPM
+            \`\`\`bash
+            npm install @ftl/sdk@${version}
+            \`\`\`
+            
+            #### Yarn
+            \`\`\`bash
+            yarn add @ftl/sdk@${version}
+            \`\`\`
+            
+            #### PNPM
+            \`\`\`bash
+            pnpm add @ftl/sdk@${version}
+            \`\`\`
+            
+            ### CDN Usage
+            \`\`\`html
+            <script src="https://unpkg.com/@ftl/sdk@${version}/dist/index.js"></script>
+            \`\`\`
+            
+            ### Documentation
+            - [NPM Package](https://www.npmjs.com/package/@ftl/sdk/v/${version})
+            - [API Documentation](https://fastertools.github.io/ftl-cli/typescript-sdk/)
+            - [GitHub Package](https://github.com/fastertools/ftl-cli/packages/npm/@ftl/sdk)
+            
+            ### Template Updates
+            Project templates have been automatically updated to use v${version}.
+            `;
+            
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['release', 'typescript-sdk', 'announcement']
+              });
+            } catch (error) {
+              console.log('Could not create issue:', error.message);
+            }

@@ -1,0 +1,383 @@
+name: Release Rust Crates
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        required: false
+        description: 'Cargo registry token for crates.io'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Validate versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check main SDK version
+          SDK_VERSION=$(grep '^version = ' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "${SDK_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in sdk/rust/Cargo.toml: found ${SDK_VERSION}, expected ${VERSION}"
+            exit 1
+          fi
+          
+          # Check macros version
+          MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "${MACROS_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in sdk/rust-macros/Cargo.toml: found ${MACROS_VERSION}, expected ${VERSION}"
+            exit 1
+          fi
+          
+          # Check that SDK depends on correct macros version
+          MACROS_DEP=$(grep 'ftl-sdk-macros.*version' sdk/rust/Cargo.toml | cut -d'"' -f2)
+          if [[ "${MACROS_DEP}" != "=${VERSION}" ]]; then
+            echo "SDK depends on wrong macros version: ${MACROS_DEP}, expected =${VERSION}"
+            exit 1
+          fi
+          
+          # Check versions.json
+          JSON_VERSION=$(jq -r '.sdk.rust' internal/scaffold/versions.json)
+          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in versions.json: found ${JSON_VERSION}, expected ${VERSION}"
+            exit 1
+          fi
+          
+          echo "All versions validated: ${VERSION}"
+
+  test-crates:
+    name: Test Crates
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Run tests
+        run: |
+          cd sdk/rust-macros
+          cargo test --all-features
+          
+          cd ../rust
+          cargo test --all-features
+
+      - name: Check documentation
+        run: |
+          cd sdk/rust-macros
+          cargo doc --no-deps --all-features
+          
+          cd ../rust
+          cargo doc --no-deps --all-features
+
+      - name: Verify examples compile
+        run: |
+          # Test that examples using the SDK compile
+          if [[ -d "examples/rust" ]]; then
+            cd examples/rust
+            for example in */; do
+              if [[ -f "${example}/Cargo.toml" ]]; then
+                echo "Building example: ${example}"
+                cd "${example}"
+                cargo build --target wasm32-wasip1
+                cd ..
+              fi
+            done
+          fi
+
+  publish-macros:
+    name: Publish ftl-sdk-macros
+    needs: test-crates
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Verify crate package
+        run: |
+          cd sdk/rust-macros
+          cargo package --no-verify
+          
+          # List package contents
+          cargo package --list
+
+      - name: Publish to crates.io (dry-run)
+        if: ${{ !secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cd sdk/rust-macros
+          cargo publish --dry-run
+          echo "Dry-run successful. Set CARGO_REGISTRY_TOKEN secret to publish."
+
+      - name: Publish to crates.io
+        if: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cd sdk/rust-macros
+          
+          # Check if already published
+          if cargo search ftl-sdk-macros | grep -q "^ftl-sdk-macros = \"${{ inputs.version }}\""; then
+            echo "ftl-sdk-macros ${{ inputs.version }} already published"
+          else
+            cargo publish --token "${CARGO_REGISTRY_TOKEN}"
+            echo "Published ftl-sdk-macros ${{ inputs.version }}"
+            
+            # Wait for crates.io to index the package
+            echo "Waiting for crates.io to index ftl-sdk-macros..."
+            for i in {1..60}; do
+              if cargo search ftl-sdk-macros | grep -q "^ftl-sdk-macros = \"${{ inputs.version }}\""; then
+                echo "Package indexed successfully"
+                break
+              fi
+              echo "Waiting... (${i}/60)"
+              sleep 5
+            done
+          fi
+
+  publish-sdk:
+    name: Publish ftl-sdk
+    needs: publish-macros
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Verify crate package
+        run: |
+          cd sdk/rust
+          cargo package --no-verify
+          
+          # List package contents
+          cargo package --list
+
+      - name: Publish to crates.io (dry-run)
+        if: ${{ !secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cd sdk/rust
+          cargo publish --dry-run
+          echo "Dry-run successful. Set CARGO_REGISTRY_TOKEN secret to publish."
+
+      - name: Publish to crates.io
+        if: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cd sdk/rust
+          
+          # Check if already published
+          if cargo search ftl-sdk | grep -q "^ftl-sdk = \"${{ inputs.version }}\""; then
+            echo "ftl-sdk ${{ inputs.version }} already published"
+          else
+            cargo publish --token "${CARGO_REGISTRY_TOKEN}"
+            echo "Published ftl-sdk ${{ inputs.version }}"
+            
+            # Wait for crates.io to index the package
+            echo "Waiting for crates.io to index ftl-sdk..."
+            for i in {1..60}; do
+              if cargo search ftl-sdk | grep -q "^ftl-sdk = \"${{ inputs.version }}\""; then
+                echo "Package indexed successfully"
+                break
+              fi
+              echo "Waiting... (${i}/60)"
+              sleep 5
+            done
+          fi
+
+  verify-publication:
+    name: Verify Publication
+    needs: [publish-macros, publish-sdk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify crates are available
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Check ftl-sdk-macros
+          if ! cargo search ftl-sdk-macros | grep -q "^ftl-sdk-macros = \"${VERSION}\""; then
+            echo "ERROR: ftl-sdk-macros ${VERSION} not found on crates.io"
+            exit 1
+          fi
+          echo "✓ ftl-sdk-macros ${VERSION} found on crates.io"
+          
+          # Check ftl-sdk
+          if ! cargo search ftl-sdk | grep -q "^ftl-sdk = \"${VERSION}\""; then
+            echo "ERROR: ftl-sdk ${VERSION} not found on crates.io"
+            exit 1
+          fi
+          echo "✓ ftl-sdk ${VERSION} found on crates.io"
+
+      - name: Test installation
+        run: |
+          # Create a test project
+          cargo new test-ftl-sdk --lib
+          cd test-ftl-sdk
+          
+          # Add dependencies
+          cargo add ftl-sdk@${{ inputs.version }}
+          cargo add ftl-sdk-macros@${{ inputs.version }}
+          
+          # Write a simple test
+          cat > src/lib.rs << 'EOF'
+          use ftl_sdk::FtlTool;
+          use ftl_sdk_macros::ftl_tool;
+          
+          #[ftl_tool]
+          pub struct TestTool;
+          
+          impl FtlTool for TestTool {
+              fn name() -> &'static str {
+                  "test"
+              }
+              
+              fn description() -> &'static str {
+                  "Test tool"
+              }
+          }
+          
+          #[cfg(test)]
+          mod tests {
+              use super::*;
+              
+              #[test]
+              fn test_tool_name() {
+                  assert_eq!(TestTool::name(), "test");
+              }
+          }
+          EOF
+          
+          # Build and test
+          cargo build
+          cargo test
+          
+          echo "✓ Successfully built and tested with published crates"
+
+  create-docs:
+    name: Generate and Deploy Documentation
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Generate documentation
+        run: |
+          cd sdk/rust
+          
+          # Generate docs with all features
+          cargo doc --no-deps --all-features
+          
+          # Add index redirect
+          echo '<meta http-equiv="refresh" content="0; url=ftl_sdk/index.html">' > target/doc/index.html
+          
+          # Copy to docs directory
+          mkdir -p ../../docs/rust-sdk
+          cp -r target/doc/* ../../docs/rust-sdk/
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-sdk-docs
+          path: docs/rust-sdk/
+          retention-days: 30
+
+  notify-downstream:
+    name: Notify Downstream Projects
+    needs: verify-publication
+    runs-on: ubuntu-latest
+    if: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: Create notification issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ inputs.version }}';
+            const title = `Rust SDK v${version} Released`;
+            const body = `
+            ## FTL Rust SDK v${version} has been released
+            
+            ### What's New
+            See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/sdk/rust/CHANGELOG.md) for details.
+            
+            ### Update Instructions
+            
+            Update your \`Cargo.toml\`:
+            \`\`\`toml
+            [dependencies]
+            ftl-sdk = "${version}"
+            ftl-sdk-macros = "${version}"
+            \`\`\`
+            
+            Or use cargo:
+            \`\`\`bash
+            cargo update -p ftl-sdk
+            cargo update -p ftl-sdk-macros
+            \`\`\`
+            
+            ### Documentation
+            - [crates.io/ftl-sdk](https://crates.io/crates/ftl-sdk)
+            - [crates.io/ftl-sdk-macros](https://crates.io/crates/ftl-sdk-macros)
+            - [docs.rs/ftl-sdk](https://docs.rs/ftl-sdk/${version})
+            
+            ### Template Updates
+            Project templates have been automatically updated to use v${version}.
+            `;
+            
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['release', 'rust-sdk', 'announcement']
+              });
+            } catch (error) {
+              console.log('Could not create issue:', error.message);
+            }
