@@ -104,15 +104,13 @@
           "type": "json",
           "path": "internal/scaffold/versions.json",
           "jsonpath": "$.sdk.rust"
+        },
+        {
+          "type": "toml",
+          "path": "sdk/rust-macros/Cargo.toml",
+          "jsonpath": "$.package.version"
         }
       ]
-    },
-    "sdk/rust-macros": {
-      "release-type": "rust",
-      "component": "sdk-rust",
-      "include-component-in-tag": false,
-      "package-name": "ftl-sdk-macros",
-      "skip-github-release": true
     },
     "sdk/python": {
       "release-type": "python",
