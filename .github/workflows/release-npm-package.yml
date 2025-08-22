@@ -492,7 +492,7 @@ jobs:
             ## FTL TypeScript SDK v${version} has been released
             
             ### What's New
-            See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/sdk/typescript/CHANGELOG.md) for details.
+            See the [CHANGELOG](https://github.com/fastertools/ftl/blob/main/sdk/typescript/CHANGELOG.md) for details.
             
             ### Installation
             
@@ -518,8 +518,8 @@ jobs:
             
             ### Documentation
             - [NPM Package](https://www.npmjs.com/package/@ftl/sdk/v/${version})
-            - [API Documentation](https://fastertools.github.io/ftl-cli/typescript-sdk/)
-            - [GitHub Package](https://github.com/fastertools/ftl-cli/packages/npm/@ftl/sdk)
+            - [API Documentation](https://fastertools.github.io/ftl/typescript-sdk/)
+            - [GitHub Package](https://github.com/fastertools/ftl/packages/npm/@ftl/sdk)
             
             ### Template Updates
             Project templates have been automatically updated to use v${version}.

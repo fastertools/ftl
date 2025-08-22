@@ -23,7 +23,7 @@
     {
       "type": "json",
       "path": "internal/scaffold/versions.json",
-      "jsonpath": "$.ftlCli"
+      "jsonpath": "$.ftl"
     }
   ],
   "plugins": [
@@ -64,12 +64,12 @@
       "changelog-path": "cmd/ftl/CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
-      "package-name": "ftl-cli",
+      "package-name": "ftl",
       "extra-files": [
         {
           "type": "json",
           "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.ftlCli"
+          "jsonpath": "$.ftl"
         },
         {
           "type": "generic",
@@ -205,7 +205,7 @@
     },
     {
       "priority": 900,
-      "groups": ["ftl-cli"]
+      "groups": ["ftl"]
     },
     {
       "priority": 800,

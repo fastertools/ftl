@@ -314,7 +314,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ```bash
 # Clone the repository
 git clone https://github.com/fastertools/ftl.git
-cd ftl-cli/sdk/go
+cd ftl/sdk/go
 
 # Install development dependencies
 make dev-deps

@@ -469,7 +469,7 @@ jobs:
             ## FTL Python SDK v${version} has been released
             
             ### What's New
-            See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/sdk/python/CHANGELOG.md) for details.
+            See the [CHANGELOG](https://github.com/fastertools/ftl/blob/main/sdk/python/CHANGELOG.md) for details.
             
             ### Installation
             

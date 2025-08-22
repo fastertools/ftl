@@ -118,7 +118,7 @@ jobs:
           # Get current version based on component
           case "$COMPONENT" in
             cli)
-              CURRENT_VERSION=$(jq -r '.ftlCli' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '.ftl' "$VERSIONS_FILE")
               ;;
             sdk-rust)
               CURRENT_VERSION=$(jq -r '.sdk.rust' "$VERSIONS_FILE")
@@ -181,7 +181,7 @@ jobs:
           case "$COMPONENT" in
             cli)
               # Update versions.json for CLI
-              jq --arg version "$NEW_VERSION" '.ftlCli = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              jq --arg version "$NEW_VERSION" '.ftl = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Format the JSON file nicely
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"

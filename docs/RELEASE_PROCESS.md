@@ -411,8 +411,8 @@ If migration needs to be reverted:
 - Contact release team in #releases Slack channel
 
 ### Monitoring
-- [GitHub Actions Dashboard](https://github.com/fastertools/ftl-cli/actions)
-- [Release History](https://github.com/fastertools/ftl-cli/releases)
+- [GitHub Actions Dashboard](https://github.com/fastertools/ftl/actions)
+- [Release History](https://github.com/fastertools/ftl/releases)
 - Package Registries:
   - [NPM](https://www.npmjs.com/package/@ftl/sdk)
   - [PyPI](https://pypi.org/project/ftl-sdk/)
