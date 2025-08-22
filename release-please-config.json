@@ -104,7 +104,7 @@
     "cmd/ftl": {
       "release-type": "go",
       "component": "cli",
-      "changelog-path": "cmd/ftl/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl",
@@ -119,7 +119,7 @@
     "sdk/go": {
       "release-type": "go",
       "component": "sdk-go",
-      "changelog-path": "sdk/go/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk-go",
@@ -133,7 +133,7 @@
     "sdk/rust": {
       "release-type": "rust",
       "component": "sdk-rust",
-      "changelog-path": "sdk/rust/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
@@ -142,7 +142,7 @@
     "sdk/python": {
       "release-type": "python",
       "component": "sdk-python",
-      "changelog-path": "sdk/python/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
@@ -151,7 +151,7 @@
     "sdk/typescript": {
       "release-type": "node",
       "component": "sdk-typescript",
-      "changelog-path": "sdk/typescript/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "@ftl/sdk",
@@ -160,7 +160,7 @@
     "components/mcp-gateway": {
       "release-type": "rust",
       "component": "component-mcp-gateway",
-      "changelog-path": "components/mcp-gateway/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "mcp-gateway",
@@ -175,7 +175,7 @@
     "components/mcp-authorizer": {
       "release-type": "rust",
       "component": "component-mcp-authorizer",
-      "changelog-path": "components/mcp-authorizer/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "mcp-authorizer",
