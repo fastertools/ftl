@@ -96,7 +96,7 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "component": "ftl",
+      "component": "",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
       "package-name": "ftl"
