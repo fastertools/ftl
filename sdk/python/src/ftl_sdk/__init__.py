@@ -27,7 +27,7 @@ from .response import (
     is_text_content,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.10.1"
 
 __all__ = [
     # Core API
