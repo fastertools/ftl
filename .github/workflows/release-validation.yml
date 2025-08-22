@@ -92,6 +92,8 @@ jobs:
   validate-versions:
     name: Validate Version Consistency
     runs-on: ubuntu-latest
+    # Skip version validation for release PRs as versions will be different
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -444,6 +446,11 @@ jobs:
               wasm: '${{ needs.validate-wasm-constraints.result }}'
             };
             
+            // Check if this is a release PR
+            const isReleasePR = context.payload.pull_request?.labels?.some(
+              label => label.name === 'autorelease: pending'
+            ) || false;
+            
             let allPassed = true;
             let summary = '## Release Validation Report\n\n';
             summary += '| Check | Status | Description |\n';
@@ -468,7 +475,11 @@ jobs:
             
             summary += '\n';
             
-            if (allPassed) {
+            if (isReleasePR && results.versions === 'skipped') {
+              summary += '### ℹ️ Release PR Validation\n\n';
+              summary += 'Version consistency checks are skipped for release PRs as the versions are being updated.\n';
+              summary += 'This is expected behavior.\n';
+            } else if (allPassed) {
               summary += '### ✅ All validation checks passed\n\n';
               summary += 'The release configuration is valid and ready for use.\n';
             } else {
@@ -495,7 +506,7 @@ jobs:
               });
             }
             
-            // Fail the workflow if validation failed
-            if (!allPassed) {
+            // Fail the workflow if validation failed (except for release PRs with skipped version checks)
+            if (!allPassed && !(isReleasePR && results.versions === 'skipped')) {
               core.setFailed('Release validation failed');
             }
