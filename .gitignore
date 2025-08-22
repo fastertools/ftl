@@ -24,6 +24,9 @@ Cargo.lock.bak
 # Go build artifacts
 /ftl
 bin/
+mcp-server/console-server
+mcp-server/ftl-server
+mcp-server/mcp-server
 *.so
 *.dylib
 *.test

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/fastertools/ftl/internal/ftl/tools"
+	"github.com/modelcontextprotocol/mcp-server/tools"
 )
 
 // newDevMcpCmd creates the dev mcp command

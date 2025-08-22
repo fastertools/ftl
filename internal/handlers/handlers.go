@@ -194,7 +194,7 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		
 		result, err := h.mcpClient.CallTool("mcp-server__build", args)
 		if err != nil {
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", err.Error())))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", err.Error())))
 			return
 		}
 		
@@ -203,9 +203,9 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		
 		w.Header().Set("Content-Type", "text/html")
 		if buildResponse.Success {
-			fmt.Fprintf(w, formatMessage("text-green-400 mb-1", fmt.Sprintf("Build successful: %s", buildResponse.Output)))
+			fmt.Fprint(w, formatMessage("text-green-400 mb-1", fmt.Sprintf("Build successful: %s", buildResponse.Output)))
 		} else {
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", buildResponse.Error)))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", buildResponse.Error)))
 		}
 		return
 	}
@@ -221,12 +221,12 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			"project_path": projectPath,
 		})
 		if err != nil {
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop FTL failed: %s", err.Error())))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop FTL failed: %s", err.Error())))
 			return
 		}
 		
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("FTL Process stopped: %s", result)))
+		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("FTL Process stopped: %s", result)))
 		return
 	}
 	
@@ -240,12 +240,12 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			"project_path": projectPath,
 		})
 		if err != nil {
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop Watch failed: %s", err.Error())))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop Watch failed: %s", err.Error())))
 			return
 		}
 		
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("Watch Mode stopped: %s", result)))
+		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("Watch Mode stopped: %s", result)))
 		return
 	}
 	
@@ -271,7 +271,7 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			if isWatchMode {
 				modeLabel = "Watch start"
 			}
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("%s failed: %s", modeLabel, err.Error())))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("%s failed: %s", modeLabel, err.Error())))
 			return
 		}
 		
@@ -283,12 +283,12 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			// Start polling for this project if server started successfully
 			h.pollingManager.StartProjectPolling(projectPath)
 			if isWatchMode {
-				fmt.Fprintf(w, formatMessage("text-blue-400 mb-1", upResponse.Message))
+				fmt.Fprint(w, formatMessage("text-blue-400 mb-1", upResponse.Message))
 			} else {
-				fmt.Fprintf(w, formatMessage("text-green-400 mb-1", upResponse.Message))
+				fmt.Fprint(w, formatMessage("text-green-400 mb-1", upResponse.Message))
 			}
 		} else {
-			fmt.Fprintf(w, formatMessage("text-red-400 mb-1", upResponse.Error))
+			fmt.Fprint(w, formatMessage("text-red-400 mb-1", upResponse.Error))
 		}
 		return
 	}
