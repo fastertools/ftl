@@ -1,6 +1,6 @@
 <div align="center">
 
-# `ftl` by fastertools 
+# `ftl` by fastertools
 
 Faster tools for AI agents
 
