@@ -10,6 +10,10 @@ test-results
 test_projects
 projects.json
 
+# E2E test data - should not be tracked
+test_projects.json
+.e2e-projects/
+
 # Rust build artifacts
 target/
 Cargo.lock.bak

@@ -4,17 +4,29 @@ const { spawn } = require('child_process');
 
 class TestHelpers {
     static async resetTestProjectsFile() {
-        // Reset test_projects.json to a clean state with just one test project
+        // Create .e2e-projects workspace directory
+        const e2eWorkspace = path.resolve('.e2e-projects');
+        if (!fs.existsSync(e2eWorkspace)) {
+            fs.mkdirSync(e2eWorkspace, { recursive: true });
+        }
+        
+        // Create unique test project for this test run
+        const projectName = `test-project-${Date.now()}`;
+        const projectPath = path.join(e2eWorkspace, projectName);
+        
+        // Initialize as valid FTL project using built CLI
+        TestHelpers.ensureTestDirectory(projectPath);
+        
         const testProject = {
-            name: "test-project",
-            path: "/Users/coreyryan/data/mashh/ftl-tool-think",
+            name: projectName,
+            path: projectPath,
             added_at: new Date().toISOString(),
             last_active: new Date().toISOString()
         };
         
         const fsPromises = require('fs').promises;
         await fsPromises.writeFile('test_projects.json', JSON.stringify([testProject], null, 2));
-        console.log('resetTestProjectsFile: Reset to single test project');
+        console.log(`resetTestProjectsFile: Created test project at ${projectPath}`);
     }
 
     static async startServer(useTestProjects = true) {
@@ -23,8 +35,8 @@ class TestHelpers {
             env.PROJECTS_FILE = 'test_projects.json';
         }
         
-        // Use the built binary instead of go run
-        const serverProcess = spawn('./htmx-mcp-demo', [], {
+        // Use the built binary from current branch
+        const serverProcess = spawn('./bin/ftl', ['dev', 'console', '--port', '8080'], {
             env,
             stdio: ['ignore', 'pipe', 'pipe']
         });
@@ -62,9 +74,9 @@ class TestHelpers {
             // Initialize as a valid FTL project
             const { execSync } = require('child_process');
             try {
-                // Extract project name from path for ftl init
+                // Extract project name from path for ftl init using built CLI
                 const projectName = path.basename(testPath);
-                execSync(`ftl init ${projectName}`, { 
+                execSync(`../bin/ftl init ${projectName}`, { 
                     cwd: testPath,
                     stdio: 'ignore' // Suppress output
                 });
@@ -96,6 +108,21 @@ language = "go"
         await action();
         await page.waitForTimeout(500);
         return page.url() !== initialUrl;
+    }
+
+    static async cleanupTestData() {
+        // Remove test_projects.json
+        if (fs.existsSync('test_projects.json')) {
+            fs.unlinkSync('test_projects.json');
+            console.log('cleanupTestData: Removed test_projects.json');
+        }
+        
+        // Remove .e2e-projects directory
+        const e2eWorkspace = path.resolve('.e2e-projects');
+        if (fs.existsSync(e2eWorkspace)) {
+            fs.rmSync(e2eWorkspace, { recursive: true, force: true });
+            console.log('cleanupTestData: Removed .e2e-projects directory');
+        }
     }
 }
 

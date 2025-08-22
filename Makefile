@@ -146,7 +146,7 @@ install-system: build
 	@echo "✅ Installed to /usr/local/bin/ftl"
 
 # Clean all build artifacts
-clean:
+clean: clean-test-data
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf bin/ target/ coverage*.out coverage*.html
 	@rm -rf node_modules/ playwright-report/ test-results/
@@ -178,7 +178,7 @@ test-console: build kill
 	@echo "🧪 Testing console server functionality..."
 	@./bin/ftl dev console --port 8080 2>&1 | head -20 | grep -q "Starting server on port" && echo "✅ Console mode starts" || echo "❌ Console mode failed"
 
-test-browser: build kill setup-browser-tests
+test-browser: build kill setup-browser-tests clean-test-data
 	@echo "🧪 Starting FTL dev console for browser tests..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
@@ -186,26 +186,29 @@ test-browser: build kill setup-browser-tests
 	@npx playwright test --config=playwright.config.js || true
 	@echo "Stopping test server..."
 	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
 	@echo "Tests completed"
 
-test-browser-headed: build kill
+test-browser-headed: build kill clean-test-data
 	@echo "🧪 Starting FTL dev console for headed browser tests..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
 	@echo "Running tests with visible browser..."
 	@npx playwright test --headed
 	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
 
-test-browser-debug: build kill
+test-browser-debug: build kill clean-test-data
 	@echo "🧪 Starting FTL dev console for debug tests..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
 	@echo "Running tests in debug mode..."
 	@npx playwright test --debug
 	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
 
 # Run FTL dev console with test data
-run-test-console: build
+run-test-console: build clean-test-data
 	@echo "🚀 Starting FTL dev console with test data..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console
 
@@ -230,6 +233,13 @@ setup-browser-tests:
 # Setup all project dependencies
 setup-all: setup-browser-tests
 	@echo "🔧 All dependencies configured"
+
+# Clean test data
+clean-test-data:
+	@echo "🧹 Cleaning E2E test data..."
+	@rm -f test_projects.json
+	@rm -rf .e2e-projects/
+	@echo "✅ E2E test data cleaned"
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser
