@@ -221,32 +221,4 @@ jobs:
         if: success()
         uses: actions/github-script@v7
         with:
-          script: >
-            const releases = [];
-            
-            if ('${{ needs.release-please.outputs.cli_released }}' === 'true') {
-              releases.push('CLI v${{ needs.release-please.outputs.cli_version }}');
-            }
-            if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') {
-              releases.push('Go SDK v${{ needs.release-please.outputs.go_sdk_version }}');
-            }
-            if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') {
-              releases.push('Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}');
-            }
-            if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') {
-              releases.push('Python SDK v${{ needs.release-please.outputs.python_sdk_version }}');
-            }
-            if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') {
-              releases.push('TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}');
-            }
-            if ('${{ needs.release-please.outputs.mcp_gateway_released }}' === 'true') {
-              releases.push('MCP Gateway v${{ needs.release-please.outputs.mcp_gateway_version }}');
-            }
-            if ('${{ needs.release-please.outputs.mcp_authorizer_released }}' === 'true') {
-              releases.push('MCP Authorizer v${{ needs.release-please.outputs.mcp_authorizer_version }}');
-            }
-            
-            if (releases.length > 0) {
-              const summary = '## Release Summary\n\nSuccessfully released:\n' + releases.map(r => '- ' + r).join('\n');
-              await core.summary.addRaw(summary).write();
-            }
+          script: "const releases = []; if ('${{ needs.release-please.outputs.cli_released }}' === 'true') { releases.push('CLI v${{ needs.release-please.outputs.cli_version }}'); } if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') { releases.push('Go SDK v${{ needs.release-please.outputs.go_sdk_version }}'); } if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') { releases.push('Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}'); } if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') { releases.push('Python SDK v${{ needs.release-please.outputs.python_sdk_version }}'); } if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') { releases.push('TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}'); } if ('${{ needs.release-please.outputs.mcp_gateway_released }}' === 'true') { releases.push('MCP Gateway v${{ needs.release-please.outputs.mcp_gateway_version }}'); } if ('${{ needs.release-please.outputs.mcp_authorizer_released }}' === 'true') { releases.push('MCP Authorizer v${{ needs.release-please.outputs.mcp_authorizer_version }}'); } if (releases.length > 0) { const summary = '## Release Summary\\n\\nSuccessfully released:\\n' + releases.map(r => '- ' + r).join('\\n'); await core.summary.addRaw(summary).write(); }"
