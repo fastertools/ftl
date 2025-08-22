@@ -113,6 +113,13 @@ jobs:
         run: |
           echo "Checking version consistency across all files..."
           
+          # Check if this is a release PR
+          IS_RELEASE_PR=false
+          if [[ "${{ github.event.pull_request.labels.*.name }}" == *"autorelease: pending"* ]]; then
+            IS_RELEASE_PR=true
+            echo "ℹ️  Release PR detected - scaffold versions may lag behind"
+          fi
+          
           # Load manifest versions
           MANIFEST_VERSIONS=$(cat .release-please-manifest.json)
           
@@ -121,12 +128,20 @@ jobs:
           CLI_SCAFFOLD=$(jq -r '.ftl' internal/scaffold/versions.json)
           
           if [[ "$CLI_MANIFEST" != "$CLI_SCAFFOLD" ]]; then
-            echo "❌ CLI version mismatch:"
-            echo "   Manifest: $CLI_MANIFEST"
-            echo "   Scaffold: $CLI_SCAFFOLD"
-            exit 1
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  CLI version mismatch (expected for release PR):"
+              echo "   Manifest: $CLI_MANIFEST"
+              echo "   Scaffold: $CLI_SCAFFOLD"
+              echo "   Note: Scaffold versions will be updated post-release"
+            else
+              echo "❌ CLI version mismatch:"
+              echo "   Manifest: $CLI_MANIFEST"
+              echo "   Scaffold: $CLI_SCAFFOLD"
+              exit 1
+            fi
+          else
+            echo "✅ CLI version consistent: $CLI_MANIFEST"
           fi
-          echo "✅ CLI version consistent: $CLI_MANIFEST"
           
           # Validate SDK versions
           for sdk in go rust python typescript; do
@@ -134,12 +149,19 @@ jobs:
             SDK_SCAFFOLD=$(jq -r ".sdk.$sdk" internal/scaffold/versions.json)
             
             if [[ "$SDK_MANIFEST" != "$SDK_SCAFFOLD" ]]; then
-              echo "❌ $sdk SDK version mismatch:"
-              echo "   Manifest: $SDK_MANIFEST"
-              echo "   Scaffold: $SDK_SCAFFOLD"
-              exit 1
+              if [[ "$IS_RELEASE_PR" == "true" ]]; then
+                echo "⚠️  $sdk SDK version mismatch (expected for release PR):"
+                echo "   Manifest: $SDK_MANIFEST"
+                echo "   Scaffold: $SDK_SCAFFOLD"
+              else
+                echo "❌ $sdk SDK version mismatch:"
+                echo "   Manifest: $SDK_MANIFEST"
+                echo "   Scaffold: $SDK_SCAFFOLD"
+                exit 1
+              fi
+            else
+              echo "✅ $sdk SDK version consistent: $SDK_MANIFEST"
             fi
-            echo "✅ $sdk SDK version consistent: $SDK_MANIFEST"
           done
           
           # Validate component versions
@@ -148,12 +170,19 @@ jobs:
             COMP_SCAFFOLD=$(jq -r ".components[\"$component\"]" internal/scaffold/versions.json)
             
             if [[ "$COMP_MANIFEST" != "$COMP_SCAFFOLD" ]]; then
-              echo "❌ $component version mismatch:"
-              echo "   Manifest: $COMP_MANIFEST"
-              echo "   Scaffold: $COMP_SCAFFOLD"
-              exit 1
+              if [[ "$IS_RELEASE_PR" == "true" ]]; then
+                echo "⚠️  $component version mismatch (expected for release PR):"
+                echo "   Manifest: $COMP_MANIFEST"
+                echo "   Scaffold: $COMP_SCAFFOLD"
+              else
+                echo "❌ $component version mismatch:"
+                echo "   Manifest: $COMP_MANIFEST"
+                echo "   Scaffold: $COMP_SCAFFOLD"
+                exit 1
+              fi
+            else
+              echo "✅ $component version consistent: $COMP_MANIFEST"
             fi
-            echo "✅ $component version consistent: $COMP_MANIFEST"
           done
 
       - name: Validate Rust crate versions

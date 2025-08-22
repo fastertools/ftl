@@ -1,0 +1,95 @@
+name: Post-Release Version Sync
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-scaffold-versions:
+    name: Sync Scaffold Versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          
+      - name: Sync versions from manifest to scaffold
+        run: |
+          echo "Syncing versions from release manifest to scaffold file..."
+          
+          # Read manifest versions
+          MANIFEST=$(cat .release-please-manifest.json)
+          
+          # Update scaffold versions
+          jq --argjson manifest "$MANIFEST" '
+            .ftl = $manifest."cmd/ftl" // .ftl |
+            .sdk.go = $manifest."sdk/go" // .sdk.go |
+            .sdk.rust = $manifest."sdk/rust" // .sdk.rust |
+            .sdk.python = $manifest."sdk/python" // .sdk.python |
+            .sdk.typescript = $manifest."sdk/typescript" // .sdk.typescript |
+            .components["mcp-gateway"] = $manifest."components/mcp-gateway" // .components["mcp-gateway"] |
+            .components["mcp-authorizer"] = $manifest."components/mcp-authorizer" // .components["mcp-authorizer"]
+          ' internal/scaffold/versions.json > versions.tmp && mv versions.tmp internal/scaffold/versions.json
+          
+          # Check if there are changes
+          if git diff --exit-code internal/scaffold/versions.json; then
+            echo "✅ Scaffold versions already up to date"
+            exit 0
+          fi
+          
+          echo "📝 Scaffold versions updated"
+          
+      - name: Create PR with updates
+        if: ${{ github.event_name == 'release' || inputs.dry_run == false }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create branch
+          BRANCH="chore/sync-scaffold-versions-$(date +%Y%m%d%H%M%S)"
+          git checkout -b "$BRANCH"
+          
+          # Commit changes
+          git add internal/scaffold/versions.json
+          git commit -m "chore: sync scaffold versions from release manifest
+
+          Updates internal/scaffold/versions.json to match the versions
+          in .release-please-manifest.json after releases.
+          
+          This ensures the scaffold templates use the latest released versions."
+          
+          # Push branch
+          git push origin "$BRANCH"
+          
+          # Create PR
+          gh pr create \
+            --title "chore: sync scaffold versions post-release" \
+            --body "## Summary
+          
+          This PR synchronizes the scaffold versions file with the release manifest.
+          
+          ### Changes
+          - Updated \`internal/scaffold/versions.json\` to match released versions
+          
+          ### Why
+          The scaffold versions are used by \`ftl init\` to create new projects with the correct SDK versions.
+          
+          ---
+          *This PR was automatically generated after a release.*" \
+            --label "chore" \
+            --label "dependencies"
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
