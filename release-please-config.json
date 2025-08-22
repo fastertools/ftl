@@ -74,12 +74,6 @@
   ],
   "plugins": [
     {
-      "type": "cargo-workspace",
-      "merge": false,
-      "updateAllPackages": true,
-      "considerAllArtifacts": false
-    },
-    {
       "type": "node-workspace",
       "merge": false,
       "updatePeerDependencies": true,
@@ -141,7 +135,13 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
-      "extra-files": []
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "sdk/rust-macros/Cargo.toml",
+          "jsonpath": "$.package.version"
+        }
+      ]
     },
     "sdk/python": {
       "release-type": "python",
