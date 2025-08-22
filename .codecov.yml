@@ -19,7 +19,8 @@ ignore:
   - "src/deps.rs"       # Testing infrastructure (DI traits)
   - "src/ui.rs"         # Interactive UI components
   - "src/api_client.rs" # Thin wrapper around auto-generated API client
-  - "**/tests/**"       # Test files themselves
+  - "**/tests/**"       # Component test files
+  - "**/e2e-tests/**"   # End-to-end test files
   - "**/*_test.rs"      # Test files
   - "**/*_tests.rs"     # Test files
   - "**/test_*.rs"      # Test helper files
