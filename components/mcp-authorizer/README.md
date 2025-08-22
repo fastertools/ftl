@@ -1,6 +1,6 @@
 # MCP Authorizer
 
-A high-performance JWT authentication gateway for Model Context Protocol (MCP) servers, built for Fermyon Spin and WebAssembly deployment.
+A high-performance JWT authorizer gateway for Model Context Protocol (MCP) servers, built for Fermyon Spin and WebAssembly deployment.
 
 ## Overview
 
@@ -9,7 +9,7 @@ The MCP Authorizer provides OAuth 2.0 bearer token authentication for MCP endpoi
 ## Features
 
 - **JWT Authentication**: Validates tokens using JWKS endpoints or static public keys
-- **Scope-Based Authorization**: Enforce required scopes for API access
+- **Policy-Based Authorization**: Enforce required scopes for API access
 - **WorkOS AuthKit**: Out-of-the-box support with automatic JWKS discovery
 - **OAuth 2.0 Discovery**: Standard-compliant metadata endpoints
 - **JWKS Caching**: 5-minute cache reduces provider API calls
