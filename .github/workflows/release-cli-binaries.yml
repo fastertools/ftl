@@ -54,6 +54,9 @@ jobs:
           
           echo "Version ${VERSION} verified"
 
+      - name: Generate embedded files
+        run: go generate ./...
+        
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}

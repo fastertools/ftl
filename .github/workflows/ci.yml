@@ -85,6 +85,9 @@ jobs:
           rm -rf $TEMP_DIR
           spin --version
           
+      - name: Generate embedded files
+        run: go generate ./...
+        
       - name: Build ftl binary
         run: go build -o ftl ./cmd/ftl
           
@@ -124,6 +127,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           
+      - name: Generate embedded files
+        run: go generate ./...
+        
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
