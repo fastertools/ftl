@@ -305,7 +305,7 @@ jobs:
             const labels = [];
             
             // Parse conventional commit type and scope
-            const match = title.match(/^(\w+)(?:\(([^)]+)\))?!?:/);
+            const match = title.match(/^(\w+)(?:\([^)]+\))?!?:/);
             if (!match) return;
             
             const [, type, scope] = match;
