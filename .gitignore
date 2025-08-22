@@ -22,7 +22,7 @@ Cargo.lock.bak
 *.wasm.gz
 
 # Go build artifacts
-ftl
+/ftl
 bin/
 *.so
 *.dylib
