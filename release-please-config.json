@@ -110,7 +110,6 @@
     "sdk/rust-macros": {
       "release-type": "rust",
       "component": "sdk-rust",
-      "changelog-path": "sdk/rust/CHANGELOG.md",
       "include-component-in-tag": false,
       "package-name": "ftl-sdk-macros",
       "skip-github-release": true
