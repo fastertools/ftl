@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -50,14 +51,31 @@ func (pr *ProjectRegistry) LoadProjects() error {
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
 
-	// Check if file exists
-	if _, err := os.Stat(pr.persistFile); os.IsNotExist(err) {
-		// No projects file yet, that's ok
-		return nil
+	// Ensure directory exists
+	dir := filepath.Dir(pr.persistFile)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create projects directory: %w", err)
 	}
 
+	// Try to read existing projects file
 	data, err := os.ReadFile(pr.persistFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Create empty projects file if it doesn't exist
+			emptyProjects := []Project{}
+			emptyData, marshalErr := json.MarshalIndent(emptyProjects, "", "  ")
+			if marshalErr != nil {
+				return fmt.Errorf("failed to marshal empty projects: %w", marshalErr)
+			}
+			
+			if writeErr := os.WriteFile(pr.persistFile, emptyData, 0644); writeErr != nil {
+				return fmt.Errorf("failed to create empty projects file: %w", writeErr)
+			}
+			
+			log.Printf("Created empty projects file at %s", pr.persistFile)
+			// No projects to load, return successfully
+			return nil
+		}
 		return fmt.Errorf("failed to read projects file: %w", err)
 	}
 

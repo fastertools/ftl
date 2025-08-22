@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fastertools/ftl/web-templates"
+	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/internal/mcpclient"
 	"github.com/fastertools/ftl/internal/models"
 	"github.com/fastertools/ftl/internal/parser"
@@ -37,10 +38,16 @@ type Handler struct {
 
 // NewHandler creates a new handler instance
 func NewHandler(mcpClient *mcpclient.Client) *Handler {
-	// Get projects file from environment or use default
+	// Get projects file from environment or use centralized default
 	projectsFile := os.Getenv("PROJECTS_FILE")
 	if projectsFile == "" {
-		projectsFile = "projects.json"
+		// Use centralized data directory instead of current directory
+		var err error
+		projectsFile, err = config.UserDataPath("projects.json")
+		if err != nil {
+			log.Printf("Failed to get user data path, falling back to current dir: %v", err)
+			projectsFile = "projects.json"
+		}
 	}
 	log.Printf("Using projects file: %s", projectsFile)
 	
@@ -52,17 +59,9 @@ func NewHandler(mcpClient *mcpclient.Client) *Handler {
 		log.Printf("Warning: failed to load projects: %v", err)
 	}
 	
-	// If no projects exist, add the default one
+	// Log projects loaded
 	allProjects := registry.GetAllProjects()
 	log.Printf("After loading projects: found %d projects", len(allProjects))
-	if len(allProjects) == 0 {
-		log.Printf("No projects found, adding default project")
-		if _, err := registry.AddProject("/Users/coreyryan/data/mashh/ftl-tool-think", "ftl-tool-think"); err != nil {
-			log.Printf("Warning: failed to add default project: %v", err)
-		}
-	} else {
-		log.Printf("Found existing projects, skipping default project creation")
-	}
 	
 	// Create polling manager
 	pollingManager := polling.NewManager(mcpClient, registry)
@@ -80,13 +79,6 @@ func NewHandler(mcpClient *mcpclient.Client) *Handler {
 
 // HandleIndex serves the main page
 func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
-	// Get current project from registry
-	currentProj, exists := h.registry.GetCurrentProject()
-	if !exists {
-		http.Error(w, "No projects configured", http.StatusInternalServerError)
-		return
-	}
-	
 	// Get all projects for sidebar
 	allProjects := h.registry.GetAllProjects()
 	
@@ -111,46 +103,66 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	// Get command history from current project state
-	stateCommandHistory := currentProj.GetCommandHistory()
-	componentCommandHistory := make([]templates.CommandOutput, len(stateCommandHistory))
-	for i, cmd := range stateCommandHistory {
-		componentCommandHistory[i] = templates.CommandOutput{
-			Command:   cmd.Command,
-			Output:    cmd.Output,
-			Timestamp: cmd.Timestamp,
-			Success:   cmd.Success,
-		}
-	}
+	// Get current project from registry (may not exist for new users)
+	currentProj, hasCurrentProject := h.registry.GetCurrentProject()
 	
-	// Get the actual FTL process port if running
-	var ftlPort int
-	if currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning {
-		ftlPort = currentProj.ProcessInfo.ActiveProcess.Port
-	}
-	
-	// Use templ components for rendering
+	// Initialize dashboard data with empty state
 	dashboardData := templates.DashboardData{
-		CurrentProject: templates.Project{
+		AllProjects:    projects,
+		RecentLogs:     []templates.LogEntry{},
+		CommandHistory: []templates.CommandOutput{},
+		ServerStatus: templates.ServerStatus{
+			Running:     false,
+			ProcessID:   os.Getpid(),
+			Port:        0,
+			LastChecked: time.Now(),
+		},
+		ProcessStatus: templates.ProcessStatus{
+			FTLRunning:   false,
+			WatchRunning: false,
+			LastActivity: time.Now(),
+		},
+	}
+	
+	// If we have a current project, populate its data
+	if hasCurrentProject && currentProj != nil {
+		// Get command history from current project state
+		stateCommandHistory := currentProj.GetCommandHistory()
+		componentCommandHistory := make([]templates.CommandOutput, len(stateCommandHistory))
+		for i, cmd := range stateCommandHistory {
+			componentCommandHistory[i] = templates.CommandOutput{
+				Command:   cmd.Command,
+				Output:    cmd.Output,
+				Timestamp: cmd.Timestamp,
+				Success:   cmd.Success,
+			}
+		}
+		dashboardData.CommandHistory = componentCommandHistory
+		
+		// Get the actual FTL process port if running
+		var ftlPort int
+		if currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning {
+			ftlPort = currentProj.ProcessInfo.ActiveProcess.Port
+		}
+		
+		// Update dashboard data with current project info
+		dashboardData.CurrentProject = templates.Project{
 			Name:        currentProj.Project.Name,
 			Path:        currentProj.Project.Path,
 			Status:      "active",
 			LastUpdated: currentProj.Project.LastActive,
-		},
-		AllProjects:    projects,
-		ServerStatus: templates.ServerStatus{
+		}
+		dashboardData.ServerStatus = templates.ServerStatus{
 			Running:     currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning,
 			ProcessID:   os.Getpid(),
 			Port:        ftlPort,
 			LastChecked: time.Now(),
-		},
-		ProcessStatus: templates.ProcessStatus{
+		}
+		dashboardData.ProcessStatus = templates.ProcessStatus{
 			FTLRunning:   currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning && currentProj.ProcessInfo.ActiveProcess.Type == "regular",
 			WatchRunning: currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning && currentProj.ProcessInfo.ActiveProcess.Type == "watch",
 			LastActivity: time.Now(),
-		},
-		RecentLogs:     []templates.LogEntry{},
-		CommandHistory: componentCommandHistory,
+		}
 	}
 	
 	w.Header().Set("Content-Type", "text/html")

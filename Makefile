@@ -38,6 +38,7 @@ help:
 	@echo "    test-browser  - Run browser/playwright tests"
 	@echo "    test-browser-headed - Run browser tests with visible browser"
 	@echo "    test-browser-debug  - Run browser tests in debug mode"
+	@echo "    test-new-user - Test new user centralized experience"
 	@echo ""
 	@echo "  Quick Commands:"
 	@echo "    dev           - Quick development build and test"
@@ -212,6 +213,11 @@ run-test-console: build clean-test-data
 	@echo "🚀 Starting FTL dev console with test data..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console
 
+# Run FTL dev console with centralized projects file (no PROJECTS_FILE env var)
+run-console-centralized: build kill
+	@echo "🚀 Starting FTL dev console with centralized projects file..."
+	@./bin/ftl dev console
+
 # Kill all FTL processes
 kill:
 	@echo "🔪 Killing all FTL processes..."
@@ -240,6 +246,40 @@ clean-test-data:
 	@rm -f test_projects.json
 	@rm -rf .e2e-projects/
 	@echo "✅ E2E test data cleaned"
+
+# Clean centralized projects data for new user testing
+clean-centralized-data:
+	@echo "🧹 Cleaning centralized projects data..."
+	@rm -rf "$(HOME)/Library/Application Support/ftl/"
+	@echo "✅ Centralized projects data cleaned"
+
+# Test new user centralized experience (no PROJECTS_FILE env var)
+test-new-user: build kill clean-centralized-data setup-browser-tests
+	@echo "🧪 Testing new user centralized experience..."
+	@./bin/ftl dev console --port 8082 > test_centralized_server.log 2>&1 &
+	@echo "⏳ Waiting for server to start..."
+	@sleep 3
+	@cd e2e-tests && npx playwright test e2e/specs/new-user-centralized.spec.js
+	@echo "🛑 Stopping centralized test server..."
+	@pkill -f "ftl dev console --port 8082" || true
+	@echo "🧹 Cleaning up centralized test..."
+	@rm -f test_centralized_server.log
+	@$(MAKE) clean-centralized-data
+
+# Debug centralized file creation (temporary)
+debug-centralized-file: build kill clean-centralized-data
+	@echo "🧪 Debug: Testing centralized file creation..."
+	@./bin/ftl dev console --port 8082 > test_centralized_server.log 2>&1 &
+	@echo "⏳ Waiting for server to start..."
+	@sleep 5
+	@echo "📋 Checking if file was created..."
+	@ls -la "$(HOME)/Library/Application Support/ftl/" || echo "❌ Directory does not exist"
+	@cat "$(HOME)/Library/Application Support/ftl/projects.json" || echo "❌ File does not exist"
+	@echo "📄 Server logs:"
+	@cat test_centralized_server.log
+	@echo "🛑 Stopping test server..."
+	@pkill -f "ftl dev console --port 8082" || true
+	@rm -f test_centralized_server.log
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser

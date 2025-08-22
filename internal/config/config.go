@@ -91,6 +91,30 @@ func configPath() (string, error) {
 	return filepath.Join(ftlDir, "config.json"), nil
 }
 
+// UserDataPath returns the path for user data files (projects.json, etc.)
+func UserDataPath(filename string) (string, error) {
+	var dataDir string
+
+	// Check XDG_DATA_HOME first for testing and Linux compatibility
+	if xdgData := os.Getenv("XDG_DATA_HOME"); xdgData != "" {
+		dataDir = xdgData
+	} else {
+		// Fall back to os.UserConfigDir() for platform-specific defaults
+		// This works for data storage on most platforms:
+		// macOS: ~/Library/Application Support
+		// Windows: %APPDATA%
+		// Linux: ~/.config (but XDG_DATA_HOME should be set to ~/.local/share)
+		var err error
+		dataDir, err = os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get data directory: %w", err)
+		}
+	}
+
+	ftlDir := filepath.Join(dataDir, "ftl")
+	return filepath.Join(ftlDir, filename), nil
+}
+
 // Load loads the configuration from disk or creates a new one
 func Load() (*Config, error) {
 	var err error
