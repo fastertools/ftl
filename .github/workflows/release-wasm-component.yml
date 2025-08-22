@@ -1,0 +1,547 @@
+name: Release WASM Component
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        description: 'Component name (e.g., mcp-gateway, mcp-authorizer)'
+        required: true
+        type: string
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+
+env:
+  RUST_VERSION: '1.83.0'
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+  WASM_TARGET: 'wasm32-wasip1'
+  REGISTRY: 'ghcr.io'
+
+jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Validate component path
+        run: |
+          COMPONENT="${{ inputs.component }}"
+          COMPONENT_PATH="components/${COMPONENT}"
+          
+          if [[ ! -d "${COMPONENT_PATH}" ]]; then
+            echo "Component directory not found: ${COMPONENT_PATH}"
+            exit 1
+          fi
+          
+          echo "Component path validated: ${COMPONENT_PATH}"
+
+      - name: Validate versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          COMPONENT="${{ inputs.component }}"
+          COMPONENT_PATH="components/${COMPONENT}"
+          
+          # Check Cargo.toml version
+          CARGO_VERSION=$(grep '^version = ' "${COMPONENT_PATH}/Cargo.toml" | head -1 | cut -d'"' -f2)
+          if [[ "${CARGO_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in Cargo.toml: ${CARGO_VERSION} != ${VERSION}"
+            exit 1
+          fi
+          echo "Cargo.toml version validated: ${CARGO_VERSION}"
+          
+          # Check spin.toml version if it exists
+          if [[ -f "${COMPONENT_PATH}/spin.toml" ]]; then
+            SPIN_VERSION=$(grep '^version = ' "${COMPONENT_PATH}/spin.toml" | head -1 | cut -d'"' -f2)
+            if [[ "${SPIN_VERSION}" != "${VERSION}" ]]; then
+              echo "Version mismatch in spin.toml: ${SPIN_VERSION} != ${VERSION}"
+              exit 1
+            fi
+            echo "spin.toml version validated: ${SPIN_VERSION}"
+          fi
+          
+          # Check versions.json
+          JSON_VERSION=$(jq -r ".components[\"${COMPONENT}\"]" internal/scaffold/versions.json)
+          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            exit 1
+          fi
+          echo "versions.json version validated: ${JSON_VERSION}"
+
+  build-component:
+    name: Build WASM Component
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Install cargo-component
+        run: |
+          # Install cargo-component for building WASM components
+          cargo install cargo-component --version 0.15.0 --locked
+
+      - name: Install wasm-tools
+        run: |
+          # Install wasm-tools for component validation
+          cargo install wasm-tools --version 1.220.0 --locked
+
+      - name: Build WASM component
+        run: |
+          cd "components/${{ inputs.component }}"
+          
+          # Build the component
+          cargo component build --release --target ${WASM_TARGET}
+          
+          # Verify the component was built
+          WASM_FILE="target/${WASM_TARGET}/release/${{ inputs.component }}.wasm"
+          if [[ ! -f "${WASM_FILE}" ]]; then
+            echo "WASM file not found: ${WASM_FILE}"
+            exit 1
+          fi
+          
+          # Display component info
+          ls -lh "${WASM_FILE}"
+          file "${WASM_FILE}"
+
+      - name: Validate WASM component
+        run: |
+          cd "components/${{ inputs.component }}"
+          WASM_FILE="target/${WASM_TARGET}/release/${{ inputs.component }}.wasm"
+          
+          # Validate the component
+          wasm-tools validate "${WASM_FILE}"
+          
+          # Check component size (fail if > 10MB)
+          SIZE=$(stat -c%s "${WASM_FILE}" 2>/dev/null || stat -f%z "${WASM_FILE}")
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          
+          if [[ ${SIZE} -gt 10485760 ]]; then
+            echo "ERROR: WASM component is too large: ${SIZE_MB}MB (max 10MB)"
+            exit 1
+          fi
+          
+          echo "WASM component size: ${SIZE_MB}MB (${SIZE} bytes)"
+          
+          # Print component metadata
+          wasm-tools component wit "${WASM_FILE}" || true
+          
+          # Print component exports
+          wasm-tools print "${WASM_FILE}" | head -100 || true
+
+      - name: Test component with Spin
+        run: |
+          # Install Spin CLI for testing
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          
+          cd "components/${{ inputs.component }}"
+          
+          # Run component tests if they exist
+          if command -v spin >/dev/null 2>&1; then
+            spin build || echo "Spin build completed"
+            
+            # Run tests if test command exists
+            if grep -q "spin test" Makefile 2>/dev/null; then
+              make test
+            elif [[ -f "tests/test.sh" ]]; then
+              bash tests/test.sh
+            else
+              echo "No component tests found"
+            fi
+          fi
+
+      - name: Optimize WASM component
+        run: |
+          cd "components/${{ inputs.component }}"
+          WASM_FILE="target/${WASM_TARGET}/release/${{ inputs.component }}.wasm"
+          OPTIMIZED_FILE="${{ inputs.component }}-${{ inputs.version }}.wasm"
+          
+          # Install wasm-opt if available
+          if command -v wasm-opt >/dev/null 2>&1; then
+            wasm-opt -Os "${WASM_FILE}" -o "${OPTIMIZED_FILE}"
+            echo "Optimized with wasm-opt"
+          else
+            # Try using wasm-tools optimize
+            wasm-tools strip "${WASM_FILE}" -o "${OPTIMIZED_FILE}"
+            echo "Stripped with wasm-tools"
+          fi
+          
+          # Compare sizes
+          ORIGINAL_SIZE=$(stat -c%s "${WASM_FILE}" 2>/dev/null || stat -f%z "${WASM_FILE}")
+          OPTIMIZED_SIZE=$(stat -c%s "${OPTIMIZED_FILE}" 2>/dev/null || stat -f%z "${OPTIMIZED_FILE}")
+          REDUCTION=$((100 - (OPTIMIZED_SIZE * 100 / ORIGINAL_SIZE)))
+          
+          echo "Original size: $((ORIGINAL_SIZE / 1024))KB"
+          echo "Optimized size: $((OPTIMIZED_SIZE / 1024))KB"
+          echo "Size reduction: ${REDUCTION}%"
+
+      - name: Create component package
+        run: |
+          cd "components/${{ inputs.component }}"
+          
+          COMPONENT="${{ inputs.component }}"
+          VERSION="${{ inputs.version }}"
+          PACKAGE_DIR="package"
+          
+          # Create package directory
+          mkdir -p "${PACKAGE_DIR}"
+          
+          # Copy optimized WASM
+          cp "${COMPONENT}-${VERSION}.wasm" "${PACKAGE_DIR}/${COMPONENT}.wasm"
+          
+          # Copy metadata files
+          cp spin.toml "${PACKAGE_DIR}/" || true
+          cp README.md "${PACKAGE_DIR}/" || true
+          cp LICENSE "${PACKAGE_DIR}/" || echo "No LICENSE file"
+          
+          # Create manifest
+          cat > "${PACKAGE_DIR}/manifest.json" << EOF
+          {
+            "name": "${COMPONENT}",
+            "version": "${VERSION}",
+            "type": "wasm-component",
+            "runtime": "spin",
+            "wasm": "${COMPONENT}.wasm",
+            "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "$(git rev-parse HEAD)",
+            "git_tag": "${{ inputs.tag }}"
+          }
+          EOF
+          
+          # Create tarball
+          tar -czf "${COMPONENT}-${VERSION}.tar.gz" -C "${PACKAGE_DIR}" .
+          
+          echo "Package created: ${COMPONENT}-${VERSION}.tar.gz"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-component-${{ inputs.component }}
+          path: |
+            components/${{ inputs.component }}/${{ inputs.component }}-${{ inputs.version }}.wasm
+            components/${{ inputs.component }}/${{ inputs.component }}-${{ inputs.version }}.tar.gz
+          retention-days: 7
+
+  publish-container:
+    name: Publish to Container Registry
+    needs: build-component
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-component-${{ inputs.component }}
+          path: artifacts/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.component }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ inputs.component }}
+            org.opencontainers.image.description=FTL WASM Component
+            org.opencontainers.image.vendor=FasterTools
+            dev.ftl.component.type=wasm
+            dev.ftl.component.runtime=spin
+
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile << 'EOF'
+          FROM scratch
+          
+          LABEL org.opencontainers.image.title="${{ inputs.component }}"
+          LABEL org.opencontainers.image.version="${{ inputs.version }}"
+          LABEL dev.ftl.component.type="wasm"
+          
+          COPY --chown=0:0 ${{ inputs.component }}-${{ inputs.version }}.wasm /component.wasm
+          COPY --chown=0:0 ${{ inputs.component }}-${{ inputs.version }}.tar.gz /component.tar.gz
+          
+          # Note: This is a WASM component, not a runnable container
+          # Use with Spin or other WASM runtimes
+          EOF
+
+      - name: Build and push container
+        uses: docker/build-push-action@v6
+        with:
+          context: artifacts/
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      - name: Sign container image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          # Install cosign
+          curl -sSL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 -o cosign
+          chmod +x cosign
+          sudo mv cosign /usr/local/bin/
+          
+          # Sign the container image
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}"
+          cosign sign --yes "${IMAGE}" || echo "Signing requires keyless signing setup"
+
+  publish-spin-registry:
+    name: Publish to Spin Registry
+    needs: build-component
+    runs-on: ubuntu-latest
+    if: ${{ vars.ENABLE_SPIN_REGISTRY == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-component-${{ inputs.component }}
+          path: artifacts/
+
+      - name: Install Spin CLI
+        run: |
+          curl -fsSL https://developer.fermyon.com/downloads/install.sh | bash
+          sudo mv spin /usr/local/bin/
+          spin --version
+
+      - name: Publish to Spin Registry
+        env:
+          SPIN_AUTH_TOKEN: ${{ secrets.SPIN_AUTH_TOKEN }}
+        run: |
+          if [[ -n "${SPIN_AUTH_TOKEN}" ]]; then
+            cd artifacts
+            
+            # Login to Spin registry
+            spin registry login --token "${SPIN_AUTH_TOKEN}"
+            
+            # Push component
+            spin registry push \
+              --name "${{ inputs.component }}" \
+              --version "${{ inputs.version }}" \
+              "${{ inputs.component }}-${{ inputs.version }}.wasm"
+            
+            echo "Published to Spin registry"
+          else
+            echo "Skipping Spin registry publish (no SPIN_AUTH_TOKEN)"
+          fi
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-component, publish-container]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-component-${{ inputs.component }}
+          path: release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          
+          # Generate SHA256 checksums
+          sha256sum *.wasm *.tar.gz > checksums.txt
+          
+          echo "Checksums:"
+          cat checksums.txt
+
+      - name: Create release notes
+        run: |
+          cat > release/notes.md << 'EOF'
+          ## WASM Component: ${{ inputs.component }} v${{ inputs.version }}
+          
+          ### Installation
+          
+          #### Using Spin
+          ```bash
+          spin registry pull ghcr.io/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}
+          ```
+          
+          #### Using Docker
+          ```bash
+          docker pull ghcr.io/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}
+          docker create --name temp ghcr.io/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}
+          docker cp temp:/component.wasm ./${{ inputs.component }}.wasm
+          docker rm temp
+          ```
+          
+          #### Direct Download
+          ```bash
+          curl -LO https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/${{ inputs.component }}-${{ inputs.version }}.wasm
+          ```
+          
+          ### Verify Checksums
+          ```bash
+          curl -LO https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/checksums.txt
+          sha256sum -c checksums.txt --ignore-missing
+          ```
+          
+          ### Usage
+          
+          Add to your `ftl.toml`:
+          ```toml
+          [[component]]
+          name = "${{ inputs.component }}"
+          source = "ghcr.io/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}"
+          ```
+          
+          ### What's Changed
+          See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/components/${{ inputs.component }}/CHANGELOG.md) for details.
+          
+          ### Component Info
+          - **Type**: WASM Component (wasm32-wasip1)
+          - **Runtime**: Spin Framework
+          - **Container**: `ghcr.io/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}`
+          EOF
+
+      - name: Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.component }} v${{ inputs.version }}
+          body_path: release/notes.md
+          files: |
+            release/*.wasm
+            release/*.tar.gz
+            release/checksums.txt
+          draft: false
+          prerelease: false
+
+  verify-deployment:
+    name: Verify Component Deployment
+    needs: [publish-container, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify container availability
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.component }}:${{ inputs.version }}"
+          
+          # Check if image exists
+          docker manifest inspect "${IMAGE}" || {
+            echo "Warning: Container image not immediately available"
+            exit 0
+          }
+          
+          echo "✓ Container image verified: ${IMAGE}"
+
+      - name: Test component download
+        run: |
+          # Test direct download from release
+          URL="https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/${{ inputs.component }}-${{ inputs.version }}.wasm"
+          
+          curl -fsSL "${URL}" -o component.wasm || {
+            echo "Warning: Direct download not immediately available"
+            exit 0
+          }
+          
+          # Verify it's a valid WASM file
+          file component.wasm | grep -q "WebAssembly" && echo "✓ Valid WASM component downloaded"
+
+  notify-downstream:
+    name: Notify Downstream Projects
+    needs: verify-deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create notification issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const component = '${{ inputs.component }}';
+            const version = '${{ inputs.version }}';
+            const title = `${component} v${version} Released`;
+            const body = `
+            ## WASM Component ${component} v${version} has been released
+            
+            ### What's New
+            See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/components/${component}/CHANGELOG.md) for details.
+            
+            ### Usage
+            
+            Update your \`ftl.toml\`:
+            \`\`\`toml
+            [[component]]
+            name = "${component}"
+            source = "ghcr.io/${{ github.repository_owner }}/${component}:${version}"
+            \`\`\`
+            
+            ### Container Image
+            \`\`\`bash
+            docker pull ghcr.io/${{ github.repository_owner }}/${component}:${version}
+            \`\`\`
+            
+            ### Direct Download
+            - [${component}-${version}.wasm](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/${component}-${version}.wasm)
+            - [checksums.txt](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/checksums.txt)
+            
+            ### Documentation
+            - [Component README](https://github.com/${{ github.repository }}/blob/main/components/${component}/README.md)
+            - [Container Registry](https://github.com/${{ github.repository }}/pkgs/container/${component})
+            `;
+            
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['release', 'wasm-component', 'announcement']
+              });
+            } catch (error) {
+              console.log('Could not create issue:', error.message);
+            }

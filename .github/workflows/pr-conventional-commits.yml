@@ -1,0 +1,415 @@
+name: PR Conventional Commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+  statuses: write
+
+jobs:
+  validate-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title follows conventional commits
+        uses: amannn/action-semantic-pull-request@v5
+        id: lint_pr_title
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            build
+            ci
+            chore
+            style
+            revert
+          scopes: |
+            cli
+            sdk
+            sdk/go
+            sdk/rust
+            sdk/python
+            sdk/typescript
+            wasm
+            components
+            core
+            deps
+            release
+            docs
+            ci
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+          ignoreLabels: |
+            bot
+            dependencies
+            autorelease: pending
+            autorelease: tagged
+          headerPattern: '^(\w+)(?:\((\w+(?:\/\w+)?)\))?: (.+)$'
+          headerPatternCorrespondence: type, scope, subject
+          validateSingleCommit: false
+          validateSingleCommitMatchesPrTitle: false
+
+      - name: Add PR comment for validation failure
+        if: failure() && steps.lint_pr_title.outputs.error_message != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const error = `${{ steps.lint_pr_title.outputs.error_message }}`;
+            const body = `## ❌ PR Title Validation Failed
+            
+            Your PR title doesn't follow the [Conventional Commits](https://www.conventionalcommits.org) specification.
+            
+            ### Error
+            ${error}
+            
+            ### Valid Format
+            \`\`\`
+            <type>(<scope>): <subject>
+            \`\`\`
+            
+            ### Examples
+            - \`feat(cli): add support for dry-run deployments\`
+            - \`fix(sdk/rust): resolve WASM runtime panic\`
+            - \`docs: update installation instructions\`
+            - \`chore(deps): update dependencies\`
+            
+            ### Valid Types
+            - **feat**: A new feature
+            - **fix**: A bug fix
+            - **perf**: A performance improvement
+            - **refactor**: Code change that neither fixes a bug nor adds a feature
+            - **docs**: Documentation only changes
+            - **test**: Adding missing tests or correcting existing tests
+            - **build**: Changes that affect the build system or external dependencies
+            - **ci**: Changes to CI configuration files and scripts
+            - **chore**: Other changes that don't modify src or test files
+            - **style**: Changes that do not affect the meaning of the code
+            - **revert**: Reverts a previous commit
+            
+            ### Valid Scopes (optional)
+            - **cli**: Changes to the FTL CLI
+            - **sdk**: General SDK changes
+            - **sdk/go**: Go SDK specific changes
+            - **sdk/rust**: Rust SDK specific changes
+            - **sdk/python**: Python SDK specific changes
+            - **sdk/typescript**: TypeScript SDK specific changes
+            - **wasm**: WASM component changes
+            - **components**: Component-related changes
+            - **core**: Core functionality changes
+            - **deps**: Dependency updates
+            - **release**: Release-related changes
+            - **docs**: Documentation changes
+            - **ci**: CI/CD changes
+            
+            ### Breaking Changes
+            Add \`!\` after the type/scope to indicate a breaking change:
+            - \`feat(cli)!: change configuration file format\`
+            - \`fix!: remove deprecated API endpoints\`
+            
+            Please update your PR title and try again.`;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('PR Title Validation Failed')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  validate-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install commitlint
+        run: |
+          npm install --no-save @commitlint/cli @commitlint/config-conventional
+
+      - name: Create commitlint config
+        run: |
+          cat > commitlint.config.js << 'EOF'
+          module.exports = {
+            extends: ['@commitlint/config-conventional'],
+            rules: {
+              'type-enum': [
+                2,
+                'always',
+                [
+                  'feat', 'fix', 'perf', 'refactor', 'docs', 'test',
+                  'build', 'ci', 'chore', 'style', 'revert'
+                ]
+              ],
+              'scope-enum': [
+                1,
+                'always',
+                [
+                  'cli', 'sdk', 'sdk/go', 'sdk/rust', 'sdk/python',
+                  'sdk/typescript', 'wasm', 'components', 'core',
+                  'deps', 'release', 'docs', 'ci'
+                ]
+              ],
+              'subject-case': [2, 'never', ['upper-case', 'pascal-case', 'start-case']],
+              'header-max-length': [2, 'always', 100],
+              'body-max-line-length': [1, 'always', 100],
+              'footer-max-line-length': [1, 'always', 100]
+            }
+          };
+          EOF
+
+      - name: Validate commits
+        run: |
+          # Get all commits in this PR
+          COMMITS=$(git log --format=%H origin/${{ github.base_ref }}..${{ github.sha }})
+          
+          FAILED=false
+          echo "Validating commits..."
+          echo ""
+          
+          for commit in $COMMITS; do
+            MESSAGE=$(git log -1 --format=%B $commit)
+            SUBJECT=$(git log -1 --format=%s $commit)
+            
+            echo "Checking commit: ${commit:0:8} - ${SUBJECT}"
+            
+            # Skip merge commits
+            if [[ "$MESSAGE" =~ ^Merge ]]; then
+              echo "  ✓ Skipping merge commit"
+              continue
+            fi
+            
+            # Validate with commitlint
+            if echo "$MESSAGE" | npx commitlint; then
+              echo "  ✓ Valid conventional commit"
+            else
+              echo "  ✗ Invalid commit message"
+              FAILED=true
+            fi
+            echo ""
+          done
+          
+          if [ "$FAILED" = true ]; then
+            echo "❌ Some commits don't follow conventional commit format"
+            echo ""
+            echo "Please ensure all commits follow the format:"
+            echo "  <type>(<scope>): <subject>"
+            echo ""
+            echo "Or squash your commits with a proper message."
+            exit 1
+          else
+            echo "✅ All commits follow conventional commit format"
+          fi
+
+  check-release-notes:
+    name: Check Release Notes
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for release notes
+        id: check_notes
+        run: |
+          # Check if this PR will trigger a release
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          
+          # Parse PR title
+          if [[ "$PR_TITLE" =~ ^(feat|fix|perf)(\(.+\))?!?:.+ ]]; then
+            echo "release_type=release" >> $GITHUB_OUTPUT
+            echo "This PR will trigger a release"
+          elif [[ "$PR_TITLE" =~ ^(refactor|docs|test|build|ci|chore|style)(\(.+\))?:.+ ]]; then
+            echo "release_type=maintenance" >> $GITHUB_OUTPUT
+            echo "This PR is maintenance only"
+          else
+            echo "release_type=unknown" >> $GITHUB_OUTPUT
+            echo "Unknown PR type"
+          fi
+
+      - name: Check for breaking changes
+        if: steps.check_notes.outputs.release_type == 'release'
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # Check for breaking change indicator
+          if [[ "$PR_TITLE" =~ ! ]] || [[ "$PR_BODY" =~ "BREAKING CHANGE:" ]]; then
+            echo "⚠️  This PR contains breaking changes"
+            echo ""
+            echo "Please ensure:"
+            echo "1. Breaking changes are documented in the PR description"
+            echo "2. Migration guide is provided if applicable"
+            echo "3. Version bump will be major (handled automatically)"
+          fi
+
+  add-labels:
+    name: Add Labels Based on Conventional Commits
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Add labels based on PR title
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const labels = [];
+            
+            // Parse conventional commit type and scope
+            const match = title.match(/^(\w+)(?:\(([^)]+)\))?!?:/);
+            if (!match) return;
+            
+            const [, type, scope] = match;
+            
+            // Add type labels
+            const typeLabels = {
+              'feat': 'enhancement',
+              'fix': 'bug',
+              'perf': 'performance',
+              'refactor': 'refactor',
+              'docs': 'documentation',
+              'test': 'testing',
+              'build': 'build',
+              'ci': 'ci/cd',
+              'chore': 'chore',
+              'style': 'style',
+              'revert': 'revert'
+            };
+            
+            if (typeLabels[type]) {
+              labels.push(typeLabels[type]);
+            }
+            
+            // Add scope labels
+            if (scope) {
+              const scopeLabels = {
+                'cli': 'cli',
+                'sdk': 'sdk',
+                'sdk/go': 'go-sdk',
+                'sdk/rust': 'rust-sdk',
+                'sdk/python': 'python-sdk',
+                'sdk/typescript': 'typescript-sdk',
+                'wasm': 'wasm',
+                'components': 'components',
+                'core': 'core',
+                'deps': 'dependencies',
+                'release': 'release',
+                'docs': 'documentation',
+                'ci': 'ci/cd'
+              };
+              
+              if (scopeLabels[scope]) {
+                labels.push(scopeLabels[scope]);
+              }
+            }
+            
+            // Add breaking change label if applicable
+            if (title.includes('!:') || context.payload.pull_request.body?.includes('BREAKING CHANGE:')) {
+              labels.push('breaking-change');
+            }
+            
+            // Add size labels based on changed files
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const { additions, deletions } = pr;
+            const changes = additions + deletions;
+            
+            if (changes < 10) {
+              labels.push('size/XS');
+            } else if (changes < 50) {
+              labels.push('size/S');
+            } else if (changes < 200) {
+              labels.push('size/M');
+            } else if (changes < 500) {
+              labels.push('size/L');
+            } else {
+              labels.push('size/XL');
+            }
+            
+            // Apply labels
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: labels
+              });
+              
+              console.log(`Added labels: ${labels.join(', ')}`);
+            }
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-title, validate-commits, check-release-notes]
+    if: always()
+    steps:
+      - name: Create summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title_status = '${{ needs.validate-title.result }}';
+            const commits_status = '${{ needs.validate-commits.result }}';
+            const notes_status = '${{ needs.check-release-notes.result }}';
+            
+            let summary = '## Conventional Commits Validation\n\n';
+            summary += '| Check | Status |\n';
+            summary += '|-------|--------|\n';
+            summary += `| PR Title | ${title_status === 'success' ? '✅ Valid' : '❌ Invalid'} |\n`;
+            summary += `| Commit Messages | ${commits_status === 'success' ? '✅ Valid' : commits_status === 'skipped' ? '⏭️ Skipped' : '❌ Invalid'} |\n`;
+            summary += `| Release Notes | ${notes_status === 'success' ? '✅ Checked' : notes_status === 'skipped' ? '⏭️ Skipped' : '⚠️ Review needed'} |\n`;
+            
+            await core.summary.addRaw(summary).write();

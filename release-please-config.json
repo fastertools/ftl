@@ -1,0 +1,221 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "da10001",
+  "release-type": "simple",
+  "include-v-in-tag": true,
+  "tag-separator": "-",
+  "changelog-sections": [
+    {"type": "feat", "section": "Features", "hidden": false},
+    {"type": "fix", "section": "Bug Fixes", "hidden": false},
+    {"type": "perf", "section": "Performance Improvements", "hidden": false},
+    {"type": "refactor", "section": "Code Refactoring", "hidden": false},
+    {"type": "deps", "section": "Dependencies", "hidden": false},
+    {"type": "docs", "section": "Documentation", "hidden": false},
+    {"type": "test", "section": "Tests", "hidden": false},
+    {"type": "build", "section": "Build System", "hidden": false},
+    {"type": "ci", "section": "Continuous Integration", "hidden": false},
+    {"type": "chore", "section": "Miscellaneous Chores", "hidden": true},
+    {"type": "style", "section": "Styles", "hidden": true},
+    {"type": "revert", "section": "Reverts", "hidden": false}
+  ],
+  "changelog-type": "github",
+  "extra-files": [
+    {
+      "type": "json",
+      "path": "internal/scaffold/versions.json",
+      "jsonpath": "$.ftlCli"
+    }
+  ],
+  "plugins": [
+    {
+      "type": "cargo-workspace",
+      "merge": false,
+      "updateAllPackages": true
+    },
+    {
+      "type": "node-workspace",
+      "merge": false,
+      "updatePeerDependencies": true,
+      "considerAllArtifacts": true
+    },
+    {
+      "type": "linked-versions",
+      "groupName": "sdk-core",
+      "components": [
+        "ftl-sdk-go",
+        "ftl-sdk-rust",
+        "ftl-sdk-python",
+        "ftl-sdk-typescript"
+      ],
+      "merge": false
+    }
+  ],
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "ftl",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": false,
+      "package-name": "ftl"
+    },
+    "cmd/ftl": {
+      "release-type": "go",
+      "component": "cli",
+      "changelog-path": "cmd/ftl/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-cli",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.ftlCli"
+        },
+        {
+          "type": "generic",
+          "path": "install.sh",
+          "glob": "**FTL_VERSION=*"
+        }
+      ]
+    },
+    "sdk/go": {
+      "release-type": "go",
+      "component": "sdk-go",
+      "changelog-path": "sdk/go/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-sdk-go",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.sdk.go"
+        },
+        {
+          "type": "generic",
+          "path": "sdk/go/README.md"
+        }
+      ]
+    },
+    "sdk/rust": {
+      "release-type": "rust",
+      "component": "sdk-rust",
+      "changelog-path": "sdk/rust/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-sdk",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.sdk.rust"
+        },
+        {
+          "type": "toml",
+          "path": "sdk/rust-macros/Cargo.toml",
+          "jsonpath": "$.package.version"
+        }
+      ]
+    },
+    "sdk/python": {
+      "release-type": "python",
+      "component": "sdk-python",
+      "changelog-path": "sdk/python/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-sdk",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.sdk.python"
+        }
+      ]
+    },
+    "sdk/typescript": {
+      "release-type": "node",
+      "component": "sdk-typescript",
+      "changelog-path": "sdk/typescript/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "@ftl/sdk",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.sdk.typescript"
+        }
+      ]
+    },
+    "components/mcp-gateway": {
+      "release-type": "rust",
+      "component": "component-mcp-gateway",
+      "changelog-path": "components/mcp-gateway/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "mcp-gateway",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.components['mcp-gateway']"
+        },
+        {
+          "type": "toml",
+          "path": "components/mcp-gateway/spin.toml",
+          "jsonpath": "$.package.version"
+        }
+      ]
+    },
+    "components/mcp-authorizer": {
+      "release-type": "rust",
+      "component": "component-mcp-authorizer",
+      "changelog-path": "components/mcp-authorizer/CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "mcp-authorizer",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "internal/scaffold/versions.json",
+          "jsonpath": "$.components['mcp-authorizer']"
+        },
+        {
+          "type": "toml",
+          "path": "components/mcp-authorizer/spin.toml",
+          "jsonpath": "$.package.version"
+        }
+      ]
+    }
+  },
+  "group-pull-request-title-pattern": "chore: release ${component} v${version}",
+  "pull-request-title-pattern": "chore: release ${component} v${version}",
+  "pull-request-header": ":rocket: Release PR\n\nThis PR was generated by [release-please](https://github.com/googleapis/release-please).",
+  "pull-request-footer": "\n---\n\n:warning: **Do not manually edit this PR**. Any manual changes will be overwritten by release-please.\n\nTo make changes, commit to `main` with conventional commit messages.",
+  "separate-pull-requests": true,
+  "sequential-calls": true,
+  "signoff": "FTL Release Bot <releases@fastertools.com>",
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "always-link-local": true,
+  "group-priority": [
+    {
+      "priority": 1000,
+      "groups": ["ftl-sdk-rust", "ftl-sdk-go", "ftl-sdk-python", "ftl-sdk-typescript"]
+    },
+    {
+      "priority": 900,
+      "groups": ["ftl-cli"]
+    },
+    {
+      "priority": 800,
+      "groups": ["mcp-gateway", "mcp-authorizer"]
+    }
+  ],
+  "release-search-depth": 100,
+  "commit-search-depth": 500,
+  "label": "autorelease: pending",
+  "release-label": "autorelease: tagged",
+  "draft": false,
+  "draft-pull-request": false
+}

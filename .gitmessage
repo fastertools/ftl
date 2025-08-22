@@ -1,0 +1,73 @@
+# FTL Conventional Commit Template
+# 
+# Format: <type>(<scope>): <subject>
+# 
+# The first line should be 72 characters or less
+# 
+# Type (required):
+#   feat     - New feature
+#   fix      - Bug fix  
+#   perf     - Performance improvement
+#   refactor - Code change that neither fixes a bug nor adds a feature
+#   docs     - Documentation only changes
+#   test     - Adding missing tests or correcting existing tests
+#   build    - Changes that affect the build system or dependencies
+#   ci       - Changes to CI configuration files and scripts
+#   chore    - Other changes that don't modify src or test files
+#   style    - Changes that do not affect the meaning of the code
+#   revert   - Reverts a previous commit
+#
+# Scope (optional):
+#   cli              - FTL CLI changes
+#   sdk              - General SDK changes
+#   sdk/go           - Go SDK specific
+#   sdk/rust         - Rust SDK specific
+#   sdk/python       - Python SDK specific
+#   sdk/typescript   - TypeScript SDK specific
+#   wasm             - WASM component changes
+#   components       - Component-related changes
+#   core             - Core functionality
+#   deps             - Dependency updates
+#   release          - Release-related changes
+#   docs             - Documentation
+#   ci               - CI/CD
+#
+# Subject:
+#   - Use imperative mood ("add" not "added")
+#   - Don't capitalize first letter
+#   - No period at the end
+#   - Maximum 50 characters
+#
+# Body (optional):
+#   - Explain what and why (not how)
+#   - Wrap at 72 characters
+#   - Separate from subject with blank line
+#
+# Footer (optional):
+#   - Reference issues: "Fixes #123", "Closes #456"
+#   - Breaking changes: Start with "BREAKING CHANGE:"
+#   - Co-authors: "Co-authored-by: Name <email>"
+#
+# Examples:
+#   feat(cli): add deployment rollback command
+#   
+#   fix(sdk/rust): resolve WASM runtime panic
+#   
+#   This fixes a panic that occurred when the WASM runtime
+#   encountered payloads larger than 1MB. The issue was caused
+#   by insufficient buffer allocation.
+#   
+#   Fixes #789
+#   
+#   feat(api)!: change authentication token format
+#   
+#   BREAKING CHANGE: Authentication now uses JWT tokens instead
+#   of API keys. Users must regenerate their authentication tokens
+#   using the new `ftl auth refresh` command.
+#
+# For breaking changes, add ! after type/scope:
+#   feat!: remove deprecated config options
+#   fix(cli)!: change default port from 8080 to 3000
+#
+# Remember: These messages become part of the permanent Git history
+# and are used to generate changelogs and determine version bumps!
