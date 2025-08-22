@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  # Allow this workflow to be called by other workflows
+  workflow_call:
   # Trigger CI on release PRs created by release-please
   pull_request_target:
     types: [opened, synchronize]
