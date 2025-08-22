@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.3 (2025-08-22)
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.11.2...v0.11.3
+
 ## 0.11.2 (2025-08-22)
 
 ## What's Changed
