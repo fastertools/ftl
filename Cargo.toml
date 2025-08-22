@@ -23,6 +23,7 @@ exclude = [
 # Build all components: cargo component build --workspace --release --target wasm32-wasip1
 
 [workspace.package]
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.89"
 authors = ["FTL Contributors"]
@@ -31,6 +32,10 @@ repository = "https://github.com/fastertools/ftl"
 homepage = "https://github.com/fastertools/ftl"
 
 [workspace.dependencies]
+# Internal workspace crates
+ftl-sdk = { version = "0.10.0", path = "sdk/rust" }
+ftl-sdk-macros = { version = "0.10.0", path = "sdk/rust-macros" }
+
 # Common dependencies used across workspace
 clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }

@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk"
-version = "0.3.0"
+version = "0.10.0"
 dependencies = [
  "ftl-sdk-macros",
  "pretty_assertions",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk-macros"
-version = "0.3.0"
+version = "0.10.0"
 dependencies = [
  "proc-macro2",
  "quote",
