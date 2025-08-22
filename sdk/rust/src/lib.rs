@@ -320,3 +320,4 @@ mod tests {
         assert_eq!(response.structured_content, Some(data));
     }
 }
+// Version 0.10.1
