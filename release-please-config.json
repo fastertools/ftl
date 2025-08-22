@@ -101,12 +101,12 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "internal/scaffold/versions.json",
+          "path": "../../internal/scaffold/versions.json",
           "jsonpath": "$.sdk.rust"
         },
         {
           "type": "toml",
-          "path": "sdk/rust-macros/Cargo.toml",
+          "path": "../rust-macros/Cargo.toml",
           "jsonpath": "$.package.version"
         }
       ]
