@@ -180,7 +180,6 @@ jobs:
     name: Publish to NPM
     needs: build-package
     runs-on: ubuntu-latest
-    environment: npm
     permissions:
       contents: read
       id-token: write
@@ -223,7 +222,6 @@ jobs:
           npm publish --dry-run
 
       - name: Publish to NPM (Token)
-        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -241,7 +239,6 @@ jobs:
           fi
 
       - name: Publish to NPM (OIDC)
-        if: ${{ secrets.NPM_TOKEN == '' }}
         run: |
           cd sdk/typescript
           
