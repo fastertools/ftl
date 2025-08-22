@@ -241,7 +241,6 @@ graph LR
 3. Generate install script
 4. Create GitHub release
 5. Build and push Docker images
-6. Update Homebrew formula
 
 #### SDK Releases
 - **Go**: Create module tag, notify Go proxy
@@ -429,7 +428,6 @@ If migration needs to be reverted:
 | `NPM_TOKEN` | NPM publishing token | Optional (OIDC available) |
 | `PYPI_API_TOKEN` | PyPI publishing token | Optional (trusted publishing) |
 | `SPIN_AUTH_TOKEN` | Spin registry token | Optional |
-| `HOMEBREW_TAP_TOKEN` | Homebrew tap update token | Optional |
 
 ### Configuration Files
 

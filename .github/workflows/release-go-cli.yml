@@ -224,14 +224,3 @@ jobs:
             ftl-*.tar.gz
             ftl-*.zip
             *.sha256
-
-  publish-homebrew:
-    name: Update Homebrew Formula
-    needs: create-release
-    runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref, '-') }}  # Skip for pre-releases
-    steps:
-      - name: Trigger Homebrew update
-        run: |
-          echo "Would trigger Homebrew formula update here"
-          # This would typically trigger a workflow in a homebrew-tap repository
