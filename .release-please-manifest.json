@@ -3,7 +3,6 @@
   "cmd/ftl": "0.10.0",
   "sdk/go": "0.10.0",
   "sdk/rust": "0.10.0",
-  "sdk/rust-macros": "0.10.0",
   "sdk/python": "0.10.0",
   "sdk/typescript": "0.10.0",
   "components/mcp-gateway": "0.10.0",

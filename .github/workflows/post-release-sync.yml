@@ -43,13 +43,20 @@ jobs:
             .components["mcp-authorizer"] = $manifest."components/mcp-authorizer" // .components["mcp-authorizer"]
           ' internal/scaffold/versions.json > versions.tmp && mv versions.tmp internal/scaffold/versions.json
           
+          # Also sync rust-macros version to match rust SDK
+          RUST_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
+          sed -i "s/^version = \".*\"/version = \"$RUST_VERSION\"/" sdk/rust-macros/Cargo.toml
+          
+          # Update the dependency in rust SDK to use exact version
+          sed -i "s/ftl-sdk-macros = { version = \"=[^\"]*\"/ftl-sdk-macros = { version = \"=$RUST_VERSION\"/" sdk/rust/Cargo.toml
+          
           # Check if there are changes
-          if git diff --exit-code internal/scaffold/versions.json; then
-            echo "✅ Scaffold versions already up to date"
+          if git diff --exit-code; then
+            echo "✅ Versions already up to date"
             exit 0
           fi
           
-          echo "📝 Scaffold versions updated"
+          echo "📝 Versions updated"
           
       - name: Create PR with updates
         if: ${{ github.event_name == 'release' || inputs.dry_run == false }}
@@ -63,8 +70,8 @@ jobs:
           git checkout -b "$BRANCH"
           
           # Commit changes
-          git add internal/scaffold/versions.json
-          git commit -m "chore: sync scaffold versions from release manifest
+          git add internal/scaffold/versions.json sdk/rust-macros/Cargo.toml sdk/rust/Cargo.toml
+          git commit -m "chore: sync versions from release manifest
 
           Updates internal/scaffold/versions.json to match the versions
           in .release-please-manifest.json after releases.
