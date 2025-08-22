@@ -36,6 +36,8 @@ jobs:
   go-lint:
     name: Go Lint
     runs-on: ubuntu-latest
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     steps:
       - uses: actions/checkout@v4
       
@@ -61,6 +63,8 @@ jobs:
 
   go-test:
     name: Go Test
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -102,6 +106,8 @@ jobs:
         
   go-build:
     name: Go Build
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     strategy:
       matrix:
         include:
@@ -146,6 +152,8 @@ jobs:
   go-security:
     name: Go Security Scan
     runs-on: ubuntu-latest
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     steps:
       - uses: actions/checkout@v4
       
@@ -223,6 +231,8 @@ jobs:
   rust-build-wasm:
     name: Build WASM Components
     runs-on: ubuntu-latest
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     steps:
       - uses: actions/checkout@v4
       
@@ -262,6 +272,8 @@ jobs:
   component-tests:
     name: Component Tests
     runs-on: ubuntu-latest
+    # Skip for release PRs as they may not have latest workflow changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
     steps:
       - uses: actions/checkout@v4
       

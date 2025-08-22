@@ -1,4 +1,4 @@
-//go:generate cp ../../.release-please-manifest.json manifest.json
+//go:generate sh -c "cp ../../.release-please-manifest.json manifest.json 2>/dev/null || cp manifest_default.json manifest.json"
 package scaffold
 
 import (
