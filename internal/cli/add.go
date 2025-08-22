@@ -124,10 +124,21 @@ func runAdd(opts *AddOptions) error {
 		return fmt.Errorf("failed to generate component: %w", err)
 	}
 
-	// Print success message
+	// Print success message with project type awareness
 	printSuccessMessage(opts.Name, opts.Language)
 
 	return nil
+}
+
+
+// generateGoSnippet creates a Go code snippet for adding the tool to main.go
+func generateGoSnippet(toolName string) string {
+	return fmt.Sprintf(`// Add this to your main.go file in the appropriate location:
+
+app.AddComponent("%s").
+    FromLocal("./%s/%s.wasm").
+    WithBuild("cd %s && make build").
+    Build()`, toolName, toolName, toolName, toolName)
 }
 
 func printSuccessMessage(name, language string) {
@@ -154,12 +165,34 @@ func printSuccessMessage(name, language string) {
 	fmt.Println()
 	fmt.Printf("💡 Edit %s to implement your tool logic\n", mainFile)
 	fmt.Println()
-	fmt.Println("🔨 Next steps:")
-	fmt.Println("  1. cd", name)
-	fmt.Println("  2. Edit the source files to implement your tools")
-	fmt.Println("  3. Run 'make build' to compile")
-	fmt.Println("  4. Return to project root and run 'ftl build'")
-	fmt.Println("  5. Run 'ftl up' to start the MCP server")
+
+	// Check if this is a Go CDK project and provide special instructions
+	projectConfig := scaffold.DetectProject()
+	if projectConfig.Type == scaffold.ProjectTypeGo {
+		fmt.Println("🔧 Go CDK Project Detected!")
+		fmt.Println()
+		Warn("Manual component registration required for Go-based configurations.")
+		fmt.Println()
+		fmt.Println("📝 Add the following to your main.go file:")
+		fmt.Println()
+		fmt.Println(generateGoSnippet(name))
+		fmt.Println()
+		fmt.Println("🔨 Next steps:")
+		fmt.Println("  1. cd", name)
+		fmt.Println("  2. Edit the source files to implement your tools")
+		fmt.Println("  3. Run 'make build' to compile")
+		fmt.Println("  4. Add the component registration code to your main.go")
+		fmt.Println("  5. Run 'ftl build' to generate the updated configuration")
+		fmt.Println("  6. Run 'ftl up' to start the MCP server")
+	} else {
+		fmt.Println("🔨 Next steps:")
+		fmt.Println("  1. cd", name)
+		fmt.Println("  2. Edit the source files to implement your tools")
+		fmt.Println("  3. Run 'make build' to compile")
+		fmt.Println("  4. Return to project root and run 'ftl build'")
+		fmt.Println("  5. Run 'ftl up' to start the MCP server")
+	}
+
 	fmt.Println()
 	fmt.Println("📚 Learn more about the FTL SDK for", language+":")
 	fmt.Printf("  https://github.com/fastertools/ftl-sdk-%s\n", getSdkSuffix(language))

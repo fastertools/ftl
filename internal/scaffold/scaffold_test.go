@@ -153,13 +153,16 @@ func main() {
 				require.NoError(t, err)
 			}
 
-			format, path, err := scaffolder.detectConfigFormat()
+			config, err := scaffolder.detectConfigFormat()
 			if tt.wantErr {
 				assert.Error(t, err)
+				assert.False(t, config.IsProject)
+				assert.Equal(t, "", string(config.Type))
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.wantFormat, format)
-				assert.Equal(t, tt.wantPath, path)
+				assert.True(t, config.IsProject)
+				assert.Equal(t, tt.wantFormat, string(config.Type))
+				assert.Equal(t, tt.wantPath, config.Path)
 			}
 		})
 	}

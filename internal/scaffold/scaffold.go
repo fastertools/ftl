@@ -22,6 +22,24 @@ var templatesCUE string
 //go:embed versions.json
 var versionsJSON string
 
+// ProjectType represents the type of FTL project configuration
+type ProjectType string
+
+const (
+	ProjectTypeYAML ProjectType = "yaml"
+	ProjectTypeJSON ProjectType = "json"
+	ProjectTypeCUE  ProjectType = "cue"
+	ProjectTypeGo   ProjectType = "go"
+	ProjectTypeNone ProjectType = ""
+)
+
+// ProjectConfig represents the detected project configuration
+type ProjectConfig struct {
+	Type      ProjectType
+	Path      string
+	IsProject bool
+}
+
 // Versions represents all versions used in templates
 type Versions struct {
 	FTLCli string      `json:"ftlCli"`
@@ -295,10 +313,13 @@ func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 // updateFTLConfig adds the new component to ftl.yaml or ftl.json
 func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 	// Detect configuration format
-	format, configPath, err := s.detectConfigFormat()
+	config, err := s.detectConfigFormat()
 	if err != nil {
 		return err
 	}
+	
+	format := string(config.Type)
+	configPath := config.Path
 
 	// Handle unsupported formats with helpful messages
 	if format == "go" {
@@ -427,33 +448,76 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 }
 
 // detectConfigFormat detects which configuration format is being used
-func (s *Scaffolder) detectConfigFormat() (string, string, error) {
+func (s *Scaffolder) detectConfigFormat() (ProjectConfig, error) {
 	// Check for YAML first (most common)
 	if _, err := os.Stat("ftl.yaml"); err == nil {
-		return "yaml", "ftl.yaml", nil
+		return ProjectConfig{
+			Type:      ProjectTypeYAML,
+			Path:      "ftl.yaml",
+			IsProject: true,
+		}, nil
 	}
 
 	// Check for JSON
 	if _, err := os.Stat("ftl.json"); err == nil {
-		return "json", "ftl.json", nil
+		return ProjectConfig{
+			Type:      ProjectTypeJSON,
+			Path:      "ftl.json",
+			IsProject: true,
+		}, nil
 	}
 
 	// Check for CUE
 	if _, err := os.Stat("app.cue"); err == nil {
-		return "cue", "app.cue", nil
+		return ProjectConfig{
+			Type:      ProjectTypeCUE,
+			Path:      "app.cue",
+			IsProject: true,
+		}, nil
 	}
 
 	// Check for Go
 	if _, err := os.Stat("main.go"); err == nil {
-		// Double-check it's actually an FTL Go config by looking for the CDK import
-		data, err := os.ReadFile("main.go")
-		if err == nil && strings.Contains(string(data), "synthesis.NewCDK") {
-			return "go", "main.go", nil
-		}
+		return ProjectConfig{
+			Type:      ProjectTypeGo,
+			Path:      "main.go",
+			IsProject: true,
+		}, nil
 	}
 
-	return "", "", fmt.Errorf("no FTL configuration found - not in an FTL project directory.\n" +
+	return ProjectConfig{
+		Type:      ProjectTypeNone,
+		Path:      "",
+		IsProject: false,
+	}, fmt.Errorf("no FTL configuration found - not in an FTL project directory.\n" +
 		"Run 'ftl init' to create a new project")
+}
+
+// DetectProject detects the FTL project type and configuration in the current directory.
+// This is the main public API for project detection.
+func DetectProject() ProjectConfig {
+	// Create a temporary scaffolder to use the detection logic
+	// We ignore the error since we handle the case in the ProjectConfig
+	s := &Scaffolder{}
+	config, err := s.detectConfigFormat()
+	if err != nil {
+		return ProjectConfig{
+			Type:      ProjectTypeNone,
+			Path:      "",
+			IsProject: false,
+		}
+	}
+	return config
+}
+
+// IsFtlProject returns true if we're in any kind of FTL project
+func IsFtlProject() bool {
+	return DetectProject().IsProject
+}
+
+// GetProjectType returns the detected project type, or ProjectTypeNone if not in a project
+func GetProjectType() ProjectType {
+	return DetectProject().Type
 }
 
 // getWasmPath returns the WASM output path for a component
