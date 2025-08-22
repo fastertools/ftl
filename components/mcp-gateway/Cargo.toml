@@ -2,7 +2,7 @@
 name = "mcp-gateway"
 authors.workspace = true
 description = "MCP gateway component"
-version = "0.10.0"
+version = "0.11.0"
 license.workspace = true
 rust-version.workspace = true
 edition.workspace = true
