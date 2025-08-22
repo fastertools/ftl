@@ -2,12 +2,9 @@
   ".": "0.11.1",
   "cmd/ftl": "0.11.0",
   "sdk/go": "0.11.0",
-  "sdk/rust": "0.11.0",
+  "sdk/rust": "0.11.1",
   "sdk/python": "0.11.0",
-  "sdk/typescript": "0.11.0",
-  "components/mcp-gateway": "0.11.1",
-  "components/mcp-authorizer": "0.11.1",
-  "sdk/rust-macros": "0.10.1",
-  "components/mcp-authorizer/tests": "0.1.1",
-  "components/mcp-gateway/tests": "0.1.1"
+  "sdk/typescript": "0.11.1",
+  "components/mcp-gateway": "0.11.0",
+  "components/mcp-authorizer": "0.11.0"
 }
