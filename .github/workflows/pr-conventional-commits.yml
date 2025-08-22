@@ -47,6 +47,7 @@ jobs:
             release
             docs
             ci
+            main
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |

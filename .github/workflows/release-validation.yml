@@ -127,7 +127,7 @@ jobs:
           
           # Validate CLI version
           CLI_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '."cmd/ftl"')
-          CLI_SCAFFOLD=$(jq -r '."."' .release-please-manifest.json)
+          CLI_SCAFFOLD=$(jq -r '."cmd/ftl"' .release-please-manifest.json)
           
           if [[ "$CLI_MANIFEST" != "$CLI_SCAFFOLD" ]]; then
             if [[ "$IS_RELEASE_PR" == "true" ]]; then
