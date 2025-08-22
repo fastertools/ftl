@@ -11,7 +11,7 @@ Faster tools for AI agents
 
 [Docs](./docs/README.md) | [Contributing](./CONTRIBUTING.md) | [Releases](https://github.com/fastertools/ftl/releases)
 
-⚡️ [Quick Start](#quick-start)
+⚡ [Quick Start](#quick-start)
 
 </div>
 
