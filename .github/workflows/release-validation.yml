@@ -118,7 +118,7 @@ jobs:
           
           # Validate CLI version
           CLI_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '."cmd/ftl"')
-          CLI_SCAFFOLD=$(jq -r '.ftlCli' internal/scaffold/versions.json)
+          CLI_SCAFFOLD=$(jq -r '.ftl' internal/scaffold/versions.json)
           
           if [[ "$CLI_MANIFEST" != "$CLI_SCAFFOLD" ]]; then
             echo "❌ CLI version mismatch:"

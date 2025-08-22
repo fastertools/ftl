@@ -46,7 +46,7 @@ jobs:
           VERSION="${{ inputs.version }}"
           
           # Check that versions.json matches the release version
-          JSON_VERSION=$(jq -r '.ftlCli' internal/scaffold/versions.json)
+          JSON_VERSION=$(jq -r '.ftl' internal/scaffold/versions.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
             echo "Version mismatch: versions.json has ${JSON_VERSION}, expected ${VERSION}"
             exit 1
@@ -65,7 +65,7 @@ jobs:
           # Build with version information embedded
           go build \
             -trimpath \
-            -ldflags="-s -w -X github.com/fastertools/ftl-cli/internal/version.Version=${VERSION} -X github.com/fastertools/ftl-cli/internal/version.GitCommit=$(git rev-parse HEAD) -X github.com/fastertools/ftl-cli/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -ldflags="-s -w -X github.com/fastertools/ftl/internal/version.Version=${VERSION} -X github.com/fastertools/ftl/internal/version.GitCommit=$(git rev-parse HEAD) -X github.com/fastertools/ftl/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -o "${OUTPUT}" \
             ./cmd/ftl
           
@@ -174,7 +174,7 @@ jobs:
             echo "### Quick Install (Linux/macOS)"
             echo ""
             echo '```bash'
-            echo "curl -fsSL https://github.com/fastertools/ftl-cli/releases/download/${TAG}/install.sh | bash"
+            echo "curl -fsSL https://github.com/fastertools/ftl/releases/download/${TAG}/install.sh | bash"
             echo '```'
             echo ""
             echo "### Manual Installation"
@@ -214,7 +214,7 @@ jobs:
             echo ""
             echo "## What's Changed"
             echo ""
-            echo "See the [CHANGELOG](https://github.com/fastertools/ftl-cli/blob/main/cmd/ftl/CHANGELOG.md) for details."
+            echo "See the [CHANGELOG](https://github.com/fastertools/ftl/blob/main/cmd/ftl/CHANGELOG.md) for details."
             echo ""
             echo "## Docker Images"
             echo ""
@@ -306,16 +306,16 @@ jobs:
       - name: Create Dockerfile
         run: |
           cat > Dockerfile << 'EOF'
-FROM gcr.io/distroless/static-debian12:nonroot
-
-ARG TARGETARCH
-
-COPY ftl-linux-${TARGETARCH} /usr/local/bin/ftl
-
-USER nonroot
-ENTRYPOINT ["/usr/local/bin/ftl"]
-CMD ["--help"]
-EOF
+          FROM gcr.io/distroless/static-debian12:nonroot
+          
+          ARG TARGETARCH
+          
+          COPY ftl-linux-${TARGETARCH} /usr/local/bin/ftl
+          
+          USER nonroot
+          ENTRYPOINT ["/usr/local/bin/ftl"]
+          CMD ["--help"]
+          EOF
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -331,7 +331,7 @@ EOF
             org.opencontainers.image.title=FTL CLI
             org.opencontainers.image.description=Fast, secure, and portable MCP tools
             org.opencontainers.image.version=${{ inputs.version }}
-            org.opencontainers.image.source=https://github.com/fastertools/ftl-cli
+            org.opencontainers.image.source=https://github.com/fastertools/ftl
             org.opencontainers.image.licenses=Apache-2.0
 
   homebrew-update:
@@ -351,7 +351,7 @@ EOF
           cd homebrew-tap
           
           VERSION="${{ inputs.version }}"
-          BASE_URL="https://github.com/fastertools/ftl-cli/releases/download/${{ inputs.tag }}"
+          BASE_URL="https://github.com/fastertools/ftl/releases/download/${{ inputs.tag }}"
           
           # Download checksums
           curl -fsSL "${BASE_URL}/checksums.txt" -o checksums.txt
@@ -364,43 +364,43 @@ EOF
           
           # Update formula
           cat > Formula/ftl.rb << EOF
-class Ftl < Formula
-  desc "Fast, secure, and portable MCP tools"
-  homepage "https://github.com/fastertools/ftl-cli"
-  version "${VERSION}"
-  license "Apache-2.0"
-
-  on_macos do
-    on_intel do
-      url "${BASE_URL}/ftl-${VERSION}-darwin-amd64.tar.gz"
-      sha256 "${DARWIN_AMD64_SHA}"
-    end
-    on_arm do
-      url "${BASE_URL}/ftl-${VERSION}-darwin-arm64.tar.gz"
-      sha256 "${DARWIN_ARM64_SHA}"
-    end
-  end
-
-  on_linux do
-    on_intel do
-      url "${BASE_URL}/ftl-${VERSION}-linux-amd64.tar.gz"
-      sha256 "${LINUX_AMD64_SHA}"
-    end
-    on_arm do
-      url "${BASE_URL}/ftl-${VERSION}-linux-arm64.tar.gz"
-      sha256 "${LINUX_ARM64_SHA}"
-    end
-  end
-
-  def install
-    bin.install "ftl"
-  end
-
-  test do
-    system "#{bin}/ftl", "version"
-  end
-end
-EOF
+          class Ftl < Formula
+            desc "Fast, secure, and portable MCP tools"
+            homepage "https://github.com/fastertools/ftl"
+            version "${VERSION}"
+            license "Apache-2.0"
+          
+            on_macos do
+              on_intel do
+                url "${BASE_URL}/ftl-${VERSION}-darwin-amd64.tar.gz"
+                sha256 "${DARWIN_AMD64_SHA}"
+              end
+              on_arm do
+                url "${BASE_URL}/ftl-${VERSION}-darwin-arm64.tar.gz"
+                sha256 "${DARWIN_ARM64_SHA}"
+              end
+            end
+          
+            on_linux do
+              on_intel do
+                url "${BASE_URL}/ftl-${VERSION}-linux-amd64.tar.gz"
+                sha256 "${LINUX_AMD64_SHA}"
+              end
+              on_arm do
+                url "${BASE_URL}/ftl-${VERSION}-linux-arm64.tar.gz"
+                sha256 "${LINUX_ARM64_SHA}"
+              end
+            end
+          
+            def install
+              bin.install "ftl"
+            end
+          
+            test do
+              system "#{bin}/ftl", "version"
+            end
+          end
+          EOF
           
           # Commit and push if token is available
           if [[ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]]; then

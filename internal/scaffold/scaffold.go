@@ -24,7 +24,7 @@ var versionsJSON string
 
 // Versions represents all versions used in templates
 type Versions struct {
-	FTLCli string      `json:"ftlCli"`
+	FTLCli string      `json:"ftl"`
 	SDK    SDKVersions `json:"sdk"`
 }
 

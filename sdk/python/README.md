@@ -426,7 +426,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ```bash
 # Clone the repository
 git clone https://github.com/fastertools/ftl.git
-cd ftl-cli/sdk/python
+cd ftl/sdk/python
 
 # Create virtual environment
 python -m venv venv
