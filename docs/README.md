@@ -39,7 +39,7 @@ These are living documents. If you see something that could be improved, please 
 
 ### FTL Project Resources
 - [Examples](../examples/README.md) - Complete example projects
-- [Templates](../templates/README.md) - Project scaffolding templates
+- [Web Templates](../web-templates/) - Templ web UI templates for dashboard
 
 ### WebAssembly & Component Model
 - [WebAssembly.org](https://webassembly.org/) - Official WebAssembly documentation and specifications

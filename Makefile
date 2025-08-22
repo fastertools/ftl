@@ -1,7 +1,7 @@
 # FTL - Polyglot WebAssembly MCP Platform
 # Main orchestration Makefile
 
-.PHONY: all help build test clean install
+.PHONY: all help build test clean install setup-browser-tests setup-all
 
 # Default to showing help
 help:
@@ -25,6 +25,10 @@ help:
 	@echo "    fmt           - Format all code (Go + Rust)"
 	@echo "    lint          - Lint all code (Go + Rust)"
 	@echo "    coverage      - Generate test coverage reports"
+	@echo ""
+	@echo "  Setup Commands:"
+	@echo "    setup-browser-tests - Install browser testing dependencies"
+	@echo "    setup-all     - Setup all project dependencies"
 	@echo ""
 	@echo "  Testing Commands:"
 	@echo "    test          - Run all tests (Go + MCP + Console + Browser)"
@@ -145,6 +149,7 @@ install-system: build
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf bin/ target/ coverage*.out coverage*.html
+	@rm -rf node_modules/ playwright-report/ test-results/
 	@go clean -cache -testcache
 	@cargo clean
 	@echo "✅ Clean complete"
@@ -173,7 +178,7 @@ test-console: build kill
 	@echo "🧪 Testing console server functionality..."
 	@./bin/ftl dev console --port 8080 2>&1 | head -20 | grep -q "Starting server on port" && echo "✅ Console mode starts" || echo "❌ Console mode failed"
 
-test-browser: build kill
+test-browser: build kill setup-browser-tests
 	@echo "🧪 Starting FTL dev console for browser tests..."
 	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
@@ -210,6 +215,21 @@ kill:
 	@pkill -f "ftl dev" || true
 	@lsof -ti:8080,8081,8082,8083,8084,8085,8086,8087,8088,8089 | xargs kill -9 2>/dev/null || true
 	@echo "✅ All FTL processes killed"
+
+# Setup browser testing dependencies
+setup-browser-tests:
+	@echo "📦 Setting up browser test dependencies..."
+	@if command -v npm >/dev/null 2>&1; then \
+		npm run setup; \
+		echo "✅ Browser test dependencies ready"; \
+	else \
+		echo "⚠️  npm not installed"; \
+		echo "   Install Node.js from: https://nodejs.org/"; \
+	fi
+
+# Setup all project dependencies
+setup-all: setup-browser-tests
+	@echo "🔧 All dependencies configured"
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser

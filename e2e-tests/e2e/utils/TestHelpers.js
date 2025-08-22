@@ -82,7 +82,7 @@ language = "go"
 
     static async takeScreenshot(page, name) {
         await page.screenshot({ 
-            path: `tests/e2e/screenshots/${name}.png`,
+            path: `e2e-tests/e2e/screenshots/${name}.png`,
             fullPage: true 
         });
     }

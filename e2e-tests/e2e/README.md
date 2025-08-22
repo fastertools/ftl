@@ -5,7 +5,7 @@ This test suite uses Playwright with the Page Object Model pattern for better or
 ## Structure
 
 ```
-tests/e2e/
+e2e-tests/e2e/
 ├── pages/           # Page Object classes
 │   ├── DashboardPage.js
 │   └── ProjectSidebarPage.js
@@ -32,7 +32,7 @@ npx playwright test --headed
 npx playwright test --debug
 
 # Run specific test file
-npx playwright test tests/e2e/specs/dashboard.spec.js
+npx playwright test e2e-tests/e2e/specs/dashboard.spec.js
 
 # View test report
 npx playwright show-report

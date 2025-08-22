@@ -5,7 +5,7 @@ const { defineConfig, devices } = require('@playwright/test');
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
-  testDir: './tests/e2e/specs',
+  testDir: './e2e-tests/e2e/specs',
   timeout: 30 * 1000,
   expect: {
     timeout: 5000

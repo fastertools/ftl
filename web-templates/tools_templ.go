@@ -42,7 +42,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(hash)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 10, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 10, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -70,7 +70,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(tool.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 20, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 20, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -88,7 +88,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tool.Description)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 22, Col: 77}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 22, Col: 77}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -111,7 +111,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/tool-params/%d", i))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 27, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 27, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -124,7 +124,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#tool-params-%d", i))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 28, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 28, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -142,7 +142,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("tool-params-%d", i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 37, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 37, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -200,7 +200,7 @@ func ToolParams(tool *mcpclient.Tool, index int) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%+v", tool.InputSchema))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/tools.templ`, Line: 50, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `tools.templ`, Line: 50, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {

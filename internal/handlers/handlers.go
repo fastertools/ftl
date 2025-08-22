@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fastertools/ftl/templates"
+	"github.com/fastertools/ftl/web-templates"
 	"github.com/fastertools/ftl/internal/mcpclient"
 	"github.com/fastertools/ftl/internal/models"
 	"github.com/fastertools/ftl/internal/parser"

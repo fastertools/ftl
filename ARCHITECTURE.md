@@ -21,17 +21,21 @@ ftl/
 │   ├── api/               # FTL Engine API client
 │   ├── auth/              # Authentication and credential management
 │   ├── cli/               # Command implementations
-│   ├── ftl/               # Core FTL business logic
+│   ├── console/           # Web console handlers and logic
+│   ├── handlers/          # HTTP request handlers
+│   ├── mcp/               # MCP server implementation
+│   ├── polling/           # Real-time polling and state management
 │   ├── scaffold/          # Project scaffolding and templates
+│   ├── state/             # Application state management
 │   └── synthesis/         # Configuration synthesis (YAML/JSON/CUE → Spin)
-│
-├── pkg/                    # Public Go packages (can be imported by other projects)
-│   ├── types/             # Shared data structures and manifest types
-│   └── spin/              # Spin framework executor and utilities
 │
 ├── components/             # WebAssembly MCP components (Rust)
 │   ├── mcp-authorizer/    # Authorization component for MCP servers
 │   └── mcp-gateway/       # Gateway component for MCP servers
+│
+├── mcp-server/             # Standalone MCP server for ftl CLI integration
+│   ├── main.go            # MCP server entry point
+│   └── tools/             # MCP tool implementations
 │
 ├── sdk/                    # Multi-language SDKs for building MCP tools
 │   ├── rust/              # Rust SDK
@@ -40,13 +44,22 @@ ftl/
 │   ├── typescript/        # TypeScript SDK
 │   └── go/                # Go SDK
 │
-├── templates/              # Quick-start templates for new projects
+├── web-templates/          # Templ web UI templates for console dashboard
+├── static/                 # Static web assets (logos, CSS, JS)
+├── e2e-tests/              # End-to-end browser tests (Playwright)
+│   └── e2e/
+│       ├── specs/         # Test specifications
+│       ├── pages/         # Page object models
+│       └── utils/         # Test utilities
+│
 ├── examples/               # Example applications and use cases
 ├── docs/                   # Documentation
 │
+├── package.json            # Node.js dependencies for browser testing
+├── playwright.config.js    # Playwright test configuration
 ├── go.mod                  # Go module definition (single module)
 ├── Cargo.toml             # Rust workspace configuration
-└── Makefile               # Build orchestration
+└── Makefile               # Build orchestration (polyglot entry point)
 ```
 
 ## Component Architecture
@@ -66,6 +79,8 @@ The CLI is the primary user interface for FTL. Written in Go for:
 - Deploying to FTL Engine or other platforms
 - Managing authentication and credentials
 - Synthesizing configurations (YAML/JSON/CUE → Spin manifests)
+- Web-based development console with real-time project management
+- MCP server integration for AI agent tooling
 
 ### 2. WebAssembly Components (Rust)
 
@@ -89,6 +104,42 @@ SDKs enable developers to build MCP tools in their preferred language:
 - **Go SDK**: For cloud-native and DevOps tools
 
 Each SDK compiles to WebAssembly using language-specific toolchains.
+
+### 4. Development Console (Web UI)
+
+The FTL CLI includes a web-based development console for project management:
+
+**Technology Stack:**
+- **Templ**: Type-safe Go HTML templating
+- **HTMX**: Dynamic UI interactions without JavaScript frameworks
+- **Go HTTP Server**: Integrated web server with real-time polling
+
+**Features:**
+- Multi-project management with switching
+- Real-time command execution and output streaming
+- Live log monitoring with auto-refresh
+- Project status tracking and build management
+- Integration with MCP server for AI agent tooling
+
+**Benefits:**
+- **Zero Dependencies**: No Node.js build pipeline required
+- **Type Safety**: Templ provides compile-time HTML validation
+- **Performance**: Server-side rendering with minimal client-side JavaScript
+- **Integration**: Direct access to FTL CLI functionality
+
+### 5. MCP Server Integration
+
+Standalone MCP (Model Context Protocol) server for AI agent integration:
+
+**Purpose:**
+- Exposes FTL CLI functionality as MCP tools
+- Enables AI agents to manage FTL projects
+- Provides structured interface for automation
+
+**Key Tools:**
+- Project lifecycle management (build, up, logs)
+- Status monitoring and health checks
+- Command execution with structured responses
 
 ## Key Design Decisions
 
@@ -115,6 +166,21 @@ Each SDK compiles to WebAssembly using language-specific toolchains.
 3. **Use Case Optimization**: Different languages excel at different tasks
 4. **WebAssembly Compatibility**: All compile to WASM via Component Model
 
+### Why Templ + HTMX for the Console?
+
+1. **Type Safety**: Templ provides compile-time HTML validation within Go
+2. **Zero Build Pipeline**: No Node.js, webpack, or complex frontend tooling
+3. **Performance**: Server-side rendering with minimal client-side JavaScript
+4. **Simplicity**: HTMX enables dynamic UIs with HTML attributes
+5. **Integration**: Direct access to Go CLI functionality without APIs
+
+### Why Separate Directory Structure?
+
+1. **Clarity**: `/e2e-tests/` clearly indicates browser tests, not unit tests
+2. **Purpose**: `/web-templates/` distinguishes UI templates from scaffolding templates
+3. **Organization**: `/mcp-server/` separates standalone MCP server from CLI
+4. **Maintainability**: Clear separation of concerns reduces cognitive load
+
 ## Data Flow
 
 ```
@@ -138,11 +204,25 @@ User → FTL CLI (Go) → Configuration Files (YAML/JSON/CUE)
 
 ## Development Workflow
 
+### For MCP Tool Development:
 1. **Choose Language**: Select SDK based on use case
 2. **Write Tool**: Implement MCP tool using SDK
 3. **Build**: Compile to WebAssembly component
 4. **Compose**: Combine multiple tools into single MCP server
 5. **Deploy**: Run locally or deploy to edge network
+
+### For FTL CLI Development:
+1. **Setup**: Run `make setup-all` for complete environment setup
+2. **Development**: Use `make dev` for quick build and test cycle
+3. **Console Testing**: Use `ftl dev console` for web UI development
+4. **Integration Testing**: Run `make test-browser` for end-to-end tests
+5. **Full Testing**: Run `make test` for comprehensive test suite
+
+### Testing Strategy:
+- **Unit Tests**: Go and Rust tests for individual components
+- **Integration Tests**: MCP server functionality testing
+- **E2E Tests**: Playwright tests for web console functionality
+- **Component Tests**: WebAssembly component testing with Spin
 
 ## Future Directions
 
@@ -159,6 +239,17 @@ This architecture is designed to be extensible. Key extension points:
 1. **New SDKs**: Add support for additional languages
 2. **New Components**: Build reusable MCP components
 3. **CLI Commands**: Extend CLI with new functionality
-4. **Synthesis Formats**: Support additional configuration formats
+4. **Console Features**: Add new web UI capabilities
+5. **MCP Tools**: Extend MCP server with new tool integrations
+6. **Synthesis Formats**: Support additional configuration formats
+7. **Testing**: Add new test scenarios for browser or integration testing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+### Key Files for Contributors:
+- `Makefile`: Build orchestration and task automation
+- `internal/cli/`: CLI command implementations
+- `web-templates/`: Web console UI templates
+- `mcp-server/tools/`: MCP tool implementations
+- `e2e-tests/`: Browser testing specifications
+- `components/`: WebAssembly component development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup and guidelines.
