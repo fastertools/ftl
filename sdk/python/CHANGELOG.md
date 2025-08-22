@@ -5,6 +5,18 @@ All notable changes to the FTL Python SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.11.0 (2025-08-22)
+
+## What's Changed
+* chore(main): release  cli v0.11.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/264
+* chore(main): release  sdk-rust v0.11.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/274
+* chore(main): release  v0.11.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/271
+* chore(main): release  sdk-typescript v0.11.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/277
+* chore(main): release  sdk-rust v0.11.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/278
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/sdk-python-v0.10.0...sdk-python-v0.11.0
+
 ## [Unreleased]
 
 ### Added
