@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "ftl-sdk-macros",
  "pretty_assertions",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk-macros"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -774,7 +774,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "mcp-authorizer"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-authorizer-tests"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "chrono",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-gateway"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "ftl-sdk",
@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-gateway-tests"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ftl-sdk",
  "futures",
