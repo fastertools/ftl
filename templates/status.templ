@@ -1,0 +1,27 @@
+package templates
+
+import "fmt"
+
+// StatusPanel displays real-time process status and monitoring
+templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus ServerStatus) {
+	<div>
+		<h2 class="text-lg font-semibold mb-4 text-white">Status Monitor</h2>
+		
+		<div class="space-y-4">
+			<!-- Process Status -->
+			<div>
+				<div id="ftl-status" 
+					 hx-post="/htmx/status/poll" 
+					 hx-trigger="load, every 3s" 
+					 hx-swap="innerHTML"
+					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
+					 class="space-y-3">
+					<!-- Initial loading state - will be replaced by HTMX -->
+					<div class="text-center py-4" style="color: #a0a0a0;">
+						<div class="animate-pulse">Loading process status...</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}

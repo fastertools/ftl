@@ -1,0 +1,84 @@
+package templates
+
+// ControlPanel provides FTL control buttons and forms with HTMX integration
+templ ControlPanel(project Project) {
+	<div>
+		<h2 class="text-lg font-semibold mb-4 text-white">Control Panel</h2>
+		
+		<div class="space-y-4">
+			<!-- Simplified FTL Operations -->
+			<div class="p-4 rounded-lg" style="background-color: #333333;">
+				<div class="grid grid-cols-4 gap-3">
+					<!-- Build Button -->
+					<form hx-post="/mcp" hx-target="#ftl-output">
+						<input type="hidden" name="action" value="build"/>
+						<input type="hidden" name="project-path" value={ project.Path }/>
+						<button 
+							type="submit"
+							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
+							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
+							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+						>
+							Build
+						</button>
+					</form>
+					
+					<!-- Up Button -->
+					<form hx-post="/mcp" hx-target="#ftl-output">
+						<input type="hidden" name="regular-project-path" value={ project.Path }/>
+						<button 
+							type="submit"
+							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
+							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
+							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+						>
+							Up
+						</button>
+					</form>
+					
+					<!-- Watch Button -->
+					<form hx-post="/mcp" hx-target="#ftl-output">
+						<input type="hidden" name="watch-project-path" value={ project.Path }/>
+						<button 
+							type="submit"
+							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
+							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
+							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+						>
+							Watch
+						</button>
+					</form>
+					
+					<!-- Stop Button -->
+					<button 
+						hx-post="/mcp"
+						hx-target="#ftl-output"
+						hx-vals='{"stop": "true"}'
+						hx-include="[name='project-path']"
+						class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+						style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
+						onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
+						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+					>
+						Stop
+					</button>
+				</div>
+			</div>
+			
+			<!-- Command Output -->
+			<div class="border-t pt-4" style="border-color: #3a3a3a;">
+				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Command Output</h3>
+				<div 
+					id="ftl-output" 
+					class="bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden"
+					style="min-height: 100px; max-height: 150px; overflow-y: auto;"
+				>
+					Ready to execute commands...
+				</div>
+			</div>
+		</div>
+	</div>
+}

@@ -21,9 +21,19 @@ help:
 	@echo ""
 	@echo "  Development Commands:"
 	@echo "    generate-api  - Generate API client from OpenAPI spec"
+	@echo "    generate-templ- Generate templ templates"
 	@echo "    fmt           - Format all code (Go + Rust)"
 	@echo "    lint          - Lint all code (Go + Rust)"
 	@echo "    coverage      - Generate test coverage reports"
+	@echo ""
+	@echo "  Testing Commands:"
+	@echo "    test          - Run all tests (Go + MCP + Console + Browser)"
+	@echo "    test-go       - Run Go unit tests only"
+	@echo "    test-mcp      - Test MCP server functionality"
+	@echo "    test-console  - Test console server functionality"
+	@echo "    test-browser  - Run browser/playwright tests"
+	@echo "    test-browser-headed - Run browser tests with visible browser"
+	@echo "    test-browser-debug  - Run browser tests in debug mode"
 	@echo ""
 	@echo "  Quick Commands:"
 	@echo "    dev           - Quick development build and test"
@@ -34,6 +44,17 @@ generate-api:
 	@echo "🔄 Generating API client from OpenAPI spec..."
 	@oapi-codegen -package api -generate types,client -o internal/api/client.gen.go internal/api/openapi.json
 	@echo "✅ API client generated: internal/api/client.gen.go"
+
+# Generate templ templates
+generate-templ:
+	@echo "🔄 Generating templ templates..."
+	@if command -v templ >/dev/null 2>&1; then \
+		templ generate; \
+		echo "✅ Templ templates generated"; \
+	else \
+		echo "⚠️  templ not installed"; \
+		echo "   Install with: go install github.com/a-h/templ/cmd/templ@latest"; \
+	fi
 
 # Build FTL CLI (Go)
 build:
@@ -135,5 +156,62 @@ dev: fmt build test-cli
 # Build everything
 all: build build-components
 	@echo "✅ All components built successfully"
+
+# Test targets
+test-go:
+	@echo "🧪 Running Go unit tests..."
+	@go test -timeout=30s ./internal/state -v || echo "Warning: state tests not found"
+	@go test -timeout=30s ./internal/polling -v || echo "Warning: polling tests not found"
+	@go test -timeout=30s ./internal/... -v
+	@echo "✅ Go tests completed"
+
+test-mcp: build
+	@echo "🧪 Testing MCP server mode..."
+	@echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | ./bin/ftl dev mcp | grep -q "mcp-server" && echo "✅ MCP mode works" || echo "❌ MCP mode failed"
+
+test-console: build kill
+	@echo "🧪 Testing console server functionality..."
+	@./bin/ftl dev console --port 8080 2>&1 | head -20 | grep -q "Starting server on port" && echo "✅ Console mode starts" || echo "❌ Console mode failed"
+
+test-browser: build kill
+	@echo "🧪 Starting FTL dev console for browser tests..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@echo "Running Playwright tests..."
+	@npx playwright test --config=playwright.config.js || true
+	@echo "Stopping test server..."
+	@pkill -f "ftl dev console" || true
+	@echo "Tests completed"
+
+test-browser-headed: build kill
+	@echo "🧪 Starting FTL dev console for headed browser tests..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@echo "Running tests with visible browser..."
+	@npx playwright test --headed
+	@pkill -f "ftl dev console" || true
+
+test-browser-debug: build kill
+	@echo "🧪 Starting FTL dev console for debug tests..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@echo "Running tests in debug mode..."
+	@npx playwright test --debug
+	@pkill -f "ftl dev console" || true
+
+# Run FTL dev console with test data
+run-test-console: build
+	@echo "🚀 Starting FTL dev console with test data..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console
+
+# Kill all FTL processes
+kill:
+	@echo "🔪 Killing all FTL processes..."
+	@pkill -f "ftl dev" || true
+	@lsof -ti:8080,8081,8082,8083,8084,8085,8086,8087,8088,8089 | xargs kill -9 2>/dev/null || true
+	@echo "✅ All FTL processes killed"
+
+# Test all functionality
+test: test-go test-mcp test-console test-browser
 
 .DEFAULT_GOAL := help

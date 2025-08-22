@@ -1,0 +1,132 @@
+package templates
+
+// No additional imports needed for ActivityPanel
+
+// ActivityPanel displays recent activity and logs with live polling in a tabbed interface
+templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []CommandOutput) {
+	<div>
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-semibold text-white">Activity</h2>
+		</div>
+		
+		<!-- Tab Navigation -->
+		<div class="flex border-b" style="border-color: #3a3a3a;">
+			<button 
+				id="logs-tab"
+				class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white"
+				onclick="switchTab('logs')"
+			>
+				Live Logs
+			</button>
+			<button 
+				id="commands-tab"
+				class="px-4 py-2 text-sm font-medium border-b-2 border-transparent"
+				style="color: #a0a0a0;"
+				onclick="switchTab('commands')"
+			>
+				Command Output
+			</button>
+		</div>
+		
+		<!-- Tab Content -->
+		<div id="tab-content" class="mt-4">
+			<!-- Live Logs Tab (default) -->
+			<div id="logs-content">
+				<div 
+					id="live-log-content" 
+					class="bg-black rounded-lg p-3 font-mono text-xs overflow-hidden"
+					style="min-height: 200px; max-height: 350px; overflow-y: auto;"
+					hx-post="/htmx/logs/poll"
+					hx-trigger="every 2s"
+					hx-include="[name='project_path']"
+					hx-target="this"
+					hx-swap="beforeend"
+				>
+					if len(recentLogs) > 0 {
+						for _, logEntry := range recentLogs {
+							<div class="text-green-400">{ logEntry.Message }</div>
+						}
+					} else {
+						<div class="text-green-400">Waiting for log output...</div>
+					}
+				</div>
+				<!-- Hidden input for project path -->
+				<input type="hidden" name="project_path" value={ project.Path }/>
+				
+				<!-- Log Controls -->
+				<div class="mt-3 flex items-center justify-between">
+					<div class="flex items-center space-x-2">
+						<button 
+							onclick="document.getElementById('live-log-content').innerHTML = ''" 
+							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
+							style="color: #a0a0a0;"
+						>
+							Clear
+						</button>
+						<button 
+							onclick="document.getElementById('live-log-content').scrollTop = document.getElementById('live-log-content').scrollHeight" 
+							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
+							style="color: #a0a0a0;"
+						>
+							Scroll to Bottom
+						</button>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Command Output Tab (hidden by default) -->
+			<div id="commands-content" style="display: none;">
+				<div 
+					id="ftl-output"
+					class="bg-black rounded-lg p-3 font-mono text-xs overflow-hidden"
+					style="min-height: 200px; max-height: 350px; overflow-y: auto;"
+				>
+					if len(commandHistory) > 0 {
+						for _, cmd := range commandHistory {
+							<div class="mb-2">
+								<div class="text-yellow-400">&gt; { cmd.Command }</div>
+								<div class="text-green-400 whitespace-pre-wrap">{ cmd.Output }</div>
+							</div>
+						}
+					} else {
+						<div class="text-green-400">Ready to execute commands...</div>
+					}
+				</div>
+			</div>
+		</div>
+		
+		<!-- Tab switching script -->
+		<script>
+			function switchTab(tab) {
+				// Hide all content
+				document.getElementById('logs-content').style.display = 'none';
+				document.getElementById('commands-content').style.display = 'none';
+				
+				// Reset all tab styles
+				document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
+				document.getElementById('logs-tab').style.color = '#a0a0a0';
+				document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
+				document.getElementById('commands-tab').style.color = '#a0a0a0';
+				
+				// Show selected content and update tab style
+				if (tab === 'logs') {
+					document.getElementById('logs-content').style.display = 'block';
+					document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+					document.getElementById('logs-tab').style.color = '';
+				} else if (tab === 'commands') {
+					document.getElementById('commands-content').style.display = 'block';
+					document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+					document.getElementById('commands-tab').style.color = '';
+				}
+			}
+			
+			// Listen for HTMX events to auto-switch to command tab when commands are executed
+			document.body.addEventListener('htmx:afterRequest', function(evt) {
+				if (evt.detail.target && evt.detail.target.id === 'ftl-output') {
+					switchTab('commands');
+				}
+			});
+		</script>
+	</div>
+}
+

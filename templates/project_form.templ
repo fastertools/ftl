@@ -1,0 +1,185 @@
+package templates
+
+// AddProjectForm renders the inline form for adding a new project
+templ AddProjectForm() {
+	<div id="add-project-container" class="mt-2">
+		<form 
+			hx-post="/htmx/project/add"
+			hx-target="#project-list"
+			hx-swap="innerHTML"
+			class="space-y-2 p-3 bg-gray-800 rounded-md"
+		>
+			<div>
+				<input 
+					type="text" 
+					name="name" 
+					placeholder="Project name"
+					required
+					class="w-full px-2 py-1 text-sm bg-gray-900 text-white rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
+				/>
+			</div>
+			<div>
+				<input 
+					type="text" 
+					name="path" 
+					placeholder="/path/to/project"
+					required
+					class="w-full px-2 py-1 text-sm bg-gray-900 text-white rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
+				/>
+			</div>
+			<div class="flex space-x-2">
+				<button 
+					type="submit"
+					class="flex-1 px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+				>
+					Add
+				</button>
+				<button 
+					type="button"
+					hx-get="/htmx/project/cancel-form"
+					hx-target="#add-project-container"
+					hx-swap="outerHTML"
+					class="flex-1 px-2 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+				>
+					Cancel
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
+// AddProjectButton renders the default add project button
+templ AddProjectButton() {
+	<div id="add-project-container">
+		<button 
+			id="add-project-btn"
+			hx-get="/htmx/project/add-form"
+			hx-target="#add-project-container"
+			hx-swap="outerHTML"
+			class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group"
+		>
+			<div class="flex items-center group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">
+				<span class="w-2 h-2 border border-gray-500 group-hover:border-white rounded-full mr-2 transition-colors duration-200"></span>
+				<span>+ Add Project</span>
+			</div>
+		</button>
+	</div>
+}
+
+// ProjectList renders the updated project list after add/remove operations
+templ ProjectList(projects []Project, currentProjectPath string) {
+	<div id="project-list" class="space-y-1">
+		<!-- Render existing projects -->
+		for _, project := range projects {
+			if project.Path == currentProjectPath {
+				<div class="px-3 py-2 text-sm rounded-md" style="background-color: #333333;">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center">
+							if project.FTLRunning || project.WatchRunning {
+								<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+							} else {
+								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+							}
+							<span style="color: #ffffff;">{ project.Name }</span>
+						</div>
+						<button 
+							hx-delete={ "/htmx/project/remove?path=" + project.Path }
+							hx-target="#project-list"
+							hx-swap="innerHTML"
+							hx-confirm="Remove this project?"
+							class="text-red-400 hover:text-red-300 text-xs"
+						>
+							×
+						</button>
+					</div>
+				</div>
+			} else {
+				<div class="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-800 transition-colors">
+					<button 
+						hx-post={ "/htmx/project/switch?path=" + project.Path }
+						hx-target="#main-container"
+						hx-swap="innerHTML"
+						class="flex-1 text-left flex items-center"
+					>
+						if project.FTLRunning || project.WatchRunning {
+							<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+						} else {
+							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+						}
+						<span style="color: #a0a0a0;">{ project.Name }</span>
+					</button>
+					<button 
+						hx-delete={ "/htmx/project/remove?path=" + project.Path }
+						hx-target="#project-list"
+						hx-swap="innerHTML"
+						hx-confirm="Remove this project?"
+						class="text-red-400 hover:text-red-300 text-xs ml-2"
+					>
+						×
+					</button>
+				</div>
+			}
+		}
+		
+		<!-- Add Project Button/Form -->
+		@AddProjectButton()
+	</div>
+}
+
+// ProjectListContents renders just the contents for HTMX updates
+templ ProjectListContents(projects []Project, currentProjectPath string) {
+	<!-- Render existing projects -->
+	for _, project := range projects {
+		if project.Path == currentProjectPath {
+			<div class="px-3 py-2 text-sm rounded-md" style="background-color: #333333;">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center">
+						if project.FTLRunning || project.WatchRunning {
+							<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+						} else {
+							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+						}
+						<span style="color: #ffffff;">{ project.Name }</span>
+					</div>
+					<button 
+						hx-delete={ "/htmx/project/remove?path=" + project.Path }
+						hx-target="#project-list"
+						hx-swap="innerHTML"
+						hx-confirm="Remove this project?"
+						class="text-red-400 hover:text-red-300 text-xs"
+					>
+						×
+					</button>
+				</div>
+			</div>
+		} else {
+			<div class="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group">
+				<button 
+					hx-post={ "/htmx/project/switch?path=" + project.Path }
+					hx-target="#main-container"
+					hx-swap="innerHTML"
+					class="flex-1 text-left flex items-center group-hover:scale-105 transition-transform duration-200"
+				>
+					if project.FTLRunning || project.WatchRunning {
+						<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+					} else {
+						<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+					}
+					<span class="group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">{ project.Name }</span>
+				</button>
+				<button 
+					hx-delete={ "/htmx/project/remove?path=" + project.Path }
+					hx-target="#project-list"
+					hx-swap="innerHTML"
+					hx-confirm="Remove this project?"
+					class="text-red-400 hover:text-red-300 text-xs ml-2"
+				>
+					×
+				</button>
+			</div>
+		}
+	}
+	
+	<!-- Add Project Button/Form -->
+	@AddProjectButton()
+}

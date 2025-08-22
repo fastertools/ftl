@@ -1,0 +1,42 @@
+package templates
+
+// SidebarWithProjects renders the sidebar with project list from state.Project
+templ SidebarWithProjects(projects []Project, currentProjectPath string) {
+	// Convert Project to state.Project for internal use
+	@SidebarInternal(projects, currentProjectPath)
+}
+
+// SidebarInternal renders the project navigation sidebar with dynamic project list
+templ SidebarInternal(projects []Project, currentProjectPath string) {
+	<div class="flex flex-col h-full">
+		<!-- Logo/Brand -->
+		<div class="p-6 border-b" style="border-color: #3a3a3a;">
+			<div class="flex items-center">
+				<div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+					<span class="text-white font-bold text-sm">FTL</span>
+				</div>
+				<span class="text-white font-semibold">Control Center</span>
+			</div>
+		</div>
+		
+		<!-- Navigation -->
+		<nav class="flex-1 p-4">
+			<div class="space-y-2">
+				<!-- Project List -->
+				<div class="mt-8">
+					<h3 class="text-xs font-medium uppercase tracking-wider mb-3" style="color: #a0a0a0;">
+						Projects
+					</h3>
+					@ProjectList(projects, currentProjectPath)
+				</div>
+			</div>
+		</nav>
+		
+		<!-- Status Footer -->
+		<div class="p-4 border-t" style="border-color: #3a3a3a;">
+			<div class="text-xs" style="color: #a0a0a0;">
+				<span>Stuff</span>
+			</div>
+		</div>
+	</div>
+}

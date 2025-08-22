@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-
 	"github.com/fastertools/ftl/internal/cli"
 )
 
@@ -19,6 +17,7 @@ func main() {
 
 	// Execute the root command
 	if err := cli.Execute(); err != nil {
-		os.Exit(1)
+		// Print error using our Error function (no help text)
+		cli.Fatal("%v", err)
 	}
 }

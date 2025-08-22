@@ -3,6 +3,13 @@
 .mnemic
 .agent
 
+#Playwright
+test_data
+playwright-report
+test-results
+test_projects
+projects.json
+
 # Rust build artifacts
 target/
 Cargo.lock.bak

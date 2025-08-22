@@ -1,0 +1,46 @@
+package templates
+
+import "fmt"
+
+// InfoPanel displays project information and server details
+templ InfoPanel(project Project, serverStatus ServerStatus) {
+	<div>
+		<h2 class="text-lg font-semibold mb-4 text-white">Project Info</h2>
+		
+		<div class="space-y-4">
+			<!-- Project Details -->
+			<div>
+				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Project Details</h3>
+				<div class="space-y-2">
+					<div class="flex justify-between">
+						<span class="text-sm" style="color: #a0a0a0;">Name</span>
+						<span class="text-sm text-white font-medium">{ project.Name }</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-sm" style="color: #a0a0a0;">Path</span>
+						<span class="text-sm text-white font-mono text-xs">{ project.Path }</span>
+					</div>
+					<div id="port-display" class="flex justify-between">
+						if serverStatus.Running && serverStatus.Port > 0 {
+							<span class="text-sm" style="color: #a0a0a0;">Port</span>
+							<span class="text-sm text-white font-mono">{ fmt.Sprintf("%d", serverStatus.Port) }</span>
+						}
+					</div>
+				</div>
+			</div>
+			
+			<!-- Tools Section -->
+			<div class="border-t pt-4" style="border-color: #3a3a3a;">
+				<div id="tools-section"
+					 hx-get="/tools-list"
+					 hx-trigger="load, every 3s"
+					 hx-swap="innerHTML"
+					 hx-vals='js:{tools_hash: document.querySelector("#tools-section [data-tools-hash]")?.dataset.toolsHash || ""}'>
+					<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Available Tools</h3>
+					<div class="text-sm" style="color: #666666;">Loading tools...</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+

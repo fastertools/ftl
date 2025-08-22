@@ -38,6 +38,8 @@ var rootCmd = &cobra.Command{
 	Long: `FTL is a comprehensive toolkit for building, composing, and deploying 
 AI tools on WebAssembly. It provides everything you need to create secure,
 high-performance MCP servers that can run anywhere.`,
+	SilenceUsage:  true, // Don't show usage on errors
+	SilenceErrors: true, // Don't print errors automatically (we handle them)
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if noColor {
 			color.NoColor = true
@@ -88,6 +90,7 @@ func init() {
 		newStatusCmd(),
 		newDeleteCmd(),
 		newLogsCmd(),
+		newDevCmd(),
 	)
 }
 
