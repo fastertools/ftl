@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.2 (2025-08-22)
+
+## What's Changed
+* chore(main): release  sdk-rust v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/285
+* chore(main): release  sdk-typescript v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/286
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.11.1...v0.11.2
+
 ## 0.11.1 (2025-08-22)
 
 ## What's Changed
