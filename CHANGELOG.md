@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1 (2025-08-22)
+
+## What's Changed
+* chore(main): release  component-mcp-authorizer v0.12.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/294
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.12.0...v0.12.1
+
 ## 0.12.0 (2025-08-22)
 
 ## What's Changed
