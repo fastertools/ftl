@@ -29,12 +29,12 @@ The Rust SDK consists of two crates that MUST maintain version parity:
 - Post-release workflow syncs versions if needed
 
 #### Scaffold Versions
-The `internal/scaffold/versions.json` file cannot be updated by release-please due to path traversal limitations.
+The scaffold system now reads versions directly from `.release-please-manifest.json`, eliminating version synchronization issues.
 
 **Solution**:
-- Accept version mismatch during release PRs
-- Post-release workflow updates scaffold versions
-- Validation workflow is lenient for release PRs
+- `scaffold.go` embeds the manifest at build time via `go:generate`
+- No separate versions.json file to maintain
+- Single source of truth for all versions
 
 ## Release Process
 
@@ -57,7 +57,6 @@ The `internal/scaffold/versions.json` file cannot be updated by release-please d
 - Publishes packages
 
 ### 5. Post-release sync
-- Updates scaffold versions
 - Syncs Rust crate versions if needed
 - Creates follow-up PR with updates
 
@@ -69,9 +68,9 @@ The `internal/scaffold/versions.json` file cannot be updated by release-please d
 3. Cannot use `../` in paths (security restriction)
 
 ### Our accommodations
-1. Scaffold versions lag behind until post-release sync
-2. Rust crates require manual version alignment
-3. Validation is lenient for release PRs
+1. Rust crates require post-release version alignment
+2. Validation is lenient for release PRs
+3. Manifest is embedded at build time via go:generate
 
 ## Troubleshooting
 
@@ -84,9 +83,9 @@ grep "^version" sdk/rust/Cargo.toml sdk/rust-macros/Cargo.toml
 ```
 
 ### Scaffold Version Out of Sync
-**Problem**: `internal/scaffold/versions.json` has old versions
+**Problem**: Scaffold uses old versions from manifest
 
-**Solution**: This is expected during releases. Post-release workflow will sync.
+**Solution**: The manifest is embedded at build time. Run `make build` to update.
 
 ### Release PR Won't Generate
 **Problem**: No release PR appears after commits

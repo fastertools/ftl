@@ -187,7 +187,7 @@ SDKs are configured to maintain version parity through the `linked-versions` plu
 The following files track versions and are automatically updated:
 
 1. **`.release-please-manifest.json`**: Source of truth for all component versions
-2. **`internal/scaffold/versions.json`**: Template versions for `ftl init`
+2. **`.release-please-manifest.json`**: Central version tracking (used by scaffold)
 3. **Language-specific files**:
    - `Cargo.toml` for Rust
    - `package.json` for TypeScript
@@ -328,7 +328,6 @@ If automation fails, follow these steps:
 1. **Update versions manually**:
    ```bash
    # Edit .release-please-manifest.json
-   # Edit internal/scaffold/versions.json
    # Update language-specific files
    ```
 

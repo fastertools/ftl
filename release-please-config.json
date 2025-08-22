@@ -6,18 +6,66 @@
   "include-v-in-tag": true,
   "tag-separator": "-",
   "changelog-sections": [
-    {"type": "feat", "section": "Features", "hidden": false},
-    {"type": "fix", "section": "Bug Fixes", "hidden": false},
-    {"type": "perf", "section": "Performance Improvements", "hidden": false},
-    {"type": "refactor", "section": "Code Refactoring", "hidden": false},
-    {"type": "deps", "section": "Dependencies", "hidden": false},
-    {"type": "docs", "section": "Documentation", "hidden": false},
-    {"type": "test", "section": "Tests", "hidden": false},
-    {"type": "build", "section": "Build System", "hidden": false},
-    {"type": "ci", "section": "Continuous Integration", "hidden": false},
-    {"type": "chore", "section": "Miscellaneous Chores", "hidden": true},
-    {"type": "style", "section": "Styles", "hidden": true},
-    {"type": "revert", "section": "Reverts", "hidden": false}
+    {
+      "type": "feat",
+      "section": "Features",
+      "hidden": false
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes",
+      "hidden": false
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements",
+      "hidden": false
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring",
+      "hidden": false
+    },
+    {
+      "type": "deps",
+      "section": "Dependencies",
+      "hidden": false
+    },
+    {
+      "type": "docs",
+      "section": "Documentation",
+      "hidden": false
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": false
+    },
+    {
+      "type": "build",
+      "section": "Build System",
+      "hidden": false
+    },
+    {
+      "type": "ci",
+      "section": "Continuous Integration",
+      "hidden": false
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous Chores",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "Styles",
+      "hidden": true
+    },
+    {
+      "type": "revert",
+      "section": "Reverts",
+      "hidden": false
+    }
   ],
   "changelog-type": "github",
   "plugins": [
@@ -62,11 +110,6 @@
       "package-name": "ftl",
       "extra-files": [
         {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.ftl"
-        },
-        {
           "type": "generic",
           "path": "install.sh",
           "glob": "**FTL_VERSION=*"
@@ -82,11 +125,6 @@
       "package-name": "ftl-sdk-go",
       "extra-files": [
         {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.sdk.go"
-        },
-        {
           "type": "generic",
           "path": "sdk/go/README.md"
         }
@@ -99,13 +137,7 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.sdk.rust"
-        }
-      ]
+      "extra-files": []
     },
     "sdk/python": {
       "release-type": "python",
@@ -114,13 +146,7 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.sdk.python"
-        }
-      ]
+      "extra-files": []
     },
     "sdk/typescript": {
       "release-type": "node",
@@ -129,13 +155,7 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "@ftl/sdk",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.sdk.typescript"
-        }
-      ]
+      "extra-files": []
     },
     "components/mcp-gateway": {
       "release-type": "rust",
@@ -145,11 +165,6 @@
       "tag-separator": "-",
       "package-name": "mcp-gateway",
       "extra-files": [
-        {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.components['mcp-gateway']"
-        },
         {
           "type": "toml",
           "path": "components/mcp-gateway/spin.toml",
@@ -166,11 +181,6 @@
       "package-name": "mcp-authorizer",
       "extra-files": [
         {
-          "type": "json",
-          "path": "internal/scaffold/versions.json",
-          "jsonpath": "$.components['mcp-authorizer']"
-        },
-        {
           "type": "toml",
           "path": "components/mcp-authorizer/spin.toml",
           "jsonpath": "$.package.version"
@@ -186,20 +196,29 @@
   "sequential-calls": true,
   "signoff": "FTL Release Bot <releases@fastertools.ai>",
   "include-component-in-tag": true,
-  "include-v-in-tag": true,
   "always-link-local": true,
   "group-priority": [
     {
       "priority": 1000,
-      "groups": ["ftl-sdk-rust", "ftl-sdk-go", "ftl-sdk-python", "ftl-sdk-typescript"]
+      "groups": [
+        "ftl-sdk-rust",
+        "ftl-sdk-go",
+        "ftl-sdk-python",
+        "ftl-sdk-typescript"
+      ]
     },
     {
       "priority": 900,
-      "groups": ["ftl"]
+      "groups": [
+        "ftl"
+      ]
     },
     {
       "priority": 800,
-      "groups": ["mcp-gateway", "mcp-authorizer"]
+      "groups": [
+        "mcp-gateway",
+        "mcp-authorizer"
+      ]
     }
   ],
   "release-search-depth": 100,

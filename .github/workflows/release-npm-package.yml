@@ -47,13 +47,13 @@ jobs:
           fi
           echo "package.json version validated: ${PACKAGE_VERSION}"
           
-          # Check versions.json
-          JSON_VERSION=$(jq -r '.sdk.typescript' internal/scaffold/versions.json)
+          # Check manifest
+          JSON_VERSION=$(jq -r '."sdk/typescript"' .release-please-manifest.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            echo "Version mismatch in manifest: ${JSON_VERSION} != ${VERSION}"
             exit 1
           fi
-          echo "versions.json version validated: ${JSON_VERSION}"
+          echo "Manifest version validated: ${JSON_VERSION}"
           
           # Verify package name
           PACKAGE_NAME=$(node -p "require('./sdk/typescript/package.json').name")

@@ -38,6 +38,8 @@ generate-api:
 # Build FTL CLI (Go)
 build:
 	@echo "🔨 Building FTL CLI..."
+	@echo "📝 Generating embedded files..."
+	@go generate ./...
 	@go build -ldflags "-X github.com/fastertools/ftl/internal/cli.version=$$(git describe --tags --always) \
 		-X github.com/fastertools/ftl/internal/cli.commit=$$(git rev-parse --short HEAD) \
 		-X github.com/fastertools/ftl/internal/cli.buildDate=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \

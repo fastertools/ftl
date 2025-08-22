@@ -65,13 +65,13 @@ jobs:
             echo "__init__.py version validated: ${INIT_VERSION}"
           fi
           
-          # Check versions.json
-          JSON_VERSION=$(jq -r '.sdk.python' internal/scaffold/versions.json)
+          # Check manifest version
+          JSON_VERSION=$(jq -r '."sdk/python"' .release-please-manifest.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            echo "Version mismatch in manifest: ${JSON_VERSION} != ${VERSION}"
             exit 1
           fi
-          echo "versions.json version validated: ${JSON_VERSION}"
+          echo "Manifest version validated: ${JSON_VERSION}"
 
   test-package:
     name: Test Python Package

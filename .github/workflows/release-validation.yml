@@ -9,7 +9,7 @@ on:
       - '**/Cargo.toml'
       - '**/package.json'
       - '**/pyproject.toml'
-      - 'internal/scaffold/versions.json'
+      - '.release-please-manifest.json'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -125,7 +125,7 @@ jobs:
           
           # Validate CLI version
           CLI_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '."cmd/ftl"')
-          CLI_SCAFFOLD=$(jq -r '.ftl' internal/scaffold/versions.json)
+          CLI_SCAFFOLD=$(jq -r '."."' .release-please-manifest.json)
           
           if [[ "$CLI_MANIFEST" != "$CLI_SCAFFOLD" ]]; then
             if [[ "$IS_RELEASE_PR" == "true" ]]; then
@@ -146,7 +146,7 @@ jobs:
           # Validate SDK versions
           for sdk in go rust python typescript; do
             SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"sdk/$sdk\"]")
-            SDK_SCAFFOLD=$(jq -r ".sdk.$sdk" internal/scaffold/versions.json)
+            SDK_SCAFFOLD=$(jq -r ".\"sdk/$sdk\"" .release-please-manifest.json)
             
             if [[ "$SDK_MANIFEST" != "$SDK_SCAFFOLD" ]]; then
               if [[ "$IS_RELEASE_PR" == "true" ]]; then
@@ -167,7 +167,7 @@ jobs:
           # Validate component versions
           for component in mcp-gateway mcp-authorizer; do
             COMP_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"components/$component\"]")
-            COMP_SCAFFOLD=$(jq -r ".components[\"$component\"]" internal/scaffold/versions.json)
+            COMP_SCAFFOLD=$(jq -r ".\"components/$component\"" .release-please-manifest.json)
             
             if [[ "$COMP_MANIFEST" != "$COMP_SCAFFOLD" ]]; then
               if [[ "$IS_RELEASE_PR" == "true" ]]; then
@@ -187,34 +187,64 @@ jobs:
 
       - name: Validate Rust crate versions
         run: |
+          # Check if this is a release PR
+          IS_RELEASE_PR=false
+          if [[ "${{ github.event.pull_request.labels.*.name }}" == *"autorelease: pending"* ]]; then
+            IS_RELEASE_PR=true
+            echo "ℹ️  Release PR detected - Cargo.toml versions may be ahead of manifest"
+          fi
+          
           # Check Rust SDK version
           MANIFEST_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
           CARGO_VERSION=$(grep '^version = ' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
           
           if [[ "$MANIFEST_VERSION" != "$CARGO_VERSION" ]]; then
-            echo "❌ Rust SDK version mismatch:"
-            echo "   Manifest: $MANIFEST_VERSION"
-            echo "   Cargo.toml: $CARGO_VERSION"
-            exit 1
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  Rust SDK version difference (expected for release PR):"
+              echo "   Manifest: $MANIFEST_VERSION"
+              echo "   Cargo.toml: $CARGO_VERSION"
+              
+              # For release PRs, ensure both crates have the same version
+              MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+              if [[ "$CARGO_VERSION" != "$MACROS_VERSION" ]]; then
+                echo "❌ Rust crates must have matching versions in release PR:"
+                echo "   SDK: $CARGO_VERSION"
+                echo "   Macros: $MACROS_VERSION"
+                exit 1
+              fi
+              echo "✅ Both Rust crates at version $CARGO_VERSION for release"
+            else
+              echo "❌ Rust SDK version mismatch:"
+              echo "   Manifest: $MANIFEST_VERSION"
+              echo "   Cargo.toml: $CARGO_VERSION"
+              exit 1
+            fi
+          else
+            # Check Rust macros version matches exactly
+            MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
+            
+            if [[ "$MANIFEST_VERSION" != "$MACROS_VERSION" ]]; then
+              echo "❌ Rust macros version mismatch:"
+              echo "   Expected: $MANIFEST_VERSION"
+              echo "   Actual: $MACROS_VERSION"
+              echo "   These crates must have the same version"
+              exit 1
+            fi
+            
+            echo "✅ Rust crate versions consistent"
+            echo "   SDK: $CARGO_VERSION"
+            echo "   Macros: $MACROS_VERSION"
           fi
-          
-          # Check Rust macros version matches exactly
-          MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-          
-          if [[ "$MANIFEST_VERSION" != "$MACROS_VERSION" ]]; then
-            echo "❌ Rust macros version mismatch:"
-            echo "   Expected: $MANIFEST_VERSION"
-            echo "   Actual: $MACROS_VERSION"
-            echo "   These crates must have the same version"
-            exit 1
-          fi
-          
-          echo "✅ Rust crate versions consistent"
-          echo "   SDK: $CARGO_VERSION"
-          echo "   Macros: $MACROS_VERSION"
 
       - name: Validate Python package version
         run: |
+          # Check if this is a release PR
+          IS_RELEASE_PR=false
+          if [[ "${{ github.event.pull_request.labels.*.name }}" == *"autorelease: pending"* ]]; then
+            IS_RELEASE_PR=true
+            echo "ℹ️  Release PR detected - pyproject.toml version may be ahead of manifest"
+          fi
+          
           MANIFEST_VERSION=$(jq -r '."sdk/python"' .release-please-manifest.json)
           
           # Check pyproject.toml
@@ -224,34 +254,61 @@ jobs:
               config = tomllib.load(f)
               version = config['project']['version']
               expected = '${MANIFEST_VERSION}'
+              is_release_pr = '${IS_RELEASE_PR}'
               if version != expected:
-                  print(f'❌ Python version mismatch: {version} != {expected}')
-                  exit(1)
-          print('✅ Python package version consistent')
+                  if is_release_pr == 'true':
+                      print(f'⚠️  Python version difference (expected for release PR):')
+                      print(f'   Manifest: {expected}')
+                      print(f'   pyproject.toml: {version}')
+                  else:
+                      print(f'❌ Python version mismatch: {version} != {expected}')
+                      exit(1)
+              else:
+                  print('✅ Python package version consistent')
           " || python -c "
           import toml
           config = toml.load('sdk/python/pyproject.toml')
           version = config['project']['version']
           expected = '${MANIFEST_VERSION}'
+          is_release_pr = '${IS_RELEASE_PR}'
           if version != expected:
-              print(f'❌ Python version mismatch: {version} != {expected}')
-              exit(1)
-          print('✅ Python package version consistent')
+              if is_release_pr == 'true':
+                  print(f'⚠️  Python version difference (expected for release PR):')
+                  print(f'   Manifest: {expected}')
+                  print(f'   pyproject.toml: {version}')
+              else:
+                  print(f'❌ Python version mismatch: {version} != {expected}')
+                  exit(1)
+          else:
+              print('✅ Python package version consistent')
           "
 
       - name: Validate TypeScript package version
         run: |
+          # Check if this is a release PR
+          IS_RELEASE_PR=false
+          if [[ "${{ github.event.pull_request.labels.*.name }}" == *"autorelease: pending"* ]]; then
+            IS_RELEASE_PR=true
+            echo "ℹ️  Release PR detected - package.json version may be ahead of manifest"
+          fi
+          
           MANIFEST_VERSION=$(jq -r '."sdk/typescript"' .release-please-manifest.json)
           PACKAGE_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
           
           if [[ "$MANIFEST_VERSION" != "$PACKAGE_VERSION" ]]; then
-            echo "❌ TypeScript version mismatch:"
-            echo "   Manifest: $MANIFEST_VERSION"
-            echo "   package.json: $PACKAGE_VERSION"
-            exit 1
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  TypeScript version difference (expected for release PR):"
+              echo "   Manifest: $MANIFEST_VERSION"
+              echo "   package.json: $PACKAGE_VERSION"
+            else
+              echo "❌ TypeScript version mismatch:"
+              echo "   Manifest: $MANIFEST_VERSION"
+              echo "   package.json: $PACKAGE_VERSION"
+              exit 1
+            fi
+          else
+            echo "✅ TypeScript package version consistent"
           fi
-          
-          echo "✅ TypeScript package version consistent"
 
   validate-dependencies:
     name: Validate Cross-Package Dependencies

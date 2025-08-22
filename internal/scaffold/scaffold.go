@@ -1,3 +1,4 @@
+//go:generate cp ../../.release-please-manifest.json manifest.json
 package scaffold
 
 import (
@@ -19,21 +20,28 @@ import (
 //go:embed templates.cue
 var templatesCUE string
 
-//go:embed versions.json
-var versionsJSON string
+//go:embed manifest.json
+var manifestJSON string
 
 // Versions represents all versions used in templates
 type Versions struct {
-	FTLCli string      `json:"ftl"`
-	SDK    SDKVersions `json:"sdk"`
+	FTLCli     string `json:"ftl"`
+	SDK        SDKVersions
+	Components ComponentVersions
 }
 
 // SDKVersions represents the SDK versions for each language
 type SDKVersions struct {
-	Go         string `json:"go"`
-	Rust       string `json:"rust"`
-	Python     string `json:"python"`
-	TypeScript string `json:"typescript"`
+	Go         string
+	Rust       string
+	Python     string
+	TypeScript string
+}
+
+// ComponentVersions represents the versions for WASM components
+type ComponentVersions struct {
+	MCPAuthorizer string
+	MCPGateway    string
 }
 
 // Scaffolder handles component generation using CUE templates
@@ -47,9 +55,25 @@ type Scaffolder struct {
 func NewScaffolder() (*Scaffolder, error) {
 	ctx := cuecontext.New()
 
-	var versions Versions
-	if err := json.Unmarshal([]byte(versionsJSON), &versions); err != nil {
-		return nil, fmt.Errorf("failed to parse versions: %w", err)
+	// Parse the release-please manifest
+	var manifest map[string]string
+	if err := json.Unmarshal([]byte(manifestJSON), &manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse release manifest: %w", err)
+	}
+
+	// Extract versions from the manifest
+	versions := Versions{
+		FTLCli: manifest["."],
+		SDK: SDKVersions{
+			Go:         manifest["sdk/go"],
+			Rust:       manifest["sdk/rust"],
+			Python:     manifest["sdk/python"],
+			TypeScript: manifest["sdk/typescript"],
+		},
+		Components: ComponentVersions{
+			MCPAuthorizer: manifest["components/mcp-authorizer"],
+			MCPGateway:    manifest["components/mcp-gateway"],
+		},
 	}
 
 	// Create templates with versions

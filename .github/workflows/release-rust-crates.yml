@@ -59,10 +59,10 @@ jobs:
             exit 1
           fi
           
-          # Check versions.json
-          JSON_VERSION=$(jq -r '.sdk.rust' internal/scaffold/versions.json)
+          # Check manifest version
+          JSON_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in versions.json: found ${JSON_VERSION}, expected ${VERSION}"
+            echo "Version mismatch in manifest: found ${JSON_VERSION}, expected ${VERSION}"
             exit 1
           fi
           

@@ -95,3 +95,4 @@ dist/
 release/
 
 .claude/
+/internal/scaffold/manifest.json

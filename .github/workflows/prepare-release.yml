@@ -112,29 +112,29 @@ jobs:
             esac
           }
           
-          # Read versions.json
-          VERSIONS_FILE="internal/scaffold/versions.json"
+          # Read manifest
+          VERSIONS_FILE=".release-please-manifest.json"
           
           # Get current version based on component
           case "$COMPONENT" in
             cli)
-              CURRENT_VERSION=$(jq -r '.ftl' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '."cmd/ftl"' "$VERSIONS_FILE")
               ;;
             sdk-rust)
-              CURRENT_VERSION=$(jq -r '.sdk.rust' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '."sdk/rust"' "$VERSIONS_FILE")
               ;;
             sdk-typescript)
-              CURRENT_VERSION=$(jq -r '.sdk.typescript' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '."sdk/typescript"' "$VERSIONS_FILE")
               ;;
             sdk-python)
-              CURRENT_VERSION=$(jq -r '.sdk.python' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '."sdk/python"' "$VERSIONS_FILE")
               ;;
             sdk-go)
-              CURRENT_VERSION=$(jq -r '.sdk.go' "$VERSIONS_FILE")
+              CURRENT_VERSION=$(jq -r '."sdk/go"' "$VERSIONS_FILE")
               ;;
             mcp-authorizer|mcp-gateway)
-              # Components are tracked in versions.json
-              CURRENT_VERSION=$(jq -r ".components.\"${COMPONENT}\"" "$VERSIONS_FILE")
+              # Components are tracked in manifest
+              CURRENT_VERSION=$(jq -r '."components/'"${COMPONENT}"'"' "$VERSIONS_FILE")
               ;;
           esac
           
@@ -176,12 +176,12 @@ jobs:
         run: |
           COMPONENT="${{ inputs.component }}"
           NEW_VERSION="${{ steps.version.outputs.new }}"
-          VERSIONS_FILE="internal/scaffold/versions.json"
+          VERSIONS_FILE=".release-please-manifest.json"
           
           case "$COMPONENT" in
             cli)
-              # Update versions.json for CLI
-              jq --arg version "$NEW_VERSION" '.ftl = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest for CLI
+              jq --arg version "$NEW_VERSION" '."cmd/ftl" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Format the JSON file nicely
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
@@ -189,8 +189,8 @@ jobs:
               git add "$VERSIONS_FILE"
               ;;
             sdk-rust)
-              # Update versions.json
-              jq --arg version "$NEW_VERSION" '.sdk.rust = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest
+              jq --arg version "$NEW_VERSION" '."sdk/rust" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update Cargo.toml files
@@ -213,8 +213,8 @@ jobs:
               git add "$VERSIONS_FILE" sdk/rust/Cargo.toml sdk/rust-macros/Cargo.toml Cargo.lock
               ;;
             sdk-typescript)
-              # Update versions.json
-              jq --arg version "$NEW_VERSION" '.sdk.typescript = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest
+              jq --arg version "$NEW_VERSION" '."sdk/typescript" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update package.json
@@ -227,8 +227,8 @@ jobs:
               git add "$VERSIONS_FILE" sdk/typescript/package.json sdk/typescript/package-lock.json
               ;;
             sdk-python)
-              # Update versions.json
-              jq --arg version "$NEW_VERSION" '.sdk.python = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest
+              jq --arg version "$NEW_VERSION" '."sdk/python" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update version in pyproject.toml
@@ -237,8 +237,8 @@ jobs:
               git add "$VERSIONS_FILE" sdk/python/pyproject.toml
               ;;
             sdk-go)
-              # Update versions.json
-              jq --arg version "$NEW_VERSION" '.sdk.go = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest
+              jq --arg version "$NEW_VERSION" '."sdk/go" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update version in README.md
@@ -258,8 +258,8 @@ jobs:
               git add "$VERSIONS_FILE" sdk/go/README.md sdk/go/go.mod sdk/go/go.sum
               ;;
             mcp-authorizer|mcp-gateway)
-              # Update versions.json for component
-              jq --arg version "$NEW_VERSION" --arg comp "$COMPONENT" '.components[$comp] = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+              # Update manifest for component
+              jq --arg version "$NEW_VERSION" '."components/'"$COMPONENT"'" = $version' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               jq '.' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
               
               # Update component Cargo.toml
@@ -383,7 +383,7 @@ jobs:
           
           ### 📋 Checklist
           
-          - [ ] Version bumped correctly in \`internal/scaffold/versions.json\`
+          - [ ] Version bumped correctly in \`.release-please-manifest.json\`
           - [ ] Package-specific version files updated
           - [ ] All tests passing
           - [ ] Documentation updated if needed
@@ -411,7 +411,7 @@ jobs:
           
           ### 📦 Affected Files
           
-          - \`internal/scaffold/versions.json\` - Central version registry
+          - \`.release-please-manifest.json\` - Central version registry
           EOF
           )
           

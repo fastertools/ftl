@@ -2,7 +2,7 @@
 #
 # WORKFLOW PURPOSE:
 # This workflow handles the Go SDK release process when a new version tag is pushed.
-# It creates GitHub releases and updates the SDK version in the template configuration.
+# It creates GitHub releases with proper Go module tagging.
 #
 # FLOW:
 # 1. Tag validation and version parsing
@@ -10,7 +10,6 @@
 # 3. Create GitHub release with dual tagging strategy:
 #    - sdk-go-v{version} (release tracking)
 #    - sdk/go/v{version} (Go module resolution)
-# 4. Create template version update PR
 #
 # FAILURE HANDLING:
 # - Manual workflow dispatch available for retries
@@ -187,91 +186,3 @@ jobs:
         echo "  - sdk/go/v${{ needs.verify-tag.outputs.version }} (Go module resolution)"
         echo ""
         echo "WARNING: Module may take a few minutes to appear in the Go module proxy"
-
-  update-templates:
-    name: Update Templates PR
-    needs: [verify-tag, release]
-    if: needs.release.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.PAT || github.token }}
-      
-      - name: Setup Git
-        uses: ./.github/actions/setup-git
-        with:
-          token: ${{ secrets.PAT || github.token }}
-      
-      - name: Create update branch
-        run: |
-          BRANCH="update-templates-sdk-go-v${{ needs.verify-tag.outputs.version }}"
-          git checkout -b "$BRANCH"
-          echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
-      
-      - name: Update template versions
-        run: |
-          VERSION="${{ needs.verify-tag.outputs.version }}"
-          
-          # Update Go SDK version in versions.json
-          jq --arg v "$VERSION" '.sdk.go = $v' internal/scaffold/versions.json > versions.tmp
-          mv versions.tmp internal/scaffold/versions.json
-          
-          echo "✅ Updated Go SDK to v$VERSION in versions.json"
-      
-      - name: Commit changes
-        run: |
-          git add -A
-          if git diff --staged --quiet; then
-            echo "No template updates needed"
-            exit 0
-          fi
-          git commit -m "chore: update templates to use Go SDK v${{ needs.verify-tag.outputs.version }}" \
-            -m "Updates project templates to use the newly published SDK version." \
-            -m "This is an automated update following the release of Go SDK v${{ needs.verify-tag.outputs.version }}."
-      
-      - name: Push update branch
-        run: |
-          git push origin "$UPDATE_BRANCH"
-      
-      - name: Create Pull Request
-        env:
-          GH_TOKEN: ${{ secrets.PAT || github.token }}
-        run: |
-          VERSION="${{ needs.verify-tag.outputs.version }}"
-          
-          PR_BODY=$(cat <<EOF
-          ## Update Templates to Go SDK v${VERSION}
-          
-          This PR updates project templates to use the newly published Go SDK version.
-          
-          ### Changes
-          - Updated Go SDK version to v${VERSION} in internal/scaffold/versions.json
-          - This will affect all new Go components created with \`ftl component add\`
-          
-          ### Context
-          This is an automated PR created after successfully publishing Go SDK v${VERSION}.
-          
-          ### Checklist
-          - [x] SDK v${VERSION} tag has been created
-          - [x] Go module subdirectory tag created for proper versioning
-          - [x] Templates updated to new version
-          - [ ] CI tests pass with new version
-          
-          ### Links
-          - [Go Packages](https://pkg.go.dev/github.com/fastertools/ftl/sdk/go@v${VERSION})
-          - [Release](https://github.com/fastertools/ftl/releases/tag/sdk-go-v${VERSION})
-          
-          ---
-          *This PR was automatically created by the release workflow*
-          EOF
-          )
-          
-          gh pr create \
-            --title "chore: update templates to Go SDK v${VERSION}" \
-            --body "$PR_BODY" \
-            --base main \
-            --head "$UPDATE_BRANCH" \
-            --label "automated" \
-            --label "dependencies"

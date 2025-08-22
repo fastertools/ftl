@@ -70,13 +70,13 @@ jobs:
             echo "spin.toml version validated: ${SPIN_VERSION}"
           fi
           
-          # Check versions.json
-          JSON_VERSION=$(jq -r ".components[\"${COMPONENT}\"]" internal/scaffold/versions.json)
+          # Check manifest
+          JSON_VERSION=$(jq -r '."components/'"${COMPONENT}"'"' .release-please-manifest.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in versions.json: ${JSON_VERSION} != ${VERSION}"
+            echo "Version mismatch in manifest: ${JSON_VERSION} != ${VERSION}"
             exit 1
           fi
-          echo "versions.json version validated: ${JSON_VERSION}"
+          echo "Manifest version validated: ${JSON_VERSION}"
 
   build-component:
     name: Build WASM Component
