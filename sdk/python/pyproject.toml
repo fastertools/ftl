@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "FTL Contributors", email = "ftl@fastertools.com"}
+    {name = "FTL Contributors", email = "ftl@fastertools.ai"}
 ]
 maintainers = [
-    {name = "FTL Contributors", email = "ftl@fastertools.com"}
+    {name = "FTL Contributors", email = "ftl@fastertools.ai"}
 ]
 keywords = ["ftl", "mcp", "wasm", "webassembly", "spin", "fermyon", "model-context-protocol"]
 classifiers = [

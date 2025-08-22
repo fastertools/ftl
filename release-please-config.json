@@ -194,7 +194,7 @@
   "pull-request-footer": "\n---\n\n:warning: **Do not manually edit this PR**. Any manual changes will be overwritten by release-please.\n\nTo make changes, commit to `main` with conventional commit messages.",
   "separate-pull-requests": true,
   "sequential-calls": true,
-  "signoff": "FTL Release Bot <releases@fastertools.com>",
+  "signoff": "FTL Release Bot <releases@fastertools.ai>",
   "include-component-in-tag": true,
   "include-v-in-tag": true,
   "always-link-local": true,
