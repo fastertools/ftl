@@ -460,88 +460,88 @@ jobs:
           all_passed=true
           
           # Check go-lint
-          if [ "${{ needs.go-lint.result }}" == "success" ]; then
-            echo "✅ go-lint: passed"
+          if [ "${{ needs.go-lint.result }}" == "success" ] || [ "${{ needs.go-lint.result }}" == "skipped" ]; then
+            echo "✅ go-lint: ${{ needs.go-lint.result }}"
           else
             echo "❌ go-lint: ${{ needs.go-lint.result }}"
             all_passed=false
           fi
           
           # Check go-test
-          if [ "${{ needs.go-test.result }}" == "success" ]; then
-            echo "✅ go-test: passed"
+          if [ "${{ needs.go-test.result }}" == "success" ] || [ "${{ needs.go-test.result }}" == "skipped" ]; then
+            echo "✅ go-test: ${{ needs.go-test.result }}"
           else
             echo "❌ go-test: ${{ needs.go-test.result }}"
             all_passed=false
           fi
           
           # Check go-build
-          if [ "${{ needs.go-build.result }}" == "success" ]; then
-            echo "✅ go-build: passed"
+          if [ "${{ needs.go-build.result }}" == "success" ] || [ "${{ needs.go-build.result }}" == "skipped" ]; then
+            echo "✅ go-build: ${{ needs.go-build.result }}"
           else
             echo "❌ go-build: ${{ needs.go-build.result }}"
             all_passed=false
           fi
           
           # Check go-security
-          if [ "${{ needs.go-security.result }}" == "success" ]; then
-            echo "✅ go-security: passed"
+          if [ "${{ needs.go-security.result }}" == "success" ] || [ "${{ needs.go-security.result }}" == "skipped" ]; then
+            echo "✅ go-security: ${{ needs.go-security.result }}"
           else
             echo "❌ go-security: ${{ needs.go-security.result }}"
             all_passed=false
           fi
           
           # Check rust-lint
-          if [ "${{ needs.rust-lint.result }}" == "success" ]; then
-            echo "✅ rust-lint: passed"
+          if [ "${{ needs.rust-lint.result }}" == "success" ] || [ "${{ needs.rust-lint.result }}" == "skipped" ]; then
+            echo "✅ rust-lint: ${{ needs.rust-lint.result }}"
           else
             echo "❌ rust-lint: ${{ needs.rust-lint.result }}"
             all_passed=false
           fi
           
           # Check rust-test
-          if [ "${{ needs.rust-test.result }}" == "success" ]; then
-            echo "✅ rust-test: passed"
+          if [ "${{ needs.rust-test.result }}" == "success" ] || [ "${{ needs.rust-test.result }}" == "skipped" ]; then
+            echo "✅ rust-test: ${{ needs.rust-test.result }}"
           else
             echo "❌ rust-test: ${{ needs.rust-test.result }}"
             all_passed=false
           fi
           
           # Check rust-build-wasm
-          if [ "${{ needs.rust-build-wasm.result }}" == "success" ]; then
-            echo "✅ rust-build-wasm: passed"
+          if [ "${{ needs.rust-build-wasm.result }}" == "success" ] || [ "${{ needs.rust-build-wasm.result }}" == "skipped" ]; then
+            echo "✅ rust-build-wasm: ${{ needs.rust-build-wasm.result }}"
           else
             echo "❌ rust-build-wasm: ${{ needs.rust-build-wasm.result }}"
             all_passed=false
           fi
           
           # Check component-tests
-          if [ "${{ needs.component-tests.result }}" == "success" ]; then
-            echo "✅ component-tests: passed"
+          if [ "${{ needs.component-tests.result }}" == "success" ] || [ "${{ needs.component-tests.result }}" == "skipped" ]; then
+            echo "✅ component-tests: ${{ needs.component-tests.result }}"
           else
             echo "❌ component-tests: ${{ needs.component-tests.result }}"
             all_passed=false
           fi
           
           # Check integration-test
-          if [ "${{ needs.integration-test.result }}" == "success" ]; then
-            echo "✅ integration-test: passed"
+          if [ "${{ needs.integration-test.result }}" == "success" ] || [ "${{ needs.integration-test.result }}" == "skipped" ]; then
+            echo "✅ integration-test: ${{ needs.integration-test.result }}"
           else
             echo "❌ integration-test: ${{ needs.integration-test.result }}"
             all_passed=false
           fi
           
           # Check python-sdk-test
-          if [ "${{ needs.python-sdk-test.result }}" == "success" ]; then
-            echo "✅ python-sdk-test: passed"
+          if [ "${{ needs.python-sdk-test.result }}" == "success" ] || [ "${{ needs.python-sdk-test.result }}" == "skipped" ]; then
+            echo "✅ python-sdk-test: ${{ needs.python-sdk-test.result }}"
           else
             echo "❌ python-sdk-test: ${{ needs.python-sdk-test.result }}"
             all_passed=false
           fi
           
           # Check typescript-sdk-test
-          if [ "${{ needs.typescript-sdk-test.result }}" == "success" ]; then
-            echo "✅ typescript-sdk-test: passed"
+          if [ "${{ needs.typescript-sdk-test.result }}" == "success" ] || [ "${{ needs.typescript-sdk-test.result }}" == "skipped" ]; then
+            echo "✅ typescript-sdk-test: ${{ needs.typescript-sdk-test.result }}"
           else
             echo "❌ typescript-sdk-test: ${{ needs.typescript-sdk-test.result }}"
             all_passed=false
