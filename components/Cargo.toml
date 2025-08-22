@@ -1,0 +1,97 @@
+[workspace]
+resolver = "2"
+members = [
+    "mcp-gateway",
+    "mcp-authorizer"
+]
+# Explicitly exclude test directories
+exclude = [
+    "*/tests"
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.89"
+authors = ["FTL Contributors"]
+license = "Apache-2.0"
+repository = "https://github.com/fastertools/ftl"
+homepage = "https://github.com/fastertools/ftl"
+
+[workspace.dependencies]
+# FTL SDK
+ftl-sdk = { version = "0.11.1", path = "../sdk/rust" }
+
+# Component dependencies
+spin-sdk = "3.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "2.0"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2.5"
+bytes = "1.5"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["serde", "v4"] }
+regress = "0.10"
+garde = { version = "0.22", features = ["derive", "regex"] }
+once_cell = "1.20"
+
+# Optimization profiles
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.tiny]
+inherits = "release"
+opt-level = "z"
+
+[profile.dev]
+opt-level = 1
+debug = true
+
+# Workspace-wide linting configuration
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# Deny categories
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+
+# Warn categories  
+complexity = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# Specific lints to enable
+missing_safety_doc = "warn"
+use_self = "warn"
+items_after_statements = "warn"
+cognitive_complexity = "warn"
+missing_const_for_fn = "warn"
+inefficient_to_string = "warn"
+large_types_passed_by_value = "warn"
+manual_ok_or = "warn"
+map_unwrap_or = "warn"
+implicit_clone = "warn"
+unused_async = "warn"
+unused_self = "warn"
+match_wildcard_for_single_variants = "warn"
+needless_continue = "warn"
+await_holding_lock = "deny"
+
+# Disable some pedantic lints that are too noisy
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+struct_excessive_bools = "allow"
