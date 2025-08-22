@@ -1,6 +1,6 @@
 # MCP Authorizer
 
-A high-performance JWT authorizer gateway for Model Context Protocol (MCP) servers, built for Fermyon Spin and WebAssembly deployment.
+A high-performance JWT authorizer for Model Context Protocol (MCP) servers, built for Fermyon Spin and WebAssembly deployment.
 
 ## Overview
 
