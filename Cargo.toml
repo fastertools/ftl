@@ -23,7 +23,6 @@ exclude = [
 # Build all components: cargo component build --workspace --release --target wasm32-wasip1
 
 [workspace.package]
-version = "0.10.0"
 edition = "2024"
 rust-version = "1.89"
 authors = ["FTL Contributors"]
