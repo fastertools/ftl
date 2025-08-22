@@ -93,7 +93,7 @@ jobs:
     name: Validate Version Consistency
     runs-on: ubuntu-latest
     # Skip version validation for release PRs as versions will be different
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') }}"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -354,7 +354,7 @@ jobs:
   test-release-simulation:
     name: Test Release Simulation
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'test-release') }}
+    if: "${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'test-release') }}"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
