@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "bootstrap-sha": "bba3e1b",
-  "last-release-sha": "bba3e1b",
+  "bootstrap-sha": "cba52c6abcc6929b16d495ceb74858d2f3145f60",
+  "last-release-sha": "cba52c6abcc6929b16d495ceb74858d2f3145f60",
   "release-type": "simple",
   "include-v-in-tag": true,
   "tag-separator": "-",
@@ -20,13 +20,6 @@
     {"type": "revert", "section": "Reverts", "hidden": false}
   ],
   "changelog-type": "github",
-  "extra-files": [
-    {
-      "type": "json",
-      "path": "internal/scaffold/versions.json",
-      "jsonpath": "$.ftl"
-    }
-  ],
   "plugins": [
     {
       "type": "cargo-workspace",
