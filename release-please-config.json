@@ -68,6 +68,10 @@
     }
   ],
   "changelog-type": "github",
+  "exclude-paths": [
+    "components/*/tests/**",
+    "**/tests/Cargo.toml"
+  ],
   "plugins": [
     {
       "type": "cargo-workspace",
