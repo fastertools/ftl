@@ -1,6 +1,6 @@
 # FTL MCP Gateway
 
-A WebAssembly-based Model Context Protocol (MCP) server that routes tool requests to individual tool components within the Spin framework.
+A WebAssembly-based Model Context Protocol (MCP) server that routes tool requests to individual tool components within the Spin framework. Built with Rust and compiled to WebAssembly for secure, sandboxed execution.
 
 ## Overview
 
