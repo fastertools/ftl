@@ -52,11 +52,18 @@ jobs:
       mcp_authorizer_version: ${{ steps.release.outputs['components/mcp-authorizer--version'] }}
       mcp_authorizer_tag: ${{ steps.release.outputs['components/mcp-authorizer--tag_name'] }}
     steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Run Release Please
         id: release
         uses: googleapis/release-please-action@v4.1.3
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: ${{ github.ref_name }}
@@ -218,8 +225,17 @@ jobs:
           
           echo "All releases completed successfully"
 
+      - name: Generate app token for summary
+        if: success()
+        id: summary-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Create release summary
         if: success()
         uses: actions/github-script@v7
         with:
+          github-token: ${{ steps.summary-token.outputs.token }}
           script: "const releases = []; if ('${{ needs.release-please.outputs.cli_released }}' === 'true') { releases.push('CLI v${{ needs.release-please.outputs.cli_version }}'); } if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') { releases.push('Go SDK v${{ needs.release-please.outputs.go_sdk_version }}'); } if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') { releases.push('Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}'); } if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') { releases.push('Python SDK v${{ needs.release-please.outputs.python_sdk_version }}'); } if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') { releases.push('TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}'); } if ('${{ needs.release-please.outputs.mcp_gateway_released }}' === 'true') { releases.push('MCP Gateway v${{ needs.release-please.outputs.mcp_gateway_version }}'); } if ('${{ needs.release-please.outputs.mcp_authorizer_released }}' === 'true') { releases.push('MCP Authorizer v${{ needs.release-please.outputs.mcp_authorizer_version }}'); } if (releases.length > 0) { const summary = '## Release Summary\\n\\nSuccessfully released:\\n' + releases.map(r => '- ' + r).join('\\n'); await core.summary.addRaw(summary).write(); }"
