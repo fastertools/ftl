@@ -1,7 +1,6 @@
----
-title: Policy Language
-sidebar_position: 3
----
+# OPA Policy Language Reference
+
+### From https://github.com/open-policy-agent/opa/blob/main/docs/docs/policy-language.md
 
 OPA is purpose built for reasoning about information represented in structured
 documents. The data that your service and its users publish can be inspected and
