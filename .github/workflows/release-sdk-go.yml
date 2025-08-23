@@ -136,10 +136,17 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Generate app token
+      id: app-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ vars.APP_ID }}
+        private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
     - name: Setup Git
       uses: ./.github/actions/setup-git
       with:
-        token: ${{ secrets.PAT || github.token }}
+        token: ${{ steps.app-token.outputs.token }}
 
     - name: Create Go module subdirectory tag
       run: |
