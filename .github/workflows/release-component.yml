@@ -105,9 +105,8 @@ jobs:
         id: wasm
         run: |
           COMPONENT="${{ needs.verify-tag.outputs.component }}"
-          # Components use ftl_ prefix and underscores in their library names
-          # Replace hyphens with underscores and add ftl_ prefix
-          WASM_NAME="ftl_${COMPONENT//-/_}.wasm"
+          # Replace hyphens with underscores (Cargo uses underscores in output names)
+          WASM_NAME="${COMPONENT//-/_}.wasm"
           echo "name=$WASM_NAME" >> $GITHUB_OUTPUT
       
       - name: Publish to ghcr.io
