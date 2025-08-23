@@ -17,7 +17,7 @@ The MCP Authorizer provides OAuth 2.0 bearer token authentication for MCP endpoi
 
 ## Configuration
 
-Configure via Spin variables (environment variables with `MCP_` prefix):
+Configure via Spin variables:
 
 ### Core Settings
 
