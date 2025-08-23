@@ -186,10 +186,14 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: |
+          cd sdk && cargo fmt --all -- --check
+          cd ../components && cargo fmt --all -- --check
         
       - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+          cd sdk && cargo clippy --workspace --all-targets -- -D warnings
+          cd ../components && cargo clippy --workspace --all-targets -- -D warnings
 
   rust-test:
     name: Rust Test
@@ -217,9 +221,9 @@ jobs:
         
       - name: Generate coverage
         run: |
-          cargo llvm-cov --workspace --all-features \
+          cd sdk && cargo llvm-cov --workspace --all-features \
             --target x86_64-unknown-linux-gnu \
-            --lcov --output-path lcov.info || true
+            --lcov --output-path ../lcov.info || true
             
 
 
@@ -239,16 +243,16 @@ jobs:
           
       - name: Build all WASM components
         run: |
-          cargo build --workspace --release --target wasm32-wasip1
+          cd components && cargo build --workspace --release --target wasm32-wasip1
           
       - name: Check WASM file sizes
         run: |
           echo "WASM Component Sizes:"
           echo "====================="
-          ls -lh target/wasm32-wasip1/release/*.wasm | awk '{print $5, $9}'
+          ls -lh components/target/wasm32-wasip1/release/*.wasm | awk '{print $5, $9}'
           
           # Fail if any WASM is over 10MB
-          for wasm in target/wasm32-wasip1/release/*.wasm; do
+          for wasm in components/target/wasm32-wasip1/release/*.wasm; do
             size=$(stat -c%s "$wasm" 2>/dev/null || stat -f%z "$wasm" 2>/dev/null)
             if [ "$size" -gt 10485760 ]; then
               echo "::error::$(basename $wasm) is over 10MB ($size bytes)"

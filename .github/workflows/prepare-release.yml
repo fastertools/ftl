@@ -206,11 +206,11 @@ jobs:
                 echo "Updated ftl-sdk dependency on ftl-sdk-macros to $NEW_VERSION"
               fi
               
-              # Update Cargo.lock - use workspace flag to avoid scanning subdirectories
-              cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION" || true
-              cargo update --workspace -p ftl-sdk-macros --precise "$NEW_VERSION" || true
+              # Update Cargo.lock
+              cd sdk && cargo update --workspace -p ftl-sdk --precise "$NEW_VERSION" || true
+              cd sdk && cargo update --workspace -p ftl-sdk-macros --precise "$NEW_VERSION" || true
               
-              git add "$VERSIONS_FILE" sdk/rust/Cargo.toml sdk/rust-macros/Cargo.toml Cargo.lock
+              git add "$VERSIONS_FILE" sdk/rust/Cargo.toml sdk/rust-macros/Cargo.toml sdk/Cargo.lock
               ;;
             sdk-typescript)
               # Update manifest
@@ -266,9 +266,9 @@ jobs:
               sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "components/${COMPONENT}/Cargo.toml"
               
               # Update Cargo.lock - components use ftl- prefix in package names
-              cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}" || true
+              cd components && cargo update --workspace -p "ftl-${COMPONENT}" --precise "$NEW_VERSION" || cargo update --workspace -p "ftl-${COMPONENT}" || true
               
-              git add "$VERSIONS_FILE" "components/${COMPONENT}/Cargo.toml" Cargo.lock
+              git add "$VERSIONS_FILE" "components/${COMPONENT}/Cargo.toml" components/Cargo.lock
               
               # Update component versions in examples if they exist
               echo "Updating component references in examples..."
