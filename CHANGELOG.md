@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0 (2025-08-23)
+
+## What's Changed
+* chore(main): release  component-mcp-authorizer v0.12.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/294
+* feat: Trigger release by @bowlofarugula in https://github.com/fastertools/ftl/pull/296
+* chore(main): release by @bowlofarugula in https://github.com/fastertools/ftl/pull/298
+* chore(main): release  component-mcp-authorizer v0.13.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/315
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.12.0...v0.13.0
+
 ## 0.12.0 (2025-08-22)
 
 ## What's Changed
