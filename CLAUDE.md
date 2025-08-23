@@ -4,17 +4,17 @@
 
 **CRITICAL**: This project runs in WebAssembly (WASM) environments with significant runtime limitations.
 
-### Forbidden Dependencies
+### Forbidden Dependencies during development until explicitly approved
 - L `tokio` - Not supported in WASM, uses system threads
 - L `async-trait` - Relies on tokio/futures runtime  
 - L `futures` crate - Runtime dependencies not available
 - L Any dependency requiring thread spawning or OS-level async runtime
 
 ### WASM-Compatible Async
--  Native `async/await` syntax - Works in WASM
--  `spin-sdk` async functions - Spin runtime provides async support
--  Simple async functions without external runtimes
--  `ftl-sdk` async tools - Built for WASM compatibility
+- Native `async/await` syntax - Works in WASM
+- `spin-sdk` async functions - Spin runtime provides async support
+- Simple async functions without external runtimes
+- `ftl-sdk` async tools - Built for WASM compatibility
 
 ### Testing in WASM
 - **NEVER** use `#[tokio::test]` for async tests - not supported in WASM  

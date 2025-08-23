@@ -6,9 +6,60 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"regexp"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// Validation functions
+func validateProjectName(name string) error {
+	if len(name) == 0 || len(name) > 50 {
+		return fmt.Errorf("project name must be 1-50 characters, got %d", len(name))
+	}
+	
+	// Allow alphanumeric, hyphens, underscores only
+	if !regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(name) {
+		return fmt.Errorf("project name contains invalid characters (allowed: a-z, A-Z, 0-9, _, -)")
+	}
+	
+	// Prevent path traversal patterns
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("project name cannot contain '..' sequences")
+	}
+	
+	return nil
+}
+
+func validateTemplateName(template string) error {
+	if template == "" {
+		return nil // Empty is ok, defaults to "rust"
+	}
+	
+	// Basic sanitization - no path traversal or shell chars
+	if strings.ContainsAny(template, "../\\|<>&;$`()") {
+		return fmt.Errorf("template name contains invalid characters")
+	}
+	
+	// Length check
+	if len(template) > 50 {
+		return fmt.Errorf("template name too long (max 50 chars)")
+	}
+	
+	return nil
+}
+
+func validateLinesCount(lines int) error {
+	if lines < 0 {
+		return fmt.Errorf("lines count cannot be negative")
+	}
+	
+	if lines > 10000 {
+		return fmt.Errorf("lines count cannot exceed 10000")
+	}
+	
+	return nil
+}
 
 // Server represents an MCP server that exposes FTL functionality
 type Server struct {
@@ -86,6 +137,21 @@ type InitResult struct {
 
 func (s *Server) handleFtlInit(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[InitParams]) (*mcp.CallToolResultFor[struct{}], error) {
 	args := params.Arguments
+	
+	// Validate project name
+	if err := validateProjectName(args.Name); err != nil {
+		return &mcp.CallToolResultFor[struct{}]{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid project name: %v", err)}},
+		}, nil
+	}
+	
+	// Validate template
+	if err := validateTemplateName(args.Template); err != nil {
+		return &mcp.CallToolResultFor[struct{}]{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid template: %v", err)}},
+		}, nil
+	}
+	
 	template := "rust"
 	if args.Template != "" {
 		template = args.Template
@@ -219,6 +285,14 @@ type LogsResult struct {
 
 func (s *Server) handleFtlLogs(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[LogsParams]) (*mcp.CallToolResultFor[struct{}], error) {
 	args := params.Arguments
+	
+	// Validate lines count
+	if err := validateLinesCount(args.Lines); err != nil {
+		return &mcp.CallToolResultFor[struct{}]{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid lines parameter: %v", err)}},
+		}, nil
+	}
+	
 	cmdArgs := []string{"logs"}
 	
 	if args.Lines > 0 {

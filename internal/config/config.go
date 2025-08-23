@@ -126,6 +126,8 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	mu.RLock()
+	defer mu.RUnlock()
 	return instance, nil
 }
 
