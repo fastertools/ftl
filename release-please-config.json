@@ -168,6 +168,8 @@
       "tag-separator": "-",
       "package-name": "ftl-components",
       "version-file": "Cargo.toml",
+      "bootstrap-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
+      "last-release-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
       "extra-files": [
         {
           "type": "toml",
