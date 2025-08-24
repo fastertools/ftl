@@ -35,9 +35,9 @@ jobs:
       go_sdk_released: ${{ steps.release.outputs['sdk/go--release_created'] }}
       go_sdk_version: ${{ steps.release.outputs['sdk/go--version'] }}
       go_sdk_tag: ${{ steps.release.outputs['sdk/go--tag_name'] }}
-      rust_sdk_released: ${{ steps.release.outputs['sdk--release_created'] }}
-      rust_sdk_version: ${{ steps.release.outputs['sdk--version'] }}
-      rust_sdk_tag: ${{ steps.release.outputs['sdk--tag_name'] }}
+      rust_sdk_released: ${{ steps.release.outputs['sdk/rust--release_created'] }}
+      rust_sdk_version: ${{ steps.release.outputs['sdk/rust--version'] }}
+      rust_sdk_tag: ${{ steps.release.outputs['sdk/rust--tag_name'] }}
       python_sdk_released: ${{ steps.release.outputs['sdk/python--release_created'] }}
       python_sdk_version: ${{ steps.release.outputs['sdk/python--version'] }}
       python_sdk_tag: ${{ steps.release.outputs['sdk/python--tag_name'] }}
@@ -71,7 +71,7 @@ jobs:
           echo "Releases created: ${{ steps.release.outputs.releases_created }}"
           echo "CLI released: ${{ steps.release.outputs['cmd/ftl--release_created'] }}"
           echo "Go SDK released: ${{ steps.release.outputs['sdk/go--release_created'] }}"
-          echo "Rust SDK released: ${{ steps.release.outputs['sdk--release_created'] }}"
+          echo "Rust SDK released: ${{ steps.release.outputs['sdk/rust--release_created'] }}"
           echo "Python SDK released: ${{ steps.release.outputs['sdk/python--release_created'] }}"
           echo "TypeScript SDK released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}"
           echo "Components released: ${{ steps.release.outputs['components--release_created'] }}"

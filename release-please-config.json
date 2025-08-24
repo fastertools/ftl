@@ -132,7 +132,7 @@
         }
       ]
     },
-    "sdk": {
+    "sdk/rust": {
       "release-type": "rust",
       "component": "sdk-rust",
       "changelog-path": "CHANGELOG.md",
@@ -140,6 +140,8 @@
       "tag-separator": "-",
       "package-name": "ftl-sdk",
       "version-file": "Cargo.toml",
+      "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
+      "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
       "extra-files": []
     },
     "sdk/python": {
