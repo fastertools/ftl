@@ -146,96 +146,111 @@ jobs:
           fi
           
           # Validate SDK versions
-          for sdk in go rust python typescript; do
-            SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"sdk/$sdk\"]")
-            SDK_SCAFFOLD=$(jq -r ".\"sdk/$sdk\"" .release-please-manifest.json)
+          # Note: Rust SDK now uses "sdk" key instead of "sdk/rust"
+          for entry in "go:sdk/go" "python:sdk/python" "typescript:sdk/typescript"; do
+            IFS=':' read -r name path <<< "$entry"
+            SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"$path\"]")
+            SDK_SCAFFOLD=$(jq -r ".\"$path\"" .release-please-manifest.json)
             
             if [[ "$SDK_MANIFEST" != "$SDK_SCAFFOLD" ]]; then
               if [[ "$IS_RELEASE_PR" == "true" ]]; then
-                echo "⚠️  $sdk SDK version mismatch (expected for release PR):"
+                echo "⚠️  $name SDK version mismatch (expected for release PR):"
                 echo "   Manifest: $SDK_MANIFEST"
                 echo "   Scaffold: $SDK_SCAFFOLD"
               else
-                echo "❌ $sdk SDK version mismatch:"
+                echo "❌ $name SDK version mismatch:"
                 echo "   Manifest: $SDK_MANIFEST"
                 echo "   Scaffold: $SDK_SCAFFOLD"
                 exit 1
               fi
             else
-              echo "✅ $sdk SDK version consistent: $SDK_MANIFEST"
+              echo "✅ $name SDK version consistent: $SDK_MANIFEST"
             fi
           done
           
-          # Validate component versions
-          for component in mcp-gateway mcp-authorizer; do
-            COMP_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"components/$component\"]")
-            COMP_SCAFFOLD=$(jq -r ".\"components/$component\"" .release-please-manifest.json)
-            
-            if [[ "$COMP_MANIFEST" != "$COMP_SCAFFOLD" ]]; then
-              if [[ "$IS_RELEASE_PR" == "true" ]]; then
-                echo "⚠️  $component version mismatch (expected for release PR):"
-                echo "   Manifest: $COMP_MANIFEST"
-                echo "   Scaffold: $COMP_SCAFFOLD"
-              else
-                echo "❌ $component version mismatch:"
-                echo "   Manifest: $COMP_MANIFEST"
-                echo "   Scaffold: $COMP_SCAFFOLD"
-                exit 1
-              fi
+          # Check Rust SDK separately (now uses "sdk" key)
+          RUST_SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '.sdk')
+          RUST_SDK_SCAFFOLD=$(jq -r '.sdk' .release-please-manifest.json)
+          
+          if [[ "$RUST_SDK_MANIFEST" != "$RUST_SDK_SCAFFOLD" ]]; then
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  Rust SDK version mismatch (expected for release PR):"
+              echo "   Manifest: $RUST_SDK_MANIFEST"
+              echo "   Scaffold: $RUST_SDK_SCAFFOLD"
             else
-              echo "✅ $component version consistent: $COMP_MANIFEST"
+              echo "❌ Rust SDK version mismatch:"
+              echo "   Manifest: $RUST_SDK_MANIFEST"
+              echo "   Scaffold: $RUST_SDK_SCAFFOLD"
+              exit 1
             fi
-          done
+          else
+            echo "✅ Rust SDK version consistent: $RUST_SDK_MANIFEST"
+          fi
+          
+          # Validate components version (now unified)
+          COMPONENTS_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '.components')
+          COMPONENTS_SCAFFOLD=$(jq -r '.components' .release-please-manifest.json)
+          
+          if [[ "$COMPONENTS_MANIFEST" != "$COMPONENTS_SCAFFOLD" ]]; then
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  Components version mismatch (expected for release PR):"
+              echo "   Manifest: $COMPONENTS_MANIFEST"
+              echo "   Scaffold: $COMPONENTS_SCAFFOLD"
+            else
+              echo "❌ Components version mismatch:"
+              echo "   Manifest: $COMPONENTS_MANIFEST"
+              echo "   Scaffold: $COMPONENTS_SCAFFOLD"
+              exit 1
+            fi
+          else
+            echo "✅ Components version consistent: $COMPONENTS_MANIFEST"
+          fi
 
-      - name: Validate Rust crate versions
+      - name: Validate Rust workspace versions
         run: |
           # Check if this is a release PR
           IS_RELEASE_PR=false
           if [[ "${{ github.event.pull_request.labels.*.name }}" == *"autorelease: pending"* ]]; then
             IS_RELEASE_PR=true
-            echo "ℹ️  Release PR detected - Cargo.toml versions may be ahead of manifest"
+            echo "ℹ️  Release PR detected - workspace versions may be ahead of manifest"
           fi
           
-          # Check Rust SDK version
-          MANIFEST_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
-          CARGO_VERSION=$(grep '^version = ' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          # Check Rust SDK workspace version
+          MANIFEST_VERSION=$(jq -r '.sdk' .release-please-manifest.json)
+          WORKSPACE_VERSION=$(grep '^\s*version = ' sdk/Cargo.toml | head -1 | cut -d'"' -f2)
           
-          if [[ "$MANIFEST_VERSION" != "$CARGO_VERSION" ]]; then
+          if [[ "$MANIFEST_VERSION" != "$WORKSPACE_VERSION" ]]; then
             if [[ "$IS_RELEASE_PR" == "true" ]]; then
-              echo "⚠️  Rust SDK version difference (expected for release PR):"
+              echo "⚠️  Rust SDK workspace version difference (expected for release PR):"
               echo "   Manifest: $MANIFEST_VERSION"
-              echo "   Cargo.toml: $CARGO_VERSION"
-              
-              # For release PRs, ensure both crates have the same version
-              MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-              if [[ "$CARGO_VERSION" != "$MACROS_VERSION" ]]; then
-                echo "❌ Rust crates must have matching versions in release PR:"
-                echo "   SDK: $CARGO_VERSION"
-                echo "   Macros: $MACROS_VERSION"
-                exit 1
-              fi
-              echo "✅ Both Rust crates at version $CARGO_VERSION for release"
+              echo "   Workspace Cargo.toml: $WORKSPACE_VERSION"
             else
-              echo "❌ Rust SDK version mismatch:"
+              echo "❌ Rust SDK workspace version mismatch:"
               echo "   Manifest: $MANIFEST_VERSION"
-              echo "   Cargo.toml: $CARGO_VERSION"
+              echo "   Workspace Cargo.toml: $WORKSPACE_VERSION"
               exit 1
             fi
           else
-            # Check Rust macros version matches exactly
-            MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-            
-            if [[ "$MANIFEST_VERSION" != "$MACROS_VERSION" ]]; then
-              echo "❌ Rust macros version mismatch:"
-              echo "   Expected: $MANIFEST_VERSION"
-              echo "   Actual: $MACROS_VERSION"
-              echo "   These crates must have the same version"
+            echo "✅ Rust SDK workspace version consistent: $WORKSPACE_VERSION"
+          fi
+          
+          # Check Components workspace version
+          COMPONENTS_MANIFEST=$(jq -r '.components' .release-please-manifest.json)
+          COMPONENTS_WORKSPACE=$(grep '^\s*version = ' components/Cargo.toml | head -1 | cut -d'"' -f2)
+          
+          if [[ "$COMPONENTS_MANIFEST" != "$COMPONENTS_WORKSPACE" ]]; then
+            if [[ "$IS_RELEASE_PR" == "true" ]]; then
+              echo "⚠️  Components workspace version difference (expected for release PR):"
+              echo "   Manifest: $COMPONENTS_MANIFEST"
+              echo "   Workspace Cargo.toml: $COMPONENTS_WORKSPACE"
+            else
+              echo "❌ Components workspace version mismatch:"
+              echo "   Manifest: $COMPONENTS_MANIFEST"
+              echo "   Workspace Cargo.toml: $COMPONENTS_WORKSPACE"
               exit 1
             fi
-            
-            echo "✅ Rust crate versions consistent"
-            echo "   SDK: $CARGO_VERSION"
-            echo "   Macros: $MACROS_VERSION"
+          else
+            echo "✅ Components workspace version consistent: $COMPONENTS_WORKSPACE"
           fi
 
       - name: Validate Python package version

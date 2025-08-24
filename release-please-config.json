@@ -80,6 +80,10 @@
       "considerAllArtifacts": false
     },
     {
+      "type": "cargo-workspace",
+      "merge": false
+    },
+    {
       "type": "linked-versions",
       "groupName": "sdk-core",
       "components": [
@@ -128,20 +132,15 @@
         }
       ]
     },
-    "sdk/rust": {
+    "sdk": {
       "release-type": "rust",
       "component": "sdk-rust",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
-      "extra-files": [
-        {
-          "type": "toml",
-          "path": "sdk/rust-macros/Cargo.toml",
-          "jsonpath": "$.package.version"
-        }
-      ]
+      "version-file": "Cargo.toml",
+      "extra-files": []
     },
     "sdk/python": {
       "release-type": "python",
@@ -161,29 +160,20 @@
       "package-name": "@ftl/sdk",
       "extra-files": []
     },
-    "components/mcp-gateway": {
+    "components": {
       "release-type": "rust",
-      "component": "component-mcp-gateway",
+      "component": "components",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
-      "package-name": "mcp-gateway",
+      "package-name": "ftl-components",
+      "version-file": "Cargo.toml",
       "extra-files": [
         {
           "type": "toml",
           "path": "components/mcp-gateway/spin.toml",
           "jsonpath": "$.package.version"
-        }
-      ]
-    },
-    "components/mcp-authorizer": {
-      "release-type": "rust",
-      "component": "component-mcp-authorizer",
-      "changelog-path": "CHANGELOG.md",
-      "include-component-in-tag": true,
-      "tag-separator": "-",
-      "package-name": "mcp-authorizer",
-      "extra-files": [
+        },
         {
           "type": "toml",
           "path": "components/mcp-authorizer/spin.toml",

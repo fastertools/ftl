@@ -38,35 +38,21 @@ jobs:
         run: |
           VERSION="${{ inputs.version }}"
           
-          # Check main SDK version
-          SDK_VERSION=$(grep '^version = ' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
-          if [[ "${SDK_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in sdk/rust/Cargo.toml: found ${SDK_VERSION}, expected ${VERSION}"
+          # Check workspace version
+          WORKSPACE_VERSION=$(grep '^\s*version = ' sdk/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [[ "${WORKSPACE_VERSION}" != "${VERSION}" ]]; then
+            echo "Version mismatch in sdk/Cargo.toml workspace: found ${WORKSPACE_VERSION}, expected ${VERSION}"
             exit 1
           fi
           
-          # Check macros version
-          MACROS_VERSION=$(grep '^version = ' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-          if [[ "${MACROS_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in sdk/rust-macros/Cargo.toml: found ${MACROS_VERSION}, expected ${VERSION}"
-            exit 1
-          fi
-          
-          # Check that SDK depends on correct macros version
-          MACROS_DEP=$(grep 'ftl-sdk-macros.*version' sdk/rust/Cargo.toml | cut -d'"' -f2)
-          if [[ "${MACROS_DEP}" != "=${VERSION}" ]]; then
-            echo "SDK depends on wrong macros version: ${MACROS_DEP}, expected =${VERSION}"
-            exit 1
-          fi
-          
-          # Check manifest version
-          JSON_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
+          # Check manifest version (now uses "sdk" key)
+          JSON_VERSION=$(jq -r '.sdk' .release-please-manifest.json)
           if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
             echo "Version mismatch in manifest: found ${JSON_VERSION}, expected ${VERSION}"
             exit 1
           fi
           
-          echo "All versions validated: ${VERSION}"
+          echo "✅ Workspace version validated: ${VERSION}"
 
   test-crates:
     name: Test Crates

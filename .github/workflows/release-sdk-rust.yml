@@ -37,25 +37,14 @@ jobs:
         run: |
           VERSION="${{ steps.parse.outputs.version }}"
           
-          # Check ftl-sdk version
-          SDK_VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
-          if [ "$SDK_VERSION" != "$VERSION" ]; then
-            echo "❌ Tag version ($VERSION) does not match ftl-sdk version ($SDK_VERSION)"
+          # Check workspace version
+          WORKSPACE_VERSION=$(grep '^\s*version' sdk/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [ "$WORKSPACE_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match workspace version ($WORKSPACE_VERSION)"
             exit 1
           fi
           
-          # Check ftl-sdk-macros version
-          MACROS_VERSION=$(grep '^version' sdk/rust-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-          echo "📦 ftl-sdk-macros version: $MACROS_VERSION"
-          
-          # Verify ftl-sdk depends on the correct macros version
-          MACROS_DEP=$(grep 'ftl-sdk-macros' sdk/rust/Cargo.toml | grep version | cut -d'"' -f2)
-          if [ "$MACROS_DEP" != "$MACROS_VERSION" ]; then
-            echo "❌ ftl-sdk depends on ftl-sdk-macros $MACROS_DEP but macros is at version $MACROS_VERSION"
-            exit 1
-          fi
-          
-          echo "✅ All versions are consistent"
+          echo "✅ Workspace version matches tag: $VERSION"
 
   publish:
     name: Publish to crates.io
@@ -85,14 +74,14 @@ jobs:
       - name: Publish ftl-sdk-macros
         run: |
           cd sdk/rust-macros
-          MACROS_VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          VERSION="${{ needs.verify-tag.outputs.version }}"
           
           # Check if already published
-          if cargo search ftl-sdk-macros --limit 1 | grep -q "^ftl-sdk-macros = \"$MACROS_VERSION\""; then
-            echo "⚠️  ftl-sdk-macros v$MACROS_VERSION already published"
+          if cargo search ftl-sdk-macros --limit 1 | grep -q "^ftl-sdk-macros = \"$VERSION\""; then
+            echo "⚠️  ftl-sdk-macros v$VERSION already published"
           else
             cargo publish
-            echo "✅ Published ftl-sdk-macros v$MACROS_VERSION"
+            echo "✅ Published ftl-sdk-macros v$VERSION"
           fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
