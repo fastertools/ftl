@@ -80,10 +80,6 @@
       "considerAllArtifacts": false
     },
     {
-      "type": "cargo-workspace",
-      "merge": false
-    },
-    {
       "type": "linked-versions",
       "groupName": "sdk-core",
       "components": [
@@ -142,7 +138,13 @@
       "version-file": "Cargo.toml",
       "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
       "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
-      "extra-files": []
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "sdk/rust/Cargo.toml",
+          "jsonpath": "$.dependencies.ftl-sdk-macros.version"
+        }
+      ]
     },
     "sdk/python": {
       "release-type": "python",
