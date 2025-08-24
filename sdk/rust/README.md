@@ -1,6 +1,6 @@
 # ftl-sdk (Rust)
 
-Rust SDK for building Model Context Protocol (MCP) tools that compile to WebAssembly.
+Rust SDK for building Model Context Protocol (MCP) tools on WebAssembly.
 
 ## Installation
 
