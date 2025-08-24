@@ -35,22 +35,19 @@ jobs:
       go_sdk_released: ${{ steps.release.outputs['sdk/go--release_created'] }}
       go_sdk_version: ${{ steps.release.outputs['sdk/go--version'] }}
       go_sdk_tag: ${{ steps.release.outputs['sdk/go--tag_name'] }}
-      rust_sdk_released: ${{ steps.release.outputs['sdk/rust--release_created'] }}
-      rust_sdk_version: ${{ steps.release.outputs['sdk/rust--version'] }}
-      rust_sdk_tag: ${{ steps.release.outputs['sdk/rust--tag_name'] }}
+      rust_sdk_released: ${{ steps.release.outputs['sdk--release_created'] }}
+      rust_sdk_version: ${{ steps.release.outputs['sdk--version'] }}
+      rust_sdk_tag: ${{ steps.release.outputs['sdk--tag_name'] }}
       python_sdk_released: ${{ steps.release.outputs['sdk/python--release_created'] }}
       python_sdk_version: ${{ steps.release.outputs['sdk/python--version'] }}
       python_sdk_tag: ${{ steps.release.outputs['sdk/python--tag_name'] }}
       typescript_sdk_released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
       typescript_sdk_version: ${{ steps.release.outputs['sdk/typescript--version'] }}
       typescript_sdk_tag: ${{ steps.release.outputs['sdk/typescript--tag_name'] }}
-      # Component releases
-      mcp_gateway_released: ${{ steps.release.outputs['components/mcp-gateway--release_created'] }}
-      mcp_gateway_version: ${{ steps.release.outputs['components/mcp-gateway--version'] }}
-      mcp_gateway_tag: ${{ steps.release.outputs['components/mcp-gateway--tag_name'] }}
-      mcp_authorizer_released: ${{ steps.release.outputs['components/mcp-authorizer--release_created'] }}
-      mcp_authorizer_version: ${{ steps.release.outputs['components/mcp-authorizer--version'] }}
-      mcp_authorizer_tag: ${{ steps.release.outputs['components/mcp-authorizer--tag_name'] }}
+      # Components releases (unified)
+      components_released: ${{ steps.release.outputs['components--release_created'] }}
+      components_version: ${{ steps.release.outputs['components--version'] }}
+      components_tag: ${{ steps.release.outputs['components--tag_name'] }}
     steps:
       - name: Generate app token
         id: app-token
@@ -74,11 +71,10 @@ jobs:
           echo "Releases created: ${{ steps.release.outputs.releases_created }}"
           echo "CLI released: ${{ steps.release.outputs['cmd/ftl--release_created'] }}"
           echo "Go SDK released: ${{ steps.release.outputs['sdk/go--release_created'] }}"
-          echo "Rust SDK released: ${{ steps.release.outputs['sdk/rust--release_created'] }}"
+          echo "Rust SDK released: ${{ steps.release.outputs['sdk--release_created'] }}"
           echo "Python SDK released: ${{ steps.release.outputs['sdk/python--release_created'] }}"
           echo "TypeScript SDK released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}"
-          echo "MCP Gateway released: ${{ steps.release.outputs['components/mcp-gateway--release_created'] }}"
-          echo "MCP Authorizer released: ${{ steps.release.outputs['components/mcp-authorizer--release_created'] }}"
+          echo "Components released: ${{ steps.release.outputs['components--release_created'] }}"
 
   # CLI Release
   release-cli:
@@ -160,25 +156,14 @@ jobs:
       tag: ${{ needs.release-please.outputs.typescript_sdk_tag }}
     secrets: inherit
 
-  # WASM Component Releases
-  release-mcp-gateway:
+  # Components Release (unified)
+  release-components:
     needs: release-please
-    if: ${{ needs.release-please.outputs.mcp_gateway_released == 'true' }}
-    uses: ./.github/workflows/release-wasm-component.yml
+    if: ${{ needs.release-please.outputs.components_released == 'true' }}
+    uses: ./.github/workflows/release-components.yml
     with:
-      component: mcp-gateway
-      version: ${{ needs.release-please.outputs.mcp_gateway_version }}
-      tag: ${{ needs.release-please.outputs.mcp_gateway_tag }}
-    secrets: inherit
-
-  release-mcp-authorizer:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.mcp_authorizer_released == 'true' }}
-    uses: ./.github/workflows/release-wasm-component.yml
-    with:
-      component: mcp-authorizer
-      version: ${{ needs.release-please.outputs.mcp_authorizer_version }}
-      tag: ${{ needs.release-please.outputs.mcp_authorizer_tag }}
+      version: ${{ needs.release-please.outputs.components_version }}
+      tag: ${{ needs.release-please.outputs.components_tag }}
     secrets: inherit
 
   # Post-release validation
@@ -190,8 +175,7 @@ jobs:
       - release-rust-sdk
       - release-python-sdk
       - release-typescript-sdk
-      - release-mcp-gateway
-      - release-mcp-authorizer
+      - release-components
     if: always() && needs.release-please.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -223,6 +207,11 @@ jobs:
             exit 1
           fi
           
+          if [[ "${{ needs.release-components.result }}" == "failure" ]]; then
+            echo "Components release failed"
+            exit 1
+          fi
+          
           echo "All releases completed successfully"
 
       - name: Generate app token for summary
@@ -238,4 +227,4 @@ jobs:
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.summary-token.outputs.token }}
-          script: "const releases = []; if ('${{ needs.release-please.outputs.cli_released }}' === 'true') { releases.push('CLI v${{ needs.release-please.outputs.cli_version }}'); } if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') { releases.push('Go SDK v${{ needs.release-please.outputs.go_sdk_version }}'); } if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') { releases.push('Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}'); } if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') { releases.push('Python SDK v${{ needs.release-please.outputs.python_sdk_version }}'); } if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') { releases.push('TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}'); } if ('${{ needs.release-please.outputs.mcp_gateway_released }}' === 'true') { releases.push('MCP Gateway v${{ needs.release-please.outputs.mcp_gateway_version }}'); } if ('${{ needs.release-please.outputs.mcp_authorizer_released }}' === 'true') { releases.push('MCP Authorizer v${{ needs.release-please.outputs.mcp_authorizer_version }}'); } if (releases.length > 0) { const summary = '## Release Summary\\n\\nSuccessfully released:\\n' + releases.map(r => '- ' + r).join('\\n'); await core.summary.addRaw(summary).write(); }"
+          script: "const releases = []; if ('${{ needs.release-please.outputs.cli_released }}' === 'true') { releases.push('CLI v${{ needs.release-please.outputs.cli_version }}'); } if ('${{ needs.release-please.outputs.go_sdk_released }}' === 'true') { releases.push('Go SDK v${{ needs.release-please.outputs.go_sdk_version }}'); } if ('${{ needs.release-please.outputs.rust_sdk_released }}' === 'true') { releases.push('Rust SDK v${{ needs.release-please.outputs.rust_sdk_version }}'); } if ('${{ needs.release-please.outputs.python_sdk_released }}' === 'true') { releases.push('Python SDK v${{ needs.release-please.outputs.python_sdk_version }}'); } if ('${{ needs.release-please.outputs.typescript_sdk_released }}' === 'true') { releases.push('TypeScript SDK v${{ needs.release-please.outputs.typescript_sdk_version }}'); } if ('${{ needs.release-please.outputs.components_released }}' === 'true') { releases.push('Components v${{ needs.release-please.outputs.components_version }}'); } if (releases.length > 0) { const summary = '## Release Summary\\n\\nSuccessfully released:\\n' + releases.map(r => '- ' + r).join('\\n'); await core.summary.addRaw(summary).write(); }"
