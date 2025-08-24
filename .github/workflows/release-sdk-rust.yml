@@ -68,6 +68,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           cache-key: release-sdk-rust-v189
+          targets: wasm32-wasip1
       
       - name: Verify crates can be published
         run: |
