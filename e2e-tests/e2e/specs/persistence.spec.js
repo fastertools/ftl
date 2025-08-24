@@ -1,7 +1,11 @@
 const { test, expect } = require('@playwright/test');
+const HTMXHelpers = require('../utils/HTMXHelpers');
 
 test.describe('Persistence Tests', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, context }) => {
+        // Set project path in context for HTMXHelpers
+        context.projectPath = '/tmp/test-project';
+        
         await page.goto('http://localhost:8080');
         await page.waitForLoadState('networkidle');
     });
@@ -17,8 +21,11 @@ test.describe('Persistence Tests', () => {
         await expect(buildButton).toBeVisible();
         await buildButton.click();
         
-        // Wait for some output to appear
-        await page.waitForTimeout(3000);
+        // Wait for command output to appear using HTMXHelpers
+        const logsResult = await HTMXHelpers.waitForLogs(page, 1, {
+            timeout: 5000,
+            projectPath: page.context().projectPath
+        });
         
         // Check if there's output in the console
         const outputBefore = await page.locator('#ftl-output').innerHTML();
@@ -39,15 +46,21 @@ test.describe('Persistence Tests', () => {
             const secondProject = projectItems.nth(1);
             await secondProject.click();
             
-            // Wait for the switch to complete
-            await page.waitForTimeout(2000);
+            // Wait for project switch to complete using HTMXHelpers
+            await HTMXHelpers.waitForSettle(page, {
+                timeout: 3000,
+                projectPath: page.context().projectPath
+            });
             
             // Switch back to the original project
             const firstProject = projectItems.nth(0);
             await firstProject.click();
             
-            // Wait for the switch to complete
-            await page.waitForTimeout(2000);
+            // Wait for project switch to complete using HTMXHelpers
+            await HTMXHelpers.waitForSettle(page, {
+                timeout: 3000,
+                projectPath: page.context().projectPath
+            });
             
             // Make sure we're on the Command Output tab after switch
             await page.click('#commands-tab');
@@ -68,8 +81,11 @@ test.describe('Persistence Tests', () => {
         // Wait for the page to load
         await page.waitForSelector('#live-log-content');
         
-        // Wait for some logs to accumulate (if any)
-        await page.waitForTimeout(5000);
+        // Wait for logs to accumulate using HTMXHelpers
+        await HTMXHelpers.waitForLogs(page, 1, {
+            timeout: 5000,
+            projectPath: page.context().projectPath
+        });
         
         // Get initial log content
         const logsBefore = await page.locator('#live-log-content').innerHTML();
@@ -84,15 +100,21 @@ test.describe('Persistence Tests', () => {
             const secondProject = projectItems.nth(1);
             await secondProject.click();
             
-            // Wait for the switch to complete
-            await page.waitForTimeout(2000);
+            // Wait for project switch to complete using HTMXHelpers
+            await HTMXHelpers.waitForSettle(page, {
+                timeout: 3000,
+                projectPath: page.context().projectPath
+            });
             
             // Switch back to the original project
             const firstProject = projectItems.nth(0);
             await firstProject.click();
             
-            // Wait for the switch to complete
-            await page.waitForTimeout(2000);
+            // Wait for project switch to complete using HTMXHelpers
+            await HTMXHelpers.waitForSettle(page, {
+                timeout: 3000,
+                projectPath: page.context().projectPath
+            });
             
             // Check if logs are still there (or at least the container is properly initialized)
             const logsAfter = await page.locator('#live-log-content').innerHTML();
@@ -118,8 +140,17 @@ test.describe('Persistence Tests', () => {
         await expect(buildButton).toBeVisible();
         await buildButton.click();
         
-        // Wait longer for command to complete
-        await page.waitForTimeout(5000);
+        // Wait for command to complete using HTMXHelpers
+        await HTMXHelpers.waitForSettle(page, {
+            timeout: 5000,
+            projectPath: page.context().projectPath
+        });
+        
+        // Also wait for logs to appear
+        await HTMXHelpers.waitForLogs(page, 1, {
+            timeout: 3000,
+            projectPath: page.context().projectPath
+        });
         
         // Check for command output
         const output = await page.locator('#ftl-output').innerHTML();

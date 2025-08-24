@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/spin"
 	"github.com/fastertools/ftl/synthesis"
 	"github.com/fatih/color"
@@ -34,15 +35,9 @@ func newBuildCmd() *cobra.Command {
 
 			// Auto-detect config file if not specified
 			if configFile == "" {
-				// Try to detect the config format
-				if _, err := os.Stat("ftl.yaml"); err == nil {
-					configFile = "ftl.yaml"
-				} else if _, err := os.Stat("ftl.json"); err == nil {
-					configFile = "ftl.json"
-				} else if _, err := os.Stat("app.cue"); err == nil {
-					configFile = "app.cue"
-				} else if _, err := os.Stat("main.go"); err == nil {
-					configFile = "main.go"
+				detected, err := config.AutoDetectForBuild()
+				if err == nil {
+					configFile = detected.Path
 				}
 			}
 

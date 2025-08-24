@@ -74,6 +74,15 @@ func runDevConsole(port int) error {
 	// Tools endpoints
 	http.HandleFunc("/tools-list", handler.HandleToolsList)
 	http.HandleFunc("/tool-params/", handler.HandleToolParams)
+	
+	// Test-specific endpoints (enabled when running tests)
+	if os.Getenv("FTL_TEST_MODE") == "true" {
+		Info("Test mode enabled - registering test endpoints")
+		http.HandleFunc("/api/test/wait-for-htmx", handler.HandleTestWaitForHTMX)
+		http.HandleFunc("/api/test/wait-for-status", handler.HandleTestWaitForStatus)
+		http.HandleFunc("/api/test/wait-for-logs", handler.HandleTestWaitForLogs)
+		http.HandleFunc("/api/test/process-tree", handler.HandleTestProcessTree)
+	}
 
 	Success("Starting server on port %d...", port)
 

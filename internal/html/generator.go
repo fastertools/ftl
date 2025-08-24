@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/fastertools/ftl/internal/models"
+	"github.com/fastertools/ftl/internal/ui"
 )
 
 // GenerateProcessHTML generates HTML for a single process status section
@@ -13,7 +14,7 @@ func GenerateProcessHTML(processName string, processInfo models.ProcessInfo, col
 	if processInfo.IsRunning {
 		if colorScheme == "green" {
 			dotColor = "bg-green-400"
-			statusText = "Running"
+			statusText = ui.StatusRunning
 			statusColor = "text-green-400"
 			statusBgColor = "bg-green-900/50"
 		} else { // blue for watch mode
@@ -24,9 +25,9 @@ func GenerateProcessHTML(processName string, processInfo models.ProcessInfo, col
 		}
 	} else {
 		dotColor = "bg-gray-500"
-		statusText = "Stopped"
-		if processName == "Watch Mode" {
-			statusText = "Inactive"
+		statusText = ui.StatusStopped
+		if processName == ui.ProcessNameWatch {
+			statusText = ui.StatusInactive
 		}
 		statusColor = "text-gray-400"
 		statusBgColor = "bg-gray-900/50"
@@ -49,13 +50,13 @@ func GenerateProcessHTML(processName string, processInfo models.ProcessInfo, col
 func GenerateIntegratedProcessHTML(status models.DetailedStatusInfo, projectPath string) string {
 	if status.ActiveProcess != nil && status.ActiveProcess.IsRunning {
 		// Display the active process
-		displayName := "FTL Process"
+		displayName := ui.ProcessNameRegular
 		colorScheme := "green"
 		if status.ActiveProcess.Type == "watch" {
-			displayName = "Watch Mode"
+			displayName = ui.ProcessNameWatch
 			colorScheme = "blue"
 		} else if status.ActiveProcess.Type == "regular" {
-			displayName = "Up Process"
+			displayName = ui.ProcessNameRegular
 			colorScheme = "green"
 		}
 		
@@ -70,7 +71,7 @@ func GenerateIntegratedProcessHTML(status models.DetailedStatusInfo, projectPath
 	
 	// No active process - show inactive state
 	emptyProcess := models.ProcessInfo{IsRunning: false}
-	inactiveSection := GenerateProcessSectionHTML("", "No Active Process", emptyProcess, projectPath, "gray")
+	inactiveSection := GenerateProcessSectionHTML("", ui.ProcessNameNone, emptyProcess, projectPath, "gray")
 	
 	return fmt.Sprintf(`
 		<div class="space-y-3">

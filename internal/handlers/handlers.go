@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fastertools/ftl/web-templates"
+	"github.com/fastertools/ftl/ui/templates"
 	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/internal/mcpclient"
 	"github.com/fastertools/ftl/internal/models"
 	"github.com/fastertools/ftl/internal/parser"
 	"github.com/fastertools/ftl/internal/polling"
 	"github.com/fastertools/ftl/internal/state"
+	"github.com/fastertools/ftl/internal/ui"
 )
 
 // formatTimestamp returns a consistent timestamp format for all messages
@@ -79,6 +80,11 @@ func NewHandler(mcpClient *mcpclient.Client) *Handler {
 
 // HandleIndex serves the main page
 func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	// Ensure projects file exists (for new users or if deleted)
+	if err := h.registry.EnsureProjectsFile(); err != nil {
+		log.Printf("Warning: failed to ensure projects file: %v", err)
+	}
+	
 	// Get all projects for sidebar
 	allProjects := h.registry.GetAllProjects()
 	
@@ -897,7 +903,7 @@ func generateControlCenterStatusHTML(status models.DetailedStatusInfo) string {
 		<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
 			<div class="flex items-center space-x-2">
 				<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-				<span class="text-sm font-medium" style="color: #666666;">Stopped</span>
+				<span class="text-sm font-medium" style="color: #666666;">` + ui.StatusStopped + `</span>
 			</div>
 		</div>
 	</div>`
@@ -920,4 +926,259 @@ func generateStopButtonHTML(processType string, isRunning bool, projectPath stri
 			Stop
 		</button>
 	`, projectPath, processType)
+}
+
+// ============================================================================
+// Test-Specific HTTP Endpoints (Phase 2)
+// ============================================================================
+
+// HandleTestWaitForHTMX blocks until HTMX operations complete
+func (h *Handler) HandleTestWaitForHTMX(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	projectPath := r.URL.Query().Get("project_path")
+	timeoutStr := r.URL.Query().Get("timeout")
+	
+	if projectPath == "" {
+		http.Error(w, "project_path parameter required", http.StatusBadRequest)
+		return
+	}
+	
+	timeout := 30 * time.Second
+	if timeoutStr != "" {
+		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
+			timeout = t
+		}
+	}
+	
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	
+	timeoutChan := time.After(timeout)
+	
+	for {
+		// Check if HTMX operations have settled (no active polling)
+		projectState, exists := h.registry.GetProject(projectPath)
+		if exists && projectState != nil && !projectState.PollingActive {
+			response := map[string]interface{}{
+				"ready":   true,
+				"message": "HTMX operations settled",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		
+		// Wait for next check or timeout
+		select {
+		case <-ticker.C:
+			continue
+		case <-timeoutChan:
+			response := map[string]interface{}{
+				"ready":   false,
+				"message": "Timeout waiting for HTMX to settle",
+			}
+			w.WriteHeader(http.StatusRequestTimeout)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+}
+
+// HandleTestWaitForStatus blocks until process status changes to expected value
+func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	projectPath := r.URL.Query().Get("project_path")
+	expectedStatus := r.URL.Query().Get("status")
+	timeoutStr := r.URL.Query().Get("timeout")
+	
+	if projectPath == "" {
+		response := models.APIResponse{
+			Success: false,
+			Error:   "project_path parameter required",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	
+	timeout := 30 * time.Second
+	if timeoutStr != "" {
+		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
+			timeout = t
+		}
+	}
+	
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	
+	timeoutChan := time.After(timeout)
+	
+	for {
+		// Check current status
+		projectState, exists := h.registry.GetProject(projectPath)
+		if exists && projectState != nil {
+			currentStatus := "stopped"
+			if projectState.ProcessInfo.ActiveProcess != nil && projectState.ProcessInfo.ActiveProcess.IsRunning {
+				currentStatus = "running"
+			}
+			
+			// Check if status matches expected
+			if expectedStatus == "" || currentStatus == expectedStatus {
+				response := map[string]interface{}{
+					"ready":   true,
+					"status":  currentStatus,
+					"message": "Process status matches",
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+		
+		// Wait for next check or timeout
+		select {
+		case <-ticker.C:
+			// Continue to next iteration
+			continue
+		case <-timeoutChan:
+			// Get current status for response
+			currentStatus := "stopped"
+			if projectState, exists := h.registry.GetProject(projectPath); exists && projectState != nil {
+				if projectState.ProcessInfo.ActiveProcess != nil && projectState.ProcessInfo.ActiveProcess.IsRunning {
+					currentStatus = "running"
+				}
+			}
+			response := map[string]interface{}{
+				"ready":   false,
+				"status":  currentStatus,
+				"message": "Timeout waiting for status",
+			}
+			w.WriteHeader(http.StatusRequestTimeout)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+}
+
+// HandleTestWaitForLogs blocks until sufficient logs are available
+func (h *Handler) HandleTestWaitForLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	projectPath := r.URL.Query().Get("project_path")
+	minLinesStr := r.URL.Query().Get("min_lines")
+	timeoutStr := r.URL.Query().Get("timeout")
+	
+	if projectPath == "" {
+		http.Error(w, "project_path parameter required", http.StatusBadRequest)
+		return
+	}
+	
+	minLines := 1
+	if minLinesStr != "" {
+		fmt.Sscanf(minLinesStr, "%d", &minLines)
+	}
+	
+	timeout := 30 * time.Second
+	if timeoutStr != "" {
+		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
+			timeout = t
+		}
+	}
+	
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	
+	timeoutChan := time.After(timeout)
+	
+	for {
+		// Check for sufficient logs
+		projectState, exists := h.registry.GetProject(projectPath)
+		if exists && projectState != nil {
+			logs := projectState.LogBuffer.GetAll()
+			if len(logs) >= minLines {
+				response := map[string]interface{}{
+					"ready": true,
+					"logs":  logs,
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+		
+		// Wait for next check or timeout
+		select {
+		case <-ticker.C:
+			continue
+		case <-timeoutChan:
+			// Get current logs for timeout response
+			currentLogs := []string{}
+			if projectState, exists := h.registry.GetProject(projectPath); exists && projectState != nil {
+				currentLogs = projectState.LogBuffer.GetAll()
+			}
+			response := map[string]interface{}{
+				"ready": false,
+				"logs":  currentLogs,
+			}
+			w.WriteHeader(http.StatusRequestTimeout)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+}
+
+// HandleTestProcessTree returns JSON process hierarchy
+func (h *Handler) HandleTestProcessTree(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	projectPath := r.URL.Query().Get("project_path")
+	if projectPath == "" {
+		http.Error(w, "project_path parameter required", http.StatusBadRequest)
+		return
+	}
+	
+	// Get process info from project state
+	projectState, exists := h.registry.GetProject(projectPath)
+	if !exists || projectState == nil {
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+	
+	// Create ftl process info
+	ftlInfo := map[string]interface{}{
+		"is_running": false,
+	}
+	
+	if projectState.ProcessInfo.ActiveProcess != nil && projectState.ProcessInfo.ActiveProcess.IsRunning {
+		ftlInfo = map[string]interface{}{
+			"is_running": true,
+			"pid":        projectState.ProcessInfo.ActiveProcess.PID,
+			"port":       projectState.ProcessInfo.ActiveProcess.Port,
+			"type":       projectState.ProcessInfo.ActiveProcess.Type,
+		}
+	}
+	
+	response := map[string]interface{}{
+		"ftl": ftlInfo,
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

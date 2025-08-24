@@ -1,5 +1,16 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+
+// Try to load dynamic test config if available
+let baseURL = 'http://localhost:8080';
+const testConfigPath = path.join(__dirname, 'e2e-tests', '.test-config.json');
+if (fs.existsSync(testConfigPath)) {
+  const config = JSON.parse(fs.readFileSync(testConfigPath, 'utf8'));
+  baseURL = config.baseURL || baseURL;
+  console.log(`Using dynamic baseURL: ${baseURL}`);
+}
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -19,8 +30,10 @@ module.exports = defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['list']
   ],
+  globalSetup: './e2e-tests/global-setup.js',
+  globalTeardown: './e2e-tests/global-teardown.js',
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

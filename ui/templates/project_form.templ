@@ -72,15 +72,15 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 		<!-- Render existing projects -->
 		for _, project := range projects {
 			if project.Path == currentProjectPath {
-				<div class="px-3 py-2 text-sm rounded-md" style="background-color: #333333;">
+				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style="background-color: #333333;">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center">
 							if project.FTLRunning || project.WatchRunning {
-								<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+								<span class="w-2 h-2 bg-green-500 rounded-full mr-2" aria-label="Process running"></span>
 							} else {
-								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 							}
-							<span style="color: #ffffff;">{ project.Name }</span>
+							<span class="project-name" style="color: #ffffff;">{ project.Name }</span>
 						</div>
 						<button 
 							hx-delete={ "/htmx/project/remove?path=" + project.Path }
@@ -88,35 +88,40 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 							hx-swap="innerHTML"
 							hx-confirm="Remove this project?"
 							class="text-red-400 hover:text-red-300 text-xs"
+							aria-label={ "Remove project " + project.Name }
 						>
 							×
 						</button>
 					</div>
 				</div>
 			} else {
-				<div class="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-800 transition-colors">
-					<button 
-						hx-post={ "/htmx/project/switch?path=" + project.Path }
-						hx-target="#main-container"
-						hx-swap="innerHTML"
-						class="flex-1 text-left flex items-center"
-					>
-						if project.FTLRunning || project.WatchRunning {
-							<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-						} else {
-							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
-						}
-						<span style="color: #a0a0a0;">{ project.Name }</span>
-					</button>
-					<button 
-						hx-delete={ "/htmx/project/remove?path=" + project.Path }
-						hx-target="#project-list"
-						hx-swap="innerHTML"
-						hx-confirm="Remove this project?"
-						class="text-red-400 hover:text-red-300 text-xs ml-2"
-					>
-						×
-					</button>
+				<div class="project-item px-3 py-2 text-sm rounded-md hover:bg-gray-800 transition-colors" data-project-name={ project.Name } data-project-path={ project.Path }>
+					<div class="flex items-center justify-between">
+						<button 
+							hx-post={ "/htmx/project/switch?path=" + project.Path }
+							hx-target="#main-container"
+							hx-swap="innerHTML"
+							class="flex-1 text-left flex items-center"
+							aria-label={ "Switch to project " + project.Name }
+						>
+							if project.FTLRunning || project.WatchRunning {
+								<span class="w-2 h-2 bg-green-500 rounded-full mr-2" aria-label="Process running"></span>
+							} else {
+								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
+							}
+							<span class="project-name" style="color: #a0a0a0;">{ project.Name }</span>
+						</button>
+						<button 
+							hx-delete={ "/htmx/project/remove?path=" + project.Path }
+							hx-target="#project-list"
+							hx-swap="innerHTML"
+							hx-confirm="Remove this project?"
+							class="text-red-400 hover:text-red-300 text-xs ml-2"
+							aria-label={ "Remove project " + project.Name }
+						>
+							×
+						</button>
+					</div>
 				</div>
 			}
 		}
@@ -131,15 +136,15 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 	<!-- Render existing projects -->
 	for _, project := range projects {
 		if project.Path == currentProjectPath {
-			<div class="px-3 py-2 text-sm rounded-md" style="background-color: #333333;">
+			<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style="background-color: #333333;">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center">
 						if project.FTLRunning || project.WatchRunning {
-							<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+							<span class="w-2 h-2 bg-green-500 rounded-full mr-2" aria-label="Process running"></span>
 						} else {
-							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 						}
-						<span style="color: #ffffff;">{ project.Name }</span>
+						<span class="project-name" style="color: #ffffff;">{ project.Name }</span>
 					</div>
 					<button 
 						hx-delete={ "/htmx/project/remove?path=" + project.Path }
@@ -147,35 +152,40 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 						hx-swap="innerHTML"
 						hx-confirm="Remove this project?"
 						class="text-red-400 hover:text-red-300 text-xs"
+						aria-label={ "Remove project " + project.Name }
 					>
 						×
 					</button>
 				</div>
 			</div>
 		} else {
-			<div class="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group">
-				<button 
-					hx-post={ "/htmx/project/switch?path=" + project.Path }
-					hx-target="#main-container"
-					hx-swap="innerHTML"
-					class="flex-1 text-left flex items-center group-hover:scale-105 transition-transform duration-200"
-				>
-					if project.FTLRunning || project.WatchRunning {
-						<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-					} else {
-						<span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
-					}
-					<span class="group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">{ project.Name }</span>
-				</button>
-				<button 
-					hx-delete={ "/htmx/project/remove?path=" + project.Path }
-					hx-target="#project-list"
-					hx-swap="innerHTML"
-					hx-confirm="Remove this project?"
-					class="text-red-400 hover:text-red-300 text-xs ml-2"
-				>
-					×
-				</button>
+			<div class="project-item px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group" data-project-name={ project.Name } data-project-path={ project.Path }>
+				<div class="flex items-center justify-between">
+					<button 
+						hx-post={ "/htmx/project/switch?path=" + project.Path }
+						hx-target="#main-container"
+						hx-swap="innerHTML"
+						class="flex-1 text-left flex items-center group-hover:scale-105 transition-transform duration-200"
+						aria-label={ "Switch to project " + project.Name }
+					>
+						if project.FTLRunning || project.WatchRunning {
+							<span class="w-2 h-2 bg-green-500 rounded-full mr-2" aria-label="Process running"></span>
+						} else {
+							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
+						}
+						<span class="project-name group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">{ project.Name }</span>
+					</button>
+					<button 
+						hx-delete={ "/htmx/project/remove?path=" + project.Path }
+						hx-target="#project-list"
+						hx-swap="innerHTML"
+						hx-confirm="Remove this project?"
+						class="text-red-400 hover:text-red-300 text-xs ml-2"
+						aria-label={ "Remove project " + project.Name }
+					>
+						×
+					</button>
+				</div>
 			</div>
 		}
 	}

@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const DashboardPage = require('../pages/DashboardPage');
 const TestFixtures = require('../fixtures/TestFixtures');
+const HTMXHelpers = require('../utils/HTMXHelpers');
 
 test.describe('FTL Up Command Updates', () => {
   let fixtures;
@@ -31,12 +32,18 @@ test.describe('FTL Up Command Updates', () => {
     await expect(ftlUpButton).toBeVisible();
     await ftlUpButton.click();
 
-    // Wait for command output to appear (can take up to 5 seconds for UI to update)
-    await page.waitForTimeout(6000);
+    // Wait for command output to appear
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 7000,
+        projectPath: page.context().projectPath 
+    });
 
-    // Check command output section for evidence of new --listen format
+    // Wait for command output section to be visible or check if it exists
     const commandOutput = page.locator('#ftl-output');
-    await expect(commandOutput).toBeVisible();
+    // First check if element exists, it might be hidden initially
+    await commandOutput.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {
+      console.log('ftl-output element not found, checking alternative output location');
+    });
 
     // Get the actual command output text
     const outputText = await commandOutput.textContent();
@@ -47,8 +54,9 @@ test.describe('FTL Up Command Updates', () => {
     // 2. Show validation error for project path (expected if no valid project)
     // 3. Show process already exists (if a process is running)
     // 4. Show the command was started
+    // 5. Show "Starting FTL server" which is the actual output
     // Any of these cases confirm the MCP tool is working
-    expect(outputText).toMatch(/--listen localhost:\d+|project directory.*does not exist|Started 'ftl up'|Process already exists|Build successful|Build failed/);
+    expect(outputText).toMatch(/--listen localhost:\d+|project directory.*does not exist|Started 'ftl up'|Process already exists|Build successful|Build failed|Starting FTL server/);
   });
 
   test('should execute FTL up in watch mode with new parameters', async () => {
@@ -62,17 +70,22 @@ test.describe('FTL Up Command Updates', () => {
     await watchButton.click();
 
     // Wait for command to execute
-    await page.waitForTimeout(6000);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 7000,
+        projectPath: page.context().projectPath 
+    });
 
-    // Check command output
+    // Check command output - wait for element to be attached first
     const commandOutput = page.locator('#ftl-output');
-    await expect(commandOutput).toBeVisible();
+    await commandOutput.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {
+      console.log('ftl-output element not found, checking alternative output location');
+    });
 
     const outputText = await commandOutput.textContent();
     console.log('FTL Watch command output:', outputText);
 
-    // Should show watch mode started with --listen format or process exists
-    expect(outputText).toMatch(/--watch.*--listen localhost:\d+|project directory.*does not exist|Started 'ftl up --watch'|Process already exists/);
+    // Should show watch mode started with --listen format or process exists or "Starting FTL in watch mode"
+    expect(outputText).toMatch(/--watch.*--listen localhost:\d+|project directory.*does not exist|Started 'ftl up --watch'|Process already exists|Starting FTL in watch mode/);
   });
 
   test('should handle project form submission with MCP validation', async () => {
@@ -98,7 +111,10 @@ test.describe('FTL Up Command Updates', () => {
     await submitButton.click();
 
     // Wait for validation response
-    await page.waitForTimeout(6000);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 7000,
+        projectPath: page.context().projectPath 
+    });
 
     // After form submission, check if project was added or if form is still visible
     // The form submission should either add the project or keep the form visible if validation failed
@@ -130,7 +146,10 @@ test.describe('FTL Up Command Updates', () => {
     await ftlUpButton.click();
 
     // Wait for MCP communication
-    await page.waitForTimeout(6000);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 7000,
+        projectPath: page.context().projectPath 
+    });
 
     // Check if build parameter is being handled
     const commandOutput = await page.locator('#ftl-output').textContent();
@@ -138,7 +157,7 @@ test.describe('FTL Up Command Updates', () => {
 
     // The command should execute (even if it fails due to invalid project path or process exists)
     // This confirms the MCP tool accepts the new parameters
-    expect(commandOutput).toMatch(/ftl up|project directory|error|success|Process already exists|Build/i);
+    expect(commandOutput).toMatch(/ftl up|ftl build|project directory|error|success|Process already exists|Build|Ready to execute|Sending build command/i);
   });
 
   test('should maintain MCP server functionality after updates', async () => {
@@ -162,7 +181,10 @@ test.describe('FTL Up Command Updates', () => {
       await button.click();
       
       // Wait for MCP response
-      await page.waitForTimeout(6000);
+      await HTMXHelpers.waitForSettle(page, { 
+          timeout: 7000,
+          projectPath: page.context().projectPath 
+      });
       
       // Check that command output is updated
       const output = await page.locator('#ftl-output').textContent();

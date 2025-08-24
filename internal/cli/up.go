@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/spin"
 	"github.com/fastertools/ftl/synthesis"
 	"github.com/fatih/color"
@@ -18,7 +19,7 @@ func newUpCmd() *cobra.Command {
 	var configFile string
 
 	// Spin up specific flags
-	var componentIDs []string
+	var componentIds []string
 	var cacheDir string
 	var directMounts bool
 	var env []string
@@ -58,15 +59,9 @@ func newUpCmd() *cobra.Command {
 
 			// Auto-detect config file if not specified
 			if configFile == "" {
-				// Try to detect the config format
-				if _, err := os.Stat("ftl.yaml"); err == nil {
-					configFile = "ftl.yaml"
-				} else if _, err := os.Stat("ftl.json"); err == nil {
-					configFile = "ftl.json"
-				} else if _, err := os.Stat("app.cue"); err == nil {
-					configFile = "app.cue"
-				} else if _, err := os.Stat("main.go"); err == nil {
-					configFile = "main.go"
+				detected, err := config.AutoDetectForBuild()
+				if err == nil {
+					configFile = detected.Path
 				}
 			}
 
@@ -111,7 +106,7 @@ func newUpCmd() *cobra.Command {
 			var spinOptions []string
 
 			// Add component IDs
-			for _, id := range componentIDs {
+			for _, id := range componentIds {
 				spinOptions = append(spinOptions, "--component-id", id)
 			}
 
@@ -234,7 +229,7 @@ func newUpCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Configuration file to synthesize (auto-detects if not specified)")
 
 	// Spin up pass-through flags
-	cmd.Flags().StringArrayVar(&componentIDs, "component-id", nil, "[Experimental] Component ID to run. This can be specified multiple times. The default is all components")
+	cmd.Flags().StringArrayVar(&componentIds, "component-id", nil, "[Experimental] Component ID to run. This can be specified multiple times. The default is all components")
 	cmd.Flags().StringVar(&cacheDir, "cache-dir", "", "Cache directory for downloaded components and assets")
 	cmd.Flags().BoolVar(&directMounts, "direct-mounts", false, "For local apps with directory mounts and no excluded files, mount them directly instead of using a temporary directory")
 	cmd.Flags().StringArrayVarP(&env, "env", "e", nil, "Pass an environment variable (key=value) to all components of the application")

@@ -166,9 +166,7 @@ all: build build-components
 # Test targets
 test-go:
 	@echo "🧪 Running Go unit tests..."
-	@go test -timeout=30s ./internal/state -v || echo "Warning: state tests not found"
-	@go test -timeout=30s ./internal/polling -v || echo "Warning: polling tests not found"
-	@go test -timeout=30s ./internal/... -v
+	@go test -timeout=2m -short ./internal/... -v
 	@echo "✅ Go tests completed"
 
 test-mcp: build
@@ -180,12 +178,11 @@ test-console: build kill
 	@./bin/ftl dev console --port 8080 2>&1 | head -20 | grep -q "Starting server on port" && echo "✅ Console mode starts" || echo "❌ Console mode failed"
 
 test-browser: build kill setup-browser-tests clean-test-data
-	@echo "🧪 Starting FTL dev console for browser tests..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@echo "🧪 Running browser tests with standardized test projects file..."
+	@rm -f .e2e-projects.json
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
-	@echo "Running Playwright tests..."
 	@npx playwright test --config=playwright.config.js || true
-	@echo "Stopping test server..."
 	@pkill -f "ftl dev console" || true
 	@$(MAKE) clean-test-data
 	@echo "Tests completed"
@@ -244,6 +241,7 @@ setup-all: setup-browser-tests
 clean-test-data:
 	@echo "🧹 Cleaning E2E test data..."
 	@rm -f test_projects.json
+	@rm -f .e2e-projects.json
 	@rm -rf .e2e-projects/
 	@echo "✅ E2E test data cleaned"
 

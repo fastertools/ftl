@@ -1,4 +1,6 @@
 // Page Object for the project sidebar
+const HTMXHelpers = require('../utils/HTMXHelpers');
+
 class ProjectSidebarPage {
     constructor(page) {
         this.page = page;
@@ -16,7 +18,10 @@ class ProjectSidebarPage {
     async clickAddProject() {
         const button = await this.page.locator(this.addProjectButton).first();
         await button.click();
-        await this.page.waitForTimeout(500);
+        await HTMXHelpers.waitForSettle(this.page, { 
+            timeout: 1000,
+            projectPath: this.page.context().projectPath 
+        });
     }
 
     async fillProjectForm(name, path) {
@@ -26,12 +31,18 @@ class ProjectSidebarPage {
 
     async submitProjectForm() {
         await this.page.locator(this.addButton).click();
-        await this.page.waitForTimeout(500);
+        await HTMXHelpers.waitForSettle(this.page, { 
+            timeout: 1000,
+            projectPath: this.page.context().projectPath 
+        });
     }
 
     async cancelProjectForm() {
         await this.page.locator(this.cancelButton).click();
-        await this.page.waitForTimeout(500);
+        await HTMXHelpers.waitForSettle(this.page, { 
+            timeout: 1000,
+            projectPath: this.page.context().projectPath 
+        });
     }
 
     async getProjectCount() {
@@ -65,7 +76,10 @@ class ProjectSidebarPage {
                 // Handle confirmation dialog if present
                 this.page.once('dialog', async dialog => await dialog.accept());
                 await removeBtn.click();
-                await this.page.waitForTimeout(500);
+                await HTMXHelpers.waitForSettle(this.page, { 
+                    timeout: 1000,
+                    projectPath: this.page.context().projectPath 
+                });
             }
         }
     }

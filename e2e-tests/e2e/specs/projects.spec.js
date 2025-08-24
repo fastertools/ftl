@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const ProjectSidebarPage = require('../pages/ProjectSidebarPage');
 const TestFixtures = require('../fixtures/TestFixtures');
 const TestHelpers = require('../utils/TestHelpers');
+const HTMXHelpers = require('../utils/HTMXHelpers');
 
 test.describe('Project Management Tests', () => {
     let fixtures;
@@ -24,11 +25,12 @@ test.describe('Project Management Tests', () => {
         await fixtures.reloadServerProjects();
         // Force a fresh page load to avoid cached UI state
         await page.goto('http://localhost:8080', { 
-            waitUntil: 'domcontentloaded',
-            // Force reload to avoid cache
             waitUntil: 'networkidle'
         });
-        await page.waitForTimeout(500); // Give UI time to render
+        await HTMXHelpers.waitForSettle(page, { 
+            timeout: 1000,
+            projectPath: page.context().projectPath 
+        });
     });
 
     test('should show Add Project button', async () => {
@@ -66,7 +68,10 @@ test.describe('Project Management Tests', () => {
         
         await TestHelpers.waitForHTMXRequest(page);
         // Give HTMX more time to update the DOM
-        await page.waitForTimeout(2000);
+        await HTMXHelpers.waitForSettle(page, { 
+            timeout: 3000,
+            projectPath: page.context().projectPath 
+        });
         
         // Refresh the page to ensure we see the current server state
         await page.reload({ waitUntil: 'domcontentloaded' });
@@ -117,7 +122,10 @@ test.describe('Project Management Tests', () => {
         await projectSidebar.submitProjectForm();
         
         await TestHelpers.waitForHTMXRequest(page);
-        await page.waitForTimeout(1000);
+        await HTMXHelpers.waitForSettle(page, { 
+            timeout: 2000,
+            projectPath: page.context().projectPath 
+        });
         
         // Reload to ensure we see the added project
         await page.reload({ waitUntil: 'domcontentloaded' });
@@ -130,7 +138,10 @@ test.describe('Project Management Tests', () => {
         await projectSidebar.removeProject(projectName);
         
         await TestHelpers.waitForHTMXRequest(page);
-        await page.waitForTimeout(1000);
+        await HTMXHelpers.waitForSettle(page, { 
+            timeout: 2000,
+            projectPath: page.context().projectPath 
+        });
         
         // Reload to see the updated state
         await page.reload({ waitUntil: 'domcontentloaded' });

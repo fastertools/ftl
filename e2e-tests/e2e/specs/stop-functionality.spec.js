@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const DashboardPage = require('../pages/DashboardPage');
 const TestFixtures = require('../fixtures/TestFixtures');
+const HTMXHelpers = require('../utils/HTMXHelpers');
 
 test.describe('Stop Functionality Tests', () => {
     let fixtures;
@@ -52,8 +53,11 @@ test.describe('Stop Functionality Tests', () => {
             // Click the stop button
             await firstStopButton.click();
             
-            // Wait a moment for the response
-            await page.waitForTimeout(2000);
+            // Wait for the stop operation to complete
+            await HTMXHelpers.waitForSettle(page, { 
+                timeout: 3000,
+                projectPath: page.context().projectPath 
+            });
             
             // Check if any error message appeared
             const feedbackText = await operationFeedback.textContent();
@@ -113,7 +117,10 @@ test.describe('Stop Functionality Tests', () => {
             await stopButtons.first().click();
             
             // Wait for response
-            await page.waitForTimeout(1500);
+            await HTMXHelpers.waitForSettle(page, { 
+                timeout: 2000,
+                projectPath: page.context().projectPath 
+            });
             
             const feedbackText = await operationFeedback.textContent();
             console.log(`Stop operation result: "${feedbackText}"`);

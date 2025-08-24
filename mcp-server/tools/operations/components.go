@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/modelcontextprotocol/mcp-server/internal/ftl"
-	"github.com/modelcontextprotocol/mcp-server/internal/types"
+	"github.com/fastertools/ftl/mcp-server/internal/ftl"
+	"github.com/fastertools/ftl/mcp-server/internal/types"
 )
 
 // ComponentsHandler handles ftl component list operations

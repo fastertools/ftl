@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/modelcontextprotocol/mcp-server/internal/files"
-	"github.com/modelcontextprotocol/mcp-server/internal/ftl"
-	"github.com/modelcontextprotocol/mcp-server/internal/process"
-	"github.com/modelcontextprotocol/mcp-server/internal/types"
+	"github.com/fastertools/ftl/mcp-server/internal/files"
+	"github.com/fastertools/ftl/mcp-server/internal/ftl"
+	"github.com/fastertools/ftl/mcp-server/internal/process"
+	"github.com/fastertools/ftl/mcp-server/internal/types"
 )
 
 // StatusHandler handles status queries for FTL processes

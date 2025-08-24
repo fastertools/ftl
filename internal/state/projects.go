@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,12 +39,45 @@ func NewProjectRegistry(persistFile string) *ProjectRegistry {
 	}
 	
 	// Only start automatic file sync in production mode
-	// In test mode (test_projects.json), use manual reload for deterministic behavior
-	if persistFile != "test_projects.json" {
+	// In test mode, use manual reload for deterministic behavior
+	// Skip sync for test files: test_projects.json, .e2e-projects.json, etc.
+	if !strings.Contains(persistFile, "test") && !strings.HasPrefix(filepath.Base(persistFile), ".e2e-") {
 		go pr.startFileSync()
 	}
 	
 	return pr
+}
+
+// EnsureProjectsFile ensures the projects file exists with at least an empty array
+func (pr *ProjectRegistry) EnsureProjectsFile() error {
+	pr.mu.Lock()
+	defer pr.mu.Unlock()
+	
+	// Check if file exists
+	if _, err := os.Stat(pr.persistFile); os.IsNotExist(err) {
+		// Create empty projects file if it doesn't exist
+		emptyProjects := []Project{}
+		emptyData, marshalErr := json.MarshalIndent(emptyProjects, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal empty projects: %w", marshalErr)
+		}
+		
+		// Ensure directory exists (only create if not current directory)
+		dir := filepath.Dir(pr.persistFile)
+		if dir != "." && dir != "" {
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				return fmt.Errorf("failed to create projects directory: %w", err)
+			}
+		}
+		
+		if writeErr := os.WriteFile(pr.persistFile, emptyData, 0644); writeErr != nil {
+			return fmt.Errorf("failed to create empty projects file: %w", writeErr)
+		}
+		
+		log.Printf("Created empty projects file at %s", pr.persistFile)
+	}
+	
+	return nil
 }
 
 // LoadProjects loads projects from persistent storage
@@ -51,10 +85,12 @@ func (pr *ProjectRegistry) LoadProjects() error {
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
 
-	// Ensure directory exists
+	// Ensure directory exists (only create if not current directory)
 	dir := filepath.Dir(pr.persistFile)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return fmt.Errorf("failed to create projects directory: %w", err)
+	if dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return fmt.Errorf("failed to create projects directory: %w", err)
+		}
 	}
 
 	// Try to read existing projects file

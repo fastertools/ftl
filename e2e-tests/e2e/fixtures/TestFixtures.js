@@ -1,5 +1,6 @@
 const { chromium } = require('playwright');
 const TestHelpers = require('../utils/TestHelpers');
+const TestDataManager = require('../data/TestDataManager');
 
 class TestFixtures {
     constructor() {
@@ -10,8 +11,9 @@ class TestFixtures {
     }
 
     async setup(options = {}) {
-        // Reset test projects file
-        await TestHelpers.resetTestProjectsFile();
+        // Use standardized test data initialization
+        const fixtureName = options.fixture || 'single';
+        await TestDataManager.initialize(fixtureName, options);
         
         // Force server to reload projects from disk
         await this.reloadServerProjects();
@@ -46,6 +48,39 @@ class TestFixtures {
         return this.page;
     }
 
+    async setupWithoutProject(options = {}) {
+        // For new-user tests - use empty fixture
+        await TestDataManager.initialize('empty');
+        
+        // Don't start server - Makefile handles this
+        // Server should already be running via 'make test-browser'
+        
+        // Launch browser
+        this.browser = await chromium.launch({ 
+            headless: options.headless !== false,
+            args: ['--no-sandbox', '--disable-dev-shm-usage']
+        });
+        
+        this.context = await this.browser.newContext();
+        this.page = await this.context.newPage();
+        
+        // Setup console logging if requested
+        if (options.logConsole) {
+            this.page.on('console', msg => {
+                console.log(`BROWSER: ${msg.text()}`);
+            });
+        }
+        
+        // Setup error logging
+        this.page.on('pageerror', error => {
+            console.error(`BROWSER ERROR: ${error.message}`);
+        });
+        
+        // Don't navigate yet - let tests control when to navigate
+        
+        return this.page;
+    }
+
     async reloadServerProjects() {
         // Call the reload endpoint to force server to re-read projects from disk
         try {
@@ -71,8 +106,8 @@ class TestFixtures {
         
         // Don't stop server - Makefile handles this
         
-        // Reset test projects file one more time
-        await TestHelpers.resetTestProjectsFile();
+        // Clean up test data using standardized system
+        await TestDataManager.cleanup();
     }
 }
 

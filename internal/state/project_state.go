@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fastertools/ftl/web-templates"
+	"github.com/fastertools/ftl/ui/templates"
 	"github.com/fastertools/ftl/internal/models"
 )
 

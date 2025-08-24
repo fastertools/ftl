@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/modelcontextprotocol/mcp-server/internal/files"
+	"github.com/fastertools/ftl/mcp-server/internal/files"
 )
 
 // Manager handles process lifecycle operations

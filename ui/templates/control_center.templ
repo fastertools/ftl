@@ -1,11 +1,14 @@
 package templates
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/fastertools/ftl/internal/ui"
+)
 
 // ControlCenter combines status monitoring and control functionality into a unified panel
 templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) {
 	<div>
-		<h2 class="text-lg font-semibold mb-4 text-white">Control Center</h2>
+		<h2 class="text-lg font-semibold mb-4 text-white">{ ui.WebUI.Titles["control_center"] }</h2>
 		
 		<div class="space-y-4">
 			<!-- Process Status Section -->
@@ -20,16 +23,16 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 					<!-- Process status rows - will be replaced by HTMX -->
 					<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
 						<div class="flex items-center space-x-3">
-							<span class="text-sm font-medium text-white">FTL Process</span>
+							<span class="text-sm font-medium text-white">{ ui.ProcessNameRegular }</span>
 							<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-							<span class="text-xs font-mono" style="color: #666666;">Stopped</span>
+							<span class="text-xs font-mono" style="color: #666666;">{ ui.StatusStopped }</span>
 						</div>
 					</div>
 					<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
 						<div class="flex items-center space-x-3">
-							<span class="text-sm font-medium text-white">Watch Mode</span>
+							<span class="text-sm font-medium text-white">{ ui.ProcessNameWatch }</span>
 							<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-							<span class="text-xs font-mono" style="color: #666666;">Inactive</span>
+							<span class="text-xs font-mono" style="color: #666666;">{ ui.StatusInactive }</span>
 						</div>
 					</div>
 				</div>

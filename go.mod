@@ -16,7 +16,6 @@ require (
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v0.2.0
-	github.com/modelcontextprotocol/mcp-server v0.0.0-00010101000000-000000000000
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/open-policy-agent/opa v1.7.1
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -109,4 +108,3 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/modelcontextprotocol/mcp-server => ./mcp-server

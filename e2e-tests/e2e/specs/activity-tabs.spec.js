@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const DashboardPage = require('../pages/DashboardPage');
 const TestFixtures = require('../fixtures/TestFixtures');
+const HTMXHelpers = require('../utils/HTMXHelpers');
 
 test.describe('Activity Panel Tab Tests', () => {
   let fixtures;
@@ -72,8 +73,11 @@ test.describe('Activity Panel Tab Tests', () => {
     // Click on Command Output tab
     await commandsTab.click();
     
-    // Wait a moment for the switch
-    await page.waitForTimeout(100);
+    // Wait for tab switch to complete
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 500,
+        projectPath: page.context().projectPath 
+    });
     
     // Check that commands tab is now active
     const commandsTabClasses = await commandsTab.getAttribute('class');
@@ -98,7 +102,10 @@ test.describe('Activity Panel Tab Tests', () => {
     
     // Switch back to logs
     await logsTab.click();
-    await page.waitForTimeout(100);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 500,
+        projectPath: page.context().projectPath 
+    });
     
     // Verify it switched back
     const logsDisplayAfter = await logsContent.evaluate(el => 
@@ -123,7 +130,10 @@ test.describe('Activity Panel Tab Tests', () => {
     await buildButton.click();
     
     // Wait for the command to execute and tab to switch
-    await page.waitForTimeout(1000);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 2000,
+        projectPath: page.context().projectPath 
+    });
     
     // Check that we switched to Command Output tab
     const commandsDisplay = await commandsContent.evaluate(el => 
@@ -161,7 +171,10 @@ test.describe('Activity Panel Tab Tests', () => {
     // Make sure we're on Live Logs tab
     const logsTab = await page.locator('#logs-tab');
     await logsTab.click();
-    await page.waitForTimeout(100);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 500,
+        projectPath: page.context().projectPath 
+    });
     
     // Check for Clear button
     const clearButton = await page.locator('button:has-text("Clear")');
@@ -176,7 +189,10 @@ test.describe('Activity Panel Tab Tests', () => {
     // Switch to Command Output tab
     const commandsTab = await page.locator('#commands-tab');
     await commandsTab.click();
-    await page.waitForTimeout(100);
+    await HTMXHelpers.waitForSettle(page, { 
+        timeout: 500,
+        projectPath: page.context().projectPath 
+    });
     
     // Check that ftl-output div exists
     const ftlOutput = await page.locator('#ftl-output');

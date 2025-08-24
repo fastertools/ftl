@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/fastertools/ftl/internal/constants"
 	"github.com/fastertools/ftl/internal/manifest"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -130,25 +131,25 @@ func createFromTemplate(opts *AddComponentOptions) manifest.Component {
 	case "go-http":
 		build = &manifest.BuildConfig{
 			Command: "tinygo build -target=wasip2 -o " + opts.Name + ".wasm main.go",
-			Watch:   []string{"**/*.go", "go.mod"},
+			Watch:   constants.WatchPatterns["go"],
 		}
 	case "rust-wasm":
 		build = &manifest.BuildConfig{
 			Command: "cargo build --target wasm32-wasip2 --release",
 			Workdir: templateDir,
-			Watch:   []string{"src/**/*.rs", "Cargo.toml"},
+			Watch:   constants.WatchPatterns["rust"],
 		}
 	case "js-http":
 		build = &manifest.BuildConfig{
 			Command: "npm run build",
 			Workdir: templateDir,
-			Watch:   []string{"src/**/*.js", "package.json"},
+			Watch:   constants.WatchPatterns["typescript"],
 		}
 	case "python-http":
 		build = &manifest.BuildConfig{
 			Command: "componentize-py -w spin-http componentize -o " + opts.Name + ".wasm app",
 			Workdir: templateDir,
-			Watch:   []string{"**/*.py"},
+			Watch:   constants.WatchPatterns["python"],
 		}
 	}
 	comp.Build = build
@@ -226,6 +227,12 @@ func createFromLocal(opts *AddComponentOptions) manifest.Component {
 	comp := manifest.Component{
 		ID:     opts.Name,
 		Source: opts.Source,
+	}
+
+	// Validate user-provided source path for security
+	if err := validateUserPath(opts.Source); err != nil {
+		Error("Invalid source path: %v", err)
+		return comp
 	}
 
 	// Check if it needs build config

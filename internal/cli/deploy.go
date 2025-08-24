@@ -82,15 +82,11 @@ Example:
 func runDeploy(ctx context.Context, opts *DeployOptions) error {
 	// Auto-detect config file if not specified
 	if opts.ConfigFile == "" {
-		for _, file := range []string{"ftl.yaml", "ftl.yml", "ftl.json", "app.cue"} {
-			if _, err := os.Stat(file); err == nil {
-				opts.ConfigFile = file
-				break
-			}
-		}
-		if opts.ConfigFile == "" {
+		detected, err := config.AutoDetectConfigFile()
+		if err != nil {
 			return fmt.Errorf("no FTL configuration file found (ftl.yaml, ftl.json, or app.cue)")
 		}
+		opts.ConfigFile = detected.Path
 	}
 
 	// First synthesize spin.toml from the FTL configuration
@@ -528,6 +524,11 @@ func processComponents(ctx context.Context, manifest *validation.Application, ec
 
 // findBuiltWASM locates the built WASM file for a local component
 func findBuiltWASM(sourcePath, componentID string) (string, error) {
+	// Validate the user-provided sourcePath for security
+	if err := validateUserPath(sourcePath); err != nil {
+		return "", fmt.Errorf("invalid source path: %w", err)
+	}
+
 	// Check if sourcePath is already a .wasm file
 	if strings.HasSuffix(sourcePath, ".wasm") {
 		if _, err := os.Stat(sourcePath); err == nil {

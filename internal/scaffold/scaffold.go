@@ -13,6 +13,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"gopkg.in/yaml.v3"
 
+	"github.com/fastertools/ftl/internal/constants"
 	"github.com/fastertools/ftl/validation"
 )
 
@@ -106,7 +107,7 @@ func (s *Scaffolder) GenerateComponent(name, language string) error {
 // GenerateProject creates a new FTL project from templates
 func (s *Scaffolder) GenerateProject(projectDir, name, description, format string) error {
 	// Validate format
-	validFormats := []string{"yaml", "json", "cue", "go"}
+	validFormats := constants.ValidFormats
 	valid := false
 	for _, f := range validFormats {
 		if f == format {
@@ -175,7 +176,7 @@ func (s *Scaffolder) validateInputs(name, language string) error {
 	}
 
 	// Validate language
-	validLanguages := []string{"rust", "typescript", "python", "go"}
+	validLanguages := constants.ValidLanguages
 	found := false
 	for _, lang := range validLanguages {
 		if lang == language {
@@ -560,7 +561,7 @@ func convertToFlatStructure(app *validation.Application) map[string]interface{} 
 
 // ListLanguages returns the available languages
 func (s *Scaffolder) ListLanguages() []string {
-	return []string{"rust", "typescript", "python", "go"}
+	return constants.ValidLanguages
 }
 
 // ValidateComponentName checks if a component name is valid

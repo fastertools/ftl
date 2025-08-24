@@ -1,4 +1,6 @@
 // Page Object for the main dashboard
+const HTMXHelpers = require('../utils/HTMXHelpers');
+
 class DashboardPage {
     constructor(page) {
         this.page = page;
@@ -21,9 +23,10 @@ class DashboardPage {
     async clickBuild() {
         const button = await this.page.locator(this.buildButton).first();
         await button.click();
-        // With HTMX, we don't wait for traditional responses
-        // Instead wait for the DOM to update
-        await this.page.waitForTimeout(1000);
+        // Use HTMXHelpers for deterministic wait instead of arbitrary timeout
+        await HTMXHelpers.waitForSettle(this.page, {
+            projectPath: this.page.context().projectPath
+        });
     }
 
     async clickFTLUp() {
@@ -58,8 +61,19 @@ class DashboardPage {
         return await statusArea.textContent();
     }
 
-    async waitForPolling(timeout = 5000) {
-        await this.page.waitForTimeout(timeout);
+    async waitForPolling(expectedStatus = null, timeout = 5000) {
+        // If expecting a specific status, use HTMXHelpers.waitForPollingUpdate
+        if (expectedStatus) {
+            return await HTMXHelpers.waitForPollingUpdate(this.page, expectedStatus, {
+                timeout: timeout,
+                projectPath: this.page.context().projectPath
+            });
+        }
+        // Otherwise just wait for HTMX to settle
+        return await HTMXHelpers.waitForSettle(this.page, {
+            timeout: timeout,
+            projectPath: this.page.context().projectPath
+        });
     }
 }
 

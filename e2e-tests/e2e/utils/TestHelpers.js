@@ -1,32 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const HTMXHelpers = require('./HTMXHelpers');
+const TestLifecycle = require('./TestLifecycle');
+const TestDataManager = require('../data/TestDataManager');
+const TestDataFactory = require('../data/TestDataFactory');
 
 class TestHelpers {
-    static async resetTestProjectsFile() {
-        // Create .e2e-projects workspace directory
-        const e2eWorkspace = path.resolve('.e2e-projects');
-        if (!fs.existsSync(e2eWorkspace)) {
-            fs.mkdirSync(e2eWorkspace, { recursive: true });
+    static async resetTestProjectsFile(createEmpty = false) {
+        // Use standardized test data system
+        if (createEmpty) {
+            // For new-user tests - use empty fixture
+            await TestDataManager.initialize('empty');
+        } else {
+            // For normal tests - use single project fixture
+            await TestDataManager.initialize('single');
         }
         
-        // Create unique test project for this test run
-        const projectName = `test-project-${Date.now()}`;
-        const projectPath = path.join(e2eWorkspace, projectName);
-        
-        // Initialize as valid FTL project using built CLI
-        TestHelpers.ensureTestDirectory(projectPath);
-        
-        const testProject = {
-            name: projectName,
-            path: projectPath,
-            added_at: new Date().toISOString(),
-            last_active: new Date().toISOString()
-        };
-        
-        const fsPromises = require('fs').promises;
-        await fsPromises.writeFile('test_projects.json', JSON.stringify([testProject], null, 2));
-        console.log(`resetTestProjectsFile: Created test project at ${projectPath}`);
+        const fixture = TestDataManager.getCurrentFixture();
+        console.log(`Test data initialized: ${fixture.metadata.fixture} fixture`);
     }
 
     static async startServer(useTestProjects = true) {
@@ -35,16 +27,27 @@ class TestHelpers {
             env.PROJECTS_FILE = 'test_projects.json';
         }
         
+        // Enable test mode for the server
+        env.FTL_TEST_MODE = 'true';
+        
         // Use the built binary from current branch
         const serverProcess = spawn('./bin/ftl', ['dev', 'console', '--port', '8080'], {
             env,
             stdio: ['ignore', 'pipe', 'pipe']
         });
 
-        // Wait for server to start
-        await new Promise((resolve) => {
-            setTimeout(resolve, 3000);
+        // Use TestLifecycle for deterministic server ready wait
+        // Get the project path from environment or use default
+        const projectPath = env.FTL_PROJECT_PATH || '/tmp/test-project';
+        const isReady = await TestLifecycle.waitForReady(projectPath, {
+            timeout: 30000,
+            maxAttempts: 10,
+            mcpServerPath: './mcp-server'
         });
+        
+        if (!isReady) {
+            console.warn('Server may not be fully ready after timeout');
+        }
 
         return serverProcess;
     }
@@ -56,14 +59,14 @@ class TestHelpers {
     }
 
     static generateTestProjectName(prefix = 'TestProject') {
-        return `${prefix}_${Date.now()}`;
+        // Use standardized ID generation
+        return TestDataFactory.generateId(prefix);
     }
 
     static generateTestProjectPath(name) {
-        // Use a test data directory with unique subdirectories
-        // We'll create this directory if it doesn't exist
-        const testDir = `./test_data/${name.toLowerCase().replace(/\s+/g, '_')}`;
-        return testDir;
+        // Use standardized path generation
+        const fixture = TestDataManager.getCurrentFixture();
+        return path.join(fixture.basePath, name.toLowerCase().replace(/\s+/g, '_'));
     }
 
     static ensureTestDirectory(testPath) {
@@ -100,29 +103,26 @@ language = "go"
     }
 
     static async waitForHTMXRequest(page) {
-        await page.waitForTimeout(1000); // Give HTMX time to process
+        // Use HTMXHelpers for deterministic wait instead of arbitrary timeout
+        const projectPath = page.context().projectPath || '/tmp/test-project';
+        await HTMXHelpers.waitForSettle(page, { projectPath });
     }
 
     static async checkForNavigation(page, action) {
         const initialUrl = page.url();
         await action();
-        await page.waitForTimeout(500);
+        // Use HTMXHelpers instead of arbitrary timeout
+        const projectPath = page.context().projectPath || '/tmp/test-project';
+        await HTMXHelpers.waitForSettle(page, { 
+            timeout: 1000,
+            projectPath 
+        });
         return page.url() !== initialUrl;
     }
 
     static async cleanupTestData() {
-        // Remove test_projects.json
-        if (fs.existsSync('test_projects.json')) {
-            fs.unlinkSync('test_projects.json');
-            console.log('cleanupTestData: Removed test_projects.json');
-        }
-        
-        // Remove .e2e-projects directory
-        const e2eWorkspace = path.resolve('.e2e-projects');
-        if (fs.existsSync(e2eWorkspace)) {
-            fs.rmSync(e2eWorkspace, { recursive: true, force: true });
-            console.log('cleanupTestData: Removed .e2e-projects directory');
-        }
+        // Use standardized cleanup
+        await TestDataManager.cleanup();
     }
 }
 

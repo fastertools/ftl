@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"text/tabwriter"
+
+	"github.com/fastertools/ftl/internal/constants"
 )
 
 // OutputFormat represents the output format type
@@ -100,7 +102,7 @@ func (dw *DataWriter) writeKeyValueTable(title string, data map[string]interface
 	w := tabwriter.NewWriter(dw.output, 0, 0, 2, ' ', 0)
 
 	// Create ordered list of keys for consistent output
-	orderedKeys := []string{"Name", "ID", "Status", "URL", "Error", "Access", "OrgID", "Created", "Updated"}
+	orderedKeys := constants.OrderedKeys
 
 	// Print known keys in order first
 	for _, key := range orderedKeys {
