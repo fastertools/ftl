@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.0 (2025-08-24)
+
+## What's Changed
+* chore(main): release  component-mcp-gateway v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/318
+* chore(main): release  sdk-rust v0.11.2 by @bowlofarugula in https://github.com/fastertools/ftl/pull/317
+* chore(main): release  sdk-rust v0.12.0 by @fastertools-gha[bot] in https://github.com/fastertools/ftl/pull/322
+
+## New Contributors
+* @fastertools-gha[bot] made their first contribution in https://github.com/fastertools/ftl/pull/322
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/component-mcp-authorizer-v0.14.0...component-mcp-authorizer-v0.15.0
+
 ## 0.14.0 (2025-08-23)
 
 **Full Changelog**: https://github.com/fastertools/ftl/compare/component-mcp-authorizer-v0.13.0...component-mcp-authorizer-v0.14.0
