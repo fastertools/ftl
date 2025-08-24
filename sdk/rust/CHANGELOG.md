@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 (2025-08-24)
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/sdk-rust-v0.11.2...sdk-rust-v0.12.0
+
 ## 0.11.2 (2025-08-24)
 
 ## What's Changed
