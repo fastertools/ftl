@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.2 (2025-08-24)
+
+## What's Changed
+* chore(main): release  sdk-typescript v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/286
+* chore(main): release  v0.11.2 by @bowlofarugula in https://github.com/fastertools/ftl/pull/287
+* chore(main): release  v0.11.3 by @bowlofarugula in https://github.com/fastertools/ftl/pull/290
+* feat: update component readme for release testing by @bowlofarugula in https://github.com/fastertools/ftl/pull/291
+* chore(main): release  v0.12.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/292
+* chore(main): release  component-mcp-authorizer v0.12.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/294
+* feat: Trigger release by @bowlofarugula in https://github.com/fastertools/ftl/pull/296
+* chore(main): release by @bowlofarugula in https://github.com/fastertools/ftl/pull/298
+* chore(main): release  component-mcp-authorizer v0.13.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/315
+* chore(main): release  component-mcp-authorizer v0.14.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/319
+* chore(main): release  component-mcp-gateway v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/318
+
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/sdk-rust-v0.11.1...sdk-rust-v0.11.2
+
 ## 0.11.1 (2025-08-22)
 
 ## What's Changed
