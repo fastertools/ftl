@@ -32,33 +32,37 @@ jobs:
           if [[ "$PR_TITLE" =~ ^chore.*release ]]; then
             echo "is_release_pr=true" >> $GITHUB_OUTPUT
             
-            # Detect which package is being released
-            if [[ "$PR_TITLE" =~ "cmd/ftl" ]] || [[ "$PR_TITLE" =~ "cli" ]]; then
+            # Detect which package is being released based on component names
+            if [[ "$PR_TITLE" =~ "release cli" ]]; then
               echo "cli_release=true" >> $GITHUB_OUTPUT
               echo "Detected CLI release"
             fi
             
-            if [[ "$PR_TITLE" =~ "sdk-rust-macros" ]] || [[ "$PR_TITLE" =~ "sdk-rust" ]]; then
+            # Check for sdk-rust-macros first (more specific), then sdk-rust
+            if [[ "$PR_TITLE" =~ "release sdk-rust-macros" ]]; then
+              echo "rust_sdk_release=true" >> $GITHUB_OUTPUT
+              echo "Detected Rust SDK Macros release"
+            elif [[ "$PR_TITLE" =~ "release sdk-rust" ]]; then
               echo "rust_sdk_release=true" >> $GITHUB_OUTPUT
               echo "Detected Rust SDK release"
             fi
             
-            if [[ "$PR_TITLE" =~ "sdk-go" ]]; then
+            if [[ "$PR_TITLE" =~ "release sdk-go" ]]; then
               echo "go_sdk_release=true" >> $GITHUB_OUTPUT
               echo "Detected Go SDK release"
             fi
             
-            if [[ "$PR_TITLE" =~ "sdk-python" ]]; then
+            if [[ "$PR_TITLE" =~ "release sdk-python" ]]; then
               echo "python_sdk_release=true" >> $GITHUB_OUTPUT
               echo "Detected Python SDK release"
             fi
             
-            if [[ "$PR_TITLE" =~ "sdk-typescript" ]]; then
+            if [[ "$PR_TITLE" =~ "release sdk-typescript" ]]; then
               echo "typescript_sdk_release=true" >> $GITHUB_OUTPUT
               echo "Detected TypeScript SDK release"
             fi
             
-            if [[ "$PR_TITLE" =~ "mcp-gateway" ]] || [[ "$PR_TITLE" =~ "mcp-authorizer" ]]; then
+            if [[ "$PR_TITLE" =~ "release mcp-gateway" ]] || [[ "$PR_TITLE" =~ "release mcp-authorizer" ]]; then
               echo "component_release=true" >> $GITHUB_OUTPUT
               echo "Detected component release"
             fi
