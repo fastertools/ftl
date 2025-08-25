@@ -81,7 +81,7 @@
     },
     {
       "type": "linked-versions",
-      "groupName": "rust-sdk",
+      "groupName": "Rust SDK",
       "components": [
         "sdk-rust",
         "sdk-rust-macros"
@@ -90,7 +90,7 @@
     },
     {
       "type": "linked-versions",
-      "groupName": "components",
+      "groupName": "Wasm Components",
       "components": [
         "mcp-gateway",
         "mcp-authorizer"
