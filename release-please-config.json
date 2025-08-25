@@ -142,8 +142,8 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
-      "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
-      "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
+      "bootstrap-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
+      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
       "extra-files": [
         {
           "type": "toml",
@@ -159,8 +159,8 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk-macros",
-      "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
-      "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe"
+      "bootstrap-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
+      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9"
     },
     "sdk/python": {
       "release-type": "python",
