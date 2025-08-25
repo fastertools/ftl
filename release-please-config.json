@@ -81,6 +81,15 @@
     },
     {
       "type": "linked-versions",
+      "groupName": "rust-sdk",
+      "components": [
+        "sdk-rust",
+        "sdk-rust-macros"
+      ],
+      "merge": true
+    },
+    {
+      "type": "linked-versions",
       "groupName": "components",
       "components": [
         "mcp-gateway",
@@ -138,15 +147,20 @@
       "extra-files": [
         {
           "type": "toml",
-          "path": "sdk/rust-macros/Cargo.toml",
-          "jsonpath": "$.package.version"
-        },
-        {
-          "type": "toml",
           "path": "sdk/rust/Cargo.toml",
           "jsonpath": "$.dependencies.ftl-sdk-macros.version"
         }
       ]
+    },
+    "sdk/rust-macros": {
+      "release-type": "rust",
+      "component": "sdk-rust-macros",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-sdk-macros",
+      "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
+      "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe"
     },
     "sdk/python": {
       "release-type": "python",
