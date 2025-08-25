@@ -3,6 +3,10 @@ name: Release Components
 on:
   workflow_call:
     inputs:
+      component:
+        description: 'Component to release (mcp-gateway or mcp-authorizer)'
+        required: true
+        type: string
       version:
         description: 'Version to release'
         required: true
@@ -13,7 +17,8 @@ on:
         type: string
   push:
     tags:
-      - 'components-v*'
+      - 'mcp-gateway-v*'
+      - 'mcp-authorizer-v*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -28,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.parse.outputs.version }}
+      tag: ${{ steps.parse.outputs.tag }}
+      component: ${{ steps.parse.outputs.component }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,42 +47,45 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
             VERSION="${{ inputs.version }}"
             TAG="${{ inputs.tag }}"
+            COMPONENT="${{ inputs.component }}"
           else
-            # Extract version from tag (push trigger)
+            # Extract component and version from tag (push trigger)
             TAG="${GITHUB_REF#refs/tags/}"
-            if [[ ! "$TAG" =~ ^components-v(.+)$ ]]; then
+            if [[ "$TAG" =~ ^(mcp-gateway|mcp-authorizer)-v(.+)$ ]]; then
+              COMPONENT="${BASH_REMATCH[1]}"
+              VERSION="${BASH_REMATCH[2]}"
+            else
               echo "❌ Invalid tag format: $TAG"
-              echo "Expected format: components-v{version}"
+              echo "Expected format: {component}-v{version}"
               exit 1
             fi
-            VERSION="${BASH_REMATCH[1]}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+          echo "📦 Component: $COMPONENT"
           echo "🔢 Version: $VERSION"
           echo "🏷️ Tag: $TAG"
       
       - name: Verify tag is on main branch
         uses: ./.github/actions/verify-tag
       
-      - name: Verify workspace version matches tag
+      - name: Verify component version matches tag
         run: |
           VERSION="${{ steps.parse.outputs.version }}"
-          # Check workspace version
-          WORKSPACE_VERSION=$(grep '^\s*version' components/Cargo.toml | head -1 | cut -d'"' -f2)
-          if [ "$WORKSPACE_VERSION" != "$VERSION" ]; then
-            echo "❌ Tag version ($VERSION) does not match workspace version ($WORKSPACE_VERSION)"
+          COMPONENT="${{ steps.parse.outputs.component }}"
+          # Check component version
+          COMPONENT_VERSION=$(grep '^\s*version' components/$COMPONENT/Cargo.toml | head -1 | cut -d'"' -f2)
+          if [ "$COMPONENT_VERSION" != "$VERSION" ]; then
+            echo "❌ Tag version ($VERSION) does not match $COMPONENT version ($COMPONENT_VERSION)"
             exit 1
           fi
           echo "✅ Workspace version matches tag: $VERSION"
 
   build-and-publish:
-    name: Build and Publish ${{ matrix.component }}
+    name: Build and Publish Component
     needs: verify-tag
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        component: [mcp-gateway, mcp-authorizer]
     steps:
       - uses: actions/checkout@v4
       
@@ -105,20 +115,21 @@ jobs:
       
       - name: Build component
         run: |
-          cd "components/${{ matrix.component }}"
+          COMPONENT="${{ needs.verify-tag.outputs.component }}"
+          cd "components/$COMPONENT"
           cargo component build --target wasm32-wasip1 --release
       
       - name: Determine WASM file name
         id: wasm
         run: |
-          COMPONENT="${{ matrix.component }}"
+          COMPONENT="${{ needs.verify-tag.outputs.component }}"
           # Replace hyphens with underscores (Cargo uses underscores in output names)
           WASM_NAME="${COMPONENT//-/_}.wasm"
           echo "name=$WASM_NAME" >> $GITHUB_OUTPUT
       
       - name: Publish to ghcr.io
         run: |
-          COMPONENT="${{ matrix.component }}"
+          COMPONENT="${{ needs.verify-tag.outputs.component }}"
           VERSION="${{ needs.verify-tag.outputs.version }}"
           WASM_FILE="../target/wasm32-wasip1/release/${{ steps.wasm.outputs.name }}"
           
@@ -141,11 +152,11 @@ jobs:
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.component }}-wasm
+          name: ${{ needs.verify-tag.outputs.component }}-wasm
           path: components/target/wasm32-wasip1/release/${{ steps.wasm.outputs.name }}
 
   create-release:
-    name: Create Unified Release
+    name: Create Component Release
     needs: [verify-tag, build-and-publish]
     runs-on: ubuntu-latest
     steps:
@@ -159,33 +170,22 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "FTL Components v${{ needs.verify-tag.outputs.version }}"
+          name: "${{ needs.verify-tag.outputs.component }} v${{ needs.verify-tag.outputs.version }}"
+          tag_name: "${{ needs.verify-tag.outputs.tag }}"
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
             artifacts/**/*.wasm
           body: |
-            ## FTL Components v${{ needs.verify-tag.outputs.version }}
-            
-            This release includes both FTL components with unified versioning:
-            - **mcp-gateway** - MCP gateway component
-            - **mcp-authorizer** - MCP authorization component
+            ## ${{ needs.verify-tag.outputs.component }} v${{ needs.verify-tag.outputs.version }}
             
             ### Installation
             
-            #### MCP Gateway
             Add to your `spin.toml`:
             ```toml
-            [component.mcp-gateway]
-            source = { registry = "ghcr.io", package = "fastertools:mcp-gateway", version = "${{ needs.verify-tag.outputs.version }}" }
-            ```
-            
-            #### MCP Authorizer
-            Add to your `spin.toml`:
-            ```toml
-            [component.mcp-authorizer]
-            source = { registry = "ghcr.io", package = "fastertools:mcp-authorizer", version = "${{ needs.verify-tag.outputs.version }}" }
+            [component.${{ needs.verify-tag.outputs.component }}]
+            source = { registry = "ghcr.io", package = "fastertools:${{ needs.verify-tag.outputs.component }}", version = "${{ needs.verify-tag.outputs.version }}" }
             ```
             
             ### Using Latest Version
