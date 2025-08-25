@@ -35,8 +35,8 @@ jobs:
             revert
           scopes: |
             cli
-            sdk
             sdk/go
+            sdk/rust
             sdk/python
             sdk/typescript
             wasm
@@ -92,7 +92,7 @@ jobs:
             
             ### Examples
             - \`feat(cli): add support for dry-run deployments\`
-            - \`fix(sdk): resolve WASM runtime panic\`
+            - \`fix(sdk/rust): resolve WASM runtime panic\`
             - \`docs: update installation instructions\`
             - \`chore(deps): update dependencies\`
             
@@ -111,8 +111,8 @@ jobs:
             
             ### Valid Scopes (optional)
             - **cli**: Changes to the FTL CLI
-            - **sdk**: Rust SDK specific changes
             - **sdk/go**: Go SDK specific changes
+            - **sdk/rust**: Rust SDK specific changes
             - **sdk/python**: Python SDK specific changes
             - **sdk/typescript**: TypeScript SDK specific changes
             - **wasm**: WASM component changes
@@ -197,7 +197,7 @@ jobs:
                 1,
                 'always',
                 [
-                  'cli', 'sdk', 'sdk/go', 'sdk/python',
+                  'cli', 'sdk/go', 'sdk/rust', 'sdk/python',
                   'sdk/typescript', 'wasm', 'components', 'core',
                   'deps', 'release', 'docs', 'ci'
                 ]
@@ -349,8 +349,8 @@ jobs:
             if (scope) {
               const scopeLabels = {
                 'cli': 'cli',
-                'sdk': 'rust-sdk',
                 'sdk/go': 'go-sdk',
+                'sdk/rust': 'rust-sdk',
                 'sdk/python': 'python-sdk',
                 'sdk/typescript': 'typescript-sdk',
                 'wasm': 'wasm',
