@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.0 (2025-08-25)
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/mcp-authorizer-v0.14.0...mcp-authorizer-v0.15.0
+
 ## 0.14.0 (2025-08-23)
 
 **Full Changelog**: https://github.com/fastertools/ftl/compare/component-mcp-authorizer-v0.13.0...component-mcp-authorizer-v0.14.0
