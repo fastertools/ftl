@@ -137,11 +137,12 @@
       "package-name": "ftl-sdk",
       "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
       "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
+      "path": "sdk/rust",
       "extra-files": [
         {
           "type": "toml",
-          "path": "sdk/Cargo.toml",
-          "jsonpath": "$.workspace.package.version"
+          "path": "sdk/rust-macros/Cargo.toml",
+          "jsonpath": "$.package.version"
         },
         {
           "type": "toml",
@@ -177,11 +178,12 @@
       "package-name": "ftl-components",
       "bootstrap-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
       "last-release-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
+      "path": "components/mcp-gateway",
       "extra-files": [
         {
           "type": "toml",
-          "path": "components/Cargo.toml",
-          "jsonpath": "$.workspace.package.version"
+          "path": "components/mcp-authorizer/Cargo.toml",
+          "jsonpath": "$.package.version"
         },
         {
           "type": "toml",
