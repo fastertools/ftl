@@ -81,23 +81,12 @@
     },
     {
       "type": "linked-versions",
-      "groupName": "sdk-core",
-      "components": [
-        "ftl-sdk-go",
-        "ftl-sdk-rust",
-        "ftl-sdk-python",
-        "ftl-sdk-typescript"
-      ],
-      "merge": false
-    },
-    {
-      "type": "linked-versions",
       "groupName": "components",
       "components": [
         "mcp-gateway",
         "mcp-authorizer"
       ],
-      "merge": false
+      "merge": true
     }
   ],
   "packages": {
