@@ -129,15 +129,20 @@
       "extra-files": [
         {
           "type": "toml",
-          "path": "../rust-macros/Cargo.toml",
-          "jsonpath": "$.package.version"
-        },
-        {
-          "type": "toml",
           "path": "Cargo.toml",
           "jsonpath": "$.dependencies['ftl-sdk-macros'].version"
         }
       ]
+    },
+    "sdk/rust-macros": {
+      "release-type": "rust",
+      "component": "sdk-rust-macros",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "package-name": "ftl-sdk-macros",
+      "bootstrap-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
+      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9"
     },
     "sdk/python": {
       "release-type": "python",
