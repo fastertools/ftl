@@ -50,7 +50,7 @@ jobs:
       python-sdk: ${{ steps.detect.outputs.python-sdk }}
       ci: ${{ steps.detect.outputs.ci }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       

@@ -36,7 +36,7 @@ jobs:
       tag: ${{ steps.parse.outputs.tag }}
       component: ${{ steps.parse.outputs.component }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       
@@ -87,7 +87,7 @@ jobs:
     needs: verify-tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Rust for WASM
         uses: ./.github/actions/setup-rust
@@ -160,7 +160,7 @@ jobs:
     needs: [verify-tag, build-and-publish]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Download artifacts
         uses: actions/download-artifact@v4
