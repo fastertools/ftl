@@ -45,6 +45,21 @@ pub struct ToolMetadata {
     pub meta: Option<Value>,
 }
 
+impl ToolMetadata {
+    /// Create a new ToolMetadata with just a name and input schema
+    pub fn new(name: impl Into<String>, input_schema: Value) -> Self {
+        Self {
+            name: name.into(),
+            title: None,
+            description: None,
+            input_schema,
+            output_schema: None,
+            annotations: None,
+            meta: None,
+        }
+    }
+}
+
 /// Annotations providing hints about tool behavior
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolAnnotations {
