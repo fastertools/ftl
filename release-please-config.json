@@ -81,13 +81,6 @@
     }
   ],
   "packages": {
-    ".": {
-      "release-type": "simple",
-      "component": "",
-      "changelog-path": "CHANGELOG.md",
-      "include-component-in-tag": false,
-      "package-name": "ftl"
-    },
     "cmd/ftl": {
       "release-type": "go",
       "component": "cli",
