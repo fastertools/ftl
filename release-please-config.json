@@ -81,15 +81,6 @@
     },
     {
       "type": "linked-versions",
-      "groupName": "rust sdk",
-      "components": [
-        "sdk-rust",
-        "sdk-rust-macros"
-      ],
-      "merge": true
-    },
-    {
-      "type": "linked-versions",
       "groupName": "wasm components",
       "components": [
         "mcp-gateway",
