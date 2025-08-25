@@ -62,7 +62,7 @@ tools! {
 }
 ```
 
-The `tools!` macro automatically:
+The `tools!` macro automatically
 - Generates the HTTP handler for all tools
 - Creates metadata from function names and doc comments
 - Derives JSON schema from your input types using schemars

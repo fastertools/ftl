@@ -118,7 +118,7 @@ Just like with the TypeScript SDK, **tools should NOT validate inputs themselves
 
 ## Response Macros
 
-The SDK provides convenient macros for creating responses:
+The SDK provides convenient macros for creating responses.
 
 ```rust
 tools! {
