@@ -24,7 +24,7 @@ This SDK provides:
 
 ### Using the `tools!` Macro
 
-The simplest way to create tools
+The simplest way to create tools:
 
 ```rust
 use ftl_sdk::{tools, text, ToolResponse};

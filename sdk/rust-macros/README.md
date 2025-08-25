@@ -110,7 +110,7 @@ The `tools!` macro generates:
 
 ## Important: Input Validation
 
-Just like with the TypeScript SDK, **tools should NOT validate inputs themselves**. The FTL gateway handles all input validation against your tool's JSON Schema before invoking your handler. This means:
+Just like with the TypeScript SDK, **tools should NOT validate inputs themselves**. The FTL gateway handles all input validation against your tool's JSON Schema before invoking your handler. This means
 
 - Your handler can assume all inputs match the schema
 - Focus on business logic, not validation
