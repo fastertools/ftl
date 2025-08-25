@@ -409,12 +409,12 @@ jobs:
           cache: true
           
       - name: Download CLI artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ftl-linux-amd64
           
       - name: Download WASM components
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: wasm-components
           path: components/
