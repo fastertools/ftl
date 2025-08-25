@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.0 (2025-08-25)
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/mcp-gateway-v0.14.0...mcp-gateway-v0.15.0
+
 ## 0.11.1 (2025-08-23)
 
 ## What's Changed
