@@ -245,3 +245,6 @@ make quality
 ## License
 
 Apache-2.0 - see [LICENSE](../../LICENSE) for details.
+# Release Process
+
+See [RELEASE_ORDER.md](../../RELEASE_ORDER.md) for release instructions.
