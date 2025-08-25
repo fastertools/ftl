@@ -80,10 +80,6 @@
       "considerAllArtifacts": false
     },
     {
-      "type": "cargo-workspace",
-      "merge": false
-    },
-    {
       "type": "linked-versions",
       "groupName": "rust-sdk-group",
       "components": ["sdk-rust", "sdk-rust-macros"]
