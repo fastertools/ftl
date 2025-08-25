@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.13.0 (2025-08-25)
+
+## What's Changed
+* chore(main): release  component-mcp-authorizer v0.12.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/294
+* feat: Trigger release by @bowlofarugula in https://github.com/fastertools/ftl/pull/296
+* chore(main): release by @bowlofarugula in https://github.com/fastertools/ftl/pull/298
+* chore(main): release  component-mcp-authorizer v0.13.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/315
+* chore(main): release  component-mcp-authorizer v0.14.0 by @bowlofarugula in https://github.com/fastertools/ftl/pull/319
+* chore(main): release  component-mcp-gateway v0.11.1 by @bowlofarugula in https://github.com/fastertools/ftl/pull/318
+* chore(main): release  sdk-rust v0.11.2 by @bowlofarugula in https://github.com/fastertools/ftl/pull/317
+* chore(main): release  sdk-rust v0.12.0 by @fastertools-gha[bot] in https://github.com/fastertools/ftl/pull/322
+* chore(main): release wasm components libraries by @fastertools-gha[bot] in https://github.com/fastertools/ftl/pull/334
+
+## New Contributors
+* @fastertools-gha[bot] made their first contribution in https://github.com/fastertools/ftl/pull/322
+
+**Full Changelog**: https://github.com/fastertools/ftl/compare/v0.12.0...v0.13.0
+
 ## 0.12.0 (2025-08-22)
 
 ## What's Changed
