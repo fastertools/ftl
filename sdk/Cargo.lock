@@ -12,10 +12,21 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 name = "ftl-sdk"
 version = "0.13.0"
 dependencies = [
- "ftl-sdk-macros",
+ "ftl-sdk-macros 0.11.1",
  "pretty_assertions",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ftl-sdk-macros"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e5a0fb2b941370ca8634c25550940ed3dbd2c26d9589e079e1bbab5768d3d68"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

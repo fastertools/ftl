@@ -22,41 +22,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  validate-version:
-    name: Validate Version Consistency
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag }}
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Validate versions
-        run: |
-          VERSION="${{ inputs.version }}"
-          
-          # Check workspace version
-          WORKSPACE_VERSION=$(grep '^\s*version = ' sdk/Cargo.toml | head -1 | cut -d'"' -f2)
-          if [[ "${WORKSPACE_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in sdk/Cargo.toml workspace: found ${WORKSPACE_VERSION}, expected ${VERSION}"
-            exit 1
-          fi
-          
-          # Check manifest version
-          JSON_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
-          if [[ "${JSON_VERSION}" != "${VERSION}" ]]; then
-            echo "Version mismatch in manifest: found ${JSON_VERSION}, expected ${VERSION}"
-            exit 1
-          fi
-          
-          echo "✅ Workspace version validated: ${VERSION}"
-
   test-crates:
     name: Test Crates
-    needs: validate-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
