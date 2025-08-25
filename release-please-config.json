@@ -148,7 +148,7 @@
         {
           "type": "toml",
           "path": "sdk/rust/Cargo.toml",
-          "jsonpath": "$.dependencies.ftl-sdk-macros.version"
+          "jsonpath": "$.dependencies['ftl-sdk-macros'].version"
         }
       ]
     },
