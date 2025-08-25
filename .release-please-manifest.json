@@ -5,5 +5,5 @@
   "sdk": "0.12.0",
   "sdk/python": "0.11.0",
   "sdk/typescript": "0.11.1",
-  "components": "0.14.0"
+  "components": "0.15.0"
 }
