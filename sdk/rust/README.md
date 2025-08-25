@@ -1,5 +1,6 @@
 # ftl-sdk (Rust)
 
+<!-- Testing selective CI implementation -->
 Rust SDK for building Model Context Protocol (MCP) tools on WebAssembly.
 
 [Documentation](https://docs.rs/ftl-sdk) | [Examples](https://github.com/fastertools/ftl/tree/main/templates/rust)
