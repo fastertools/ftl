@@ -3,6 +3,9 @@ use quote::quote;
 use syn::{FnArg, ItemFn, parse_macro_input};
 
 /// Define multiple tools in a single component.
+/// 
+/// This macro generates the complete HTTP handler with routing for your tools.
+/// The macro automatically handles JSON serialization and HTTP routing.
 ///
 /// This macro allows you to define all your tools in one place, automatically
 /// generating the HTTP handler and metadata for each tool.
