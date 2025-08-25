@@ -2,16 +2,15 @@ name: CI for Release PRs
 
 on:
   pull_request_target:
-    types: [opened, synchronize]
-    paths:
-      - '.release-please-manifest.json'
-      - 'release-please-config.json'
+    types: [opened, synchronize, reopened]
 
 jobs:
   # Detect which package is being released from PR title
   detect-release:
     name: Detect Release Package
     runs-on: ubuntu-latest
+    # Only run for release-please PRs
+    if: github.event.pull_request.user.login == 'release-please[bot]'
     outputs:
       is_release_pr: ${{ steps.detect.outputs.is_release_pr }}
       cli_release: ${{ steps.detect.outputs.cli_release }}
