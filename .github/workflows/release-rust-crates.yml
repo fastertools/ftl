@@ -1,6 +1,25 @@
 name: Release Rust Crates
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+      package:
+        description: 'Package to release (rust, rust-macros, or both)'
+        required: false
+        type: choice
+        options:
+          - both
+          - rust
+          - rust-macros
+        default: 'both'
   workflow_call:
     inputs:
       version:
