@@ -154,3 +154,6 @@ tools! {
 ## License
 
 Apache-2.0
+# Release Process
+
+See [RELEASE_ORDER.md](../../RELEASE_ORDER.md) for release instructions.
