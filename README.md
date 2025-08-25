@@ -15,13 +15,11 @@ Faster tools for AI agents
 
 </div>
 
-FTL is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io)(MCP) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards.
+FTL is an open-source framework for building and running polyglot [Model Context Protocol](https://modelcontextprotocol.io) servers. It's designed from the ground up to be fast, secure, and portable, using a modern stack of open standards:
 
-We believe the future of AI tooling shouldn't be locked into proprietary ecosystems. FTL is our commitment to that vision, built entirely on:
-
-- WebAssembly (WASM): For secure, sandboxed execution with sub-millisecond cold starts.
-- The [Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html): To compose tools written in different languages (Rust, Python, Go, TS) into a single application.
-- [Spin](https://github.com/spinframework/spin): The CNCF-hosted developer tool and runtime for building and running WASM applications.
+- WebAssembly (Wasm): For secure, sandboxed execution with sub-millisecond cold starts.
+- The [Component Model](https://component-model.bytecodealliance.org/design/why-component-model.html): To compose MCP components written in different languages (Rust, Python, Go, TS) into a single application.
+- [Spin](https://github.com/spinframework/spin): The [Wasmtime](https://github.com/bytecodealliance/wasmtime)-based CNCF-hosted developer tool and runtime for building and running WASM applications.
 
 This foundation ensures that what you build with FTL today will be compatible with the open, interoperable ecosystem of tomorrow.
 
@@ -32,12 +30,7 @@ This monorepo contains everything you need to build and deploy AI tools:
 - **ftl**: CLI for managing FTL applications and deployments (Go)
 - **MCP Components**: Pre-built gateway and authorizer for secure MCP servers (Rust/WASM)
 - **SDKs**: Multi-language support for building AI tools (Python, Rust, TypeScript, Go)
-- **Templates**: Quick-start patterns for common use cases
 - **Examples**: Real-world applications demonstrating best practices
-
-## FTL vs. FTL Engine
-- **ftl** (This Repo): The open-source framework and CLI for building MCP servers that can run anywhere Spin apps are supported.
-- **FTL Engine**: Our optional, managed platform for deploying ftl applications to a globally distributed edge network for the simplest path to production
 
 ### Features
 
@@ -46,7 +39,7 @@ This monorepo contains everything you need to build and deploy AI tools:
 - **Secure & Sandboxed**: Each tool runs in an isolated WASM sandbox, with no access to the host system unless explicitly granted
 - **Run Anywhere**: Deploy to any host compatible with Spin/[Wasmtime](https://github.com/bytecodealliance/wasmtime).
 - **MCP Compliant**: Out-of-the-box support for [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) and spec-compliant [Authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
-- **Blazing Fast**: Sub-millisecond cold starts and near-native performance, powered by Wasmtime.
+- **Blazing Fast**: Instant cold starts and near-native performance, powered by Wasmtime.
 
 ## Quick Start
 ### Prerequisites
