@@ -38,6 +38,9 @@ jobs:
       rust_sdk_released: ${{ steps.release.outputs['sdk/rust--release_created'] }}
       rust_sdk_version: ${{ steps.release.outputs['sdk/rust--version'] }}
       rust_sdk_tag: ${{ steps.release.outputs['sdk/rust--tag_name'] }}
+      rust_sdk_macros_released: ${{ steps.release.outputs['sdk/rust-macros--release_created'] }}
+      rust_sdk_macros_version: ${{ steps.release.outputs['sdk/rust-macros--version'] }}
+      rust_sdk_macros_tag: ${{ steps.release.outputs['sdk/rust-macros--tag_name'] }}
       python_sdk_released: ${{ steps.release.outputs['sdk/python--release_created'] }}
       python_sdk_version: ${{ steps.release.outputs['sdk/python--version'] }}
       python_sdk_tag: ${{ steps.release.outputs['sdk/python--tag_name'] }}
@@ -75,6 +78,7 @@ jobs:
           echo "CLI released: ${{ steps.release.outputs['cmd/ftl--release_created'] }}"
           echo "Go SDK released: ${{ steps.release.outputs['sdk/go--release_created'] }}"
           echo "Rust SDK released: ${{ steps.release.outputs['sdk/rust--release_created'] }}"
+          echo "Rust SDK Macros released: ${{ steps.release.outputs['sdk/rust-macros--release_created'] }}"
           echo "Python SDK released: ${{ steps.release.outputs['sdk/python--release_created'] }}"
           echo "TypeScript SDK released: ${{ steps.release.outputs['sdk/typescript--release_created'] }}"
           echo "MCP Gateway released: ${{ steps.release.outputs['components/mcp-gateway--release_created'] }}"
@@ -130,6 +134,17 @@ jobs:
           
           echo "Notified Go proxy about new version v${VERSION}"
 
+  # Rust SDK Macros Release
+  release-rust-sdk-macros:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.rust_sdk_macros_released == 'true' }}
+    uses: ./.github/workflows/release-rust-crates.yml
+    with:
+      version: ${{ needs.release-please.outputs.rust_sdk_macros_version }}
+      tag: ${{ needs.release-please.outputs.rust_sdk_macros_tag }}
+      package: rust-macros
+    secrets: inherit
+
   # Rust SDK Release
   release-rust-sdk:
     needs: release-please
@@ -138,6 +153,7 @@ jobs:
     with:
       version: ${{ needs.release-please.outputs.rust_sdk_version }}
       tag: ${{ needs.release-please.outputs.rust_sdk_tag }}
+      package: rust
     secrets: inherit
 
   # Python SDK Release

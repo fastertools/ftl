@@ -1,6 +1,25 @@
 name: Release Rust Crates
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+      package:
+        description: 'Package to release (rust, rust-macros, or both)'
+        required: false
+        type: choice
+        options:
+          - both
+          - rust
+          - rust-macros
+        default: 'both'
   workflow_call:
     inputs:
       version:
@@ -11,6 +30,11 @@ on:
         description: 'Git tag for the release'
         required: true
         type: string
+      package:
+        description: 'Package to release (rust or rust-macros)'
+        required: false
+        type: string
+        default: 'both'
     secrets:
       CARGO_REGISTRY_TOKEN:
         required: false
@@ -36,19 +60,31 @@ jobs:
 
       - name: Run tests
         run: |
-          cd sdk/rust-macros
-          cargo test --all-features
+          if [[ "${{ inputs.package }}" == "rust-macros" ]] || [[ "${{ inputs.package }}" == "both" ]]; then
+            cd sdk/rust-macros
+            cargo test --all-features
+            cd ..
+          fi
           
-          cd ../rust
-          cargo test --all-features
+          if [[ "${{ inputs.package }}" == "rust" ]] || [[ "${{ inputs.package }}" == "both" ]]; then
+            cd sdk/rust
+            cargo test --all-features
+            cd ..
+          fi
 
       - name: Check documentation
         run: |
-          cd sdk/rust-macros
-          cargo doc --no-deps --all-features
+          if [[ "${{ inputs.package }}" == "rust-macros" ]] || [[ "${{ inputs.package }}" == "both" ]]; then
+            cd sdk/rust-macros
+            cargo doc --no-deps --all-features
+            cd ..
+          fi
           
-          cd ../rust
-          cargo doc --no-deps --all-features
+          if [[ "${{ inputs.package }}" == "rust" ]] || [[ "${{ inputs.package }}" == "both" ]]; then
+            cd sdk/rust
+            cargo doc --no-deps --all-features
+            cd ..
+          fi
 
       - name: Verify examples compile
         run: |
@@ -68,6 +104,7 @@ jobs:
   publish-macros:
     name: Publish ftl-sdk-macros
     needs: test-crates
+    if: ${{ inputs.package == 'rust-macros' || inputs.package == 'both' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -119,7 +156,8 @@ jobs:
 
   publish-sdk:
     name: Publish ftl-sdk
-    needs: publish-macros
+    needs: [test-crates, publish-macros]
+    if: ${{ always() && (inputs.package == 'rust' || inputs.package == 'both') && (needs.test-crates.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
