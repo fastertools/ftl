@@ -9,8 +9,8 @@ jobs:
   detect-release:
     name: Detect Release Package
     runs-on: ubuntu-latest
-    # Only run for release-please PRs (from fastertools GitHub App)
-    if: github.event.pull_request.user.login == 'app/fastertools-gha' || contains(github.event.pull_request.title, 'chore(main): release')
+    # Only run for release PRs (check title pattern)
+    if: contains(github.event.pull_request.title, 'chore(main): release')
     outputs:
       is_release_pr: ${{ steps.detect.outputs.is_release_pr }}
       cli_release: ${{ steps.detect.outputs.cli_release }}
