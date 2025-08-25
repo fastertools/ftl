@@ -136,6 +136,21 @@ tools! {
 }
 ```
 
+## Async Support
+
+The `tools!` macro fully supports async functions:
+
+```rust
+tools! {
+    /// Async tool example
+    async fn fetch_data(req: FetchRequest) -> ToolResponse {
+        // Async operations work seamlessly
+        let result = some_async_operation().await?;
+        text!("Fetched: {}", result)
+    }
+}
+```
+
 ## License
 
 Apache-2.0
