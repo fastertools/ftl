@@ -3,6 +3,10 @@
 //! This crate provides only the type definitions needed to implement
 //! MCP-compliant tools. It does not include any HTTP server logic,
 //! allowing you to use any web framework of your choice.
+//!
+//! # Features
+//!
+//! - `macros` - Enables the `tools!` macro for simplified tool development
 
 // Re-export macros when the feature is enabled
 #[cfg(feature = "macros")]
