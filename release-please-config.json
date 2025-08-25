@@ -142,7 +142,14 @@
       "tag-separator": "-",
       "package-name": "ftl-sdk-macros",
       "bootstrap-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
-      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9"
+      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "sdk/rust/Cargo.toml",
+          "jsonpath": "$.dependencies['ftl-sdk-macros'].version"
+        }
+      ]
     },
     "sdk/python": {
       "release-type": "python",
