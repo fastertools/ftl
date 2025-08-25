@@ -253,5 +253,6 @@
   "label": "autorelease: pending",
   "release-label": "autorelease: tagged",
   "draft": false,
-  "draft-pull-request": false
+  "draft-pull-request": false,
+  "always-update": true
 }
