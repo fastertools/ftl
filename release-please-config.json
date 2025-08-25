@@ -184,8 +184,8 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "mcp-gateway",
-      "bootstrap-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
-      "last-release-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
+      "bootstrap-sha": "5fa80cc70eb2205000546fcf2ff2d467bbf47668",
+      "last-release-sha": "5fa80cc70eb2205000546fcf2ff2d467bbf47668",
       "extra-files": [
         {
           "type": "toml",
@@ -201,8 +201,8 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "mcp-authorizer",
-      "bootstrap-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
-      "last-release-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
+      "bootstrap-sha": "5fa80cc70eb2205000546fcf2ff2d467bbf47668",
+      "last-release-sha": "5fa80cc70eb2205000546fcf2ff2d467bbf47668",
       "extra-files": [
         {
           "type": "toml",
