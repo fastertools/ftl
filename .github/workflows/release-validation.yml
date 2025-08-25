@@ -146,7 +146,7 @@ jobs:
           fi
           
           # Validate SDK versions
-          # Note: Rust SDK now uses "sdk" key instead of "sdk/rust"
+          # Note: Rust SDK uses "sdk" key in manifest
           for entry in "go:sdk/go" "python:sdk/python" "typescript:sdk/typescript"; do
             IFS=':' read -r name path <<< "$entry"
             SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r ".[\"$path\"]")
@@ -169,8 +169,8 @@ jobs:
           done
           
           # Check Rust SDK 
-          RUST_SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '.sdk')
-          RUST_SDK_SCAFFOLD=$(jq -r '.sdk' .release-please-manifest.json)
+          RUST_SDK_MANIFEST=$(echo "$MANIFEST_VERSIONS" | jq -r '."sdk"')
+          RUST_SDK_SCAFFOLD=$(jq -r '."sdk"' .release-please-manifest.json)
           
           if [[ "$RUST_SDK_MANIFEST" != "$RUST_SDK_SCAFFOLD" ]]; then
             if [[ "$IS_RELEASE_PR" == "true" ]]; then
@@ -216,7 +216,7 @@ jobs:
           fi
           
           # Check Rust SDK workspace version
-          MANIFEST_VERSION=$(jq -r '.sdk' .release-please-manifest.json)
+          MANIFEST_VERSION=$(jq -r '."sdk"' .release-please-manifest.json)
           WORKSPACE_VERSION=$(grep '^\s*version = ' sdk/Cargo.toml | head -1 | cut -d'"' -f2)
           
           if [[ "$MANIFEST_VERSION" != "$WORKSPACE_VERSION" ]]; then
@@ -337,7 +337,7 @@ jobs:
       - name: Check Rust SDK dependencies
         run: |
           # Ensure ftl-sdk depends on correct ftl-sdk-macros version
-          SDK_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
+          SDK_VERSION=$(jq -r '."sdk"' .release-please-manifest.json)
           MACROS_DEP=$(grep 'ftl-sdk-macros.*version' sdk/rust/Cargo.toml | cut -d'"' -f2)
           
           if [[ "$MACROS_DEP" != "=$SDK_VERSION" ]] && [[ "$MACROS_DEP" != "$SDK_VERSION" ]]; then
@@ -358,7 +358,7 @@ jobs:
             # Extract component dependencies
             if grep -q "rust-sdk" "$ftl_file"; then
               EXAMPLE_VERSION=$(grep "rust-sdk" "$ftl_file" | grep -oP 'v\K[0-9.]+' || echo "unknown")
-              EXPECTED_VERSION=$(jq -r '."sdk/rust"' .release-please-manifest.json)
+              EXPECTED_VERSION=$(jq -r '."sdk"' .release-please-manifest.json)
               
               if [[ "$EXAMPLE_VERSION" != "$EXPECTED_VERSION" ]] && [[ "$EXAMPLE_VERSION" != "unknown" ]]; then
                 echo "  ⚠️  Example uses rust-sdk v$EXAMPLE_VERSION, expected v$EXPECTED_VERSION"

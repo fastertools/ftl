@@ -129,7 +129,7 @@
       ]
     },
     "sdk": {
-      "release-type": "rust",
+      "release-type": "simple",
       "component": "sdk-rust",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
@@ -137,7 +137,13 @@
       "package-name": "ftl-sdk",
       "bootstrap-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
       "last-release-sha": "162b1781c1e9ff7accc1369177c83a02fb174dbe",
+      "version-file": "Cargo.toml",
       "extra-files": [
+        {
+          "type": "toml",
+          "path": "sdk/Cargo.toml",
+          "jsonpath": "$.workspace.package.version"
+        },
         {
           "type": "toml",
           "path": "sdk/rust/Cargo.toml",
@@ -164,7 +170,7 @@
       "extra-files": []
     },
     "components": {
-      "release-type": "rust",
+      "release-type": "simple",
       "component": "components",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
@@ -174,6 +180,11 @@
       "bootstrap-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
       "last-release-sha": "991bc96311be7c205bcc1acc9f697f4948a1982f",
       "extra-files": [
+        {
+          "type": "toml",
+          "path": "components/Cargo.toml",
+          "jsonpath": "$.workspace.package.version"
+        },
         {
           "type": "toml",
           "path": "components/mcp-gateway/spin.toml",
