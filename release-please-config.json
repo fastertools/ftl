@@ -128,10 +128,10 @@
         }
       ]
     },
-    "sdk/rust": {
+    "sdk": {
       "release-type": "rust",
       "component": "sdk-rust",
-      "changelog-path": "CHANGELOG.md",
+      "changelog-path": "rust/CHANGELOG.md",
       "include-component-in-tag": true,
       "tag-separator": "-",
       "package-name": "ftl-sdk",
