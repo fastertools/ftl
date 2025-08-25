@@ -12,7 +12,7 @@ jobs:
     name: Detect Changes
     uses: ./.github/workflows/detect-changes.yml
 
-  # Run CI if needed
+  # Run CI with selective job execution
   ci:
     name: Run CI
     needs: changes
@@ -25,6 +25,13 @@ jobs:
       needs.changes.outputs.components == 'true' || 
       needs.changes.outputs.ci == 'true'
     uses: ./.github/workflows/ci.yml
+    with:
+      cli_changed: ${{ needs.changes.outputs.cli == 'true' }}
+      rust_sdk_changed: ${{ needs.changes.outputs.rust-sdk == 'true' }}
+      go_sdk_changed: ${{ needs.changes.outputs.go-sdk == 'true' }}
+      python_sdk_changed: ${{ needs.changes.outputs.python-sdk == 'true' }}
+      typescript_sdk_changed: ${{ needs.changes.outputs.typescript-sdk == 'true' }}
+      components_changed: ${{ needs.changes.outputs.components == 'true' }}
   
   # The single required status check
   status:
