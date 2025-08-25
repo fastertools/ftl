@@ -134,13 +134,7 @@
       "tag-separator": "-",
       "package-name": "ftl-sdk",
       "bootstrap-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
-      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9",
-      "extra-files": [
-        {
-          "type": "cargo-toml",
-          "path": "sdk/rust/Cargo.toml"
-        }
-      ]
+      "last-release-sha": "9a49d230d69cc70959638c57575dffe4292daae9"
     },
     "sdk/rust-macros": {
       "release-type": "rust",
