@@ -6,14 +6,27 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-  # Allow this workflow to be called by other workflows
+  # Allow this workflow to be called by other workflows with change detection
   workflow_call:
-  # Trigger CI on release PRs created by release-please
-  pull_request_target:
-    types: [opened, synchronize]
-    paths:
-      - '.release-please-manifest.json'
-      - 'release-please-config.json'
+    inputs:
+      cli_changed:
+        type: boolean
+        default: true
+      rust_sdk_changed:
+        type: boolean
+        default: true
+      go_sdk_changed:
+        type: boolean
+        default: true
+      python_sdk_changed:
+        type: boolean
+        default: true
+      typescript_sdk_changed:
+        type: boolean
+        default: true
+      components_changed:
+        type: boolean
+        default: true
 
 env:
   # Go environment
@@ -30,12 +43,28 @@ env:
 
 jobs:
   # ============================================================================
+  # Change Detection (when not called as workflow)
+  # ============================================================================
+  
+  detect-changes:
+    name: Detect Changes
+    if: github.event_name != 'workflow_call'
+    uses: ./.github/workflows/detect-changes.yml
+
+  # ============================================================================
   # Go CLI Jobs
   # ============================================================================
   
   go-lint:
     name: Go Lint
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.cli_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.cli == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -64,6 +93,13 @@ jobs:
 
   go-test:
     name: Go Test
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.cli_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.cli == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -105,6 +141,13 @@ jobs:
         
   go-build:
     name: Go Build
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.cli_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.cli == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     strategy:
       matrix:
         include:
@@ -149,6 +192,13 @@ jobs:
   go-security:
     name: Go Security Scan
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.cli_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.cli == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -174,6 +224,13 @@ jobs:
   rust-lint:
     name: Rust Lint
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && (inputs.rust_sdk_changed || inputs.components_changed)) ||
+        (github.event_name != 'workflow_call' && (needs.detect-changes.outputs.rust-sdk == 'true' || needs.detect-changes.outputs.components == 'true')) ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -198,6 +255,13 @@ jobs:
   rust-test:
     name: Rust Test
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && (inputs.rust_sdk_changed || inputs.components_changed)) ||
+        (github.event_name != 'workflow_call' && (needs.detect-changes.outputs.rust-sdk == 'true' || needs.detect-changes.outputs.components == 'true')) ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -230,6 +294,13 @@ jobs:
   rust-build-wasm:
     name: Build WASM Components
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.components_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.components == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -269,6 +340,13 @@ jobs:
   component-tests:
     name: Component Tests
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.components_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.components == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
       
@@ -313,7 +391,13 @@ jobs:
   
   integration-test:
     name: Integration Tests
-    needs: [go-build, rust-build-wasm]
+    needs: [detect-changes, go-build, rust-build-wasm]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && (inputs.cli_changed || inputs.components_changed)) ||
+        (github.event_name != 'workflow_call' && (needs.detect-changes.outputs.cli == 'true' || needs.detect-changes.outputs.components == 'true')) ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -369,6 +453,13 @@ jobs:
   python-sdk-test:
     name: Python SDK Test
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.python_sdk_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.python-sdk == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     strategy:
       matrix:
         python-version: ['3.12']
@@ -399,6 +490,13 @@ jobs:
   typescript-sdk-test:
     name: TypeScript SDK Test
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() && (
+        (github.event_name == 'workflow_call' && inputs.typescript_sdk_changed) ||
+        (github.event_name != 'workflow_call' && needs.detect-changes.outputs.typescript-sdk == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     strategy:
       matrix:
         node-version: [20, 22]
@@ -434,6 +532,7 @@ jobs:
     name: CI Status
     if: always()
     needs: 
+      - detect-changes
       - go-lint
       - go-test
       - go-build

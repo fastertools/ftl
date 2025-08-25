@@ -1,0 +1,104 @@
+name: CI for Release PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+    paths:
+      - '.release-please-manifest.json'
+      - 'release-please-config.json'
+
+jobs:
+  # Detect which package is being released from PR title
+  detect-release:
+    name: Detect Release Package
+    runs-on: ubuntu-latest
+    outputs:
+      is_release_pr: ${{ steps.detect.outputs.is_release_pr }}
+      cli_release: ${{ steps.detect.outputs.cli_release }}
+      rust_sdk_release: ${{ steps.detect.outputs.rust_sdk_release }}
+      go_sdk_release: ${{ steps.detect.outputs.go_sdk_release }}
+      python_sdk_release: ${{ steps.detect.outputs.python_sdk_release }}
+      typescript_sdk_release: ${{ steps.detect.outputs.typescript_sdk_release }}
+      component_release: ${{ steps.detect.outputs.component_release }}
+    steps:
+      - name: Detect release from PR title
+        id: detect
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR Title: $PR_TITLE"
+          
+          # Check if this is a release PR
+          if [[ "$PR_TITLE" =~ ^chore.*release ]]; then
+            echo "is_release_pr=true" >> $GITHUB_OUTPUT
+            
+            # Detect which package is being released
+            if [[ "$PR_TITLE" =~ "cmd/ftl" ]] || [[ "$PR_TITLE" =~ "cli" ]]; then
+              echo "cli_release=true" >> $GITHUB_OUTPUT
+              echo "Detected CLI release"
+            fi
+            
+            if [[ "$PR_TITLE" =~ "sdk-rust-macros" ]] || [[ "$PR_TITLE" =~ "sdk-rust" ]]; then
+              echo "rust_sdk_release=true" >> $GITHUB_OUTPUT
+              echo "Detected Rust SDK release"
+            fi
+            
+            if [[ "$PR_TITLE" =~ "sdk-go" ]]; then
+              echo "go_sdk_release=true" >> $GITHUB_OUTPUT
+              echo "Detected Go SDK release"
+            fi
+            
+            if [[ "$PR_TITLE" =~ "sdk-python" ]]; then
+              echo "python_sdk_release=true" >> $GITHUB_OUTPUT
+              echo "Detected Python SDK release"
+            fi
+            
+            if [[ "$PR_TITLE" =~ "sdk-typescript" ]]; then
+              echo "typescript_sdk_release=true" >> $GITHUB_OUTPUT
+              echo "Detected TypeScript SDK release"
+            fi
+            
+            if [[ "$PR_TITLE" =~ "mcp-gateway" ]] || [[ "$PR_TITLE" =~ "mcp-authorizer" ]]; then
+              echo "component_release=true" >> $GITHUB_OUTPUT
+              echo "Detected component release"
+            fi
+          else
+            echo "is_release_pr=false" >> $GITHUB_OUTPUT
+            echo "Not a release PR"
+          fi
+
+  # Run selective CI for release PRs
+  ci:
+    name: Run CI for Release PR
+    needs: detect-release
+    if: needs.detect-release.outputs.is_release_pr == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      cli_changed: ${{ needs.detect-release.outputs.cli_release == 'true' }}
+      rust_sdk_changed: ${{ needs.detect-release.outputs.rust_sdk_release == 'true' }}
+      go_sdk_changed: ${{ needs.detect-release.outputs.go_sdk_release == 'true' }}
+      python_sdk_changed: ${{ needs.detect-release.outputs.python_sdk_release == 'true' }}
+      typescript_sdk_changed: ${{ needs.detect-release.outputs.typescript_sdk_release == 'true' }}
+      components_changed: ${{ needs.detect-release.outputs.component_release == 'true' }}
+
+  # Status check for release PRs
+  status:
+    name: Release PR CI Status
+    runs-on: ubuntu-latest
+    needs: [detect-release, ci]
+    if: always()
+    steps:
+      - name: Check Status
+        run: |
+          if [[ "${{ needs.detect-release.outputs.is_release_pr }}" == "true" ]]; then
+            if [[ "${{ needs.ci.result }}" == "success" ]]; then
+              echo "✅ CI passed for release PR"
+              exit 0
+            else
+              echo "❌ CI failed for release PR: ${{ needs.ci.result }}"
+              exit 1
+            fi
+          else
+            echo "ℹ️ Not a release PR, skipping"
+            exit 0
+          fi
