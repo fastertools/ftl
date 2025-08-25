@@ -2,7 +2,7 @@
   ".": "0.12.0",
   "cmd/ftl": "0.11.0",
   "sdk/go": "0.11.0",
-  "sdk/rust": "0.13.0",
+  "sdk/rust": "0.14.0",
   "sdk/rust-macros": "0.13.0",
   "sdk/python": "0.11.0",
   "sdk/typescript": "0.11.1",
