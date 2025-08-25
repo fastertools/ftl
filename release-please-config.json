@@ -129,12 +129,12 @@
       "extra-files": [
         {
           "type": "toml",
-          "path": "sdk/rust-macros/Cargo.toml",
+          "path": "../rust-macros/Cargo.toml",
           "jsonpath": "$.package.version"
         },
         {
           "type": "toml",
-          "path": "sdk/rust/Cargo.toml",
+          "path": "Cargo.toml",
           "jsonpath": "$.dependencies['ftl-sdk-macros'].version"
         }
       ]
