@@ -2,6 +2,8 @@
 
 Rust SDK for building Model Context Protocol (MCP) tools on WebAssembly.
 
+[Documentation](https://docs.rs/ftl-sdk) | [Examples](https://github.com/fastertools/ftl/tree/main/templates/rust)
+
 ## Installation
 
 ```toml
