@@ -10,7 +10,7 @@ jobs:
     name: Detect Release Package
     runs-on: ubuntu-latest
     # Only run for release PRs (check title pattern)
-    if: contains(github.event.pull_request.title, 'chore(main): release')
+    if: ${{ contains(github.event.pull_request.title, 'chore(main): release') }}
     outputs:
       is_release_pr: ${{ steps.detect.outputs.is_release_pr }}
       cli_release: ${{ steps.detect.outputs.cli_release }}
