@@ -28,14 +28,17 @@ var WebUI = struct {
 	Buttons  map[string]string
 	Messages map[string]string
 	Forms    map[string]string
+	Sections map[string]string
 }{
 	Titles: map[string]string{
 		"main":           "FTL Control Center",
 		"control_center": "Control Center",
+		"control_panel":  "Control Panel",
 		"projects":       "Projects",
 		"activity":       "Activity",
 		"project_info":   "Project Info",
 		"tools":          "Available Tools",
+		"status_monitor": "Status Monitor",
 	},
 	Tabs: map[string]string{
 		"live_logs":      "Live Logs",
@@ -66,6 +69,12 @@ var WebUI = struct {
 		"project_name":   "Project name",
 		"project_path":   "/path/to/project",
 		"confirm_remove": "Remove this project?",
+	},
+	Sections: map[string]string{
+		"operations":      "Operations",
+		"command_output":  "Command Output",
+		"available_tools": "Available Tools",
+		"process_status":  "Process Status",
 	},
 }
 

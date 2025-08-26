@@ -1,9 +1,11 @@
 package templates
 
+import ui "github.com/fastertools/ftl/ui/gen"
+
 // ControlPanel provides FTL control buttons and forms with HTMX integration
 templ ControlPanel(project Project) {
 	<div>
-		<h2 class="text-lg font-semibold mb-4 text-white">Control Panel</h2>
+		<h2 class="text-lg font-semibold mb-4 text-white">{ ui.WebUI.Titles["control_panel"] }</h2>
 		
 		<div class="space-y-4">
 			<!-- Simplified FTL Operations -->
@@ -70,13 +72,13 @@ templ ControlPanel(project Project) {
 			
 			<!-- Command Output -->
 			<div class="border-t pt-4" style="border-color: #3a3a3a;">
-				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Command Output</h3>
+				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">{ ui.WebUI.Sections["command_output"] }</h3>
 				<div 
 					id="ftl-output" 
 					class="bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden"
 					style="min-height: 100px; max-height: 150px; overflow-y: auto;"
 				>
-					Ready to execute commands...
+					{ ui.WebUI.Messages["ready_commands"] }
 				</div>
 			</div>
 		</div>

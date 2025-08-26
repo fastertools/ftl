@@ -181,20 +181,20 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 // HandleMCP handles MCP form submissions (legacy endpoint)
 func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		http.Error(w, ui.Handlers.Errors["parse_form_failed"], http.StatusBadRequest)
 		return
 	}
 
 	// Get current project
 	currentProj, exists := h.registry.GetCurrentProject()
 	if !exists {
-		http.Error(w, "No projects configured", http.StatusInternalServerError)
+		http.Error(w, ui.Handlers.Errors["no_projects"], http.StatusInternalServerError)
 		return
 	}
 
@@ -317,14 +317,14 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 // HandleFTLStart handles starting FTL in regular mode
 func (h *Handler) HandleFTLStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -346,14 +346,14 @@ func (h *Handler) HandleFTLStart(w http.ResponseWriter, r *http.Request) {
 // HandleFTLStop handles stopping FTL regular mode
 func (h *Handler) HandleFTLStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -372,14 +372,14 @@ func (h *Handler) HandleFTLStop(w http.ResponseWriter, r *http.Request) {
 // HandleWatchStart handles starting FTL watch mode
 func (h *Handler) HandleWatchStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -401,14 +401,14 @@ func (h *Handler) HandleWatchStart(w http.ResponseWriter, r *http.Request) {
 // HandleWatchStop handles stopping FTL watch mode
 func (h *Handler) HandleWatchStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -427,14 +427,14 @@ func (h *Handler) HandleWatchStop(w http.ResponseWriter, r *http.Request) {
 // HandleLogsPoll polls for logs using background-collected data
 func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -481,14 +481,14 @@ func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 // HandleStatusPoll polls for process status using background-collected data
 func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
+		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
 		return
 	}
 
@@ -544,7 +544,7 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 // HandleProcessStop handles universal process stopping
 func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -607,13 +607,13 @@ func (h *Handler) HandleProjectCancelForm(w http.ResponseWriter, r *http.Request
 // HandleProjectAdd adds a new project and returns updated project list
 func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		http.Error(w, ui.Handlers.Errors["parse_form_failed"], http.StatusBadRequest)
 		return
 	}
 
@@ -713,7 +713,7 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 // HandleProjectRemove removes a project and returns updated project list
 func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -777,7 +777,7 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 // HandleProjectSwitch switches to a different project
 func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -855,7 +855,7 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 // This is primarily used by tests to ensure server state matches file state
 func (h *Handler) HandleProjectReload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -935,7 +935,7 @@ func generateStopButtonHTML(processType string, isRunning bool, projectPath stri
 // HandleTestWaitForHTMX blocks until HTMX operations complete
 func (h *Handler) HandleTestWaitForHTMX(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -992,7 +992,7 @@ func (h *Handler) HandleTestWaitForHTMX(w http.ResponseWriter, r *http.Request) 
 // HandleTestWaitForStatus blocks until process status changes to expected value
 func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -1073,7 +1073,7 @@ func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request
 // HandleTestWaitForLogs blocks until sufficient logs are available
 func (h *Handler) HandleTestWaitForLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -1144,7 +1144,7 @@ func (h *Handler) HandleTestWaitForLogs(w http.ResponseWriter, r *http.Request) 
 // HandleTestProcessTree returns JSON process hierarchy
 func (h *Handler) HandleTestProcessTree(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
 		return
 	}
 

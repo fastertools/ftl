@@ -24,10 +24,19 @@ package ui
 	titles: {
 		main:           "FTL Control Center"
 		control_center: "Control Center"
+		control_panel:  "Control Panel"
 		projects:       "Projects"
 		activity:       "Activity"
 		project_info:   "Project Info"
 		tools:          "Available Tools"
+		status_monitor: "Status Monitor"
+	}
+	
+	sections: {
+		operations:      "Operations"
+		command_output:  "Command Output"
+		available_tools: "Available Tools"
+		process_status:  "Process Status"
 	}
 	
 	tabs: {

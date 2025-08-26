@@ -222,12 +222,13 @@ func generateWebUI(buf *bytes.Buffer, value cue.Value) error {
 	buf.WriteString("\tButtons  map[string]string\n")
 	buf.WriteString("\tMessages map[string]string\n")
 	buf.WriteString("\tForms    map[string]string\n")
+	buf.WriteString("\tSections map[string]string\n")
 	buf.WriteString("}{\n")
 
 	webUI := value.LookupPath(cue.ParsePath("#WebUI"))
 
 	// Generate each map
-	categories := []string{"titles", "tabs", "buttons", "messages", "forms"}
+	categories := []string{"titles", "tabs", "buttons", "messages", "forms", "sections"}
 	for _, cat := range categories {
 		buf.WriteString(fmt.Sprintf("\t%s: map[string]string{\n", strings.Title(cat)))
 

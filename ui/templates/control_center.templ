@@ -18,7 +18,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 		<div class={ ui.CSSClasses.Components["space_y_4"] }>
 			<!-- Process Status Section -->
 			<div>
-				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Process Status</h3>
+				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>{ ui.WebUI.Sections["process_status"] }</h3>
 				<div id="ftl-status" 
 					 hx-post="/htmx/status/poll" 
 					 hx-trigger="load, every 3s" 
@@ -45,7 +45,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 			
 			<!-- Control Buttons Section -->
 			<div class={ ui.CSSClasses.Components["border_top"] } style={ "border-color: " + ui.Colors.UI["border_primary"] }>
-				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Operations</h3>
+				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>{ ui.WebUI.Sections["operations"] }</h3>
 				<div class="p-4 rounded-lg" style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]) }>
 					<div class={ ui.CSSClasses.Components["grid_3_cols"] }>
 						<!-- Build Button -->

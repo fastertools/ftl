@@ -8,6 +8,8 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import ui "github.com/fastertools/ftl/ui/gen"
+
 // ControlPanel provides FTL control buttons and forms with HTMX integration
 func ControlPanel(project Project) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -30,46 +32,85 @@ func ControlPanel(project Project) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h2 class=\"text-lg font-semibold mb-4 text-white\">Control Panel</h2><div class=\"space-y-4\"><!-- Simplified FTL Operations --><div class=\"p-4 rounded-lg\" style=\"background-color: #333333;\"><div class=\"grid grid-cols-4 gap-3\"><!-- Build Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"action\" value=\"build\"> <input type=\"hidden\" name=\"project-path\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h2 class=\"text-lg font-semibold mb-4 text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Titles["control_panel"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 15, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 8, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Build</button></form><!-- Up Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"regular-project-path\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h2><div class=\"space-y-4\"><!-- Simplified FTL Operations --><div class=\"p-4 rounded-lg\" style=\"background-color: #333333;\"><div class=\"grid grid-cols-4 gap-3\"><!-- Build Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"action\" value=\"build\"> <input type=\"hidden\" name=\"project-path\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 29, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 17, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Up</button></form><!-- Watch Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"watch-project-path\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Build</button></form><!-- Up Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"regular-project-path\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 43, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 31, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Watch</button></form><!-- Stop Button --><button hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-vals='{\"stop\": \"true\"}' hx-include=\"[name='project-path']\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Stop</button></div></div><!-- Command Output --><div class=\"border-t pt-4\" style=\"border-color: #3a3a3a;\"><h3 class=\"text-sm font-medium mb-2\" style=\"color: #a0a0a0;\">Command Output</h3><div id=\"ftl-output\" class=\"bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden\" style=\"min-height: 100px; max-height: 150px; overflow-y: auto;\">Ready to execute commands...</div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Up</button></form><!-- Watch Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\"><input type=\"hidden\" name=\"watch-project-path\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 45, Col: 73}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\"> <button type=\"submit\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Watch</button></form><!-- Stop Button --><button hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-vals='{\"stop\": \"true\"}' hx-include=\"[name='project-path']\" class=\"w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium\" style=\"background-color: #4a4a4a; border: 1px solid #5a5a5a;\" onmouseover=\"this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'\">Stop</button></div></div><!-- Command Output --><div class=\"border-t pt-4\" style=\"border-color: #3a3a3a;\"><h3 class=\"text-sm font-medium mb-2\" style=\"color: #a0a0a0;\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Sections["command_output"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 75, Col: 102}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</h3><div id=\"ftl-output\" class=\"bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden\" style=\"min-height: 100px; max-height: 150px; overflow-y: auto;\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Messages["ready_commands"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control.templ`, Line: 81, Col: 42}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
