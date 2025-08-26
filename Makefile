@@ -23,6 +23,8 @@ help:
 	@echo "    generate-api  - Generate API client from OpenAPI spec"
 	@echo "    generate-templ- Generate templ templates"
 	@echo "    generate-ui   - Generate UI constants from CUE modules"
+	@echo "    generate-css  - Build Tailwind CSS"
+	@echo "    css-watch     - Watch and rebuild CSS on changes"
 	@echo "    fmt           - Format all code (Go + Rust)"
 	@echo "    lint          - Lint all code (Go + Rust)"
 	@echo "    coverage      - Generate test coverage reports"
@@ -68,8 +70,19 @@ generate-ui:
 	@cd ui && go run generate_v2.go
 	@echo "✅ UI constants generated: ui/gen/"
 
-# Build FTL CLI (Go)
-build:
+# Build Tailwind CSS
+generate-css:
+	@echo "🎨 Building Tailwind CSS..."
+	@npm run css:build
+	@echo "✅ CSS built: static/css/output.css"
+
+# Watch and rebuild CSS on changes
+css-watch:
+	@echo "👁️  Watching CSS files for changes..."
+	@npm run css:watch
+
+# Build FTL CLI (Go) with all generation steps
+build: generate-ui generate-templ generate-css
 	@echo "🔨 Building FTL CLI..."
 	@go build -ldflags "-X github.com/fastertools/ftl/internal/cli.version=$$(git describe --tags --always) \
 		-X github.com/fastertools/ftl/internal/cli.commit=$$(git rev-parse --short HEAD) \
@@ -158,6 +171,7 @@ clean: clean-test-data
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf bin/ target/ coverage*.out coverage*.html
 	@rm -rf node_modules/ playwright-report/ test-results/
+	@rm -rf ui/gen/ ui/templates/*_templ.go static/css/output.css
 	@go clean -cache -testcache
 	@cargo clean
 	@echo "✅ Clean complete"
@@ -166,7 +180,7 @@ clean: clean-test-data
 dev: fmt build test-cli
 	@echo "✅ Development build complete"
 
-# Build everything
+# Build everything (includes all generation steps)
 all: build build-components
 	@echo "✅ All components built successfully"
 
