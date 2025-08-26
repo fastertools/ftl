@@ -56,6 +56,26 @@ type DashboardData struct {
 	CommandHistory  []CommandOutput
 }
 
+script configureTailwind(bgPrimary, bgSecondary, bgTertiary, textPrimary, textSecondary, accentGreen, accentBlue, accentOrange, accentRed string) {
+	tailwind.config = {
+		theme: {
+			extend: {
+				colors: {
+					'bg-primary': bgPrimary,
+					'bg-secondary': bgSecondary,
+					'bg-tertiary': bgTertiary,
+					'text-primary': textPrimary,
+					'text-secondary': textSecondary,
+					'accent-green': accentGreen,
+					'accent-blue': accentBlue,
+					'accent-orange': accentOrange,
+					'accent-red': accentRed
+				}
+			}
+		}
+	}
+}
+
 // Layout renders the main dashboard layout with professional dark theme
 templ Layout(data DashboardData) {
 	<!DOCTYPE html>
@@ -67,25 +87,17 @@ templ Layout(data DashboardData) {
 		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js" integrity="sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm" crossorigin="anonymous"></script>
 		<script src="https://unpkg.com/htmx.org@2.0.6/dist/ext/json-enc.js"></script>
 		<script src="https://cdn.tailwindcss.com"></script>
-		<script>
-			tailwind.config = {
-				theme: {
-					extend: {
-						colors: {
-							'bg-primary': '{ ui.Colors.Primary.BG }',
-							'bg-secondary': '{ ui.Colors.Secondary.BG }',
-							'bg-tertiary': '{ ui.Colors.UI["border_primary"] }',
-							'text-primary': '{ ui.Colors.Primary.Text }',
-							'text-secondary': '{ ui.Colors.Secondary.Text }',
-							'accent-green': '{ ui.Colors.Accents["green"] }',
-							'accent-blue': '{ ui.Colors.Accents["blue"] }',
-							'accent-orange': '{ ui.Colors.Accents["orange"] }',
-							'accent-red': '{ ui.Colors.Accents["red"] }'
-						}
-					}
-				}
-			}
-		</script>
+		@configureTailwind(
+			ui.Colors.Primary.BG,
+			ui.Colors.Secondary.BG, 
+			ui.Colors.UI["border_primary"],
+			ui.Colors.Primary.Text,
+			ui.Colors.Secondary.Text,
+			ui.Colors.Accents["green"],
+			ui.Colors.Accents["blue"],
+			ui.Colors.Accents["orange"],
+			ui.Colors.Accents["red"],
+		)
 		@BaseStyles()
 	</head>
 	<body class="h-full flex" style={ "background-color: " + ui.Colors.Primary.BG }>

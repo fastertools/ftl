@@ -2,6 +2,7 @@
 module.exports = {
   content: [
     "./ui/templates/**/*.{templ,go}",
+    "./ui/gen/**/*.go",
     "./internal/handlers/**/*.go",
     "./internal/html/**/*.go",
   ],

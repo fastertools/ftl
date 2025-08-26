@@ -24,7 +24,7 @@ var Colors = struct {
 		"muted_text":      "#a0a0a0",
 		"secondary_text":  "#666666",
 		"tool_label_text": "#888888",
-		"header_bg":       "#2a2a2a",
+		"header_bg":       "#333333",
 	},
 	Accents: map[string]string{
 		"green":  "#22c55e",

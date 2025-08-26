@@ -1,5 +1,10 @@
 package templates
 
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
+
 // AddProjectForm renders the inline form for adding a new project
 templ AddProjectForm() {
 	<div id="add-project-container" class="mt-2">
@@ -30,7 +35,7 @@ templ AddProjectForm() {
 			<div class="flex space-x-2">
 				<button 
 					type="submit"
-					class="flex-1 px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+					class={ fmt.Sprintf("flex-1 px-2 py-1 text-sm rounded transition-colors %s", ui.CSSClasses.Buttons["primary"]) }
 				>
 					Add
 				</button>
@@ -39,7 +44,7 @@ templ AddProjectForm() {
 					hx-get="/htmx/project/cancel-form"
 					hx-target="#add-project-container"
 					hx-swap="outerHTML"
-					class="flex-1 px-2 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+					class={ fmt.Sprintf("flex-1 px-2 py-1 text-sm rounded transition-colors %s", ui.CSSClasses.Buttons["secondary"]) }
 				>
 					Cancel
 				</button>
@@ -58,7 +63,7 @@ templ AddProjectButton() {
 			hx-swap="outerHTML"
 			class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group"
 		>
-			<div class="flex items-center group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">
+			<div class="flex items-center group-hover:text-white transition-colors duration-200" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>
 				<span class="w-2 h-2 border border-gray-500 group-hover:border-white rounded-full mr-2 transition-colors duration-200"></span>
 				<span>+ Add Project</span>
 			</div>
@@ -72,7 +77,7 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 		<!-- Render existing projects -->
 		for _, project := range projects {
 			if project.Path == currentProjectPath {
-				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style="background-color: #333333;">
+				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]) }>
 					<div class="flex items-center justify-between">
 						<div class="flex items-center">
 							if project.FTLRunning || project.WatchRunning {
@@ -80,7 +85,7 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 							} else {
 								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 							}
-							<span class="project-name" style="color: #ffffff;">{ project.Name }</span>
+							<span class="project-name" style={ fmt.Sprintf("color: %s;", ui.Colors.Primary.Text) }>{ project.Name }</span>
 						</div>
 						<button 
 							hx-delete={ "/htmx/project/remove?path=" + project.Path }
@@ -109,7 +114,7 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 							} else {
 								<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 							}
-							<span class="project-name" style="color: #a0a0a0;">{ project.Name }</span>
+							<span class="project-name" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
 						</button>
 						<button 
 							hx-delete={ "/htmx/project/remove?path=" + project.Path }
@@ -136,7 +141,7 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 	<!-- Render existing projects -->
 	for _, project := range projects {
 		if project.Path == currentProjectPath {
-			<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style="background-color: #333333;">
+			<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]) }>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center">
 						if project.FTLRunning || project.WatchRunning {
@@ -144,7 +149,7 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 						} else {
 							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 						}
-						<span class="project-name" style="color: #ffffff;">{ project.Name }</span>
+						<span class="project-name" style={ fmt.Sprintf("color: %s;", ui.Colors.Primary.Text) }>{ project.Name }</span>
 					</div>
 					<button 
 						hx-delete={ "/htmx/project/remove?path=" + project.Path }
@@ -173,7 +178,7 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 						} else {
 							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 						}
-						<span class="project-name group-hover:text-white transition-colors duration-200" style="color: #a0a0a0;">{ project.Name }</span>
+						<span class="project-name group-hover:text-white transition-colors duration-200" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
 					</button>
 					<button 
 						hx-delete={ "/htmx/project/remove?path=" + project.Path }

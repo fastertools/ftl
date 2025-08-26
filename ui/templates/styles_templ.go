@@ -91,7 +91,7 @@ func getBaseCSS() string {
 func DynamicPanelStyle() templ.Attributes {
 	return templ.Attributes{
 		"style": fmt.Sprintf("background-color: %s; border: 1px solid %s; border-radius: 8px;",
-			ui.Colors.Secondary.BG,
+			ui.Colors.UI["panel_bg"],
 			ui.Colors.UI["border_primary"]),
 	}
 }
@@ -101,7 +101,7 @@ func DynamicHeaderStyle() templ.Attributes {
 	return templ.Attributes{
 		"style": fmt.Sprintf("border-color: %s; background-color: %s;",
 			ui.Colors.UI["border_primary"],
-			ui.Colors.Secondary.BG),
+			ui.Colors.UI["header_bg"]),
 	}
 }
 

@@ -8,6 +8,11 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
+
 // SidebarWithProjects renders the sidebar with project list from state.Project
 func SidebarWithProjects(projects []Project, currentProjectPath string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -60,7 +65,72 @@ func SidebarInternal(projects []Project, currentProjectPath string) templ.Compon
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col h-full\"><!-- Logo/Brand --><div class=\"p-6 border-b\" style=\"border-color: #3a3a3a;\"><div class=\"flex items-center\"><img src=\"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCABkAGQDASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAAAAYHCAUD/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEAMQAAAB1SAAAAAAAAAAAAAAAZ/NAMvyYvpiGbGqEMmYAAAxJtuEleXp6jJs9tLvlD29HZedEAAAAAAAAAAAAAAAAAAAAAAH/8QAHxAAAgIDAAIDAAAAAAAAAAAAAwYEBQECByBgEBUj/9oACAEBAAEFAvROhONhBs8qTjjM9UajQqjLTcsTCBgUFRMOaSrefUI447zJ5bWMBRDwEXMv26D2SOUymrdGX4a7TXkJgi+VlT/dXfxWrtbUSSD1MPdAXt9q+ujVUT0T/8QAFBEBAAAAAAAAAAAAAAAAAAAAUP/aAAgBAwEBPwFH/8QAFBEBAAAAAAAAAAAAAAAAAAAAUP/aAAgBAgEBPwFH/8QANBAAAgECBAMCDAcAAAAAAAAAAgMBBBEABRIhEzFBIiMGEBUVIDAyQ1FgYbFicYGSocHR/9oACAEBAAY/AvkSkyTJ+zW1FrstvF5tERfHeeE61n1Hyk/8xQJps9gCUE8ZpOPUw5n8uUbWxWZOrPmi+m16jJxaZ0lpnFQ6szptRVuqVgs1tLsDYr8/j/WMsdUMJzmJgiM5vM+oBraotLoWRwoe0oeW312mcecHPzBJviC4RSESEW2Hl0jABHIYtGM9d+Fv8tjAEsZIVVImdukWKPvMYy6nqK3gPSkVmBKOd4j6Riaigdx0wWjVoId/1j06Mnjejoe90z7x3T9sffxtfR0gIc32zHrggMYMCi0iUXicTM5Sjf4RbAU1IkUIDkA/Iv8A/8QAJRABAQACAgAEBwEAAAAAAAAAAREAITFRQWBhwRAgMHGBkaHw/9oACAEBAAE/IfIk6xOZ6Jg6qvBM3Zm0CZWuEJqnZwo/LvEhaddqELy9Y/SASCQg34vsynOijd1foOy6Kzkq7XU5MehzRjErkAleMqHPboJg8Z90+2M4DR2z/LeP0l6AB2ojLizF1IgFNV5PnMn0oaTV+lH1T0/EVmpZd7uvePH5EB5E8cHJVdw/QzLJmn0Vr/XyL//aAAwDAQACAAMAAAAQ88888888888888884408884MAw88888888888888888888888//EABQRAQAAAAAAAAAAAAAAAAAAAFD/2gAIAQMBAT8QR//EABQRAQAAAAAAAAAAAAAAAAAAAFD/2gAIAQIBAT8QR//EACIQAQEAAgECBwEAAAAAAAAAAAERACExQWEQIDBRYIGRof/aAAgBAQABPxD4JIsFLmhl1BbITaFJyWFdyR/CYw9/gVqaESjzQVggiq7AabElGuZhkQY4KQCBocbOTFQAqQoRtYnoO4WgFdEcI/E3DbKGEgawNMEKtxq0jcoBfoxHmF73ufiyr0HGvv2IfpiBYkj6FYQR4SxpiH0DCgCYNwJuWj53gV24qeTeyHuXioUgWbco52wNUng0QECaRxKlEB3sAHYAxYENod22qqjV6/Bf/9k=\" alt=\"FTL Logo\" class=\"w-8 h-8 mr-3\" style=\"filter: brightness(1.2);\"> <span class=\"text-white font-semibold\">Control Center</span></div></div><!-- Navigation --><nav class=\"flex-1 p-4\"><div class=\"space-y-2\"><!-- Project List --><div class=\"mt-8\"><h3 class=\"text-xs font-medium uppercase tracking-wider mb-3\" style=\"color: #a0a0a0;\">Projects</h3>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col h-full border-r\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border-color: %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 16, Col: 164}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><!-- Logo/Brand --><div class=\"p-6 border-b\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("border-color: %s;", ui.Colors.UI["border_primary"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 18, Col: 100}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><div class=\"flex items-center\"><img src=\"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCABkAGQDASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAAAAYHCAUD/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEAMQAAAB1SAAAAAAAAAAAAAAAZ/NAMvyYvpiGbGqEMmYAAAxJtuEleXp6jJs9tLvlD29HZedEAAAAAAAAAAAAAAAAAAAAAAH/8QAHxAAAgIDAAIDAAAAAAAAAAAAAwYEBQECByBgEBUj/9oACAEBAAEFAvROhONhBs8qTjjM9UajQqjLTcsTCBgUFRMOaSrefUI447zJ5bWMBRDwEXMv26D2SOUymrdGX4a7TXkJgi+VlT/dXfxWrtbUSSD1MPdAXt9q+ujVUT0T/8QAFBEBAAAAAAAAAAAAAAAAAAAAUP/aAAgBAwEBPwFH/8QAFBEBAAAAAAAAAAAAAAAAAAAAUP/aAAgBAgEBPwFH/8QANBAAAgECBAMCDAcAAAAAAAAAAgMBBBEABRIhEzFBIiMGEBUVIDAyQ1FgYbFicYGSocHR/9oACAEBAAY/AvkSkyTJ+zW1FrstvF5tERfHeeE61n1Hyk/8xQJps9gCUE8ZpOPUw5n8uUbWxWZOrPmi+m16jJxaZ0lpnFQ6szptRVuqVgs1tLsDYr8/j/WMsdUMJzmJgiM5vM+oBraotLoWRwoe0oeW312mcecHPzBJviC4RSESEW2Hl0jABHIYtGM9d+Fv8tjAEsZIVVImdukWKPvMYy6nqK3gPSkVmBKOd4j6Riaigdx0wWjVoId/1j06Mnjejoe90z7x3T9sffxtfR0gIc32zHrggMYMCi0iUXicTM5Sjf4RbAU1IkUIDkA/Iv8A/8QAJRABAQACAgAEBwEAAAAAAAAAAREAITFRQWBhwRAgMHGBkaHw/9oACAEBAAE/IfIk6xOZ6Jg6qvBM3Zm0CZWuEJqnZwo/LvEhaddqELy9Y/SASCQg34vsynOijd1foOy6Kzkq7XU5MehzRjErkAleMqHPboJg8Z90+2M4DR2z/LeP0l6AB2ojLizF1IgFNV5PnMn0oaTV+lH1T0/EVmpZd7uvePH5EB5E8cHJVdw/QzLJmn0Vr/XyL//aAAwDAQACAAMAAAAQ88888888888888884408884MAw88888888888888888888888//EABQRAQAAAAAAAAAAAAAAAAAAAFD/2gAIAQMBAT8QR//EABQRAQAAAAAAAAAAAAAAAAAAAFD/2gAIAQIBAT8QR//EACIQAQEAAgECBwEAAAAAAAAAAAERACExQWEQIDBRYIGRof/aAAgBAQABPxD4JIsFLmhl1BbITaFJyWFdyR/CYw9/gVqaESjzQVggiq7AabElGuZhkQY4KQCBocbOTFQAqQoRtYnoO4WgFdEcI/E3DbKGEgawNMEKtxq0jcoBfoxHmF73ufiyr0HGvv2IfpiBYkj6FYQR4SxpiH0DCgCYNwJuWj53gV24qeTeyHuXioUgWbco52wNUng0QECaRxKlEB3sAHYAxYENod22qqjV6/Bf/9k=\" alt=\"FTL Logo\" class=\"w-8 h-8 mr-3\" style=\"filter: brightness(1.2);\"> <span class=\"text-white font-semibold\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Titles["control_center"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 21, Col: 78}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</span></div></div><!-- Navigation --><nav class=\"flex-1 p-4\"><div class=\"space-y-2\"><!-- Project List --><div class=\"mt-8\"><h3 class=\"text-xs font-medium uppercase tracking-wider mb-3\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 30, Col: 128}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Titles["projects"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 31, Col: 35}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</h3>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,7 +138,33 @@ func SidebarInternal(projects []Project, currentProjectPath string) templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div></div></nav><!-- Status Footer --><div class=\"p-4 border-t\" style=\"border-color: #3a3a3a;\"><div class=\"text-xs\" style=\"color: #a0a0a0;\"><span>Stuff</span></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></div></nav><!-- Status Footer --><div class=\"p-4 border-t\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("border-color: %s;", ui.Colors.UI["border_primary"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 39, Col: 100}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><div class=\"text-xs\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/sidebar.templ`, Line: 40, Col: 85}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"><span>Stuff</span></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

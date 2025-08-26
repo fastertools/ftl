@@ -8,7 +8,10 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
 
 // StatusPanel displays real-time process status and monitoring
 func StatusPanel(project Project, processStatus ProcessStatus, serverStatus ServerStatus) templ.Component {
@@ -32,20 +35,46 @@ func StatusPanel(project Project, processStatus ProcessStatus, serverStatus Serv
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h2 class=\"text-lg font-semibold mb-4 text-white\">Status Monitor</h2><div class=\"space-y-4\"><!-- Process Status --><div><div id=\"ftl-status\" hx-post=\"/htmx/status/poll\" hx-trigger=\"load, every 3s\" hx-swap=\"innerHTML\" hx-vals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><h2 class=\"text-lg font-semibold mb-4 text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"project_path": "%s"}`, project.Path))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Titles["status_monitor"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/status.templ`, Line: 17, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/status.templ`, Line: 11, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"space-y-3\"><!-- Initial loading state - will be replaced by HTMX --><div class=\"text-center py-4\" style=\"color: #a0a0a0;\"><div class=\"animate-pulse\">Loading process status...</div></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h2><div class=\"space-y-4\"><!-- Process Status --><div><div id=\"ftl-status\" hx-post=\"/htmx/status/poll\" hx-trigger=\"load, every 3s\" hx-swap=\"innerHTML\" hx-vals=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"project_path": "%s"}`, project.Path))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/status.templ`, Line: 20, Col: 67}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" class=\"space-y-3\"><!-- Initial loading state - will be replaced by HTMX --><div class=\"text-center py-4\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/status.templ`, Line: 23, Col: 96}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><div class=\"animate-pulse\">Loading process status...</div></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -30,7 +30,7 @@ package ui
 		muted_text:       "#a0a0a0"    // Muted/secondary text
 		secondary_text:   "#666666"    // Even more muted text
 		tool_label_text:  "#888888"    // Tool parameter labels
-		header_bg:        "#2a2a2a"    // Header background color
+		header_bg:        "#333333"    // Header background color
 	}
 	
 	// Accent colors

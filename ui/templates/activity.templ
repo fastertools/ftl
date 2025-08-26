@@ -2,6 +2,39 @@ package templates
 
 import ui "github.com/fastertools/ftl/ui/gen"
 
+script switchTab(tab, mutedColor string) {
+	// Hide all content
+	document.getElementById('logs-content').style.display = 'none';
+	document.getElementById('commands-content').style.display = 'none';
+	
+	// Reset all tab styles
+	document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
+	document.getElementById('logs-tab').style.color = mutedColor;
+	document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
+	document.getElementById('commands-tab').style.color = mutedColor;
+	
+	// Show selected content and update tab style
+	if (tab === 'logs') {
+		document.getElementById('logs-content').style.display = 'block';
+		document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+		document.getElementById('logs-tab').style.color = '';
+	} else if (tab === 'commands') {
+		document.getElementById('commands-content').style.display = 'block';
+		document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+		document.getElementById('commands-tab').style.color = '';
+	}
+}
+
+script setupHTMXListener(mutedColor string) {
+	// Listen for HTMX events to auto-switch to command tab when commands are executed
+	document.body.addEventListener('htmx:afterRequest', function(evt) {
+		if (evt.detail.target && evt.detail.target.id === 'ftl-output') {
+			// Call the templ script function with the muted color
+			switchTab('commands', mutedColor);
+		}
+	});
+}
+
 // ActivityPanel displays recent activity and logs with live polling in a tabbed interface
 templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []CommandOutput) {
 	<div>
@@ -14,7 +47,7 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 			<button 
 				id="logs-tab"
 				class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white"
-				onclick="switchTab('logs')"
+				onclick={ switchTab("logs", ui.Colors.UI["muted_text"]) }
 			>
 				{ ui.WebUI.Tabs["live_logs"] }
 			</button>
@@ -22,7 +55,7 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 				id="commands-tab"
 				class="px-4 py-2 text-sm font-medium border-b-2 border-transparent"
 				style={ "color: " + ui.Colors.UI["muted_text"] }
-				onclick="switchTab('commands')"
+				onclick={ switchTab("commands", ui.Colors.UI["muted_text"]) }
 			>
 				{ ui.WebUI.Tabs["command_output"] }
 			</button>
@@ -95,38 +128,8 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 			</div>
 		</div>
 		
-		<!-- Tab switching script -->
-		<script>
-			function switchTab(tab) {
-				// Hide all content
-				document.getElementById('logs-content').style.display = 'none';
-				document.getElementById('commands-content').style.display = 'none';
-				
-				// Reset all tab styles
-				document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
-				document.getElementById('logs-tab').style.color = '{ ui.Colors.UI["muted_text"] }';
-				document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
-				document.getElementById('commands-tab').style.color = '{ ui.Colors.UI["muted_text"] }';
-				
-				// Show selected content and update tab style
-				if (tab === 'logs') {
-					document.getElementById('logs-content').style.display = 'block';
-					document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
-					document.getElementById('logs-tab').style.color = '';
-				} else if (tab === 'commands') {
-					document.getElementById('commands-content').style.display = 'block';
-					document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
-					document.getElementById('commands-tab').style.color = '';
-				}
-			}
-			
-			// Listen for HTMX events to auto-switch to command tab when commands are executed
-			document.body.addEventListener('htmx:afterRequest', function(evt) {
-				if (evt.detail.target && evt.detail.target.id === 'ftl-output') {
-					switchTab('commands');
-				}
-			});
-		</script>
+		<!-- Setup HTMX event listener -->
+		@setupHTMXListener(ui.Colors.UI["muted_text"])
 	</div>
 }
 

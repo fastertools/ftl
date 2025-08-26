@@ -1,11 +1,14 @@
 package templates
 
-import "fmt"
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
 
 // StatusPanel displays real-time process status and monitoring
 templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus ServerStatus) {
 	<div>
-		<h2 class="text-lg font-semibold mb-4 text-white">Status Monitor</h2>
+		<h2 class="text-lg font-semibold mb-4 text-white">{ ui.WebUI.Titles["status_monitor"] }</h2>
 		
 		<div class="space-y-4">
 			<!-- Process Status -->
@@ -17,7 +20,7 @@ templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus Ser
 					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
 					 class="space-y-3">
 					<!-- Initial loading state - will be replaced by HTMX -->
-					<div class="text-center py-4" style="color: #a0a0a0;">
+					<div class="text-center py-4" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>
 						<div class="animate-pulse">Loading process status...</div>
 					</div>
 				</div>

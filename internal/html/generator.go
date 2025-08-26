@@ -13,23 +13,23 @@ func GenerateProcessHTML(processName string, processInfo models.ProcessInfo, col
 
 	if processInfo.IsRunning {
 		if colorScheme == "green" {
-			dotColor = "bg-green-400"
+			dotColor = ui.CSSClasses.StatusDots["running"]
 			statusText = ui.StatusRunning
-			statusColor = "text-green-400"
+			statusColor = ui.CSSClasses.Text["success"]
 			statusBgColor = "bg-green-900/50"
 		} else { // blue for watch mode
-			dotColor = "bg-blue-400"
-			statusText = "Active"
-			statusColor = "text-blue-400"
+			dotColor = ui.CSSClasses.StatusDots["building"]
+			statusText = ui.StatusRunning
+			statusColor = ui.CSSClasses.Text["info"]
 			statusBgColor = "bg-blue-900/50"
 		}
 	} else {
-		dotColor = "bg-gray-500"
+		dotColor = ui.CSSClasses.StatusDots["stopped"]
 		statusText = ui.StatusStopped
 		if processName == ui.ProcessNameWatch {
 			statusText = ui.StatusInactive
 		}
-		statusColor = "text-gray-400"
+		statusColor = ui.CSSClasses.Text["muted"]
 		statusBgColor = "bg-gray-900/50"
 	}
 
@@ -42,7 +42,7 @@ func GenerateProcessHTML(processName string, processInfo models.ProcessInfo, col
 			<span class="text-xs px-2 py-1 rounded-full %s %s">%s</span>
 		</div>
 	`, dotColor,
-		(map[bool]string{true: "text-white", false: "text-gray-400"})[processInfo.IsRunning],
+		(map[bool]string{true: ui.CSSClasses.Text["primary"], false: ui.CSSClasses.Text["muted"]})[processInfo.IsRunning],
 		processName, statusBgColor, statusColor, statusText)
 }
 
@@ -86,12 +86,12 @@ func GenerateProcessSectionHTML(processType, displayName string, processInfo mod
 
 	if processInfo.IsRunning {
 		if colorScheme == "green" {
-			dotColor = "bg-green-400"
+			dotColor = ui.CSSClasses.StatusDots["running"]
 		} else {
-			dotColor = "bg-blue-400"
+			dotColor = ui.CSSClasses.StatusDots["building"]
 		}
 	} else {
-		dotColor = "bg-gray-500"
+		dotColor = ui.CSSClasses.StatusDots["stopped"]
 	}
 
 	// Generate stop button HTML if process is running
@@ -103,17 +103,20 @@ func GenerateProcessSectionHTML(processType, displayName string, processInfo mod
 				hx-target="#ftl-output"
 				hx-vals='{"stop_%s": "true", "project-path": "%s"}'
 				class="ml-3 px-2 py-1 text-xs rounded-md transition-all duration-200"
-				style="background-color: #4a4a4a; border: 1px solid #5a5a5a; color: #ef4444;"
-				onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a';"
-				onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a';"
+				style="background-color: %s; border: 1px solid %s; color: %s;"
+				onmouseover="this.style.backgroundColor='%s'; this.style.borderColor='%s';"
+				onmouseout="this.style.backgroundColor='%s'; this.style.borderColor='%s';"
 			>
 				Stop ×
 			</button>
-		`, processType, projectPath)
+		`, processType, projectPath,
+			ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"], ui.Colors.Accents["red"],
+			ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"],
+			ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])
 	}
 
 	return fmt.Sprintf(`
-		<div class="flex items-center justify-between p-3 rounded-lg" style="background-color: #333333;">
+		<div class="flex items-center justify-between p-3 rounded-lg" style="background-color: %s;">
 			<div class="flex items-center">
 				<div class="w-3 h-3 %s rounded-full mr-3"></div>
 				<span class="text-sm font-medium %s">%s</span>
@@ -123,8 +126,8 @@ func GenerateProcessSectionHTML(processType, displayName string, processInfo mod
 				%s
 			</div>
 		</div>
-	`, dotColor,
-		(map[bool]string{true: "text-white", false: "text-gray-400"})[processInfo.IsRunning],
+	`, ui.Colors.UI["panel_bg"], dotColor,
+		(map[bool]string{true: ui.CSSClasses.Text["primary"], false: ui.CSSClasses.Text["muted"]})[processInfo.IsRunning],
 		displayName,
 		generateProcessDetails(processInfo),
 		stopButton)
@@ -132,8 +135,8 @@ func GenerateProcessSectionHTML(processType, displayName string, processInfo mod
 
 func generateProcessDetails(processInfo models.ProcessInfo) string {
 	if processInfo.IsRunning {
-		return fmt.Sprintf(`<span class="text-xs ml-3 font-mono" style="color: #a0a0a0;">PID: <span style="color: #ffffff;">%d</span> | Port: <span style="color: #ffffff;">%d</span></span>`,
-			processInfo.PID, processInfo.Port)
+		return fmt.Sprintf(`<span class="text-xs ml-3 font-mono" style="color: %s;">PID: <span style="color: %s;">%d</span> | Port: <span style="color: %s;">%d</span></span>`,
+			ui.Colors.UI["muted_text"], ui.Colors.Primary.Text, processInfo.PID, ui.Colors.Primary.Text, processInfo.Port)
 	}
 	return ""
 }

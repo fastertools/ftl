@@ -1,6 +1,15 @@
 package templates
 
-import ui "github.com/fastertools/ftl/ui/gen"
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
+
+script controlButtonHover(bgColor, borderColor, transform string) {
+	this.style.backgroundColor = bgColor;
+	this.style.borderColor = borderColor;
+	this.style.transform = transform;
+}
 
 // ControlPanel provides FTL control buttons and forms with HTMX integration
 templ ControlPanel(project Project) {
@@ -9,7 +18,7 @@ templ ControlPanel(project Project) {
 		
 		<div class="space-y-4">
 			<!-- Simplified FTL Operations -->
-			<div class="p-4 rounded-lg" style="background-color: #333333;">
+			<div class="p-4 rounded-lg" style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]) }>
 				<div class="grid grid-cols-4 gap-3">
 					<!-- Build Button -->
 					<form hx-post="/mcp" hx-target="#ftl-output">
@@ -18,9 +27,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+							onmouseover={ controlButtonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"], "translateY(-1px)") }
+							onmouseout={ controlButtonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"], "translateY(0)") }
 						>
 							Build
 						</button>
@@ -32,9 +41,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+							onmouseover={ controlButtonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"], "translateY(-1px)") }
+							onmouseout={ controlButtonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"], "translateY(0)") }
 						>
 							Up
 						</button>
@@ -46,9 +55,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-							style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+							onmouseover={ controlButtonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"], "translateY(-1px)") }
+							onmouseout={ controlButtonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"], "translateY(0)") }
 						>
 							Watch
 						</button>
@@ -61,9 +70,9 @@ templ ControlPanel(project Project) {
 						hx-vals='{"stop": "true"}'
 						hx-include="[name='project-path']"
 						class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-						style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-						onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+						style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+						onmouseover={ controlButtonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"], "translateY(-1px)") }
+						onmouseout={ controlButtonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"], "translateY(0)") }
 					>
 						Stop
 					</button>
@@ -71,8 +80,8 @@ templ ControlPanel(project Project) {
 			</div>
 			
 			<!-- Command Output -->
-			<div class="border-t pt-4" style="border-color: #3a3a3a;">
-				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">{ ui.WebUI.Sections["command_output"] }</h3>
+			<div class="border-t pt-4" style={ fmt.Sprintf("border-color: %s;", ui.Colors.UI["border_primary"]) }>
+				<h3 class="text-sm font-medium mb-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ ui.WebUI.Sections["command_output"] }</h3>
 				<div 
 					id="ftl-output" 
 					class="bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden"
