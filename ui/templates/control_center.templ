@@ -5,10 +5,6 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
-script buttonHover(bgColor, borderColor string) {
-	this.style.backgroundColor = bgColor;
-	this.style.borderColor = borderColor;
-}
 
 // ControlCenter combines status monitoring and control functionality into a unified panel
 templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) {
@@ -26,14 +22,14 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
 					 class={ ui.CSSClasses.Components["space_y_2"] }>
 					<!-- Process status rows - will be replaced by HTMX -->
-					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["panel_bg"] }>
+					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["button_bg"] }>
 						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
 							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameRegular }</span>
 							<div class={ ui.CSSClasses.Components["status_dot"] + " bg-gray-500" }></div>
 							<span class="text-xs font-mono" style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusStopped }</span>
 						</div>
 					</div>
-					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["panel_bg"] }>
+					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["button_bg"] }>
 						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
 							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameWatch }</span>
 							<div class={ ui.CSSClasses.Components["status_dot"] + " bg-gray-500" }></div>
@@ -59,8 +55,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'"
+								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'"
 							>
 								Build
 							</button>
@@ -78,8 +74,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'"
+								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'"
 							>
 								Up
 							</button>
@@ -97,8 +93,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'"
+								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'"
 							>
 								Watch
 							</button>

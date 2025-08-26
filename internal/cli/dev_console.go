@@ -53,6 +53,9 @@ func runDevConsole(port int) error {
 	// Setup routes
 	http.HandleFunc("/", handler.HandleIndex)
 	http.HandleFunc("/mcp", handler.HandleMCP)
+	
+	// Static file serving
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static/"))))
 
 	// HTMX-specific endpoints that return HTML fragments
 	http.HandleFunc("/htmx/ftl/start", handler.HandleFTLStart)

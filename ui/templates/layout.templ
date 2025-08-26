@@ -86,18 +86,7 @@ templ Layout(data DashboardData) {
 		<title>FTL Control Center</title>
 		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js" integrity="sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm" crossorigin="anonymous"></script>
 		<script src="https://unpkg.com/htmx.org@2.0.6/dist/ext/json-enc.js"></script>
-		<script src="https://cdn.tailwindcss.com"></script>
-		@configureTailwind(
-			ui.Colors.Primary.BG,
-			ui.Colors.Secondary.BG, 
-			ui.Colors.UI["border_primary"],
-			ui.Colors.Primary.Text,
-			ui.Colors.Secondary.Text,
-			ui.Colors.Accents["green"],
-			ui.Colors.Accents["blue"],
-			ui.Colors.Accents["orange"],
-			ui.Colors.Accents["red"],
-		)
+		<link rel="stylesheet" href="/static/css/output.css"/>
 		@BaseStyles()
 	</head>
 	<body class="h-full flex" style={ "background-color: " + ui.Colors.Primary.BG }>

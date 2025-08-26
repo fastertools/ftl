@@ -77,7 +77,7 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 		<!-- Render existing projects -->
 		for _, project := range projects {
 			if project.Path == currentProjectPath {
-				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]) }>
+				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s; border-left: 5px solid %s;", ui.Colors.UI["button_bg_hover"], ui.Colors.Accents["blue"]) }>
 					<div class="flex items-center justify-between">
 						<div class="flex items-center">
 							if project.FTLRunning || project.WatchRunning {
@@ -100,13 +100,19 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 					</div>
 				</div>
 			} else {
-				<div class="project-item px-3 py-2 text-sm rounded-md hover:bg-gray-800 transition-colors" data-project-name={ project.Name } data-project-path={ project.Path }>
+				<div 
+					class="project-item project-item-inactive px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer" 
+					data-project-name={ project.Name } 
+					data-project-path={ project.Path }
+					style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }
+					onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.transform='translateY(-1px)'"
+					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.transform='translateY(0)'">
 					<div class="flex items-center justify-between">
 						<button 
 							hx-post={ "/htmx/project/switch?path=" + project.Path }
 							hx-target="#main-container"
 							hx-swap="innerHTML"
-							class="flex-1 text-left flex items-center"
+							class="flex-1 text-left flex items-center cursor-pointer"
 							aria-label={ "Switch to project " + project.Name }
 						>
 							if project.FTLRunning || project.WatchRunning {
@@ -164,13 +170,16 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 				</div>
 			</div>
 		} else {
-			<div class="project-item px-3 py-2 text-sm rounded-md hover:bg-gray-800 hover:shadow-md transition-all duration-200 group" data-project-name={ project.Name } data-project-path={ project.Path }>
+			<div 
+				class="project-item project-item-inactive px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer" 
+				data-project-name={ project.Name } 
+				data-project-path={ project.Path }>
 				<div class="flex items-center justify-between">
 					<button 
 						hx-post={ "/htmx/project/switch?path=" + project.Path }
 						hx-target="#main-container"
 						hx-swap="innerHTML"
-						class="flex-1 text-left flex items-center group-hover:scale-105 transition-transform duration-200"
+						class="flex-1 text-left flex items-center"
 						aria-label={ "Switch to project " + project.Name }
 					>
 						if project.FTLRunning || project.WatchRunning {
@@ -178,7 +187,7 @@ templ ProjectListContents(projects []Project, currentProjectPath string) {
 						} else {
 							<span class="w-2 h-2 bg-gray-500 rounded-full mr-2" aria-label="Process stopped"></span>
 						}
-						<span class="project-name group-hover:text-white transition-colors duration-200" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
+						<span class="project-name" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
 					</button>
 					<button 
 						hx-delete={ "/htmx/project/remove?path=" + project.Path }

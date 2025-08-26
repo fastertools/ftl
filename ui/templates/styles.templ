@@ -8,7 +8,7 @@ import (
 // BaseStyles generates the base CSS styles for the application
 templ BaseStyles() {
 	<style type="text/css">
-		{ templ.Raw(getBaseCSS()) }
+		{ getBaseCSS() }
 	</style>
 }
 
@@ -43,6 +43,16 @@ func getBaseCSS() string {
 		.status-running { background-color: %s; }
 		.status-stopped { background-color: %s; }
 		.status-warning { background-color: %s; }
+		
+		.project-item-inactive {
+			background-color: %s;
+		}
+		
+		.project-item-inactive:hover,
+		.project-item-inactive:has(button:hover) {
+			background-color: %s !important;
+			transform: translateY(-2px);
+		}
 	`,
 		ui.Colors.Primary.BG,           // body background
 		ui.Colors.Primary.Text,         // body text
@@ -53,6 +63,8 @@ func getBaseCSS() string {
 		ui.Colors.Status["running"],    // status running
 		ui.Colors.Status["error"],      // status stopped (error)
 		ui.Colors.Status["warning"],    // status warning
+		ui.Colors.UI["button_bg"],      // project item background (match Control Center buttons)
+		ui.Colors.UI["button_bg_hover"], // project item hover background
 	)
 }
 
