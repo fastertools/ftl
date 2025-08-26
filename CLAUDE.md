@@ -75,6 +75,7 @@ templ MyButton() {
 2. **Parameters are properly sanitized** - templ handles injection protection
 3. **Functions are unique** - templ generates collision-free function names
 4. **Type safety** - Go compiler validates script parameters
+5. **CRITICAL: `this` does NOT work in templ script functions** - Use `templ.JSExpression` instead
 
 ### What NOT to do (Common Mistakes)
 
@@ -87,14 +88,25 @@ onmouseover="this.style.backgroundColor='#5a5a5a'"
 
 // ❌ WRONG - Cannot use Go expressions in JavaScript attributes directly
 style={ fmt.Sprintf("color: %s;", ui.Colors.UI["text"]) }
+
+// ❌ WRONG - `this` does not work in templ script functions
+script badHover(color string) {
+    this.style.backgroundColor = color; // ERROR: this is undefined
+}
 ```
 
 ### Correct Patterns
 
 ```go
-// ✅ CORRECT - Use script templates for event handlers
-script changeColor(color string) {
-    this.style.backgroundColor = color;
+// ✅ CORRECT - Use templ.JSExpression to access the DOM element
+script changeColor(event templ.JSExpression, color string) {
+    event.target.style.backgroundColor = color;
+}
+
+script handleHover(event templ.JSExpression, bgColor, borderColor string) {
+    event.target.style.backgroundColor = bgColor;
+    event.target.style.borderColor = borderColor;
+    event.target.style.transform = 'translateY(-1px)';
 }
 
 // ✅ CORRECT - Use Go expressions for CSS styles  
@@ -103,14 +115,21 @@ style={ fmt.Sprintf("color: %s;", ui.Colors.UI["text"]) }
 // ✅ CORRECT - Combine both approaches
 templ Button() {
     <button 
-        onmouseover={ changeColor("#5a5a5a") }
-        onmouseout={ changeColor("#4a4a4a") }
+        onmouseover={ changeColor(templ.JSExpression("event"), "#5a5a5a") }
+        onmouseout={ changeColor(templ.JSExpression("event"), "#4a4a4a") }
         style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }
     >
         Button
     </button>
 }
 ```
+
+### Element Reference Summary
+
+- **NEVER use `this`** - It's undefined in templ script functions
+- **USE `templ.JSExpression("event")`** - First parameter should be the event object
+- **Access element via `event.target`** - This gives you the DOM element that triggered the event
+- **Always pass event as first parameter** - `script myFunc(event templ.JSExpression, ...other params)`
 
 ### Legacy vs Modern
 

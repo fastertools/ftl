@@ -13,6 +13,30 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
+func handleCenterHover(event templ.JSExpression, bgColor, borderColor string) templ.ComponentScript {
+	return templ.ComponentScript{
+		Name: `__templ_handleCenterHover_ec18`,
+		Function: `function __templ_handleCenterHover_ec18(event, bgColor, borderColor){event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(-1px)';
+}`,
+		Call:       templ.SafeScript(`__templ_handleCenterHover_ec18`, event, bgColor, borderColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleCenterHover_ec18`, event, bgColor, borderColor),
+	}
+}
+
+func handleCenterOut(event templ.JSExpression, bgColor, borderColor string) templ.ComponentScript {
+	return templ.ComponentScript{
+		Name: `__templ_handleCenterOut_13c8`,
+		Function: `function __templ_handleCenterOut_13c8(event, bgColor, borderColor){event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(0)';
+}`,
+		Call:       templ.SafeScript(`__templ_handleCenterOut_13c8`, event, bgColor, borderColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleCenterOut_13c8`, event, bgColor, borderColor),
+	}
+}
+
 // ControlCenter combines status monitoring and control functionality into a unified panel
 func ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -64,7 +88,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Titles["control_center"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 13, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 25, Col: 90}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -121,7 +145,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("color: " + ui.Colors.UI["muted_text"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 18, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 30, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -134,7 +158,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Sections["process_status"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 18, Col: 147}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 30, Col: 147}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -156,7 +180,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"project_path": "%s"}`, project.Path))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 23, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 35, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -204,7 +228,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("background-color: " + ui.Colors.UI["button_bg"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 26, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 38, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -261,7 +285,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(ui.ProcessNameRegular)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 28, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 40, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -296,7 +320,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("color: " + ui.Colors.UI["secondary_text"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 30, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 42, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -309,7 +333,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(ui.StatusStopped)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 30, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 42, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -344,7 +368,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("background-color: " + ui.Colors.UI["button_bg"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 33, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 45, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -401,7 +425,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(ui.ProcessNameWatch)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 35, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 47, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -436,7 +460,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("color: " + ui.Colors.UI["secondary_text"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 37, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 49, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -449,7 +473,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(ui.StatusInactive)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 37, Col: 111}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 49, Col: 111}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -484,7 +508,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("border-color: " + ui.Colors.UI["border_primary"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 44, Col: 114}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 56, Col: 114}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -519,7 +543,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("color: " + ui.Colors.UI["muted_text"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 45, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 57, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -532,7 +556,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var44 string
 		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(ui.WebUI.Sections["operations"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 45, Col: 143}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 57, Col: 143}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 		if templ_7745c5c3_Err != nil {
@@ -545,7 +569,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 46, Col: 156}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 58, Col: 156}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -580,7 +604,7 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 54, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 66, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -592,6 +616,10 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		}
 		var templ_7745c5c3_Var49 = []any{ui.CSSClasses.Buttons["ftl_control"]}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var49...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]), handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -608,116 +636,178 @@ func ControlCenter(project Project, processStatus ProcessStatus, serverStatus Se
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" onmouseover=\"this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" onmouseover=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var51 string
-		templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 60, Col: 132}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
+		var templ_7745c5c3_Var51 templ.ComponentScript = handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51.Call)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\">Build</button></form><!-- Up (Regular Mode) Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-swap=\"beforeend\" hx-on::before-request=\"document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\\\'text-blue-400\\\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL server...</div>')\"><input type=\"hidden\" name=\"action\" value=\"up\"> <input type=\"hidden\" name=\"project-path\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" onmouseout=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var52 string
-		templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 72, Col: 68}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
+		var templ_7745c5c3_Var52 templ.ComponentScript = handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52.Call)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\"> <input type=\"hidden\" name=\"mode\" value=\"regular\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var53 = []any{ui.CSSClasses.Buttons["ftl_control"]}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var53...)
+		var templ_7745c5c3_Var53 string
+		templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 72, Col: 132}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<button type=\"submit\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\">Build</button></form><!-- Up (Regular Mode) Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-swap=\"beforeend\" hx-on::before-request=\"document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\\\'text-blue-400\\\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL server...</div>')\"><input type=\"hidden\" name=\"action\" value=\"up\"> <input type=\"hidden\" name=\"project-path\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var54 string
-		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var53).String())
+		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 1, Col: 0}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 84, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" onmouseover=\"this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\"> <input type=\"hidden\" name=\"mode\" value=\"regular\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var55 string
-		templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 79, Col: 132}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
+		var templ_7745c5c3_Var55 = []any{ui.CSSClasses.Buttons["ftl_control"]}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var55...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\">Up</button></form><!-- Up (Watch Mode) Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-swap=\"beforeend\" hx-on::before-request=\"document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\\\'text-blue-400\\\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL in watch mode...</div>')\"><input type=\"hidden\" name=\"action\" value=\"up\"> <input type=\"hidden\" name=\"project-path\" value=\"")
+		templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]), handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<button type=\"submit\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var56 string
-		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
+		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var55).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 91, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\"> <input type=\"hidden\" name=\"mode\" value=\"watch\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" onmouseover=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var57 = []any{ui.CSSClasses.Buttons["ftl_control"]}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var57...)
+		var templ_7745c5c3_Var57 templ.ComponentScript = handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57.Call)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<button type=\"submit\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" onmouseout=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var58 string
-		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var57).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
+		var templ_7745c5c3_Var58 templ.ComponentScript = handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58.Call)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" onmouseover=\"this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 98, Col: 132}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 91, Col: 132}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\">Watch</button></form></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\">Up</button></form><!-- Up (Watch Mode) Button --><form hx-post=\"/mcp\" hx-target=\"#ftl-output\" hx-swap=\"beforeend\" hx-on::before-request=\"document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\\\'text-blue-400\\\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL in watch mode...</div>')\"><input type=\"hidden\" name=\"action\" value=\"up\"> <input type=\"hidden\" name=\"project-path\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var60 string
+		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 103, Col: 68}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\"> <input type=\"hidden\" name=\"mode\" value=\"watch\"> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var61 = []any{ui.CSSClasses.Buttons["ftl_control"]}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var61...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]), handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<button type=\"submit\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var62 string
+		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var61).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" onmouseover=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var63 templ.ComponentScript = handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63.Call)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" onmouseout=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var64 templ.ComponentScript = handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64.Call)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var65 string
+		templ_7745c5c3_Var65, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/control_center.templ`, Line: 110, Col: 132}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\">Watch</button></form></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

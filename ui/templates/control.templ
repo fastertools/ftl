@@ -5,6 +5,19 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
+script handleControlHover(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(-1px)';
+}
+
+script handleControlOut(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(0)';
+}
+
+
 
 
 // ControlPanel provides FTL control buttons and forms with HTMX integration
@@ -23,8 +36,8 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+							onmouseover={ handleControlHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+							onmouseout={ handleControlOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 						>
 							Build
@@ -37,8 +50,8 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+							onmouseover={ handleControlHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+							onmouseout={ handleControlOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 						>
 							Up
@@ -51,8 +64,8 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+							onmouseover={ handleControlHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+							onmouseout={ handleControlOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 						>
 							Watch
@@ -66,8 +79,8 @@ templ ControlPanel(project Project) {
 						hx-vals='{"stop": "true"}'
 						hx-include="[name='project-path']"
 						class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
-					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+							onmouseover={ handleControlHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+							onmouseout={ handleControlOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 						style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							>
 						Stop

@@ -13,25 +13,27 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
-func handleProjectHover(bgColor string) templ.ComponentScript {
+func handleProjectHover(event templ.JSExpression, bgColor, borderColor string) templ.ComponentScript {
 	return templ.ComponentScript{
-		Name: `__templ_handleProjectHover_1fe9`,
-		Function: `function __templ_handleProjectHover_1fe9(bgColor){this.style.backgroundColor = bgColor;
-	this.style.transform = 'translateY(-1px)';
+		Name: `__templ_handleProjectHover_ec18`,
+		Function: `function __templ_handleProjectHover_ec18(event, bgColor, borderColor){event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(-1px)';
 }`,
-		Call:       templ.SafeScript(`__templ_handleProjectHover_1fe9`, bgColor),
-		CallInline: templ.SafeScriptInline(`__templ_handleProjectHover_1fe9`, bgColor),
+		Call:       templ.SafeScript(`__templ_handleProjectHover_ec18`, event, bgColor, borderColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleProjectHover_ec18`, event, bgColor, borderColor),
 	}
 }
 
-func handleProjectOut(bgColor string) templ.ComponentScript {
+func handleProjectOut(event templ.JSExpression, bgColor, borderColor string) templ.ComponentScript {
 	return templ.ComponentScript{
-		Name: `__templ_handleProjectOut_0e6c`,
-		Function: `function __templ_handleProjectOut_0e6c(bgColor){this.style.backgroundColor = bgColor;
-	this.style.transform = 'translateY(0)';
+		Name: `__templ_handleProjectOut_13c8`,
+		Function: `function __templ_handleProjectOut_13c8(event, bgColor, borderColor){event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(0)';
 }`,
-		Call:       templ.SafeScript(`__templ_handleProjectOut_0e6c`, bgColor),
-		CallInline: templ.SafeScriptInline(`__templ_handleProjectOut_0e6c`, bgColor),
+		Call:       templ.SafeScript(`__templ_handleProjectOut_13c8`, event, bgColor, borderColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleProjectOut_13c8`, event, bgColor, borderColor),
 	}
 }
 
@@ -138,7 +140,7 @@ func AddProjectButton() templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 77, Col: 149}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 79, Col: 149}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -187,7 +189,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 91, Col: 111}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 93, Col: 111}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -200,7 +202,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 91, Col: 146}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 93, Col: 146}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -213,7 +215,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border-left: 5px solid %s;", ui.Colors.UI["button_bg_hover"], ui.Colors.Accents["blue"]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 91, Col: 280}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 93, Col: 280}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -246,7 +248,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.Primary.Text))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 102, Col: 96}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 104, Col: 96}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -259,7 +261,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 102, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 104, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -272,7 +274,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/remove?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 105, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 107, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -285,7 +287,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs("Remove project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 110, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 112, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -296,7 +298,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleProjectHover(ui.Colors.UI["button_bg_hover"]), handleProjectOut(ui.Colors.UI["button_bg"]))
+				templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleProjectHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]), handleProjectOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -307,7 +309,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 119, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 121, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -320,7 +322,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 120, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 122, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -331,9 +333,9 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var18 string
-				templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]))
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 121, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 123, Col: 129}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -343,7 +345,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var19 templ.ComponentScript = handleProjectHover(ui.Colors.UI["button_bg_hover"])
+				var templ_7745c5c3_Var19 templ.ComponentScript = handleProjectHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19.Call)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -352,7 +354,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var20 templ.ComponentScript = handleProjectOut(ui.Colors.UI["button_bg"])
+				var templ_7745c5c3_Var20 templ.ComponentScript = handleProjectOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20.Call)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -364,7 +366,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/switch?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 126, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 128, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -377,7 +379,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs("Switch to project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 130, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 132, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -410,7 +412,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 140, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 142, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -423,7 +425,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 140, Col: 117}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 142, Col: 117}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -436,7 +438,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/remove?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 143, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 145, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -449,7 +451,7 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs("Remove project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 148, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 150, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -512,7 +514,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var28 string
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 167, Col: 110}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 169, Col: 110}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {
@@ -525,7 +527,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 167, Col: 145}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 169, Col: 145}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -538,7 +540,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 167, Col: 218}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 169, Col: 218}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
@@ -571,7 +573,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.Primary.Text))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 178, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 180, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
@@ -584,7 +586,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 178, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 180, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -597,7 +599,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/remove?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 181, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 183, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -610,7 +612,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var34 string
 				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs("Remove project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 186, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 188, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -628,7 +630,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 195, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 197, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
@@ -641,7 +643,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 196, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 198, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -654,7 +656,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var37 string
 				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/switch?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 199, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 201, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 				if templ_7745c5c3_Err != nil {
@@ -667,7 +669,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var38 string
 				templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("Switch to project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 203, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 205, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 				if templ_7745c5c3_Err != nil {
@@ -700,7 +702,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var39 string
 				templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 213, Col: 99}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 215, Col: 99}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 				if templ_7745c5c3_Err != nil {
@@ -713,7 +715,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 213, Col: 116}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 215, Col: 116}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 				if templ_7745c5c3_Err != nil {
@@ -726,7 +728,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs("/htmx/project/remove?path=" + project.Path)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 216, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 218, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
@@ -739,7 +741,7 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 				var templ_7745c5c3_Var42 string
 				templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs("Remove project " + project.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 221, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 223, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 				if templ_7745c5c3_Err != nil {

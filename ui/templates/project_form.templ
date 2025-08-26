@@ -5,14 +5,16 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
-script handleProjectHover(bgColor string) {
-	this.style.backgroundColor = bgColor;
-	this.style.transform = 'translateY(-1px)';
+script handleProjectHover(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(-1px)';
 }
 
-script handleProjectOut(bgColor string) {
-	this.style.backgroundColor = bgColor;
-	this.style.transform = 'translateY(0)';
+script handleProjectOut(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(0)';
 }
 
 
@@ -118,9 +120,9 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 					class="project-item project-item-inactive px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer" 
 					data-project-name={ project.Name } 
 					data-project-path={ project.Path }
-					style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }
-					onmouseover={ handleProjectHover(ui.Colors.UI["button_bg_hover"]) }
-					onmouseout={ handleProjectOut(ui.Colors.UI["button_bg"]) }>
+					style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+					onmouseover={ handleProjectHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+					onmouseout={ handleProjectOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }>
 					<div class="flex items-center justify-between">
 						<button 
 							hx-post={ "/htmx/project/switch?path=" + project.Path }

@@ -5,6 +5,18 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
+script handleCenterHover(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(-1px)';
+}
+
+script handleCenterOut(event templ.JSExpression, bgColor, borderColor string) {
+	event.target.style.backgroundColor = bgColor;
+	event.target.style.borderColor = borderColor;
+	event.target.style.transform = 'translateY(0)';
+}
+
 
 
 // ControlCenter combines status monitoring and control functionality into a unified panel
@@ -55,8 +67,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<button 
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 									>
 								Build
@@ -74,8 +86,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<button 
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 									>
 								Up
@@ -93,8 +105,8 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<button 
 								type="submit"
 								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
-						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
+						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 									>
 								Watch
