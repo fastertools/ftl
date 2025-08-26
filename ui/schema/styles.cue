@@ -69,7 +69,8 @@ package ui
 	
 	// Background color classes for status dots
 	status_dots: {
-		running:  "bg-green-500"
+		running:  "bg-green-400"  // Changed to match original green-400
+		watching: "bg-blue-400"   // Added for watch mode
 		stopped:  "bg-gray-500"
 		error:    "bg-red-500"
 		warning:  "bg-orange-500"

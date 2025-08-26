@@ -1,17 +1,18 @@
 package ui
 
-// Process display names - CRITICAL for fixing "FTL Process" vs "Up Process" bug
+// Process display names - ONLY valid strings: "Stopped", "Up", "Watching"
 #ProcessNames: {
-	regular: "FTL Process"
-	watch:   "Watch Mode"
-	build:   "Build Process"
-	none:    "No Active Process"
+	regular: "Up"         // ONLY "Up" for regular FTL process
+	watch:   "Watching"   // ONLY "Watching" for watch mode
+	build:   "Building"   
+	none:    "Stopped"    // ONLY "Stopped" when no process
 }
 
 // Status indicators used across UI
 #StatusStrings: {
 	stopped:  "Stopped"
-	running:  "Running"
+	running:  "Up"        // Changed from "Running" to "Up" for regular FTL
+	watching: "Watching"  // Added for watch mode
 	inactive: "Inactive"
 	starting: "Starting..."
 	stopping: "Stopping..."

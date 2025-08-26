@@ -6,6 +6,14 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
+script handleToolButtonHover(bgColor string) {
+	this.style.backgroundColor = bgColor;
+}
+
+script handleToolButtonOut(bgColor string) {
+	this.style.backgroundColor = bgColor;
+}
+
 // ToolsList displays the list of available tools from running servers
 templ ToolsList(project Project, tools []*mcpclient.Tool, hash string) {
 	<div data-tools-hash={ hash }>
@@ -18,7 +26,7 @@ templ ToolsList(project Project, tools []*mcpclient.Tool, hash string) {
 					<div class="p-2 rounded" style={ "background-color: " + ui.Colors.UI["panel_bg"] }>
 						<div class="flex items-center justify-between">
 							<div class="flex-1">
-								<div class="text-sm font-medium text-white">{ tool.Name }</div>
+								<div class="text-sm font-medium" style={ "color: " + ui.Colors.Primary.Text }>{ tool.Name }</div>
 								if tool.Description != "" {
 									<div class="text-xs mt-1" style={ "color: " + ui.Colors.UI["muted_text"] }>{ tool.Description }</div>
 								}
@@ -28,8 +36,10 @@ templ ToolsList(project Project, tools []*mcpclient.Tool, hash string) {
 									hx-get={ fmt.Sprintf("/tool-params/%d", i) }
 									hx-target={ fmt.Sprintf("#tool-params-%d", i) }
 									hx-swap="innerHTML"
-									class="text-xs px-2 py-1 rounded hover:bg-gray-600 transition-colors"
+									class="text-xs px-2 py-1 rounded transition-colors"
 									style={ fmt.Sprintf("background-color: %s; color: %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["muted_text"]) }
+									onmouseover={ handleToolButtonHover(ui.Colors.UI["button_bg_hover"]) }
+									onmouseout={ handleToolButtonOut(ui.Colors.UI["button_bg"]) }
 								>
 									Parameters
 								</button>

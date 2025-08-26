@@ -558,11 +558,10 @@ func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projectPath := r.FormValue("project_path")
-	processType := r.FormValue("process_type")
 
-	if projectPath == "" || processType == "" {
+	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		if err := templates.SimpleErrorDiv("Error: project_path and process_type required").Render(r.Context(), w); err != nil {
+		if err := templates.SimpleErrorDiv("Error: project_path required").Render(r.Context(), w); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return

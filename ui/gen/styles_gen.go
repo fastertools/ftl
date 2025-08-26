@@ -63,7 +63,8 @@ var CSSClasses = struct {
 		"primary": "text-white",
 	},
 	StatusDots: map[string]string{
-		"running":  "bg-green-500",
+		"running":  "bg-green-400",
+		"watching": "bg-blue-400",
 		"stopped":  "bg-gray-500",
 		"error":    "bg-red-500",
 		"warning":  "bg-orange-500",

@@ -30,53 +30,30 @@ templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus Ser
 	</div>
 }
 
-// Process status display for polling updates
+// Process status display for polling updates - shows single unified status
 templ ProcessStatusDisplay(status models.DetailedStatusInfo, projectPath string) {
 	<div id="process-status-container" class="space-y-2">
-		// Determine which process type is active
-		if status.ActiveProcess != nil && status.ActiveProcess.Type == "regular" {
-			@ProcessStatusRow("ftl", ui.ProcessNameRegular, *status.ActiveProcess, projectPath)
-			@ProcessStatusRow("watch", ui.ProcessNameWatch, models.ProcessInfo{IsRunning: false}, projectPath)
-		} else if status.ActiveProcess != nil && status.ActiveProcess.Type == "watch" {
-			@ProcessStatusRow("ftl", ui.ProcessNameRegular, models.ProcessInfo{IsRunning: false}, projectPath)
-			@ProcessStatusRow("watch", ui.ProcessNameWatch, *status.ActiveProcess, projectPath)
-		} else {
-			// No active process
-			@ProcessStatusRow("ftl", ui.ProcessNameRegular, models.ProcessInfo{IsRunning: false}, projectPath)
-			@ProcessStatusRow("watch", ui.ProcessNameWatch, models.ProcessInfo{IsRunning: false}, projectPath)
-		}
-	</div>
-}
-
-// Individual process status row
-templ ProcessStatusRow(processType, processName string, process models.ProcessInfo, projectPath string) {
-	<div class={ ui.CSSClasses.Composite["process_row"] } 
-	     style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }>
-		<div class={ ui.CSSClasses.Components["flex_space_3"] }>
-			<span class={ ui.CSSClasses.Components["text_value"] }>
-				{ processName }
-			</span>
-			if process.IsRunning {
-				<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["running"] }></div>
-				<span class="text-xs font-mono" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["secondary_text"]) }>
-					{ ui.StatusRunning }
-				</span>
-			} else {
-				<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["stopped"] }></div>
-				<span class="text-xs font-mono" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["secondary_text"]) }>
-					{ ui.StatusStopped }
-				</span>
-			}
+		// Use universal status component
+		<div class={ ui.CSSClasses.Composite["process_row"] } 
+		     style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }>
+			<div class={ ui.CSSClasses.Components["flex_space_3"] }>
+				if status.ActiveProcess != nil && status.ActiveProcess.IsRunning {
+					@UniversalStatusDot(true, status.ActiveProcess.Type, "md", true)
+					@StopButton(status.ActiveProcess.Type, projectPath, true)
+				} else {
+					@UniversalStatusDot(false, "", "md", true)
+				}
+			</div>
 		</div>
-		if process.IsRunning {
-			@StopButton(processType, projectPath, true)
-		}
 	</div>
 	
-	if process.IsRunning && process.Port > 0 && processType == "ftl" {
-		@PortDisplayOOB(process.Port)
+	// Show port if regular FTL is running
+	if status.ActiveProcess != nil && status.ActiveProcess.IsRunning && 
+	   status.ActiveProcess.Type == "regular" && status.ActiveProcess.Port > 0 {
+		@PortDisplayOOB(status.ActiveProcess.Port)
 	}
 }
+
 
 // Port display with OOB swap capability
 templ PortDisplayOOB(port int) {
@@ -112,4 +89,44 @@ templ StopButton(processType, projectPath string, isRunning bool) {
 			Stop
 		</button>
 	}
+}
+
+// UniversalStatusDot - Single status component that can be used everywhere
+// Parameters:
+//   - isRunning: true if any process is running
+//   - processType: "regular", "watch", or "" if not running
+//   - size: "sm" (sidebar) or "md" (main content) 
+//   - showLabel: whether to show status text
+templ UniversalStatusDot(isRunning bool, processType string, size string, showLabel bool) {
+	<div class="flex items-center">
+		// Status dot with appropriate color
+		if isRunning {
+			if processType == "watch" {
+				<span class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["watching"] } aria-label="Process watching"></span>
+			} else {
+				<span class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["running"] } aria-label="Process running"></span>
+			}
+		} else {
+			<span class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["stopped"] } aria-label="Process stopped"></span>
+		}
+		
+		// Optional status label
+		if showLabel {
+			if isRunning {
+				if processType == "watch" {
+					<span class="text-xs font-mono ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["primary_text"]) }>
+						{ ui.StatusWatching }
+					</span>
+				} else {
+					<span class="text-xs font-mono ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["primary_text"]) }>
+						{ ui.StatusRunning }
+					</span>
+				}
+			} else {
+				<span class="text-xs font-mono ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["primary_text"]) }>
+					{ ui.StatusStopped }
+				</span>
+			}
+		}
+	</div>
 }

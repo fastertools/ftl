@@ -4,16 +4,17 @@ package gen
 
 // Process display names
 const (
-	ProcessNameRegular = "FTL Process"
-	ProcessNameWatch   = "Watch Mode"
-	ProcessNameBuild   = "Build Process"
-	ProcessNameNone    = "No Active Process"
+	ProcessNameRegular = "Up"
+	ProcessNameWatch   = "Watching"
+	ProcessNameBuild   = "Building"
+	ProcessNameNone    = "Stopped"
 )
 
 // Status strings
 const (
 	StatusStopped  = "Stopped"
-	StatusRunning  = "Running"
+	StatusRunning  = "Up"
+	StatusWatching = "Watching"
 	StatusInactive = "Inactive"
 	StatusStarting = "Starting..."
 	StatusStopping = "Stopping..."

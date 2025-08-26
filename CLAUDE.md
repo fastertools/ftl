@@ -39,6 +39,85 @@
 
 This constraint applies to ALL components in this project.
 
+## Templ Template Engine - JavaScript/Hover Functionality
+
+**CRITICAL**: This project uses the templ template engine for type-safe HTML generation. Here are the correct patterns for implementing hover functionality and JavaScript interactions.
+
+### Script Template Syntax (Recommended)
+
+For onmouseover, onmouseout, and other JavaScript event handlers, use templ script templates:
+
+```go
+script handleHover(bgColor, borderColor string) {
+    this.style.backgroundColor = bgColor;
+    this.style.borderColor = borderColor;
+}
+
+script handleHoverOut(bgColor, borderColor string) {
+    this.style.backgroundColor = bgColor;
+    this.style.borderColor = borderColor;
+}
+
+templ MyButton() {
+    <button 
+        onmouseover={ handleHover("#5a5a5a", "#6a6a6a") }
+        onmouseout={ handleHoverOut("#4a4a4a", "#5a5a5a") }
+        style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
+    >
+        Click me
+    </button>
+}
+```
+
+### Key Rules for Templ JavaScript
+
+1. **USE script templates** - Don't use `fmt.Sprintf` for JavaScript event handlers
+2. **Parameters are properly sanitized** - templ handles injection protection
+3. **Functions are unique** - templ generates collision-free function names
+4. **Type safety** - Go compiler validates script parameters
+
+### What NOT to do (Common Mistakes)
+
+```go
+// ❌ WRONG - This causes compilation errors
+onmouseover={ fmt.Sprintf("this.style.backgroundColor='%s'", color) }
+
+// ❌ WRONG - Raw JavaScript strings are not type-safe
+onmouseover="this.style.backgroundColor='#5a5a5a'"
+
+// ❌ WRONG - Cannot use Go expressions in JavaScript attributes directly
+style={ fmt.Sprintf("color: %s;", ui.Colors.UI["text"]) }
+```
+
+### Correct Patterns
+
+```go
+// ✅ CORRECT - Use script templates for event handlers
+script changeColor(color string) {
+    this.style.backgroundColor = color;
+}
+
+// ✅ CORRECT - Use Go expressions for CSS styles  
+style={ fmt.Sprintf("color: %s;", ui.Colors.UI["text"]) }
+
+// ✅ CORRECT - Combine both approaches
+templ Button() {
+    <button 
+        onmouseover={ changeColor("#5a5a5a") }
+        onmouseout={ changeColor("#4a4a4a") }
+        style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }
+    >
+        Button
+    </button>
+}
+```
+
+### Legacy vs Modern
+
+- **Script templates**: Recommended for simple interactions, but considered legacy
+- **Modern approach**: Use `templ.JSFuncCall`, `templ.JSONString`, and bundlers like esbuild for complex apps
+- **This project**: Use script templates for simplicity unless complexity requires modern approach
+
 ## README Template Standards
 
 ### Standard Structure for All SDK Templates

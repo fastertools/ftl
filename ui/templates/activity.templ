@@ -1,6 +1,9 @@
 package templates
 
-import ui "github.com/fastertools/ftl/ui/gen"
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
 
 script switchTab(tab, mutedColor string) {
 	// Hide all content
@@ -16,11 +19,13 @@ script switchTab(tab, mutedColor string) {
 	// Show selected content and update tab style
 	if (tab === 'logs') {
 		document.getElementById('logs-content').style.display = 'block';
-		document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+		document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 text-white';
+		document.getElementById('logs-tab').style.borderColor = '#60a5fa';
 		document.getElementById('logs-tab').style.color = '';
 	} else if (tab === 'commands') {
 		document.getElementById('commands-content').style.display = 'block';
-		document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white';
+		document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 text-white';
+		document.getElementById('commands-tab').style.borderColor = '#60a5fa';
 		document.getElementById('commands-tab').style.color = '';
 	}
 }
@@ -46,7 +51,8 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 		<div class="flex border-b" style={ "border-color: " + ui.Colors.UI["border_primary"] }>
 			<button 
 				id="logs-tab"
-				class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white"
+				class="px-4 py-2 text-sm font-medium border-b-2"
+				style={ fmt.Sprintf("border-color: %s; color: %s;", ui.Colors.Accents["blue"], ui.Colors.Primary.Text) }
 				onclick={ switchTab("logs", ui.Colors.UI["muted_text"]) }
 			>
 				{ ui.WebUI.Tabs["live_logs"] }
@@ -77,10 +83,10 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 				>
 					if len(recentLogs) > 0 {
 						for _, logEntry := range recentLogs {
-							<div class="text-green-400">{ logEntry.Message }</div>
+							<div class={ ui.CSSClasses.Text["success"] }>{ logEntry.Message }</div>
 						}
 					} else {
-						<div class="text-green-400">{ ui.WebUI.Messages["waiting_logs"] }</div>
+						<div class={ ui.CSSClasses.Text["success"] }>{ ui.WebUI.Messages["waiting_logs"] }</div>
 					}
 				</div>
 				<!-- Hidden input for project path -->
@@ -91,14 +97,20 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 					<div class="flex items-center space-x-2">
 						<button 
 							onclick="document.getElementById('live-log-content').innerHTML = ''" 
-							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
+							class="text-xs px-2 py-1 rounded transition-colors"
+							style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }
+							onmouseover="this.style.backgroundColor='#5a5a5a'"
+							onmouseout="this.style.backgroundColor=''" 
 							style={ "color: " + ui.Colors.UI["muted_text"] }
 						>
 							{ ui.WebUI.Buttons["clear"] }
 						</button>
 						<button 
 							onclick="document.getElementById('live-log-content').scrollTop = document.getElementById('live-log-content').scrollHeight" 
-							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
+							class="text-xs px-2 py-1 rounded transition-colors"
+							style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }
+							onmouseover="this.style.backgroundColor='#5a5a5a'"
+							onmouseout="this.style.backgroundColor=''" 
 							style={ "color: " + ui.Colors.UI["muted_text"] }
 						>
 							Scroll to Bottom
@@ -117,12 +129,12 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 					if len(commandHistory) > 0 {
 						for _, cmd := range commandHistory {
 							<div class="mb-2">
-								<div class="text-yellow-400">&gt; { cmd.Command }</div>
-								<div class="text-green-400 whitespace-pre-wrap">{ cmd.Output }</div>
+								<div class={ ui.CSSClasses.Text["warning"] }>&gt; { cmd.Command }</div>
+								<div class={ ui.CSSClasses.Text["success"] + " whitespace-pre-wrap" }>{ cmd.Output }</div>
 							</div>
 						}
 					} else {
-						<div class="text-green-400">{ ui.WebUI.Messages["ready_commands"] }</div>
+						<div class={ ui.CSSClasses.Text["success"] }>{ ui.WebUI.Messages["ready_commands"] }</div>
 					}
 				</div>
 			</div>

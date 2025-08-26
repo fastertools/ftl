@@ -6,6 +6,7 @@ import (
 )
 
 
+
 // ControlPanel provides FTL control buttons and forms with HTMX integration
 templ ControlPanel(project Project) {
 	<div>
@@ -22,9 +23,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
+					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
 						>
 							Build
 						</button>
@@ -36,9 +37,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
+					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
 						>
 							Up
 						</button>
@@ -50,9 +51,9 @@ templ ControlPanel(project Project) {
 						<button 
 							type="submit"
 							class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
+					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
 							style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-							onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-							onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
 						>
 							Watch
 						</button>
@@ -65,10 +66,10 @@ templ ControlPanel(project Project) {
 						hx-vals='{"stop": "true"}'
 						hx-include="[name='project-path']"
 						class="w-full text-white text-sm py-2 px-4 rounded-md transition-all duration-200 font-medium"
+					onmouseover="this.style.backgroundColor='#6a6a6a'; this.style.borderColor='#8a8a8a'; this.style.transform='translateY(-1px)';"
+					onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)';"
 						style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-						onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-						onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
-					>
+							>
 						Stop
 					</button>
 				</div>
@@ -79,7 +80,7 @@ templ ControlPanel(project Project) {
 				<h3 class="text-sm font-medium mb-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ ui.WebUI.Sections["command_output"] }</h3>
 				<div 
 					id="ftl-output" 
-					class="bg-black rounded-lg p-3 font-mono text-xs text-green-400 overflow-hidden"
+					class={ ui.CSSClasses.Text["success"] + " bg-black rounded-lg p-3 font-mono text-xs overflow-hidden" }
 					style="min-height: 100px; max-height: 150px; overflow-y: auto;"
 				>
 					{ ui.WebUI.Messages["ready_commands"] }
