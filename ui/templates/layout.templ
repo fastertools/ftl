@@ -2,6 +2,7 @@ package templates
 
 import (
 	"time"
+	ui "github.com/fastertools/ftl/ui/gen"
 )
 
 // Project represents a project in the system
@@ -71,52 +72,23 @@ templ Layout(data DashboardData) {
 				theme: {
 					extend: {
 						colors: {
-							'bg-primary': '#1a1a1a',
-							'bg-secondary': '#2a2a2a',
-							'bg-tertiary': '#3a3a3a',
-							'text-primary': '#ffffff',
-							'text-secondary': '#a0a0a0',
-							'accent-green': '#22c55e',
-							'accent-blue': '#3b82f6',
-							'accent-orange': '#f97316',
-							'accent-red': '#ef4444'
+							'bg-primary': '{ ui.Colors.Primary.BG }',
+							'bg-secondary': '{ ui.Colors.Secondary.BG }',
+							'bg-tertiary': '{ ui.Colors.UI["border_primary"] }',
+							'text-primary': '{ ui.Colors.Primary.Text }',
+							'text-secondary': '{ ui.Colors.Secondary.Text }',
+							'accent-green': '{ ui.Colors.Accents["green"] }',
+							'accent-blue': '{ ui.Colors.Accents["blue"] }',
+							'accent-orange': '{ ui.Colors.Accents["orange"] }',
+							'accent-red': '{ ui.Colors.Accents["red"] }'
 						}
 					}
 				}
 			}
 		</script>
-		<style>
-			body {
-				background: #1a1a1a;
-				color: #ffffff;
-				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-			}
-			
-			.panel {
-				background: #2a2a2a;
-				border: 1px solid #3a3a3a;
-				border-radius: 8px;
-			}
-			
-			.sidebar {
-				background: #1e1e1e;
-				border-right: 1px solid #3a3a3a;
-			}
-			
-			.status-dot {
-				width: 8px;
-				height: 8px;
-				border-radius: 50%;
-				display: inline-block;
-				margin-right: 8px;
-			}
-			
-			.status-running { background-color: #22c55e; }
-			.status-stopped { background-color: #ef4444; }
-			.status-warning { background-color: #f97316; }
-		</style>
+		@BaseStyles()
 	</head>
-	<body class="h-full flex" style="background-color: #1a1a1a;">
+	<body class="h-full flex" style={ "background-color: " + ui.Colors.Primary.BG }>
 		<div id="main-container" class="h-full flex w-full">
 			<!-- Sidebar -->
 			<div class="sidebar w-64 h-full flex flex-col">
@@ -126,9 +98,9 @@ templ Layout(data DashboardData) {
 			<!-- Main Content Area -->
 			<div class="flex-1 h-full flex flex-col">
 			<!-- Header -->
-			<header class="border-b" style="border-color: #3a3a3a; background-color: #2a2a2a;">
+			<header class="border-b" { DynamicHeaderStyle()... }>
 				<div class="px-6 py-4">
-					<p class="text-sm" style="color: #a0a0a0;">
+					<p class="text-sm" { DynamicTextStyle("muted_text")... }>
 						Project: { data.CurrentProject.Name } 
 						<span class="status-dot status-running"></span>
 						{ data.CurrentProject.Status }
@@ -144,19 +116,19 @@ templ Layout(data DashboardData) {
 			<!-- Dashboard Grid - 2 Panel Top Layout -->
 			<div class="p-6 pb-3 grid grid-cols-2 gap-6">
 				<!-- Info Panel (Left) -->
-				<div class="panel p-6">
+				<div class="panel p-6" { DynamicPanelStyle()... }>
 					@InfoPanel(data.CurrentProject, data.ServerStatus)
 				</div>
 				
 				<!-- Control Center (Right - Status + Controls) -->
-				<div class="panel p-6">
+				<div class="panel p-6" { DynamicPanelStyle()... }>
 					@ControlCenter(data.CurrentProject, data.ProcessStatus, data.ServerStatus, data.CommandHistory)
 				</div>
 			</div>
 			
 			<!-- Activity Panel (Full Width Bottom) -->
 			<div class="px-6 pb-6">
-				<div class="panel p-6">
+				<div class="panel p-6" { DynamicPanelStyle()... }>
 					@ActivityPanel(data.CurrentProject, data.RecentLogs, data.CommandHistory)
 				</div>
 			</div>

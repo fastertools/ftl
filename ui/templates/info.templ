@@ -1,43 +1,46 @@
 package templates
 
-import "fmt"
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
 
 // InfoPanel displays project information and server details
 templ InfoPanel(project Project, serverStatus ServerStatus) {
 	<div>
-		<h2 class="text-lg font-semibold mb-4 text-white">Project Info</h2>
+		<h2 class={ ui.CSSClasses.Components["heading_lg"] }>Project Info</h2>
 		
-		<div class="space-y-4">
+		<div class={ ui.CSSClasses.Components["space_y_4"] }>
 			<!-- Project Details -->
 			<div>
-				<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Project Details</h3>
-				<div class="space-y-2">
-					<div class="flex justify-between">
-						<span class="text-sm" style="color: #a0a0a0;">Name</span>
-						<span class="text-sm text-white font-medium">{ project.Name }</span>
+				<h3 class={ ui.CSSClasses.Components["heading_sm"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Project Details</h3>
+				<div class={ ui.CSSClasses.Components["space_y_2"] }>
+					<div class={ ui.CSSClasses.Components["flex_between"] }>
+						<span class={ ui.CSSClasses.Components["text_label"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Name</span>
+						<span class={ ui.CSSClasses.Components["text_value"] }>{ project.Name }</span>
 					</div>
-					<div class="flex justify-between">
-						<span class="text-sm" style="color: #a0a0a0;">Path</span>
-						<span class="text-sm text-white font-mono text-xs">{ project.Path }</span>
+					<div class={ ui.CSSClasses.Components["flex_between"] }>
+						<span class={ ui.CSSClasses.Components["text_label"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Path</span>
+						<span class={ ui.CSSClasses.Components["text_mono_xs"] }>{ project.Path }</span>
 					</div>
-					<div id="port-display" class="flex justify-between">
+					<div id="port-display" class={ ui.CSSClasses.Components["flex_between"] }>
 						if serverStatus.Running && serverStatus.Port > 0 {
-							<span class="text-sm" style="color: #a0a0a0;">Port</span>
-							<span class="text-sm text-white font-mono">{ fmt.Sprintf("%d", serverStatus.Port) }</span>
+							<span class={ ui.CSSClasses.Components["text_label"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Port</span>
+							<span class={ ui.CSSClasses.Components["text_mono"] }>{ fmt.Sprintf("%d", serverStatus.Port) }</span>
 						}
 					</div>
 				</div>
 			</div>
 			
 			<!-- Tools Section -->
-			<div class="border-t pt-4" style="border-color: #3a3a3a;">
+			<div class={ ui.CSSClasses.Components["border_top"] } style={ "border-color: " + ui.Colors.UI["border_primary"] }>
 				<div id="tools-section"
 					 hx-get="/tools-list"
 					 hx-trigger="load, every 3s"
 					 hx-swap="innerHTML"
 					 hx-vals='js:{tools_hash: document.querySelector("#tools-section [data-tools-hash]")?.dataset.toolsHash || ""}'>
-					<h3 class="text-sm font-medium mb-2" style="color: #a0a0a0;">Available Tools</h3>
-					<div class="text-sm" style="color: #666666;">Loading tools...</div>
+					<h3 class={ ui.CSSClasses.Components["heading_sm"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Available Tools</h3>
+					<div class={ ui.CSSClasses.Components["text_label"] } style={ "color: " + ui.Colors.UI["secondary_text"] }>Loading tools...</div>
 				</div>
 			</div>
 		</div>

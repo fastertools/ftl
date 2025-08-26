@@ -5,44 +5,49 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
+script buttonHover(bgColor, borderColor string) {
+	this.style.backgroundColor = bgColor;
+	this.style.borderColor = borderColor;
+}
+
 // ControlCenter combines status monitoring and control functionality into a unified panel
 templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) {
 	<div>
-		<h2 class="text-lg font-semibold mb-4 text-white">{ ui.WebUI.Titles["control_center"] }</h2>
+		<h2 class={ ui.CSSClasses.Components["heading_lg"] }>{ ui.WebUI.Titles["control_center"] }</h2>
 		
-		<div class="space-y-4">
+		<div class={ ui.CSSClasses.Components["space_y_4"] }>
 			<!-- Process Status Section -->
 			<div>
-				<h3 class="text-sm font-medium mb-3" style="color: #a0a0a0;">Process Status</h3>
+				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Process Status</h3>
 				<div id="ftl-status" 
 					 hx-post="/htmx/status/poll" 
 					 hx-trigger="load, every 3s" 
 					 hx-swap="innerHTML"
 					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
-					 class="space-y-2">
+					 class={ ui.CSSClasses.Components["space_y_2"] }>
 					<!-- Process status rows - will be replaced by HTMX -->
-					<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
-						<div class="flex items-center space-x-3">
-							<span class="text-sm font-medium text-white">{ ui.ProcessNameRegular }</span>
-							<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-							<span class="text-xs font-mono" style="color: #666666;">{ ui.StatusStopped }</span>
+					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["panel_bg"] }>
+						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
+							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameRegular }</span>
+							<div class={ ui.CSSClasses.Components["status_dot"] + " bg-gray-500" }></div>
+							<span class="text-xs font-mono" style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusStopped }</span>
 						</div>
 					</div>
-					<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
-						<div class="flex items-center space-x-3">
-							<span class="text-sm font-medium text-white">{ ui.ProcessNameWatch }</span>
-							<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-							<span class="text-xs font-mono" style="color: #666666;">{ ui.StatusInactive }</span>
+					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["panel_bg"] }>
+						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
+							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameWatch }</span>
+							<div class={ ui.CSSClasses.Components["status_dot"] + " bg-gray-500" }></div>
+							<span class="text-xs font-mono" style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusInactive }</span>
 						</div>
 					</div>
 				</div>
 			</div>
 			
 			<!-- Control Buttons Section -->
-			<div class="border-t pt-4" style="border-color: #3a3a3a;">
-				<h3 class="text-sm font-medium mb-3" style="color: #a0a0a0;">Operations</h3>
-				<div class="p-4 rounded-lg" style="background-color: #333333;">
-					<div class="grid grid-cols-3 gap-3">
+			<div class={ ui.CSSClasses.Components["border_top"] } style={ "border-color: " + ui.Colors.UI["border_primary"] }>
+				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>Operations</h3>
+				<div class="p-4 rounded-lg" style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]) }>
+					<div class={ ui.CSSClasses.Components["grid_3_cols"] }>
 						<!-- Build Button -->
 						<form hx-post="/mcp" 
 							hx-target="#ftl-output"
@@ -52,10 +57,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<button 
 								type="submit"
-								class="w-full text-white text-sm py-2.5 px-4 rounded-md transition-all duration-200 font-medium"
-								style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+								class={ ui.CSSClasses.Buttons["ftl_control"] }
+								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							>
 								Build
 							</button>
@@ -71,10 +76,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<input type="hidden" name="mode" value="regular"/>
 							<button 
 								type="submit"
-								class="w-full text-white text-sm py-2.5 px-4 rounded-md transition-all duration-200 font-medium"
-								style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+								class={ ui.CSSClasses.Buttons["ftl_control"] }
+								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							>
 								Up
 							</button>
@@ -90,10 +95,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<input type="hidden" name="mode" value="watch"/>
 							<button 
 								type="submit"
-								class="w-full text-white text-sm py-2.5 px-4 rounded-md transition-all duration-200 font-medium"
-								style="background-color: #4a4a4a; border: 1px solid #5a5a5a;"
-								onmouseover="this.style.backgroundColor='#5a5a5a'; this.style.borderColor='#6a6a6a'; this.style.transform='translateY(-1px)'"
-								onmouseout="this.style.backgroundColor='#4a4a4a'; this.style.borderColor='#5a5a5a'; this.style.transform='translateY(0)'"
+								class={ ui.CSSClasses.Buttons["ftl_control"] }
+								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
+								onmouseover={ buttonHover(ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
+								onmouseout={ buttonHover(ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
 							>
 								Watch
 							</button>

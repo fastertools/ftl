@@ -6,11 +6,26 @@ package gen
 var Colors = struct {
 	Primary   struct{ BG, Text string }
 	Secondary struct{ BG, Text string }
+	UI        map[string]string
 	Accents   map[string]string
 	Status    map[string]string
 }{
 	Primary:   struct{ BG, Text string }{BG: "#1a1a1a", Text: "#ffffff"},
 	Secondary: struct{ BG, Text string }{BG: "#2a2a2a", Text: "#a0a0a0"},
+	UI: map[string]string{
+		"sidebar_bg":      "#1e1e1e",
+		"panel_bg":        "#333333",
+		"button_bg":       "#4a4a4a",
+		"button_bg_hover": "#5a5a5a",
+		"tool_param_bg":   "#2a2a2a",
+		"border_primary":  "#3a3a3a",
+		"border_hover":    "#6a6a6a",
+		"button_border":   "#5a5a5a",
+		"muted_text":      "#a0a0a0",
+		"secondary_text":  "#666666",
+		"tool_label_text": "#888888",
+		"header_bg":       "#2a2a2a",
+	},
 	Accents: map[string]string{
 		"green":  "#22c55e",
 		"blue":   "#3b82f6",
@@ -36,6 +51,8 @@ var CSSClasses = struct {
 	StatusDots map[string]string
 	Buttons    map[string]string
 	Panels     map[string]string
+	Components map[string]string
+	Composite  map[string]string
 }{
 	Text: map[string]string{
 		"success": "text-green-400",
@@ -54,16 +71,43 @@ var CSSClasses = struct {
 		"inactive": "bg-gray-500",
 	},
 	Buttons: map[string]string{
-		"primary":   "bg-blue-600 hover:bg-blue-700 text-white",
-		"secondary": "bg-gray-600 hover:bg-gray-700 text-white",
-		"danger":    "bg-red-600 hover:bg-red-700 text-white",
-		"success":   "bg-green-600 hover:bg-green-700 text-white",
-		"ghost":     "hover:bg-gray-700 text-gray-300",
+		"primary":      "bg-blue-600 hover:bg-blue-700 text-white",
+		"secondary":    "bg-gray-600 hover:bg-gray-700 text-white",
+		"danger":       "bg-red-600 hover:bg-red-700 text-white",
+		"success":      "bg-green-600 hover:bg-green-700 text-white",
+		"ghost":        "hover:bg-gray-700 text-gray-300",
+		"ftl_control":  "w-full text-white text-sm py-2.5 px-4 rounded-md transition-all duration-200 font-medium",
+		"action_small": "text-xs px-2 py-1 rounded hover:bg-gray-600 transition-colors bg-gray-700 text-gray-300",
+		"utility":      "text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors text-gray-300",
 	},
 	Panels: map[string]string{
 		"main":     "bg-primary rounded-lg shadow-lg",
 		"sidebar":  "bg-secondary rounded-lg",
 		"activity": "bg-primary rounded-lg",
 		"control":  "bg-secondary rounded-lg p-4",
+	},
+	Components: map[string]string{
+		"heading_lg":    "text-lg font-semibold mb-4 text-white",
+		"heading_sm":    "text-sm font-medium mb-2",
+		"text_label":    "text-sm",
+		"text_value":    "text-sm text-white font-medium",
+		"text_mono":     "text-sm text-white font-mono",
+		"text_mono_xs":  "text-sm text-white font-mono text-xs",
+		"space_y_4":     "space-y-4",
+		"space_y_2":     "space-y-2",
+		"flex_between":  "flex justify-between",
+		"flex_center":   "flex items-center",
+		"flex_space_3":  "flex items-center space-x-3",
+		"grid_3_cols":   "grid grid-cols-3 gap-3",
+		"grid_4_cols":   "grid grid-cols-4 gap-3",
+		"status_dot":    "w-2 h-2 rounded-full",
+		"process_item":  "flex items-center justify-between p-2 rounded",
+		"border_top":    "border-t pt-4",
+		"control_panel": "p-4 rounded-lg",
+	},
+	Composite: map[string]string{
+		"section_heading": "text-sm font-medium mb-3",
+		"process_row":     "flex items-center justify-between p-2 rounded",
+		"info_row":        "flex justify-between",
 	},
 }

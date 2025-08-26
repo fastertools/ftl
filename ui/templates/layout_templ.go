@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	ui "github.com/fastertools/ftl/ui/gen"
 	"time"
 )
 
@@ -85,7 +86,28 @@ func Layout(data DashboardData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>FTL Control Center</title><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js\" integrity=\"sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm\" crossorigin=\"anonymous\"></script><script src=\"https://unpkg.com/htmx.org@2.0.6/dist/ext/json-enc.js\"></script><script src=\"https://cdn.tailwindcss.com\"></script><script>\n\t\t\ttailwind.config = {\n\t\t\t\ttheme: {\n\t\t\t\t\textend: {\n\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t'bg-primary': '#1a1a1a',\n\t\t\t\t\t\t\t'bg-secondary': '#2a2a2a',\n\t\t\t\t\t\t\t'bg-tertiary': '#3a3a3a',\n\t\t\t\t\t\t\t'text-primary': '#ffffff',\n\t\t\t\t\t\t\t'text-secondary': '#a0a0a0',\n\t\t\t\t\t\t\t'accent-green': '#22c55e',\n\t\t\t\t\t\t\t'accent-blue': '#3b82f6',\n\t\t\t\t\t\t\t'accent-orange': '#f97316',\n\t\t\t\t\t\t\t'accent-red': '#ef4444'\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t</script><style>\n\t\t\tbody {\n\t\t\t\tbackground: #1a1a1a;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;\n\t\t\t}\n\t\t\t\n\t\t\t.panel {\n\t\t\t\tbackground: #2a2a2a;\n\t\t\t\tborder: 1px solid #3a3a3a;\n\t\t\t\tborder-radius: 8px;\n\t\t\t}\n\t\t\t\n\t\t\t.sidebar {\n\t\t\t\tbackground: #1e1e1e;\n\t\t\t\tborder-right: 1px solid #3a3a3a;\n\t\t\t}\n\t\t\t\n\t\t\t.status-dot {\n\t\t\t\twidth: 8px;\n\t\t\t\theight: 8px;\n\t\t\t\tborder-radius: 50%;\n\t\t\t\tdisplay: inline-block;\n\t\t\t\tmargin-right: 8px;\n\t\t\t}\n\t\t\t\n\t\t\t.status-running { background-color: #22c55e; }\n\t\t\t.status-stopped { background-color: #ef4444; }\n\t\t\t.status-warning { background-color: #f97316; }\n\t\t</style></head><body class=\"h-full flex\" style=\"background-color: #1a1a1a;\"><div id=\"main-container\" class=\"h-full flex w-full\"><!-- Sidebar --><div class=\"sidebar w-64 h-full flex flex-col\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>FTL Control Center</title><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js\" integrity=\"sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm\" crossorigin=\"anonymous\"></script><script src=\"https://unpkg.com/htmx.org@2.0.6/dist/ext/json-enc.js\"></script><script src=\"https://cdn.tailwindcss.com\"></script><script>\n\t\t\ttailwind.config = {\n\t\t\t\ttheme: {\n\t\t\t\t\textend: {\n\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t'bg-primary': '{ ui.Colors.Primary.BG }',\n\t\t\t\t\t\t\t'bg-secondary': '{ ui.Colors.Secondary.BG }',\n\t\t\t\t\t\t\t'bg-tertiary': '{ ui.Colors.UI[\"border_primary\"] }',\n\t\t\t\t\t\t\t'text-primary': '{ ui.Colors.Primary.Text }',\n\t\t\t\t\t\t\t'text-secondary': '{ ui.Colors.Secondary.Text }',\n\t\t\t\t\t\t\t'accent-green': '{ ui.Colors.Accents[\"green\"] }',\n\t\t\t\t\t\t\t'accent-blue': '{ ui.Colors.Accents[\"blue\"] }',\n\t\t\t\t\t\t\t'accent-orange': '{ ui.Colors.Accents[\"orange\"] }',\n\t\t\t\t\t\t\t'accent-red': '{ ui.Colors.Accents[\"red\"] }'\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t</script>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = BaseStyles().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</head><body class=\"h-full flex\" style=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("background-color: " + ui.Colors.Primary.BG)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/layout.templ`, Line: 91, Col: 78}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><div id=\"main-container\" class=\"h-full flex w-full\"><!-- Sidebar --><div class=\"sidebar w-64 h-full flex flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -93,33 +115,57 @@ func Layout(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><!-- Main Content Area --><div class=\"flex-1 h-full flex flex-col\"><!-- Header --><header class=\"border-b\" style=\"border-color: #3a3a3a; background-color: #2a2a2a;\"><div class=\"px-6 py-4\"><p class=\"text-sm\" style=\"color: #a0a0a0;\">Project: ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><!-- Main Content Area --><div class=\"flex-1 h-full flex flex-col\"><!-- Header --><header class=\"border-b\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(data.CurrentProject.Name)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/layout.templ`, Line: 132, Col: 41}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, DynamicHeaderStyle())
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <span class=\"status-dot status-running\"></span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "><div class=\"px-6 py-4\"><p class=\"text-sm\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, DynamicTextStyle("muted_text"))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, ">Project: ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.CurrentProject.Status)
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.CurrentProject.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/layout.templ`, Line: 134, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/layout.templ`, Line: 104, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p></div></header><!-- Operation Feedback Area --><div id=\"operation-feedback\" class=\"mx-6 mt-4\"><!-- Operation messages appear here --></div><!-- Dashboard Grid - 2 Panel Top Layout --><div class=\"p-6 pb-3 grid grid-cols-2 gap-6\"><!-- Info Panel (Left) --><div class=\"panel p-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " <span class=\"status-dot status-running\"></span> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.CurrentProject.Status)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/layout.templ`, Line: 106, Col: 34}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</p></div></header><!-- Operation Feedback Area --><div id=\"operation-feedback\" class=\"mx-6 mt-4\"><!-- Operation messages appear here --></div><!-- Dashboard Grid - 2 Panel Top Layout --><div class=\"p-6 pb-3 grid grid-cols-2 gap-6\"><!-- Info Panel (Left) --><div class=\"panel p-6\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, DynamicPanelStyle())
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, ">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -127,7 +173,15 @@ func Layout(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><!-- Control Center (Right - Status + Controls) --><div class=\"panel p-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><!-- Control Center (Right - Status + Controls) --><div class=\"panel p-6\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, DynamicPanelStyle())
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, ">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -135,7 +189,15 @@ func Layout(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div></div><!-- Activity Panel (Full Width Bottom) --><div class=\"px-6 pb-6\"><div class=\"panel p-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div></div><!-- Activity Panel (Full Width Bottom) --><div class=\"px-6 pb-6\"><div class=\"panel p-6\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, DynamicPanelStyle())
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, ">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -143,7 +205,7 @@ func Layout(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></div></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

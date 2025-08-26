@@ -1,6 +1,6 @@
 package templates
 
-// No additional imports needed for ActivityPanel
+import ui "github.com/fastertools/ftl/ui/gen"
 
 // ActivityPanel displays recent activity and logs with live polling in a tabbed interface
 templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []CommandOutput) {
@@ -10,7 +10,7 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 		</div>
 		
 		<!-- Tab Navigation -->
-		<div class="flex border-b" style="border-color: #3a3a3a;">
+		<div class="flex border-b" style={ "border-color: " + ui.Colors.UI["border_primary"] }>
 			<button 
 				id="logs-tab"
 				class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white"
@@ -21,7 +21,7 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 			<button 
 				id="commands-tab"
 				class="px-4 py-2 text-sm font-medium border-b-2 border-transparent"
-				style="color: #a0a0a0;"
+				style={ "color: " + ui.Colors.UI["muted_text"] }
 				onclick="switchTab('commands')"
 			>
 				Command Output
@@ -59,14 +59,14 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 						<button 
 							onclick="document.getElementById('live-log-content').innerHTML = ''" 
 							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
-							style="color: #a0a0a0;"
+							style={ "color: " + ui.Colors.UI["muted_text"] }
 						>
 							Clear
 						</button>
 						<button 
 							onclick="document.getElementById('live-log-content').scrollTop = document.getElementById('live-log-content').scrollHeight" 
 							class="text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors" 
-							style="color: #a0a0a0;"
+							style={ "color: " + ui.Colors.UI["muted_text"] }
 						>
 							Scroll to Bottom
 						</button>
@@ -104,9 +104,9 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 				
 				// Reset all tab styles
 				document.getElementById('logs-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
-				document.getElementById('logs-tab').style.color = '#a0a0a0';
+				document.getElementById('logs-tab').style.color = '{ ui.Colors.UI["muted_text"] }';
 				document.getElementById('commands-tab').className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent';
-				document.getElementById('commands-tab').style.color = '#a0a0a0';
+				document.getElementById('commands-tab').style.color = '{ ui.Colors.UI["muted_text"] }';
 				
 				// Show selected content and update tab style
 				if (tab === 'logs') {

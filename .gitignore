@@ -13,6 +13,7 @@ projects.json
 # E2E test data - should not be tracked
 test_projects.json
 .e2e-projects/
+.e2e-projects.json
 
 # Rust build artifacts
 target/
