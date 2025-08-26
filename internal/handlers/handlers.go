@@ -19,16 +19,6 @@ import (
 	"github.com/fastertools/ftl/ui/templates"
 )
 
-// formatTimestamp returns a consistent timestamp format for all messages
-func formatTimestamp() string {
-	return time.Now().Format("15:04:05")
-}
-
-// formatMessage creates a consistently formatted message with timestamp
-func formatMessage(color, message string) string {
-	return fmt.Sprintf(`<div class="%s">[%s] %s</div>`, color, formatTimestamp(), message)
-}
-
 // Handler encapsulates all HTTP handlers
 type Handler struct {
 	mcpClient      *mcpclient.Client
@@ -85,29 +75,8 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Warning: failed to ensure projects file: %v", err)
 	}
 
-	// Get all projects for sidebar
-	allProjects := h.registry.GetAllProjects()
-
-	// Convert to components.Project with process status
-	projects := make([]templates.Project, len(allProjects))
-	for i, p := range allProjects {
-		// Get project state to access process info
-		projectState, exists := h.registry.GetProject(p.Path)
-		var ftlRunning, watchRunning bool
-		if exists && projectState != nil && projectState.ProcessInfo.ActiveProcess != nil {
-			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
-			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
-		}
-
-		projects[i] = templates.Project{
-			Name:         p.Name,
-			Path:         p.Path,
-			Status:       "active",
-			LastUpdated:  p.LastActive,
-			FTLRunning:   ftlRunning,
-			WatchRunning: watchRunning,
-		}
-	}
+	// Get all projects for sidebar using helper
+	projects := ConvertProjectsToTemplates(h.registry)
 
 	// Get current project from registry (may not exist for new users)
 	currentProj, hasCurrentProject := h.registry.GetCurrentProject()
@@ -212,7 +181,9 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 
 		result, err := h.mcpClient.CallTool("mcp-server__build", args)
 		if err != nil {
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", err.Error())))
+			if err := templates.ErrorMessage(fmt.Sprintf("Build failed: %s", err.Error())).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -221,9 +192,13 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "text/html")
 		if buildResponse.Success {
-			fmt.Fprint(w, formatMessage("text-green-400 mb-1", fmt.Sprintf("Build successful: %s", buildResponse.Output)))
+			if err := templates.SuccessMessage(fmt.Sprintf("Build successful: %s", buildResponse.Output)).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		} else {
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", buildResponse.Error)))
+			if err := templates.ErrorMessage(fmt.Sprintf("Build failed: %s", buildResponse.Error)).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 		return
 	}
@@ -239,12 +214,16 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			"project_path": projectPath,
 		})
 		if err != nil {
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop FTL failed: %s", err.Error())))
+			if err := templates.ErrorMessage(fmt.Sprintf("Stop FTL failed: %s", err.Error())).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("FTL Process stopped: %s", result)))
+		if err := templates.WarningMessage(fmt.Sprintf("FTL Process stopped: %s", result)).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -258,12 +237,16 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			"project_path": projectPath,
 		})
 		if err != nil {
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop Watch failed: %s", err.Error())))
+			if err := templates.ErrorMessage(fmt.Sprintf("Stop Watch failed: %s", err.Error())).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("Watch Mode stopped: %s", result)))
+		if err := templates.WarningMessage(fmt.Sprintf("Watch Mode stopped: %s", result)).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -289,7 +272,9 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			if isWatchMode {
 				modeLabel = "Watch start"
 			}
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("%s failed: %s", modeLabel, err.Error())))
+			if err := templates.ErrorMessage(fmt.Sprintf("%s failed: %s", modeLabel, err.Error())).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -301,12 +286,18 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			// Start polling for this project if server started successfully
 			h.pollingManager.StartProjectPolling(projectPath)
 			if isWatchMode {
-				fmt.Fprint(w, formatMessage("text-blue-400 mb-1", upResponse.Message))
+				if err := templates.InfoMessage(upResponse.Message).Render(r.Context(), w); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 			} else {
-				fmt.Fprint(w, formatMessage("text-green-400 mb-1", upResponse.Message))
+				if err := templates.SuccessMessage(upResponse.Message).Render(r.Context(), w); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 			}
 		} else {
-			fmt.Fprint(w, formatMessage("text-red-400 mb-1", upResponse.Error))
+			if err := templates.ErrorMessage(upResponse.Error).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 		return
 	}
@@ -324,7 +315,9 @@ func (h *Handler) HandleFTLStart(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -337,9 +330,13 @@ func (h *Handler) HandleFTLStart(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpClient.CallTool("mcp-server__up", args)
 	if err != nil {
-		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
+		if err := templates.SimpleErrorDiv(fmt.Sprintf("Error: %s", err.Error())).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
-		fmt.Fprintf(w, `<div class="text-green-400">%s</div>`, result)
+		if err := templates.SimpleSuccessDiv(result).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -353,7 +350,9 @@ func (h *Handler) HandleFTLStop(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -363,9 +362,13 @@ func (h *Handler) HandleFTLStop(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpClient.CallTool("mcp-server__stop", args)
 	if err != nil {
-		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
+		if err := templates.SimpleErrorDiv(fmt.Sprintf("Error: %s", err.Error())).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
-		fmt.Fprintf(w, `<div class="text-green-400">%s</div>`, result)
+		if err := templates.SimpleSuccessDiv(result).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -379,7 +382,9 @@ func (h *Handler) HandleWatchStart(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -392,9 +397,13 @@ func (h *Handler) HandleWatchStart(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpClient.CallTool("mcp-server__up", args)
 	if err != nil {
-		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
+		if err := templates.SimpleErrorDiv(fmt.Sprintf("Error: %s", err.Error())).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
-		fmt.Fprintf(w, `<div class="text-green-400">%s</div>`, result)
+		if err := templates.SimpleSuccessDiv(result).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -408,7 +417,9 @@ func (h *Handler) HandleWatchStop(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -418,9 +429,13 @@ func (h *Handler) HandleWatchStop(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpClient.CallTool("mcp-server__stop", args)
 	if err != nil {
-		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
+		if err := templates.SimpleErrorDiv(fmt.Sprintf("Error: %s", err.Error())).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
-		fmt.Fprintf(w, `<div class="text-green-400">%s</div>`, result)
+		if err := templates.SimpleSuccessDiv(result).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -434,7 +449,9 @@ func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -470,8 +487,9 @@ func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 
 	// Return new logs with proper HTML formatting if we have content
 	if len(newLogs) > 0 && strings.TrimSpace(newLogsText) != "" {
-		escapedLogs := strings.ReplaceAll(newLogsText, "\n", "<br>")
-		fmt.Fprintf(w, `<div class="text-green-400">%s</div>`, escapedLogs)
+		if err := templates.LogString(newLogsText).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
 		// Return empty content when no meaningful new logs - don't append anything
 		fmt.Fprint(w, "")
@@ -488,7 +506,9 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, ui.Handlers.Errors["project_path_required"])
+		if err := templates.SimpleErrorDiv(ui.Handlers.Errors["project_path_required"]).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -502,8 +522,9 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 			ActiveProcess: nil, // No active process
 		}
 
-		htmlContent := generateControlCenterStatusHTML(detailedStatus)
-		fmt.Fprint(w, htmlContent)
+		if err := templates.ProcessStatusDisplay(detailedStatus, projectPath).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -522,23 +543,11 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 		log.Printf("DEBUG: Using cached state - No active process")
 	}
 
-	// Generate status HTML compatible with Control Center template
-	htmlContent := generateControlCenterStatusHTML(detailedStatus)
-
-	// Also generate Info Panel port update if process is running
-	if detailedStatus.ActiveProcess != nil && detailedStatus.ActiveProcess.IsRunning && detailedStatus.ActiveProcess.Port > 0 {
-		// Include OOB swap to update the info panel port
-		htmlContent += fmt.Sprintf(`
-		<div hx-swap-oob="innerHTML:#port-display">
-			<span class="text-sm" style="color: #a0a0a0;">Port</span>
-			<span class="text-sm text-white font-mono">%d</span>
-		</div>`, detailedStatus.ActiveProcess.Port)
-	} else {
-		// Clear port display when not running
-		htmlContent += `<div hx-swap-oob="innerHTML:#port-display"></div>`
+	// Render status using templ component
+	if err := templates.ProcessStatusDisplay(detailedStatus, projectPath).Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-
-	fmt.Fprint(w, htmlContent)
 }
 
 // HandleProcessStop handles universal process stopping
@@ -553,7 +562,9 @@ func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 
 	if projectPath == "" || processType == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `<div class="text-red-400">Error: project_path and process_type required</div>`)
+		if err := templates.SimpleErrorDiv("Error: project_path and process_type required").Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -566,9 +577,10 @@ func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpClient.CallTool(toolName, args)
 	if err != nil {
-		fmt.Fprintf(w, `<div class="text-red-400">Stop failed: %s</div>`, err.Error())
-		// Auto-clear error message after 3 seconds
-		fmt.Fprint(w, `<script>setTimeout(() => { document.getElementById('operation-feedback').innerHTML = ''; }, 3000);</script>`)
+		// Use auto-clearing error message
+		if err := templates.AutoClearErrorMessage(fmt.Sprintf("Stop failed: %s", err.Error()), 3000).Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	} else {
 		// Parse the stop response but don't show success messages
 		stopResponse := parser.ParseStopResponse(result)
@@ -578,13 +590,16 @@ func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 			if stopResponse.Error != "" {
 				errorMsg = fmt.Sprintf("%s: %s", stopResponse.Message, stopResponse.Error)
 			}
-			fmt.Fprintf(w, `<div class="text-red-400">%s</div>`, errorMsg)
-			// Auto-clear error message after 3 seconds
-			fmt.Fprint(w, `<script>setTimeout(() => { document.getElementById('operation-feedback').innerHTML = ''; }, 3000);</script>`)
+			// Use auto-clearing error message
+			if err := templates.AutoClearErrorMessage(errorMsg, 3000).Render(r.Context(), w); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 		// Success case: return empty response for operation-feedback, but also append to command output
 		// Send success message to command output via OOB swap
-		fmt.Fprintf(w, `<div hx-swap-oob="beforeend:#ftl-output">%s</div>`, formatMessage("text-yellow-400", "Process stopped successfully"))
+		if err := templates.MessageWithOOB("Process stopped successfully", ui.CSSClasses.Text["warning"], "#ftl-output").Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -679,30 +694,9 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 	// Start polling for the new project
 	h.pollingManager.StartProjectPolling(path)
 
-	// Get all projects and render updated list
-	allProjects := h.registry.GetAllProjects()
+	// Get all projects and render updated list using helper
+	projects := ConvertProjectsToTemplates(h.registry)
 	currentPath := h.registry.GetCurrentProjectPath()
-
-	// Convert to components.Project with process status
-	projects := make([]templates.Project, len(allProjects))
-	for i, p := range allProjects {
-		// Get project state to access process info
-		projectState, exists := h.registry.GetProject(p.Path)
-		var ftlRunning, watchRunning bool
-		if exists && projectState != nil && projectState.ProcessInfo.ActiveProcess != nil {
-			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
-			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
-		}
-
-		projects[i] = templates.Project{
-			Name:         p.Name,
-			Path:         p.Path,
-			Status:       "active",
-			LastUpdated:  p.LastActive,
-			FTLRunning:   ftlRunning,
-			WatchRunning: watchRunning,
-		}
-	}
 
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.ProjectListContents(projects, currentPath).Render(r.Context(), w); err != nil {
@@ -747,26 +741,8 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 		currentPath = h.registry.GetCurrentProjectPath()
 	}
 
-	// Convert to components.Project with process status
-	projects := make([]templates.Project, len(allProjects))
-	for i, p := range allProjects {
-		// Get project state to access process info
-		projectState, exists := h.registry.GetProject(p.Path)
-		var ftlRunning, watchRunning bool
-		if exists && projectState != nil && projectState.ProcessInfo.ActiveProcess != nil {
-			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
-			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
-		}
-
-		projects[i] = templates.Project{
-			Name:         p.Name,
-			Path:         p.Path,
-			Status:       "active",
-			LastUpdated:  p.LastActive,
-			FTLRunning:   ftlRunning,
-			WatchRunning: watchRunning,
-		}
-	}
+	// Convert to components.Project with process status using helper
+	projects := ConvertProjectsToTemplates(h.registry)
 
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.ProjectListContents(projects, currentPath).Render(r.Context(), w); err != nil {
@@ -809,27 +785,8 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get all projects for sidebar with process status
-	allProjects := h.registry.GetAllProjects()
-	sidebarProjects := make([]templates.Project, len(allProjects))
-	for i, p := range allProjects {
-		// Get project state to access process info
-		projectState, exists := h.registry.GetProject(p.Path)
-		var ftlRunning, watchRunning bool
-		if exists && projectState != nil && projectState.ProcessInfo.ActiveProcess != nil {
-			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
-			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
-		}
-
-		sidebarProjects[i] = templates.Project{
-			Name:         p.Name,
-			Path:         p.Path,
-			Status:       "Active", // All projects in registry are active
-			LastUpdated:  p.LastActive,
-			FTLRunning:   ftlRunning,
-			WatchRunning: watchRunning,
-		}
-	}
+	// Get all projects for sidebar with process status using helper
+	sidebarProjects := ConvertProjectsToTemplates(h.registry)
 
 	// Create dashboard data with converted types
 	data := templates.DashboardData{
@@ -873,60 +830,6 @@ func (h *Handler) HandleProjectReload(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Projects reloaded successfully")
 }
 
-// generateControlCenterStatusHTML generates HTML compatible with Control Center status div
-func generateControlCenterStatusHTML(status models.DetailedStatusInfo) string {
-	if status.ActiveProcess != nil && status.ActiveProcess.IsRunning {
-		// Display the active process status
-		dotColor := "bg-green-400"
-		statusText := "Up"
-
-		if status.ActiveProcess.Type == "watch" {
-			dotColor = "bg-blue-400"
-			statusText = "Watching"
-		}
-
-		return fmt.Sprintf(`<div class="space-y-2">
-			<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
-				<div class="flex items-center space-x-2">
-					<div class="w-2 h-2 %s rounded-full"></div>
-					<span class="text-sm font-medium text-white">%s</span>
-				</div>
-				<div class="flex items-center">
-					%s
-				</div>
-			</div>
-		</div>`, dotColor, statusText, generateStopButtonHTML(status.ActiveProcess.Type, true, status.ProjectPath))
-	}
-
-	// No active process
-	return `<div class="space-y-2">
-		<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
-			<div class="flex items-center space-x-2">
-				<div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-				<span class="text-sm font-medium" style="color: #666666;">` + ui.StatusStopped + `</span>
-			</div>
-		</div>
-	</div>`
-}
-
-// generateStopButtonHTML generates stop button HTML if process is running
-func generateStopButtonHTML(processType string, isRunning bool, projectPath string) string {
-	if !isRunning {
-		return ""
-	}
-
-	return fmt.Sprintf(`
-		<button 
-			class="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-			hx-post="/htmx/process/stop"
-			hx-vals='{"project_path": "%s", "process_type": "%s"}'
-			hx-target="#operation-feedback"
-			hx-on::before-request="document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\'text-blue-400\'>[' + new Date().toTimeString().slice(0,8) + '] Sending stop command...</div>')"
-		>
-			Stop
-		</button>
-	`, projectPath, processType)
-}
 
 // ============================================================================
 // Test-Specific HTTP Endpoints (Phase 2)

@@ -43,7 +43,9 @@ func (h *Handler) HandleToolsList(w http.ResponseWriter, r *http.Request) {
 		}
 		component := templates.ToolsList(templates.Project{}, []*mcpclient.Tool{}, currentHash)
 		if err := component.Render(r.Context(), w); err != nil {
-			http.Error(w, formatMessage("text-red-500", "Error rendering tools: "+err.Error()), http.StatusInternalServerError)
+			var buf bytes.Buffer
+			templates.SimpleErrorDiv("Error rendering tools: " + err.Error()).Render(r.Context(), &buf)
+			http.Error(w, buf.String(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -64,7 +66,9 @@ func (h *Handler) HandleToolsList(w http.ResponseWriter, r *http.Request) {
 		}
 		component := templates.ToolsList(project, []*mcpclient.Tool{}, currentHash)
 		if err := component.Render(r.Context(), w); err != nil {
-			http.Error(w, formatMessage("text-red-500", "Error rendering tools: "+err.Error()), http.StatusInternalServerError)
+			var buf bytes.Buffer
+			templates.SimpleErrorDiv("Error rendering tools: " + err.Error()).Render(r.Context(), &buf)
+			http.Error(w, buf.String(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -94,7 +98,9 @@ func (h *Handler) HandleToolsList(w http.ResponseWriter, r *http.Request) {
 	// Render the tools component with new hash
 	component := templates.ToolsList(project, tools, currentHash)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, formatMessage("text-red-500", "Error rendering tools: "+err.Error()), http.StatusInternalServerError)
+		var buf bytes.Buffer
+		templates.SimpleErrorDiv("Error rendering tools: " + err.Error()).Render(r.Context(), &buf)
+		http.Error(w, buf.String(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -147,7 +153,9 @@ func (h *Handler) HandleToolParams(w http.ResponseWriter, r *http.Request) {
 	// Render the tool parameters component
 	component := templates.ToolParams(tool, index)
 	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, formatMessage("text-red-500", "Error rendering params: "+err.Error()), http.StatusInternalServerError)
+		var buf bytes.Buffer
+		templates.SimpleErrorDiv("Error rendering params: " + err.Error()).Render(r.Context(), &buf)
+		http.Error(w, buf.String(), http.StatusInternalServerError)
 		return
 	}
 }

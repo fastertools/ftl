@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	ui "github.com/fastertools/ftl/ui/gen"
+	"github.com/fastertools/ftl/internal/models"
 )
 
 // StatusPanel displays real-time process status and monitoring
@@ -27,4 +28,88 @@ templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus Ser
 			</div>
 		</div>
 	</div>
+}
+
+// Process status display for polling updates
+templ ProcessStatusDisplay(status models.DetailedStatusInfo, projectPath string) {
+	<div id="process-status-container" class="space-y-2">
+		// Determine which process type is active
+		if status.ActiveProcess != nil && status.ActiveProcess.Type == "regular" {
+			@ProcessStatusRow("ftl", ui.ProcessNameRegular, *status.ActiveProcess, projectPath)
+			@ProcessStatusRow("watch", ui.ProcessNameWatch, models.ProcessInfo{IsRunning: false}, projectPath)
+		} else if status.ActiveProcess != nil && status.ActiveProcess.Type == "watch" {
+			@ProcessStatusRow("ftl", ui.ProcessNameRegular, models.ProcessInfo{IsRunning: false}, projectPath)
+			@ProcessStatusRow("watch", ui.ProcessNameWatch, *status.ActiveProcess, projectPath)
+		} else {
+			// No active process
+			@ProcessStatusRow("ftl", ui.ProcessNameRegular, models.ProcessInfo{IsRunning: false}, projectPath)
+			@ProcessStatusRow("watch", ui.ProcessNameWatch, models.ProcessInfo{IsRunning: false}, projectPath)
+		}
+	</div>
+}
+
+// Individual process status row
+templ ProcessStatusRow(processType, processName string, process models.ProcessInfo, projectPath string) {
+	<div class={ ui.CSSClasses.Composite["process_row"] } 
+	     style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"]) }>
+		<div class={ ui.CSSClasses.Components["flex_space_3"] }>
+			<span class={ ui.CSSClasses.Components["text_value"] }>
+				{ processName }
+			</span>
+			if process.IsRunning {
+				<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["running"] }></div>
+				<span class="text-xs font-mono" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["secondary_text"]) }>
+					{ ui.StatusRunning }
+				</span>
+			} else {
+				<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["stopped"] }></div>
+				<span class="text-xs font-mono" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["secondary_text"]) }>
+					{ ui.StatusStopped }
+				</span>
+			}
+		</div>
+		if process.IsRunning {
+			@StopButton(processType, projectPath, true)
+		}
+	</div>
+	
+	if process.IsRunning && process.Port > 0 && processType == "ftl" {
+		@PortDisplayOOB(process.Port)
+	}
+}
+
+// Port display with OOB swap capability
+templ PortDisplayOOB(port int) {
+	<div hx-swap-oob="innerHTML:#port-display">
+		<span class="text-sm" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>
+			Port
+		</span>
+		<span class="text-sm text-white font-mono">{ fmt.Sprintf("%d", port) }</span>
+	</div>
+}
+
+// Port display regular (non-OOB)
+templ PortDisplay(port int) {
+	<div id="port-display">
+		<span class="text-sm" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>
+			Port
+		</span>
+		<span class="text-sm text-white font-mono">{ fmt.Sprintf("%d", port) }</span>
+	</div>
+}
+
+// Stop button component
+templ StopButton(processType, projectPath string, isRunning bool) {
+	if isRunning {
+		<button 
+			hx-post="/htmx/process/stop"
+			hx-vals={ fmt.Sprintf(`{"processType":"%s","project_path":"%s"}`, processType, projectPath) }
+			hx-target="#ftl-output"
+			hx-swap="beforeend"
+			hx-on::before-request="this.disabled=true; this.textContent='Stopping...'"
+			class={ ui.CSSClasses.Buttons["action_small"] }
+			style={ fmt.Sprintf("background-color: %s;", ui.Colors.Accents["red"]) }>
+			Stop
+		</button>
+	}
 }

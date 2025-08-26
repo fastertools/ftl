@@ -1,0 +1,46 @@
+package templates
+
+import (
+	"strings"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
+
+// Log output display with proper HTML escaping
+templ LogOutput(logs []string) {
+	<div class={ ui.CSSClasses.Text["success"] }>
+		for _, line := range logs {
+			if line != "" {
+				{ line }<br/>
+			}
+		}
+	</div>
+}
+
+// Log output with custom styling
+templ LogOutputStyled(logs []string, cssClass string) {
+	<div class={ cssClass }>
+		for _, line := range logs {
+			if line != "" {
+				{ line }<br/>
+			}
+		}
+	</div>
+}
+
+// Single log string with line breaks converted
+templ LogString(logText string) {
+	<div class={ ui.CSSClasses.Text["success"] }>
+		for _, line := range strings.Split(logText, "\n") {
+			if line != "" {
+				{ line }<br/>
+			}
+		}
+	</div>
+}
+
+// Raw log output for simple cases
+templ RawLogOutput(logText string) {
+	<div class={ ui.CSSClasses.Text["success"] }>
+		{ logText }
+	</div>
+}

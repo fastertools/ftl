@@ -1,0 +1,71 @@
+package templates
+
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+	"time"
+)
+
+// formatTimestamp returns current time in standard format
+func formatTimestamp() string {
+	return time.Now().Format("15:04:05")
+}
+
+// Base message component with timestamp
+templ MessageWithTimestamp(cssClass, message string) {
+	<div class={ cssClass }>
+		[{ formatTimestamp() }] { message }
+	</div>
+}
+
+// Specific message types using UI constants
+templ ErrorMessage(message string) {
+	@MessageWithTimestamp(ui.CSSClasses.Text["error"] + " mb-1", message)
+}
+
+templ SuccessMessage(message string) {
+	@MessageWithTimestamp(ui.CSSClasses.Text["success"] + " mb-1", message)
+}
+
+templ InfoMessage(message string) {
+	@MessageWithTimestamp(ui.CSSClasses.Text["info"] + " mb-1", message)
+}
+
+templ WarningMessage(message string) {
+	@MessageWithTimestamp(ui.CSSClasses.Text["warning"] + " mb-1", message)
+}
+
+// Auto-clearing error message with JavaScript
+templ AutoClearErrorMessage(message string, clearAfterMs int) {
+	<div id={ fmt.Sprintf("error-msg-%d", time.Now().UnixNano()) } class={ ui.CSSClasses.Text["error"] }>
+		{ message }
+	</div>
+	<script>
+		setTimeout(() => {
+			const elem = document.getElementById('{ fmt.Sprintf("error-msg-%d", time.Now().UnixNano()) }');
+			if (elem) elem.remove();
+		}, { fmt.Sprintf("%d", clearAfterMs) });
+	</script>
+}
+
+// Message with HTMX OOB swap
+templ MessageWithOOB(message, cssClass, oobTarget string) {
+	<div hx-swap-oob={ "beforeend:" + oobTarget } class={ cssClass }>
+		[{ formatTimestamp() }] { message }
+	</div>
+}
+
+// Simple message without timestamp (for handlers that add their own)
+templ SimpleMessage(cssClass, message string) {
+	<div class={ cssClass }>{ message }</div>
+}
+
+// Error div without timestamp (replacement for inline HTML)
+templ SimpleErrorDiv(message string) {
+	<div class={ ui.CSSClasses.Text["error"] }>{ message }</div>
+}
+
+// Success div without timestamp (replacement for inline HTML)
+templ SimpleSuccessDiv(message string) {
+	<div class={ ui.CSSClasses.Text["success"] }>{ message }</div>
+}
