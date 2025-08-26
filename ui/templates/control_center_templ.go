@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl/internal/ui"
+	ui "github.com/fastertools/ftl/ui/gen"
 )
 
 // ControlCenter combines status monitoring and control functionality into a unified panel

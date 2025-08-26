@@ -22,6 +22,7 @@ help:
 	@echo "  Development Commands:"
 	@echo "    generate-api  - Generate API client from OpenAPI spec"
 	@echo "    generate-templ- Generate templ templates"
+	@echo "    generate-ui   - Generate UI constants from CUE modules"
 	@echo "    fmt           - Format all code (Go + Rust)"
 	@echo "    lint          - Lint all code (Go + Rust)"
 	@echo "    coverage      - Generate test coverage reports"
@@ -60,6 +61,12 @@ generate-templ:
 		echo "⚠️  templ not installed"; \
 		echo "   Install with: go install github.com/a-h/templ/cmd/templ@latest"; \
 	fi
+
+# Generate UI constants from CUE
+generate-ui:
+	@echo "🔄 Generating UI constants from CUE modules..."
+	@cd ui && go run generate_v2.go
+	@echo "✅ UI constants generated: ui/gen/"
 
 # Build FTL CLI (Go)
 build:

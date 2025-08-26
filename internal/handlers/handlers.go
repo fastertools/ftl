@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fastertools/ftl/ui/templates"
 	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/internal/mcpclient"
 	"github.com/fastertools/ftl/internal/models"
 	"github.com/fastertools/ftl/internal/parser"
 	"github.com/fastertools/ftl/internal/polling"
 	"github.com/fastertools/ftl/internal/state"
-	"github.com/fastertools/ftl/internal/ui"
+	ui "github.com/fastertools/ftl/ui/gen"
+	"github.com/fastertools/ftl/ui/templates"
 )
 
 // formatTimestamp returns a consistent timestamp format for all messages
@@ -51,25 +51,25 @@ func NewHandler(mcpClient *mcpclient.Client) *Handler {
 		}
 	}
 	log.Printf("Using projects file: %s", projectsFile)
-	
+
 	// Create project registry
 	registry := state.NewProjectRegistry(projectsFile)
-	
+
 	// Load existing projects
 	if err := registry.LoadProjects(); err != nil {
 		log.Printf("Warning: failed to load projects: %v", err)
 	}
-	
+
 	// Log projects loaded
 	allProjects := registry.GetAllProjects()
 	log.Printf("After loading projects: found %d projects", len(allProjects))
-	
+
 	// Create polling manager
 	pollingManager := polling.NewManager(mcpClient, registry)
-	
+
 	// Start polling for all existing projects
 	pollingManager.StartAllPolling()
-	
+
 	return &Handler{
 		mcpClient:      mcpClient,
 		logPositions:   state.NewLogPositionTracker(),
@@ -84,10 +84,10 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	if err := h.registry.EnsureProjectsFile(); err != nil {
 		log.Printf("Warning: failed to ensure projects file: %v", err)
 	}
-	
+
 	// Get all projects for sidebar
 	allProjects := h.registry.GetAllProjects()
-	
+
 	// Convert to components.Project with process status
 	projects := make([]templates.Project, len(allProjects))
 	for i, p := range allProjects {
@@ -98,7 +98,7 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
 			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
 		}
-		
+
 		projects[i] = templates.Project{
 			Name:         p.Name,
 			Path:         p.Path,
@@ -108,10 +108,10 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 			WatchRunning: watchRunning,
 		}
 	}
-	
+
 	// Get current project from registry (may not exist for new users)
 	currentProj, hasCurrentProject := h.registry.GetCurrentProject()
-	
+
 	// Initialize dashboard data with empty state
 	dashboardData := templates.DashboardData{
 		AllProjects:    projects,
@@ -129,7 +129,7 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 			LastActivity: time.Now(),
 		},
 	}
-	
+
 	// If we have a current project, populate its data
 	if hasCurrentProject && currentProj != nil {
 		// Get command history from current project state
@@ -144,13 +144,13 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		dashboardData.CommandHistory = componentCommandHistory
-		
+
 		// Get the actual FTL process port if running
 		var ftlPort int
 		if currentProj.ProcessInfo.ActiveProcess != nil && currentProj.ProcessInfo.ActiveProcess.IsRunning {
 			ftlPort = currentProj.ProcessInfo.ActiveProcess.Port
 		}
-		
+
 		// Update dashboard data with current project info
 		dashboardData.CurrentProject = templates.Project{
 			Name:        currentProj.Project.Name,
@@ -170,7 +170,7 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 			LastActivity: time.Now(),
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.Layout(dashboardData).Render(r.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
@@ -184,41 +184,41 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Get current project
 	currentProj, exists := h.registry.GetCurrentProject()
 	if !exists {
 		http.Error(w, "No projects configured", http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Handle build action
 	if r.FormValue("action") == "build" {
 		projectPath := r.FormValue("project-path")
 		if projectPath == "" {
 			projectPath = currentProj.Project.Path
 		}
-		
+
 		args := map[string]interface{}{
 			"project_path": projectPath,
 			"clean":        false,
 		}
-		
+
 		result, err := h.mcpClient.CallTool("mcp-server__build", args)
 		if err != nil {
 			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Build failed: %s", err.Error())))
 			return
 		}
-		
+
 		// Parse the build response JSON
 		buildResponse := parser.ParseBuildResponse(result)
-		
+
 		w.Header().Set("Content-Type", "text/html")
 		if buildResponse.Success {
 			fmt.Fprint(w, formatMessage("text-green-400 mb-1", fmt.Sprintf("Build successful: %s", buildResponse.Output)))
@@ -227,14 +227,14 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	
+
 	// Handle stop actions for specific processes
 	if r.FormValue("stop_regular") == "true" {
 		projectPath := r.FormValue("project-path")
 		if projectPath == "" {
 			projectPath = currentProj.Project.Path
 		}
-		
+
 		result, err := h.mcpClient.CallTool("mcp-server__stop", map[string]interface{}{
 			"project_path": projectPath,
 		})
@@ -242,18 +242,18 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop FTL failed: %s", err.Error())))
 			return
 		}
-		
+
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("FTL Process stopped: %s", result)))
 		return
 	}
-	
+
 	if r.FormValue("stop_watch") == "true" {
 		projectPath := r.FormValue("project-path")
 		if projectPath == "" {
 			projectPath = currentProj.Project.Path
 		}
-		
+
 		result, err := h.mcpClient.CallTool("mcp-server__stop", map[string]interface{}{
 			"project_path": projectPath,
 		})
@@ -261,28 +261,28 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("Stop Watch failed: %s", err.Error())))
 			return
 		}
-		
+
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprint(w, formatMessage("text-orange-400 mb-1", fmt.Sprintf("Watch Mode stopped: %s", result)))
 		return
 	}
-	
+
 	// Handle unified FTL up with mode parameter
 	if projectPath := r.FormValue("project-path"); projectPath != "" {
 		mode := r.FormValue("mode")
 		if mode == "" {
 			mode = "regular" // Default to regular mode
 		}
-		
+
 		isWatchMode := mode == "watch"
-		
+
 		args := map[string]interface{}{
 			"project_path": projectPath,
 			"watch":        isWatchMode,
 			"build":        false,
 			"listen":       "",
 		}
-		
+
 		result, err := h.mcpClient.CallTool("mcp-server__up", args)
 		if err != nil {
 			modeLabel := "Start"
@@ -292,10 +292,10 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, formatMessage("text-red-400 mb-1", fmt.Sprintf("%s failed: %s", modeLabel, err.Error())))
 			return
 		}
-		
+
 		// Parse the up response JSON
 		upResponse := parser.ParseUpResponse(result)
-		
+
 		w.Header().Set("Content-Type", "text/html")
 		if upResponse.Success {
 			// Start polling for this project if server started successfully
@@ -310,7 +310,7 @@ func (h *Handler) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	
+
 	http.Error(w, "No valid action specified", http.StatusBadRequest)
 }
 
@@ -320,21 +320,21 @@ func (h *Handler) HandleFTLStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	args := map[string]interface{}{
 		"project_path": projectPath,
 		"watch":        false,
 		"build":        false,
 		"listen":       "",
 	}
-	
+
 	result, err := h.mcpClient.CallTool("mcp-server__up", args)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
@@ -349,18 +349,18 @@ func (h *Handler) HandleFTLStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	args := map[string]interface{}{
 		"project_path": projectPath,
 	}
-	
+
 	result, err := h.mcpClient.CallTool("mcp-server__stop", args)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
@@ -375,21 +375,21 @@ func (h *Handler) HandleWatchStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	args := map[string]interface{}{
 		"project_path": projectPath,
 		"watch":        true,
 		"build":        false,
 		"listen":       "",
 	}
-	
+
 	result, err := h.mcpClient.CallTool("mcp-server__up", args)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
@@ -404,18 +404,18 @@ func (h *Handler) HandleWatchStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	args := map[string]interface{}{
 		"project_path": projectPath,
 	}
-	
+
 	result, err := h.mcpClient.CallTool("mcp-server__stop", args)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="text-red-400">Error: %s</div>`, err.Error())
@@ -430,14 +430,14 @@ func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	// Use background-collected project state instead of fresh MCP calls
 	projectState, exists := h.registry.GetProject(projectPath)
 	if !exists || projectState == nil {
@@ -446,28 +446,28 @@ func (h *Handler) HandleLogsPoll(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "")
 		return
 	}
-	
+
 	// Get current log position for this project
 	since := h.logPositions.GetPosition(projectPath)
-	
+
 	// Get all cached logs from background polling
 	allLogs := projectState.GetLogs()
 	totalLines := len(allLogs)
-	
+
 	// Check if we have new logs since the last position
 	if since >= totalLines {
 		// No new logs - return empty content
 		fmt.Fprint(w, "")
 		return
 	}
-	
+
 	// Get new logs since the specified position
 	newLogs := allLogs[since:]
 	newLogsText := strings.Join(newLogs, "\n")
-	
+
 	// Update log position to current total
 	h.logPositions.SetPosition(projectPath, totalLines)
-	
+
 	// Return new logs with proper HTML formatting if we have content
 	if len(newLogs) > 0 && strings.TrimSpace(newLogsText) != "" {
 		escapedLogs := strings.ReplaceAll(newLogsText, "\n", "<br>")
@@ -484,14 +484,14 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	if projectPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path required</div>`)
 		return
 	}
-	
+
 	// Use background-collected project state instead of fresh MCP calls
 	projectState, exists := h.registry.GetProject(projectPath)
 	if !exists || projectState == nil {
@@ -501,30 +501,30 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 			ProjectPath:   projectPath,
 			ActiveProcess: nil, // No active process
 		}
-		
+
 		htmlContent := generateControlCenterStatusHTML(detailedStatus)
 		fmt.Fprint(w, htmlContent)
 		return
 	}
-	
+
 	// Convert cached project state to DetailedStatusInfo
 	detailedStatus := models.DetailedStatusInfo{
 		ProjectPath:   projectPath,
 		ActiveProcess: projectState.ProcessInfo.ActiveProcess, // Use the cached active process
 	}
-	
+
 	// Debug logging
 	if detailedStatus.ActiveProcess != nil {
-		log.Printf("DEBUG: Using cached state - ActiveProcess: Type=%s Running=%t PID=%d Port=%d", 
-			detailedStatus.ActiveProcess.Type, detailedStatus.ActiveProcess.IsRunning, 
+		log.Printf("DEBUG: Using cached state - ActiveProcess: Type=%s Running=%t PID=%d Port=%d",
+			detailedStatus.ActiveProcess.Type, detailedStatus.ActiveProcess.IsRunning,
 			detailedStatus.ActiveProcess.PID, detailedStatus.ActiveProcess.Port)
 	} else {
 		log.Printf("DEBUG: Using cached state - No active process")
 	}
-	
+
 	// Generate status HTML compatible with Control Center template
 	htmlContent := generateControlCenterStatusHTML(detailedStatus)
-	
+
 	// Also generate Info Panel port update if process is running
 	if detailedStatus.ActiveProcess != nil && detailedStatus.ActiveProcess.IsRunning && detailedStatus.ActiveProcess.Port > 0 {
 		// Include OOB swap to update the info panel port
@@ -537,7 +537,7 @@ func (h *Handler) HandleStatusPoll(w http.ResponseWriter, r *http.Request) {
 		// Clear port display when not running
 		htmlContent += `<div hx-swap-oob="innerHTML:#port-display"></div>`
 	}
-	
+
 	fmt.Fprint(w, htmlContent)
 }
 
@@ -547,23 +547,23 @@ func (h *Handler) HandleProcessStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.FormValue("project_path")
 	processType := r.FormValue("process_type")
-	
+
 	if projectPath == "" || processType == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `<div class="text-red-400">Error: project_path and process_type required</div>`)
 		return
 	}
-	
+
 	// Use unified stop tool for all process types
 	toolName := "mcp-server__stop"
-	
+
 	args := map[string]interface{}{
 		"project_path": projectPath,
 	}
-	
+
 	result, err := h.mcpClient.CallTool(toolName, args)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="text-red-400">Stop failed: %s</div>`, err.Error())
@@ -610,41 +610,41 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
-	
+
 	name := r.FormValue("name")
 	path := r.FormValue("path")
-	
+
 	if name == "" || path == "" {
 		http.Error(w, "Name and path are required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Validate that the directory exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Printf("Project path does not exist: %s", path)
 		http.Error(w, fmt.Sprintf("Directory does not exist: %s", path), http.StatusBadRequest)
 		return
 	}
-	
+
 	// Validate that it's an FTL project by calling mcp-server__list_components
 	log.Printf("Validating FTL project by calling list_components for: %s", path)
 	componentArgs := map[string]interface{}{
 		"project_path": path,
 	}
-	
+
 	componentResult, err := h.mcpClient.CallTool("mcp-server__list_components", componentArgs)
 	if err != nil {
 		log.Printf("Failed to validate FTL project via MCP: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to validate project: %v", err), http.StatusBadRequest)
 		return
 	}
-	
+
 	// Parse the MCP response to check if it succeeded
 	var componentResponse map[string]interface{}
 	if err := json.Unmarshal([]byte(componentResult), &componentResponse); err != nil {
@@ -652,7 +652,7 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to validate project structure", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Check if the component list call was successful
 	if success, ok := componentResponse["success"].(bool); !ok || !success {
 		errorMsg := "Unknown validation error"
@@ -663,9 +663,9 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Not a valid FTL project: %s", errorMsg), http.StatusBadRequest)
 		return
 	}
-	
+
 	log.Printf("FTL project validation successful for: %s", path)
-	
+
 	// Add project to registry
 	log.Printf("Adding validated FTL project: name=%s, path=%s", name, path)
 	_, err = h.registry.AddProject(path, name)
@@ -675,14 +675,14 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Successfully added project: %s", name)
-	
+
 	// Start polling for the new project
 	h.pollingManager.StartProjectPolling(path)
-	
+
 	// Get all projects and render updated list
 	allProjects := h.registry.GetAllProjects()
 	currentPath := h.registry.GetCurrentProjectPath()
-	
+
 	// Convert to components.Project with process status
 	projects := make([]templates.Project, len(allProjects))
 	for i, p := range allProjects {
@@ -693,7 +693,7 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
 			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
 		}
-		
+
 		projects[i] = templates.Project{
 			Name:         p.Name,
 			Path:         p.Path,
@@ -703,7 +703,7 @@ func (h *Handler) HandleProjectAdd(w http.ResponseWriter, r *http.Request) {
 			WatchRunning: watchRunning,
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.ProjectListContents(projects, currentPath).Render(r.Context(), w); err != nil {
 		http.Error(w, "Failed to render project list", http.StatusInternalServerError)
@@ -716,26 +716,26 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		http.Error(w, "Path is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Stop polling first
 	h.pollingManager.StopProjectPolling(path)
-	
+
 	// Check if we're removing the current project
 	currentPath := h.registry.GetCurrentProjectPath()
 	removingCurrentProject := (currentPath == path)
-	
+
 	// Remove from registry
 	if err := h.registry.RemoveProject(path); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to remove project: %v", err), http.StatusBadRequest)
 		return
 	}
-	
+
 	// If we removed the current project, switch to another one
 	allProjects := h.registry.GetAllProjects()
 	if removingCurrentProject && len(allProjects) > 0 {
@@ -746,7 +746,7 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 	} else {
 		currentPath = h.registry.GetCurrentProjectPath()
 	}
-	
+
 	// Convert to components.Project with process status
 	projects := make([]templates.Project, len(allProjects))
 	for i, p := range allProjects {
@@ -757,7 +757,7 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
 			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
 		}
-		
+
 		projects[i] = templates.Project{
 			Name:         p.Name,
 			Path:         p.Path,
@@ -767,7 +767,7 @@ func (h *Handler) HandleProjectRemove(w http.ResponseWriter, r *http.Request) {
 			WatchRunning: watchRunning,
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.ProjectListContents(projects, currentPath).Render(r.Context(), w); err != nil {
 		http.Error(w, "Failed to render project list", http.StatusInternalServerError)
@@ -780,13 +780,13 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		http.Error(w, "Path is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Get the project state (pre-collected from background polling)
 	projectState, exists := h.registry.GetProject(path)
 	if !exists || projectState == nil {
@@ -794,9 +794,9 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert complex state to component types directly  
+	// Convert complex state to component types directly
 	project, processStatus, serverStatus, recentLogs := projectState.ToComponentTypes()
-	
+
 	// Get command history from project state
 	stateCommandHistory := projectState.GetCommandHistory()
 	componentCommandHistory := make([]templates.CommandOutput, len(stateCommandHistory))
@@ -808,7 +808,7 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 			Success:   cmd.Success,
 		}
 	}
-	
+
 	// Get all projects for sidebar with process status
 	allProjects := h.registry.GetAllProjects()
 	sidebarProjects := make([]templates.Project, len(allProjects))
@@ -820,7 +820,7 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 			ftlRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "regular"
 			watchRunning = projectState.ProcessInfo.ActiveProcess.IsRunning && projectState.ProcessInfo.ActiveProcess.Type == "watch"
 		}
-		
+
 		sidebarProjects[i] = templates.Project{
 			Name:         p.Name,
 			Path:         p.Path,
@@ -830,20 +830,20 @@ func (h *Handler) HandleProjectSwitch(w http.ResponseWriter, r *http.Request) {
 			WatchRunning: watchRunning,
 		}
 	}
-	
+
 	// Create dashboard data with converted types
 	data := templates.DashboardData{
-		CurrentProject:  project,
-		AllProjects:     sidebarProjects,
-		ServerStatus:    serverStatus,
-		ProcessStatus:   processStatus,
-		RecentLogs:      recentLogs,
-		CommandHistory:  componentCommandHistory,
+		CurrentProject: project,
+		AllProjects:    sidebarProjects,
+		ServerStatus:   serverStatus,
+		ProcessStatus:  processStatus,
+		RecentLogs:     recentLogs,
+		CommandHistory: componentCommandHistory,
 	}
-	
+
 	// Set current project in registry
 	h.registry.SetCurrentProject(path)
-	
+
 	// Render complete main content area with updated project data using existing Layout
 	w.Header().Set("Content-Type", "text/html")
 	if err := templates.Layout(data).Render(r.Context(), w); err != nil {
@@ -858,16 +858,16 @@ func (h *Handler) HandleProjectReload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	log.Println("Reloading projects from disk (test mode)")
-	
+
 	// Reload projects from disk
 	if err := h.registry.ReloadProjects(); err != nil {
 		log.Printf("Failed to reload projects: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to reload projects: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Return success
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "Projects reloaded successfully")
@@ -879,12 +879,12 @@ func generateControlCenterStatusHTML(status models.DetailedStatusInfo) string {
 		// Display the active process status
 		dotColor := "bg-green-400"
 		statusText := "Up"
-		
+
 		if status.ActiveProcess.Type == "watch" {
 			dotColor = "bg-blue-400"
 			statusText = "Watching"
 		}
-		
+
 		return fmt.Sprintf(`<div class="space-y-2">
 			<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
 				<div class="flex items-center space-x-2">
@@ -897,7 +897,7 @@ func generateControlCenterStatusHTML(status models.DetailedStatusInfo) string {
 			</div>
 		</div>`, dotColor, statusText, generateStopButtonHTML(status.ActiveProcess.Type, true, status.ProjectPath))
 	}
-	
+
 	// No active process
 	return `<div class="space-y-2">
 		<div class="flex items-center justify-between p-2 rounded" style="background-color: #333333;">
@@ -914,7 +914,7 @@ func generateStopButtonHTML(processType string, isRunning bool, projectPath stri
 	if !isRunning {
 		return ""
 	}
-	
+
 	return fmt.Sprintf(`
 		<button 
 			class="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
@@ -938,27 +938,27 @@ func (h *Handler) HandleTestWaitForHTMX(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.URL.Query().Get("project_path")
 	timeoutStr := r.URL.Query().Get("timeout")
-	
+
 	if projectPath == "" {
 		http.Error(w, "project_path parameter required", http.StatusBadRequest)
 		return
 	}
-	
+
 	timeout := 30 * time.Second
 	if timeoutStr != "" {
 		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
 			timeout = t
 		}
 	}
-	
+
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	timeoutChan := time.After(timeout)
-	
+
 	for {
 		// Check if HTMX operations have settled (no active polling)
 		projectState, exists := h.registry.GetProject(projectPath)
@@ -971,7 +971,7 @@ func (h *Handler) HandleTestWaitForHTMX(w http.ResponseWriter, r *http.Request) 
 			json.NewEncoder(w).Encode(response)
 			return
 		}
-		
+
 		// Wait for next check or timeout
 		select {
 		case <-ticker.C:
@@ -995,11 +995,11 @@ func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.URL.Query().Get("project_path")
 	expectedStatus := r.URL.Query().Get("status")
 	timeoutStr := r.URL.Query().Get("timeout")
-	
+
 	if projectPath == "" {
 		response := models.APIResponse{
 			Success: false,
@@ -1009,19 +1009,19 @@ func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request
 		json.NewEncoder(w).Encode(response)
 		return
 	}
-	
+
 	timeout := 30 * time.Second
 	if timeoutStr != "" {
 		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
 			timeout = t
 		}
 	}
-	
+
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	timeoutChan := time.After(timeout)
-	
+
 	for {
 		// Check current status
 		projectState, exists := h.registry.GetProject(projectPath)
@@ -1030,7 +1030,7 @@ func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request
 			if projectState.ProcessInfo.ActiveProcess != nil && projectState.ProcessInfo.ActiveProcess.IsRunning {
 				currentStatus = "running"
 			}
-			
+
 			// Check if status matches expected
 			if expectedStatus == "" || currentStatus == expectedStatus {
 				response := map[string]interface{}{
@@ -1043,7 +1043,7 @@ func (h *Handler) HandleTestWaitForStatus(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-		
+
 		// Wait for next check or timeout
 		select {
 		case <-ticker.C:
@@ -1076,33 +1076,33 @@ func (h *Handler) HandleTestWaitForLogs(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.URL.Query().Get("project_path")
 	minLinesStr := r.URL.Query().Get("min_lines")
 	timeoutStr := r.URL.Query().Get("timeout")
-	
+
 	if projectPath == "" {
 		http.Error(w, "project_path parameter required", http.StatusBadRequest)
 		return
 	}
-	
+
 	minLines := 1
 	if minLinesStr != "" {
 		fmt.Sscanf(minLinesStr, "%d", &minLines)
 	}
-	
+
 	timeout := 30 * time.Second
 	if timeoutStr != "" {
 		if t, err := time.ParseDuration(timeoutStr + "ms"); err == nil {
 			timeout = t
 		}
 	}
-	
+
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	timeoutChan := time.After(timeout)
-	
+
 	for {
 		// Check for sufficient logs
 		projectState, exists := h.registry.GetProject(projectPath)
@@ -1118,7 +1118,7 @@ func (h *Handler) HandleTestWaitForLogs(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 		}
-		
+
 		// Wait for next check or timeout
 		select {
 		case <-ticker.C:
@@ -1147,25 +1147,25 @@ func (h *Handler) HandleTestProcessTree(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	projectPath := r.URL.Query().Get("project_path")
 	if projectPath == "" {
 		http.Error(w, "project_path parameter required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Get process info from project state
 	projectState, exists := h.registry.GetProject(projectPath)
 	if !exists || projectState == nil {
 		http.Error(w, "Project not found", http.StatusNotFound)
 		return
 	}
-	
+
 	// Create ftl process info
 	ftlInfo := map[string]interface{}{
 		"is_running": false,
 	}
-	
+
 	if projectState.ProcessInfo.ActiveProcess != nil && projectState.ProcessInfo.ActiveProcess.IsRunning {
 		ftlInfo = map[string]interface{}{
 			"is_running": true,
@@ -1174,11 +1174,11 @@ func (h *Handler) HandleTestProcessTree(w http.ResponseWriter, r *http.Request) 
 			"type":       projectState.ProcessInfo.ActiveProcess.Type,
 		}
 	}
-	
+
 	response := map[string]interface{}{
 		"ftl": ftlInfo,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

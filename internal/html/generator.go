@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/fastertools/ftl/internal/models"
-	"github.com/fastertools/ftl/internal/ui"
+	ui "github.com/fastertools/ftl/ui/gen"
 )
 
 // GenerateProcessHTML generates HTML for a single process status section
@@ -59,20 +59,20 @@ func GenerateIntegratedProcessHTML(status models.DetailedStatusInfo, projectPath
 			displayName = ui.ProcessNameRegular
 			colorScheme = "green"
 		}
-		
+
 		activeSection := GenerateProcessSectionHTML(status.ActiveProcess.Type, displayName, *status.ActiveProcess, projectPath, colorScheme)
-		
+
 		return fmt.Sprintf(`
 			<div class="space-y-3">
 				%s
 			</div>
 		`, activeSection)
 	}
-	
+
 	// No active process - show inactive state
 	emptyProcess := models.ProcessInfo{IsRunning: false}
 	inactiveSection := GenerateProcessSectionHTML("", ui.ProcessNameNone, emptyProcess, projectPath, "gray")
-	
+
 	return fmt.Sprintf(`
 		<div class="space-y-3">
 			%s
