@@ -16,7 +16,7 @@ templ StatusPanel(project Project, processStatus ProcessStatus, serverStatus Ser
 			<div>
 				<div id="ftl-status" 
 					 hx-post="/htmx/status/poll" 
-					 hx-trigger="load, every 3s" 
+					 hx-trigger="load, every 1s" 
 					 hx-swap="innerHTML"
 					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
 					 class="space-y-3">

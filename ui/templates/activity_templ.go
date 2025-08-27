@@ -194,7 +194,7 @@ func ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Comm
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</button></div><!-- Tab Content --><div id=\"tab-content\" class=\"mt-4\"><!-- Live Logs Tab (default) --><div id=\"logs-content\"><div id=\"live-log-content\" class=\"bg-black rounded-lg p-3 font-mono text-xs overflow-hidden\" style=\"min-height: 200px; max-height: 350px; overflow-y: auto;\" hx-post=\"/htmx/logs/poll\" hx-trigger=\"every 2s\" hx-include=\"[name='project_path']\" hx-target=\"this\" hx-swap=\"beforeend\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</button></div><!-- Tab Content --><div id=\"tab-content\" class=\"mt-4\"><!-- Live Logs Tab (default) --><div id=\"logs-content\"><div id=\"live-log-content\" class=\"bg-black rounded-lg p-3 font-mono text-xs overflow-hidden\" style=\"min-height: 200px; max-height: 350px; overflow-y: auto;\" hx-post=\"/htmx/logs/poll\" hx-trigger=\"every 500ms\" hx-include=\"[name='project_path']\" hx-target=\"this\" hx-swap=\"beforeend\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

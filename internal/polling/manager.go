@@ -41,12 +41,12 @@ func (m *Manager) StartProjectPolling(projectPath string) {
 
 	// Add delay to allow MCP client initialization to complete
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		m.pollStatus(ps)
 	}()
 
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		m.pollLogs(ps)
 	}()
 
@@ -66,7 +66,7 @@ func (m *Manager) StopProjectPolling(projectPath string) {
 
 // pollStatus continuously polls for process status
 func (m *Manager) pollStatus(ps *state.ProjectState) {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	stopChan := ps.GetStopChannel("status")
@@ -104,7 +104,7 @@ func (m *Manager) pollStatus(ps *state.ProjectState) {
 
 // pollLogs continuously polls for new logs
 func (m *Manager) pollLogs(ps *state.ProjectState) {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	stopChan := ps.GetStopChannel("logs")

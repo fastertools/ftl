@@ -49,7 +49,7 @@ func StatusPanel(project Project, processStatus ProcessStatus, serverStatus Serv
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h2><div class=\"space-y-4\"><!-- Process Status --><div><div id=\"ftl-status\" hx-post=\"/htmx/status/poll\" hx-trigger=\"load, every 3s\" hx-swap=\"innerHTML\" hx-vals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h2><div class=\"space-y-4\"><!-- Process Status --><div><div id=\"ftl-status\" hx-post=\"/htmx/status/poll\" hx-trigger=\"load, every 1s\" hx-swap=\"innerHTML\" hx-vals=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

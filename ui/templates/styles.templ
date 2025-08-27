@@ -8,7 +8,7 @@ import (
 // BaseStyles generates the base CSS styles for the application
 templ BaseStyles() {
 	<style type="text/css">
-		{ getBaseCSS() }
+		{ templ.Raw(getBaseCSS()) }
 	</style>
 }
 

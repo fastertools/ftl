@@ -76,7 +76,7 @@ templ ActivityPanel(project Project, recentLogs []LogEntry, commandHistory []Com
 					class="bg-black rounded-lg p-3 font-mono text-xs overflow-hidden"
 					style="min-height: 200px; max-height: 350px; overflow-y: auto;"
 					hx-post="/htmx/logs/poll"
-					hx-trigger="every 2s"
+					hx-trigger="every 500ms"
 					hx-include="[name='project_path']"
 					hx-target="this"
 					hx-swap="beforeend"

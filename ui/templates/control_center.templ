@@ -17,6 +17,18 @@ script handleCenterOut(event templ.JSExpression, bgColor, borderColor string) {
 	event.target.style.transform = 'translateY(0)';
 }
 
+script addBuildMessage() {
+	document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div style="color: #3b82f6">[' + new Date().toTimeString().slice(0,8) + '] Sending build command...</div>');
+}
+
+script addUpMessage() {
+	document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div style="color: #3b82f6">[' + new Date().toTimeString().slice(0,8) + '] Starting FTL server...</div>');
+}
+
+script addWatchMessage() {
+	document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div style="color: #3b82f6">[' + new Date().toTimeString().slice(0,8) + '] Starting FTL in watch mode...</div>');
+}
+
 
 
 // ControlCenter combines status monitoring and control functionality into a unified panel
@@ -30,7 +42,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>{ ui.WebUI.Sections["process_status"] }</h3>
 				<div id="ftl-status" 
 					 hx-post="/htmx/status/poll" 
-					 hx-trigger="load, every 3s" 
+					 hx-trigger="load, every 1s" 
 					 hx-swap="innerHTML"
 					 hx-vals={ fmt.Sprintf(`{"project_path": "%s"}`, project.Path) }
 					 class={ ui.CSSClasses.Components["space_y_2"] }>
@@ -39,14 +51,14 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
 							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameRegular }</span>
 							<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["stopped"] }></div>
-							<span class="text-xs font-mono" style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusStopped }</span>
+							<span class={ ui.CSSClasses.Components["text_mono_xs"] } style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusStopped }</span>
 						</div>
 					</div>
 					<div class={ ui.CSSClasses.Composite["process_row"] } style={ "background-color: " + ui.Colors.UI["button_bg"] }>
 						<div class={ ui.CSSClasses.Components["flex_space_3"] }>
 							<span class={ ui.CSSClasses.Components["text_value"] }>{ ui.ProcessNameWatch }</span>
 							<div class={ ui.CSSClasses.Components["status_dot"] + " " + ui.CSSClasses.StatusDots["stopped"] }></div>
-							<span class="text-xs font-mono" style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusInactive }</span>
+							<span class={ ui.CSSClasses.Components["text_mono_xs"] } style={ "color: " + ui.Colors.UI["secondary_text"] }>{ ui.StatusInactive }</span>
 						</div>
 					</div>
 				</div>
@@ -55,13 +67,13 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 			<!-- Control Buttons Section -->
 			<div class={ ui.CSSClasses.Components["border_top"] } style={ "border-color: " + ui.Colors.UI["border_primary"] }>
 				<h3 class={ ui.CSSClasses.Composite["section_heading"] } style={ "color: " + ui.Colors.UI["muted_text"] }>{ ui.WebUI.Sections["operations"] }</h3>
-				<div class="p-4 rounded-lg" style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]) }>
+				<div class={ ui.CSSClasses.Components["control_panel"] } style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]) }>
 					<div class={ ui.CSSClasses.Components["grid_3_cols"] }>
 						<!-- Build Button -->
 						<form hx-post="/mcp" 
 							hx-target="#ftl-output"
 							hx-swap="beforeend"
-							hx-on::before-request="document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\'text-blue-400\\'>[' + new Date().toTimeString().slice(0,8) + '] Sending build command...</div>')">
+							hx-on::before-request={ addBuildMessage() }>
 							<input type="hidden" name="action" value="build"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<button 
@@ -79,7 +91,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 						<form hx-post="/mcp" 
 							hx-target="#ftl-output"
 							hx-swap="beforeend"
-							hx-on::before-request="document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\'text-blue-400\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL server...</div>')">
+							hx-on::before-request={ addUpMessage() }>
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="regular"/>
@@ -98,7 +110,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 						<form hx-post="/mcp" 
 							hx-target="#ftl-output"
 							hx-swap="beforeend"
-							hx-on::before-request="document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div class=\\'text-blue-400\\'>[' + new Date().toTimeString().slice(0,8) + '] Starting FTL in watch mode...</div>')">
+							hx-on::before-request={ addWatchMessage() }>
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="watch"/>

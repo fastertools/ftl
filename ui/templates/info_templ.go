@@ -466,7 +466,7 @@ func InfoPanel(project Project, serverStatus ServerStatus) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\"><div id=\"tools-section\" hx-get=\"/tools-list\" hx-trigger=\"load, every 3s\" hx-swap=\"innerHTML\" hx-vals='js:{tools_hash: document.querySelector(\"#tools-section [data-tools-hash]\")?.dataset.toolsHash || \"\"}'>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\"><div id=\"tools-section\" hx-get=\"/tools-list\" hx-trigger=\"load, every 1s\" hx-swap=\"innerHTML\" hx-vals='js:{tools_hash: document.querySelector(\"#tools-section [data-tools-hash]\")?.dataset.toolsHash || \"\"}'>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
