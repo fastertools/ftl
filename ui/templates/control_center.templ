@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	ui "github.com/fastertools/ftl/ui/gen"
+	"github.com/fastertools/ftl/ui/components"
 )
 
 script handleCenterHover(event templ.JSExpression, bgColor, borderColor string) {
@@ -76,15 +77,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							hx-on::before-request={ addBuildMessage() }>
 							<input type="hidden" name="action" value="build"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
-							<button 
-								type="submit"
-								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-									>
-								Build
-							</button>
+							@components.BaseButton(components.BaseButtonConfig{
+								Type: "submit",
+								Content: "Build",
+							})
 						</form>
 						
 						<!-- Up (Regular Mode) Button -->
@@ -95,15 +91,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="regular"/>
-							<button 
-								type="submit"
-								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-									>
-								Up
-							</button>
+							@components.BaseButton(components.BaseButtonConfig{
+								Type: "submit",
+								Content: "Up",
+							})
 						</form>
 						
 						<!-- Up (Watch Mode) Button -->
@@ -114,15 +105,10 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="watch"/>
-							<button 
-								type="submit"
-								class={ ui.CSSClasses.Buttons["ftl_control"] }
-						onmouseover={ handleCenterHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-						onmouseout={ handleCenterOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-								style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-									>
-								Watch
-							</button>
+							@components.BaseButton(components.BaseButtonConfig{
+								Type: "submit",
+								Content: "Watch",
+							})
 						</form>
 					</div>
 				</div>

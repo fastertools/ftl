@@ -74,7 +74,7 @@ func GetTestConfig() *TestConfig {
 			TestDataDir:   ".e2e-projects",
 			TempDir:       filepath.Join(os.TempDir(), "ftl-tests"),
 			LogDir:        filepath.Join(".e2e-projects", "logs"),
-			ScreenshotDir: filepath.Join("e2e-tests", "screenshots"),
+			ScreenshotDir: filepath.Join("ui", "e2e", "screenshots"),
 			
 			// Default test data
 			DefaultProjectType:     "tool",
@@ -162,7 +162,7 @@ func (tc *TestConfig) Reset() {
 		TestDataDir:    ".e2e-projects",
 		TempDir:        filepath.Join(os.TempDir(), "ftl-tests"),
 		LogDir:         filepath.Join(".e2e-projects", "logs"),
-		ScreenshotDir:  filepath.Join("e2e-tests", "screenshots"),
+		ScreenshotDir:  filepath.Join("ui", "e2e", "screenshots"),
 		DefaultProjectType:     "tool",
 		DefaultProjectLanguage: "rust",
 		DefaultTimeout:         30000,

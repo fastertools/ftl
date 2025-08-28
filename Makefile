@@ -42,6 +42,7 @@ help:
 	@echo "    test-browser-headed - Run browser tests with visible browser"
 	@echo "    test-browser-debug  - Run browser tests in debug mode"
 	@echo "    test-new-user - Test new user centralized experience"
+	@echo "    test-button-refactor - Run button refactor TDD tests"
 	@echo ""
 	@echo "  Quick Commands:"
 	@echo "    dev           - Quick development build and test"
@@ -278,7 +279,7 @@ test-new-user: build kill clean-centralized-data setup-browser-tests
 	@./bin/ftl dev console --port 8082 > test_centralized_server.log 2>&1 &
 	@echo "⏳ Waiting for server to start..."
 	@sleep 3
-	@cd e2e-tests && npx playwright test e2e/specs/new-user-centralized.spec.js
+	@cd ui && npx playwright test e2e/specs/new-user-centralized.spec.js
 	@echo "🛑 Stopping centralized test server..."
 	@pkill -f "ftl dev console --port 8082" || true
 	@echo "🧹 Cleaning up centralized test..."
@@ -299,6 +300,34 @@ debug-centralized-file: build kill clean-centralized-data
 	@echo "🛑 Stopping test server..."
 	@pkill -f "ftl dev console --port 8082" || true
 	@rm -f test_centralized_server.log
+
+# Run button refactor TDD tests
+test-button-refactor: build kill setup-browser-tests clean-test-data
+	@echo "🧪 Running button refactor TDD tests..."
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --reporter=list || true
+	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
+	@echo "Button refactor tests completed"
+
+# Run button refactor tests with visible browser (for debugging)
+test-button-refactor-headed: build kill clean-test-data
+	@echo "🧪 Running button refactor tests with visible browser..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --headed
+	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
+
+# Run button refactor tests in debug mode
+test-button-refactor-debug: build kill clean-test-data
+	@echo "🧪 Running button refactor tests in debug mode..."
+	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@sleep 3
+	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --debug
+	@pkill -f "ftl dev console" || true
+	@$(MAKE) clean-test-data
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser

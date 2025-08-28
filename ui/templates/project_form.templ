@@ -3,19 +3,8 @@ package templates
 import (
 	"fmt"
 	ui "github.com/fastertools/ftl/ui/gen"
+	"github.com/fastertools/ftl/ui/components"
 )
-
-script handleProjectHover(event templ.JSExpression, bgColor, borderColor string) {
-	event.target.style.backgroundColor = bgColor;
-	event.target.style.borderColor = borderColor;
-	event.target.style.transform = 'translateY(-1px)';
-}
-
-script handleProjectOut(event templ.JSExpression, bgColor, borderColor string) {
-	event.target.style.backgroundColor = bgColor;
-	event.target.style.borderColor = borderColor;
-	event.target.style.transform = 'translateY(0)';
-}
 
 
 // AddProjectForm renders the inline form for adding a new project
@@ -89,71 +78,18 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 	<div id="project-list" class="space-y-1">
 		<!-- Render existing projects -->
 		for _, project := range projects {
-			if project.Path == currentProjectPath {
-				<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s; border-left: 5px solid %s;", ui.Colors.UI["button_bg_hover"], ui.Colors.Accents["blue"]) }>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center">
-							// Determine process type for unified status
-							if project.WatchRunning {
-								@UniversalStatusDot(true, "watch", "sm", false)
-							} else if project.FTLRunning {
-								@UniversalStatusDot(true, "regular", "sm", false)
-							} else {
-								@UniversalStatusDot(false, "", "sm", false)
-							}
-							<span class="project-name ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.Primary.Text) }>{ project.Name }</span>
-						</div>
-						<button 
-							hx-delete={ "/htmx/project/remove?path=" + project.Path }
-							hx-target="#project-list"
-							hx-swap="innerHTML"
-							hx-confirm="Remove this project?"
-							class="text-red-400 hover:text-red-300 text-xs"
-							aria-label={ "Remove project " + project.Name }
-						>
-							×
-						</button>
-					</div>
-				</div>
-			} else {
-				<div 
-					class="project-item project-item-inactive px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer" 
-					data-project-name={ project.Name } 
-					data-project-path={ project.Path }
-					style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }
-					onmouseover={ handleProjectHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"]) }
-					onmouseout={ handleProjectOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"]) }>
-					<div class="flex items-center justify-between">
-						<button 
-							hx-post={ "/htmx/project/switch?path=" + project.Path }
-							hx-target="#main-container"
-							hx-swap="innerHTML"
-							class="flex-1 text-left flex items-center cursor-pointer"
-							aria-label={ "Switch to project " + project.Name }
-						>
-							// Determine process type for unified status
-							if project.WatchRunning {
-								@UniversalStatusDot(true, "watch", "sm", false)
-							} else if project.FTLRunning {
-								@UniversalStatusDot(true, "regular", "sm", false)
-							} else {
-								@UniversalStatusDot(false, "", "sm", false)
-							}
-							<span class="project-name ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
-						</button>
-						<button 
-							hx-delete={ "/htmx/project/remove?path=" + project.Path }
-							hx-target="#project-list"
-							hx-swap="innerHTML"
-							hx-confirm="Remove this project?"
-							class="text-red-400 hover:text-red-300 text-xs ml-2"
-							aria-label={ "Remove project " + project.Name }
-						>
-							×
-						</button>
-					</div>
-				</div>
-			}
+			@components.SidebarProjectButton(components.SidebarProjectButtonConfig{
+				Project:  components.Project{
+					Name:         project.Name,
+					Path:         project.Path,
+					Status:       project.Status,
+					LastUpdated:  project.LastUpdated,
+					FTLRunning:   project.FTLRunning,
+					WatchRunning: project.WatchRunning,
+				},
+				IsActive: project.Path == currentProjectPath,
+				Disabled: false,
+			})
 		}
 		
 		<!-- Add Project Button/Form -->
@@ -165,68 +101,18 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 templ ProjectListContents(projects []Project, currentProjectPath string) {
 	<!-- Render existing projects -->
 	for _, project := range projects {
-		if project.Path == currentProjectPath {
-			<div class="project-item project-item-active px-3 py-2 text-sm rounded-md" data-project-name={ project.Name } data-project-path={ project.Path } style={ fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"]) }>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center">
-						// Determine process type for unified status
-						if project.WatchRunning {
-							@UniversalStatusDot(true, "watch", "sm", false)
-						} else if project.FTLRunning {
-							@UniversalStatusDot(true, "regular", "sm", false)
-						} else {
-							@UniversalStatusDot(false, "", "sm", false)
-						}
-						<span class="project-name ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.Primary.Text) }>{ project.Name }</span>
-					</div>
-					<button 
-						hx-delete={ "/htmx/project/remove?path=" + project.Path }
-						hx-target="#project-list"
-						hx-swap="innerHTML"
-						hx-confirm="Remove this project?"
-						class="text-red-400 hover:text-red-300 text-xs"
-						aria-label={ "Remove project " + project.Name }
-					>
-						×
-					</button>
-				</div>
-			</div>
-		} else {
-			<div 
-				class="project-item project-item-inactive px-3 py-2 text-sm rounded-md transition-all duration-200 cursor-pointer" 
-				data-project-name={ project.Name } 
-				data-project-path={ project.Path }>
-				<div class="flex items-center justify-between">
-					<button 
-						hx-post={ "/htmx/project/switch?path=" + project.Path }
-						hx-target="#main-container"
-						hx-swap="innerHTML"
-						class="flex-1 text-left flex items-center"
-						aria-label={ "Switch to project " + project.Name }
-					>
-						// Determine process type for unified status
-						if project.WatchRunning {
-							@UniversalStatusDot(true, "watch", "sm", false)
-						} else if project.FTLRunning {
-							@UniversalStatusDot(true, "regular", "sm", false)
-						} else {
-							@UniversalStatusDot(false, "", "sm", false)
-						}
-						<span class="project-name ml-2" style={ fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]) }>{ project.Name }</span>
-					</button>
-					<button 
-						hx-delete={ "/htmx/project/remove?path=" + project.Path }
-						hx-target="#project-list"
-						hx-swap="innerHTML"
-						hx-confirm="Remove this project?"
-						class="text-red-400 hover:text-red-300 text-xs ml-2"
-						aria-label={ "Remove project " + project.Name }
-					>
-						×
-					</button>
-				</div>
-			</div>
-		}
+		@components.SidebarProjectButton(components.SidebarProjectButtonConfig{
+			Project:  components.Project{
+				Name:         project.Name,
+				Path:         project.Path,
+				Status:       project.Status,
+				LastUpdated:  project.LastUpdated,
+				FTLRunning:   project.FTLRunning,
+				WatchRunning: project.WatchRunning,
+			},
+			IsActive: project.Path == currentProjectPath,
+			Disabled: false,
+		})
 	}
 	
 	<!-- Add Project Button/Form -->

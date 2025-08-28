@@ -5,7 +5,7 @@ const path = require('path');
 
 // Try to load dynamic test config if available
 let baseURL = 'http://localhost:8080';
-const testConfigPath = path.join(__dirname, 'e2e-tests', '.test-config.json');
+const testConfigPath = path.join(__dirname, 'ui', '.test-config.json');
 if (fs.existsSync(testConfigPath)) {
   const config = JSON.parse(fs.readFileSync(testConfigPath, 'utf8'));
   baseURL = config.baseURL || baseURL;
@@ -16,7 +16,7 @@ if (fs.existsSync(testConfigPath)) {
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
-  testDir: './e2e-tests/e2e/specs',
+  testDir: './ui/e2e/specs',
   timeout: 30 * 1000,
   expect: {
     timeout: 5000
@@ -30,8 +30,8 @@ module.exports = defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['list']
   ],
-  globalSetup: './e2e-tests/global-setup.js',
-  globalTeardown: './e2e-tests/global-teardown.js',
+  globalSetup: './ui/global-setup.js',
+  globalTeardown: './ui/global-teardown.js',
   use: {
     baseURL,
     trace: 'on-first-retry',

@@ -1,0 +1,52 @@
+{
+  "colors": {
+    "button_bg": "#4a4a4a",
+    "button_bg_hover": "#5a5a5a", 
+    "button_border": "#5a5a5a",
+    "border_hover": "#6a6a6a",
+    "panel_bg": "#333333",
+    "sidebar_bg": "#1e1e1e",
+    "primary_text": "#ffffff",
+    "muted_text": "#a0a0a0",
+    "secondary_text": "#666666",
+    "status_dots": {
+      "running": "#22c55e",
+      "watching": "#3b82f6", 
+      "stopped": "#666666"
+    },
+    "accents": {
+      "blue": "#3b82f6",
+      "red": "#ef4444"
+    }
+  },
+  "rgbColors": {
+    "button_bg": "rgb(74, 74, 74)",
+    "button_bg_hover": "rgb(90, 90, 90)",
+    "button_border": "rgb(90, 90, 90)", 
+    "border_hover": "rgb(106, 106, 106)",
+    "status_dots": {
+      "running": "rgb(34, 197, 94)",
+      "watching": "rgb(59, 130, 246)",
+      "stopped": "rgb(102, 102, 102)"
+    }
+  },
+  "transforms": {
+    "hover_translateY": "translateY(-1px)",
+    "normal_translateY": "translateY(0px)"
+  },
+  "timing": {
+    "hover_duration": "200ms",
+    "max_hover_response_time": 50,
+    "polling_intervals": {
+      "status": 1000,
+      "logs": 500
+    }
+  },
+  "cssClasses": {
+    "baseButton": "ftl_control",
+    "projectItemActive": "project-item-active", 
+    "projectItemInactive": "project-item-inactive",
+    "statusDot": "status-dot",
+    "projectName": "project-name"
+  }
+}
