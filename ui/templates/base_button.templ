@@ -1,0 +1,71 @@
+package templates
+
+import (
+    "fmt"
+    ui "github.com/fastertools/ftl/ui/gen"
+)
+
+// BaseButtonConfig defines the configuration for base buttons
+type BaseButtonConfig struct {
+    Type        string  // "submit", "button"
+    Content     string  // Button text/content
+    HTMX        *HTMXConfig
+    Disabled    bool
+    ExtraClasses string
+}
+
+type HTMXConfig struct {
+    Post        string
+    Target      string
+    Swap        string
+    Trigger     string
+    Vals        string
+    OnRequest   string // JavaScript to run before request
+}
+
+// Unified hover handlers for all buttons
+script handleUnifiedHover(event templ.JSExpression, bgColor, borderColor string) {
+    event.target.style.backgroundColor = bgColor;
+    event.target.style.borderColor = borderColor;
+    event.target.style.transform = 'translateY(-1px)';
+}
+
+script handleUnifiedOut(event templ.JSExpression, bgColor, borderColor string) {
+    event.target.style.backgroundColor = bgColor;
+    event.target.style.borderColor = borderColor;
+    event.target.style.transform = 'translateY(0)';
+}
+
+templ BaseButton(config BaseButtonConfig) {
+    <button 
+        type={config.Type}
+        class={ui.CSSClasses.Buttons["ftl_control"] + " " + config.ExtraClasses}
+        onmouseover={handleUnifiedHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])}
+        onmouseout={handleUnifiedOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])}
+        style={fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["button_border"])}
+        if config.HTMX != nil {
+            if config.HTMX.Post != "" {
+                hx-post={config.HTMX.Post}
+            }
+            if config.HTMX.Target != "" {
+                hx-target={config.HTMX.Target}
+            }
+            if config.HTMX.Swap != "" {
+                hx-swap={config.HTMX.Swap}
+            }
+            if config.HTMX.Trigger != "" {
+                hx-trigger={config.HTMX.Trigger}
+            }
+            if config.HTMX.Vals != "" {
+                hx-vals={config.HTMX.Vals}
+            }
+            if config.HTMX.OnRequest != "" {
+                hx-on::before-request={config.HTMX.OnRequest}
+            }
+        }
+        if config.Disabled {
+            disabled
+        }>
+        {config.Content}
+    </button>
+}

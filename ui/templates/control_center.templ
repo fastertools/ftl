@@ -59,29 +59,35 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 				<div class={ ui.CSSClasses.Components["control_panel"] } style={ fmt.Sprintf("background-color: %s; border: 1px solid %s;", ui.Colors.UI["panel_bg"], ui.Colors.UI["border_primary"]) }>
 					<div class={ ui.CSSClasses.Components["grid_3_cols"] }>
 						<!-- Build Button -->
-						<form hx-post="/mcp" 
-							hx-target="#ftl-output"
-							hx-swap="beforeend"
-							hx-on::before-request={ addBuildMessage() }>
+						<form>
 							<input type="hidden" name="action" value="build"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
-							@components.BaseButton(components.BaseButtonConfig{
+							@BaseButton(BaseButtonConfig{
 								Type: "submit",
 								Content: "Build",
+								HTMX: &HTMXConfig{
+									Post: "/mcp",
+									Target: "#ftl-output", 
+									Swap: "beforeend",
+									OnRequest: "addBuildMessage()",
+								},
 							})
 						</form>
 						
 						<!-- Up (Regular Mode) Button -->
-						<form hx-post="/mcp" 
-							hx-target="#ftl-output"
-							hx-swap="beforeend"
-							hx-on::before-request={ addUpMessage() }>
+						<form>
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="regular"/>
-							@components.BaseButton(components.BaseButtonConfig{
+							@BaseButton(BaseButtonConfig{
 								Type: "submit",
 								Content: "Up",
+								HTMX: &HTMXConfig{
+									Post: "/mcp",
+									Target: "#ftl-output", 
+									Swap: "beforeend",
+									OnRequest: "addUpMessage()",
+								},
 							})
 						</form>
 						
