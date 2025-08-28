@@ -10,7 +10,6 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
-	"github.com/fastertools/ftl/ui/components"
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
@@ -117,7 +116,7 @@ func AddProjectButton() templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("color: %s;", ui.Colors.UI["muted_text"]))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 68, Col: 149}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/templates/project_form.templ`, Line: 67, Col: 149}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -158,17 +157,11 @@ func ProjectList(projects []Project, currentProjectPath string) templ.Component 
 			return templ_7745c5c3_Err
 		}
 		for _, project := range projects {
-			templ_7745c5c3_Err = components.SidebarProjectButton(components.SidebarProjectButtonConfig{
-				Project: components.Project{
-					Name:         project.Name,
-					Path:         project.Path,
-					Status:       project.Status,
-					LastUpdated:  project.LastUpdated,
-					FTLRunning:   project.FTLRunning,
-					WatchRunning: project.WatchRunning,
-				},
-				IsActive: project.Path == currentProjectPath,
-				Disabled: false,
+			templ_7745c5c3_Err = SidebarProjectButton(SidebarProjectButtonConfig{
+				Project:     project,
+				IsSelected:  project.Path == currentProjectPath,
+				IsActive:    project.FTLRunning || project.WatchRunning,
+				ProcessType: DetermineProcessType(project.FTLRunning, project.WatchRunning),
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -217,17 +210,11 @@ func ProjectListContents(projects []Project, currentProjectPath string) templ.Co
 			return templ_7745c5c3_Err
 		}
 		for _, project := range projects {
-			templ_7745c5c3_Err = components.SidebarProjectButton(components.SidebarProjectButtonConfig{
-				Project: components.Project{
-					Name:         project.Name,
-					Path:         project.Path,
-					Status:       project.Status,
-					LastUpdated:  project.LastUpdated,
-					FTLRunning:   project.FTLRunning,
-					WatchRunning: project.WatchRunning,
-				},
-				IsActive: project.Path == currentProjectPath,
-				Disabled: false,
+			templ_7745c5c3_Err = SidebarProjectButton(SidebarProjectButtonConfig{
+				Project:     project,
+				IsSelected:  project.Path == currentProjectPath,
+				IsActive:    project.FTLRunning || project.WatchRunning,
+				ProcessType: DetermineProcessType(project.FTLRunning, project.WatchRunning),
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

@@ -3,7 +3,6 @@ package templates
 import (
 	"fmt"
 	ui "github.com/fastertools/ftl/ui/gen"
-	"github.com/fastertools/ftl/ui/components"
 )
 
 script addBuildMessage() {
@@ -22,7 +21,7 @@ script addWatchMessage() {
 
 // ControlCenter combines status monitoring and control functionality into a unified panel
 templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) {
-	<div>
+	<div data-testid="control-center">
 		<h2 class={ ui.CSSClasses.Components["heading_lg"] }>{ ui.WebUI.Titles["control_center"] }</h2>
 		
 		<div class={ ui.CSSClasses.Components["space_y_4"] }>
@@ -69,7 +68,7 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 									Post: "/mcp",
 									Target: "#ftl-output", 
 									Swap: "beforeend",
-									OnRequest: "addBuildMessage()",
+									OnRequest: addBuildMessage(),
 								},
 							})
 						</form>
@@ -86,22 +85,25 @@ templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus S
 									Post: "/mcp",
 									Target: "#ftl-output", 
 									Swap: "beforeend",
-									OnRequest: "addUpMessage()",
+									OnRequest: addUpMessage(),
 								},
 							})
 						</form>
 						
 						<!-- Up (Watch Mode) Button -->
-						<form hx-post="/mcp" 
-							hx-target="#ftl-output"
-							hx-swap="beforeend"
-							hx-on::before-request={ addWatchMessage() }>
+						<form>
 							<input type="hidden" name="action" value="up"/>
 							<input type="hidden" name="project-path" value={ project.Path }/>
 							<input type="hidden" name="mode" value="watch"/>
-							@components.BaseButton(components.BaseButtonConfig{
+							@BaseButton(BaseButtonConfig{
 								Type: "submit",
 								Content: "Watch",
+								HTMX: &HTMXConfig{
+									Post: "/mcp",
+									Target: "#ftl-output",
+									Swap: "beforeend",
+									OnRequest: addWatchMessage(),
+								},
 							})
 						</form>
 					</div>

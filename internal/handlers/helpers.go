@@ -44,3 +44,13 @@ func GetProjectStatus(ftlRunning, watchRunning bool) string {
 	}
 	return "Stopped"
 }
+
+// convertToSidebarConfig converts project data to SidebarProjectButtonConfig format
+func convertToSidebarConfig(project templates.Project, current string, processStatus templates.ProcessStatus) templates.SidebarProjectButtonConfig {
+	return templates.SidebarProjectButtonConfig{
+		Project:     project,
+		IsSelected:  project.Path == current,
+		IsActive:    processStatus.FTLRunning || processStatus.WatchRunning,
+		ProcessType: templates.DetermineProcessType(processStatus.FTLRunning, processStatus.WatchRunning),
+	}
+}

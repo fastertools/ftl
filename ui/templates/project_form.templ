@@ -3,7 +3,6 @@ package templates
 import (
 	"fmt"
 	ui "github.com/fastertools/ftl/ui/gen"
-	"github.com/fastertools/ftl/ui/components"
 )
 
 
@@ -78,17 +77,11 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 	<div id="project-list" class="space-y-1">
 		<!-- Render existing projects -->
 		for _, project := range projects {
-			@components.SidebarProjectButton(components.SidebarProjectButtonConfig{
-				Project:  components.Project{
-					Name:         project.Name,
-					Path:         project.Path,
-					Status:       project.Status,
-					LastUpdated:  project.LastUpdated,
-					FTLRunning:   project.FTLRunning,
-					WatchRunning: project.WatchRunning,
-				},
-				IsActive: project.Path == currentProjectPath,
-				Disabled: false,
+			@SidebarProjectButton(SidebarProjectButtonConfig{
+				Project: project,
+				IsSelected: project.Path == currentProjectPath,
+				IsActive: project.FTLRunning || project.WatchRunning,
+				ProcessType: DetermineProcessType(project.FTLRunning, project.WatchRunning),
 			})
 		}
 		
@@ -101,17 +94,11 @@ templ ProjectList(projects []Project, currentProjectPath string) {
 templ ProjectListContents(projects []Project, currentProjectPath string) {
 	<!-- Render existing projects -->
 	for _, project := range projects {
-		@components.SidebarProjectButton(components.SidebarProjectButtonConfig{
-			Project:  components.Project{
-				Name:         project.Name,
-				Path:         project.Path,
-				Status:       project.Status,
-				LastUpdated:  project.LastUpdated,
-				FTLRunning:   project.FTLRunning,
-				WatchRunning: project.WatchRunning,
-			},
-			IsActive: project.Path == currentProjectPath,
-			Disabled: false,
+		@SidebarProjectButton(SidebarProjectButtonConfig{
+			Project: project,
+			IsSelected: project.Path == currentProjectPath,
+			IsActive: project.FTLRunning || project.WatchRunning,
+			ProcessType: DetermineProcessType(project.FTLRunning, project.WatchRunning),
 		})
 	}
 	

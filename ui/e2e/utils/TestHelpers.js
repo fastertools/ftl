@@ -83,14 +83,14 @@ class TestHelpers {
                     cwd: testPath,
                     stdio: 'ignore' // Suppress output
                 });
-            } catch (error) {
-                // If ftl init fails, create a minimal ftl.toml manually
-                const ftlTomlContent = `name = "${path.basename(testPath)}"
 
-[runtime]
-language = "go"
-`;
-                fs.writeFileSync(path.join(testPath, 'ftl.toml'), ftlTomlContent);
+                execSync(`cd ${projectName} && ../bin/ftl add ${projectName}-tool -l rust`, { 
+                    cwd: testPath,
+                    stdio: 'ignore' // Suppress output
+                });
+                
+            } catch (error) {
+                throw new Error(`ftl init failed with: ${error}`)
             }
         }
     }

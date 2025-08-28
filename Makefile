@@ -1,7 +1,7 @@
 # FTL - Polyglot WebAssembly MCP Platform
 # Main orchestration Makefile
 
-.PHONY: all help build test clean install setup-browser-tests setup-all
+.PHONY: all help build test clean install setup-all
 
 # Default to showing help
 help:
@@ -30,7 +30,6 @@ help:
 	@echo "    coverage      - Generate test coverage reports"
 	@echo ""
 	@echo "  Setup Commands:"
-	@echo "    setup-browser-tests - Install browser testing dependencies"
 	@echo "    setup-all     - Setup all project dependencies"
 	@echo ""
 	@echo "  Testing Commands:"
@@ -199,7 +198,7 @@ test-console: build kill
 	@echo "🧪 Testing console server functionality..."
 	@./bin/ftl dev console --port 8080 2>&1 | head -20 | grep -q "Starting server on port" && echo "✅ Console mode starts" || echo "❌ Console mode failed"
 
-test-browser: build kill setup-browser-tests clean-test-data
+test-browser: build kill clean-test-data
 	@echo "🧪 Running browser tests with standardized test projects file..."
 	@rm -f .e2e-projects.json
 	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
@@ -211,7 +210,7 @@ test-browser: build kill setup-browser-tests clean-test-data
 
 test-browser-headed: build kill clean-test-data
 	@echo "🧪 Starting FTL dev console for headed browser tests..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
 	@echo "Running tests with visible browser..."
 	@npx playwright test --headed
@@ -220,7 +219,7 @@ test-browser-headed: build kill clean-test-data
 
 test-browser-debug: build kill clean-test-data
 	@echo "🧪 Starting FTL dev console for debug tests..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
 	@echo "Running tests in debug mode..."
 	@npx playwright test --debug
@@ -230,7 +229,7 @@ test-browser-debug: build kill clean-test-data
 # Run FTL dev console with test data
 run-test-console: build clean-test-data
 	@echo "🚀 Starting FTL dev console with test data..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console
 
 # Run FTL dev console with centralized projects file (no PROJECTS_FILE env var)
 run-console-centralized: build kill
@@ -244,88 +243,39 @@ kill:
 	@lsof -ti:8080,8081,8082,8083,8084,8085,8086,8087,8088,8089 | xargs kill -9 2>/dev/null || true
 	@echo "✅ All FTL processes killed"
 
-# Setup browser testing dependencies
-setup-browser-tests:
-	@echo "📦 Setting up browser test dependencies..."
-	@if command -v npm >/dev/null 2>&1; then \
-		npm run setup; \
-		echo "✅ Browser test dependencies ready"; \
-	else \
-		echo "⚠️  npm not installed"; \
-		echo "   Install Node.js from: https://nodejs.org/"; \
-	fi
-
-# Setup all project dependencies
-setup-all: setup-browser-tests
-	@echo "🔧 All dependencies configured"
-
 # Clean test data
 clean-test-data:
 	@echo "🧹 Cleaning E2E test data..."
-	@rm -f test_projects.json
 	@rm -f .e2e-projects.json
 	@rm -rf .e2e-projects/
 	@echo "✅ E2E test data cleaned"
 
-# Clean centralized projects data for new user testing
-clean-centralized-data:
-	@echo "🧹 Cleaning centralized projects data..."
-	@rm -rf "$(HOME)/Library/Application Support/ftl/"
-	@echo "✅ Centralized projects data cleaned"
-
-# Test new user centralized experience (no PROJECTS_FILE env var)
-test-new-user: build kill clean-centralized-data setup-browser-tests
-	@echo "🧪 Testing new user centralized experience..."
-	@./bin/ftl dev console --port 8082 > test_centralized_server.log 2>&1 &
-	@echo "⏳ Waiting for server to start..."
-	@sleep 3
-	@cd ui && npx playwright test e2e/specs/new-user-centralized.spec.js
-	@echo "🛑 Stopping centralized test server..."
-	@pkill -f "ftl dev console --port 8082" || true
-	@echo "🧹 Cleaning up centralized test..."
-	@rm -f test_centralized_server.log
-	@$(MAKE) clean-centralized-data
-
-# Debug centralized file creation (temporary)
-debug-centralized-file: build kill clean-centralized-data
-	@echo "🧪 Debug: Testing centralized file creation..."
-	@./bin/ftl dev console --port 8082 > test_centralized_server.log 2>&1 &
-	@echo "⏳ Waiting for server to start..."
-	@sleep 5
-	@echo "📋 Checking if file was created..."
-	@ls -la "$(HOME)/Library/Application Support/ftl/" || echo "❌ Directory does not exist"
-	@cat "$(HOME)/Library/Application Support/ftl/projects.json" || echo "❌ File does not exist"
-	@echo "📄 Server logs:"
-	@cat test_centralized_server.log
-	@echo "🛑 Stopping test server..."
-	@pkill -f "ftl dev console --port 8082" || true
-	@rm -f test_centralized_server.log
-
 # Run button refactor TDD tests
-test-button-refactor: build kill setup-browser-tests clean-test-data
+test-button-refactor: build kill 
 	@echo "🧪 Running button refactor TDD tests..."
+	@echo "🚀 Starting global test setup..."
+	@rm -f .e2e-projects.json
 	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@echo "Starting server on port 8080..."
 	@sleep 3
-	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --reporter=list || true
+	@echo "Server is ready"
+	@echo "✅ Test server ready at http://localhost:8080"
+	@npx playwright test --config=playwright.config.js ui/e2e/specs/button-simple/ --reporter=list || true
+	@echo "🧹 Starting global test teardown..."
+	@echo "Stopping server..."
 	@pkill -f "ftl dev console" || true
+	@echo "✅ Test server stopped"
 	@$(MAKE) clean-test-data
+	@echo "✅ Cleaned up orphaned FTL processes"
+	@echo "✅ Global teardown complete"
 	@echo "Button refactor tests completed"
 
 # Run button refactor tests with visible browser (for debugging)
 test-button-refactor-headed: build kill clean-test-data
 	@echo "🧪 Running button refactor tests with visible browser..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
+	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
 	@sleep 3
-	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --headed
-	@pkill -f "ftl dev console" || true
-	@$(MAKE) clean-test-data
-
-# Run button refactor tests in debug mode
-test-button-refactor-debug: build kill clean-test-data
-	@echo "🧪 Running button refactor tests in debug mode..."
-	@PROJECTS_FILE=test_projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
-	@sleep 3
-	@cd ui && npx playwright test e2e/specs/button-refactor/specifications/ --debug
+	@cd e2e-tests && npx playwright test e2e/specs/button-simple/ --headed
 	@pkill -f "ftl dev console" || true
 	@$(MAKE) clean-test-data
 

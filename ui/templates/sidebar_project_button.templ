@@ -1,0 +1,141 @@
+package templates
+
+import (
+	"fmt"
+	ui "github.com/fastertools/ftl/ui/gen"
+)
+
+// SidebarProjectButtonConfig extends base functionality for project management buttons
+// in the sidebar. This component handles project selection, status display, and removal.
+//
+// Features:
+//   - Unified hover behavior consistent with BaseButton 
+//   - Integrated status dots using UniversalStatusDot
+//   - HTMX project switching via button click
+//   - Project removal functionality 
+//   - Visual selection highlighting
+//   - Process status indication (regular/watch/stopped)
+//
+// Usage:
+//   @SidebarProjectButton(SidebarProjectButtonConfig{
+//       Project:     project,
+//       IsSelected:  project.Path == currentPath,
+//       IsActive:    processStatus.FTLRunning || processStatus.WatchRunning,
+//       ProcessType: DetermineProcessType(processStatus.FTLRunning, processStatus.WatchRunning),
+//   })
+type SidebarProjectButtonConfig struct {
+	Project     Project  // Project data (name, path, etc.)
+	IsSelected  bool     // Whether this project is currently selected
+	IsActive    bool     // Whether any process is running for this project
+	ProcessType string   // Process type: "regular", "watch", or "" for stopped
+}
+
+templ SidebarProjectButton(config SidebarProjectButtonConfig) {
+	<div 
+		data-testid="project-button"
+		data-active={fmt.Sprintf("%t", config.IsActive)}
+		data-project-name={config.Project.Name}
+		class={getSidebarProjectClasses(config)}
+		style={getSidebarProjectStyles(config)}>
+		
+		<div class="flex items-center justify-between">
+			<!-- Unified project content with integrated status dot and HTMX -->
+			<button 
+				type="button"
+				class={getSidebarProjectButtonClasses(config)}
+				if !config.IsSelected {
+					hx-post={fmt.Sprintf("/htmx/project/switch?path=%s", config.Project.Path)}
+					hx-target="#main-container"
+					hx-swap="innerHTML"
+				}
+				onmouseover={handleSidebarProjectHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"], ui.Colors.UI["border_hover"])}
+				onmouseout={handleSidebarProjectOut(templ.JSExpression("event"), getSidebarProjectBgColor(config), ui.Colors.UI["button_border"])}>
+				@UniversalStatusDot(config.IsActive, config.ProcessType, "sm", false)
+				<span>{config.Project.Name}</span>
+			</button>
+			
+			<!-- Remove button (unchanged) -->
+			<button 
+				hx-delete={fmt.Sprintf("/htmx/project/remove?path=%s", config.Project.Path)}
+				hx-target="#project-list"
+				hx-swap="innerHTML"
+				class="text-red-400 hover:text-red-300 text-xs ml-2">
+				×
+			</button>
+		</div>
+	</div>
+}
+
+// Helper functions
+func getSidebarProjectClasses(config SidebarProjectButtonConfig) string {
+	baseClasses := "project-item mb-2 rounded-lg p-3"
+	if config.IsSelected {
+		return baseClasses + " border-l-4 border-blue-400"
+	}
+	return baseClasses
+}
+
+func getSidebarProjectStyles(config SidebarProjectButtonConfig) string {
+	if config.IsSelected {
+		return fmt.Sprintf("background-color: %s;", ui.Colors.UI["panel_bg"])
+	}
+	return fmt.Sprintf("background-color: %s;", ui.Colors.UI["button_bg"])
+}
+
+func getSidebarProjectBgColor(config SidebarProjectButtonConfig) string {
+	if config.IsSelected {
+		return ui.Colors.UI["panel_bg"]
+	}
+	return ui.Colors.UI["button_bg"]
+}
+
+func getSidebarProjectButtonClasses(config SidebarProjectButtonConfig) string {
+	baseClasses := "flex-1 text-left flex items-center space-x-3 text-white font-medium bg-transparent border-0 p-0"
+	if config.IsSelected {
+		return baseClasses + " cursor-default opacity-75"  // Show it's selected/disabled
+	}
+	return baseClasses + " cursor-pointer"
+}
+
+
+// Custom hover handlers for sidebar project buttons
+// These target the parent container div, not the button itself
+script handleSidebarProjectHover(event templ.JSExpression, bgColor, borderColor string) {
+    // Find the parent container with data-testid="project-button"
+    const container = event.target.closest('[data-testid="project-button"]');
+    if (container) {
+        container.style.backgroundColor = bgColor;
+        // Only override border color if not selected (preserve blue border from CSS classes)
+        if (!container.classList.contains('border-l-4')) {
+            container.style.borderColor = borderColor;
+        }
+        container.style.transform = 'translateY(-1px)';
+    }
+}
+
+script handleSidebarProjectOut(event templ.JSExpression, bgColor, borderColor string) {
+    // Find the parent container with data-testid="project-button"
+    const container = event.target.closest('[data-testid="project-button"]');
+    if (container) {
+        container.style.backgroundColor = bgColor;
+        // Only override border color if not selected (preserve blue border from CSS classes)
+        if (!container.classList.contains('border-l-4')) {
+            container.style.borderColor = borderColor;
+        } else {
+            // For selected items, remove inline border-color to let CSS classes take effect
+            container.style.borderColor = '';
+        }
+        container.style.transform = 'translateY(0)';
+    }
+}
+
+// Canonical process type determination using Cue-defined process states
+// This function works with any struct that has FTLRunning and WatchRunning bool fields
+func DetermineProcessType(ftlRunning bool, watchRunning bool) string {
+	if watchRunning {
+		return "watch"    // Maps to Cue ProcessColorSchemes.watch (blue #3b82f6)
+	} else if ftlRunning {
+		return "regular"  // Maps to Cue ProcessColorSchemes.regular (green #22c55e)  
+	}
+	return ""             // Maps to Cue ProcessColorSchemes.stopped (gray #666666)
+}

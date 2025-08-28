@@ -75,27 +75,16 @@ func getBaseCSS() string {
 		.status-stopped { background-color: %s; }
 		.status-warning { background-color: %s; }
 		
-		.project-item-inactive {
-			background-color: %s;
-		}
-		
-		.project-item-inactive:hover,
-		.project-item-inactive:has(button:hover) {
-			background-color: %s !important;
-			transform: translateY(-2px);
-		}
 	`,
-		ui.Colors.Primary.BG,            // body background
-		ui.Colors.Primary.Text,          // body text
-		ui.Colors.UI["panel_bg"],        // panel background
-		ui.Colors.UI["border_primary"],  // panel border
-		ui.Colors.UI["sidebar_bg"],      // sidebar background
-		ui.Colors.UI["border_primary"],  // sidebar border
-		ui.Colors.Status["running"],     // status running
-		ui.Colors.Status["error"],       // status stopped (error)
-		ui.Colors.Status["warning"],     // status warning
-		ui.Colors.UI["button_bg"],       // project item background (match Control Center buttons)
-		ui.Colors.UI["button_bg_hover"], // project item hover background
+		ui.Colors.Primary.BG,           // body background
+		ui.Colors.Primary.Text,         // body text
+		ui.Colors.UI["panel_bg"],       // panel background
+		ui.Colors.UI["border_primary"], // panel border
+		ui.Colors.UI["sidebar_bg"],     // sidebar background
+		ui.Colors.UI["border_primary"], // sidebar border
+		ui.Colors.Status["running"],    // status running
+		ui.Colors.Status["error"],      // status stopped (error)
+		ui.Colors.Status["warning"],    // status warning
 	)
 }
 
