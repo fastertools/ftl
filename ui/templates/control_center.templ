@@ -6,18 +6,6 @@ import (
 	"github.com/fastertools/ftl/ui/components"
 )
 
-script handleCenterHover(event templ.JSExpression, bgColor, borderColor string) {
-	event.target.style.backgroundColor = bgColor;
-	event.target.style.borderColor = borderColor;
-	event.target.style.transform = 'translateY(-1px)';
-}
-
-script handleCenterOut(event templ.JSExpression, bgColor, borderColor string) {
-	event.target.style.backgroundColor = bgColor;
-	event.target.style.borderColor = borderColor;
-	event.target.style.transform = 'translateY(0)';
-}
-
 script addBuildMessage() {
 	document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div style="color: #3b82f6">[' + new Date().toTimeString().slice(0,8) + '] Sending build command...</div>');
 }
