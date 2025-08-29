@@ -1,10 +1,14 @@
 import { test, expect, Page, Locator } from '@playwright/test';
+import TestHelpers from '../../utils/test-helpers';
 
 test.describe('Shared Button Behavior', () => {
   test.beforeEach(async ({ page }: { page: Page }) => {
-    // Initialize test data with multiple projects for sidebar testing
-    await TestDataManager.initialize('multiple', { count: 3 });
-    await page.goto('/');
+    // Initialize test environment with multiple projects for sidebar testing
+    const projectSetup = await TestHelpers.setupMultipleProjects();
+    await page.goto(projectSetup.baseUrl);
+    
+    // Use enhanced HTMX waiting instead of waitForSelector
+    await TestHelpers.waitForHTMX(page, { timeout: 10000 });
     await page.waitForSelector('[data-testid="control-center"]', { timeout: 10000 });
     await page.waitForSelector('[data-testid="sidebar"]', { timeout: 10000 });
   });

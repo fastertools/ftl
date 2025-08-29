@@ -1,10 +1,14 @@
 import { test, expect, Page } from '@playwright/test';
+import TestHelpers from '../../utils/test-helpers';
 
 test.describe('Control Center Buttons', () => {
   test.beforeEach(async ({ page }: { page: Page }) => {
-    // Initialize test data with a single project for control center testing
-    await TestDataManager.initialize('single');
-    await page.goto('/');
+    // Initialize test environment with a single project for control center testing
+    const projectSetup = await TestHelpers.setupSingleProject();
+    await page.goto(projectSetup.baseUrl);
+    
+    // Use enhanced HTMX waiting instead of waitForSelector
+    await TestHelpers.waitForHTMX(page, { timeout: 10000 });
     await page.waitForSelector('[data-testid="control-center"]', { timeout: 10000 });
   });
 

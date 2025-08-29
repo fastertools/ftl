@@ -10,6 +10,7 @@ import (
 	"github.com/fastertools/ftl/mcp-server/tools/lifecycle"
 	"github.com/fastertools/ftl/mcp-server/tools/operations"
 	processtools "github.com/fastertools/ftl/mcp-server/tools/process"
+	"github.com/fastertools/ftl/mcp-server/tools/project"
 	"github.com/fastertools/ftl/mcp-server/tools/testing"
 )
 
@@ -114,6 +115,9 @@ func (r *Registry) RegisterAll() {
 		Description: "Get logs from running watch process",
 	}, logsHandler.Handle)
 	
+	// Register project management tools (standard tools)
+	r.registerProjectTools()
+	
 	// Register process management tools
 	r.registerProcessTools()
 	
@@ -121,6 +125,24 @@ func (r *Registry) RegisterAll() {
 	if r.testMode {
 		r.registerTestTools()
 	}
+}
+
+// registerProjectTools registers project management tools (init, add, etc.)
+func (r *Registry) registerProjectTools() {
+	// Create project tool handlers
+	initHandler := project.NewInitHandler(r.ftlCommander)
+	addHandler := project.NewAddHandler(r.ftlCommander)
+	
+	// Register project management tools
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__init",
+		Description: "Initialize a new FTL project",
+	}, initHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__add",
+		Description: "Add a tool to an FTL project",
+	}, addHandler.Handle)
 }
 
 // registerProcessTools registers cross-platform process management tools

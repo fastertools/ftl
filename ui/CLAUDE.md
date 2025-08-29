@@ -9,7 +9,7 @@ The FTL UI is the web-based development console that provides real-time monitori
 This is a **self-contained console** that runs as part of the main FTL binary:
 
 1. **Console Launch**: `ftl dev console` starts the web server
-2. **MCP Integration**: Console creates MCP client that calls back to itself (`os.Args[0]`) with `dev mcp` subcommand  
+2. **MCP Integration**: Console creates MCP client that calls back to itself via internal stdio calls OR HTMX endpoints 
 3. **Tool Operations**: HTMX frontend calls MCP tools for build/deploy/status operations
 4. **File System Changes**: MCP tools call the same FTL binary for actual filesystem operations
 

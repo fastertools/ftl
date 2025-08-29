@@ -8,21 +8,12 @@ The MCP (Model Context Protocol) server is **embedded within the main FTL binary
 
 ### Single Binary Architecture
 - **ONE BINARY**: Everything runs as part of the same `./bin/ftl` executable
-- **Self-Reference**: Console calls itself via `os.Args[0]` with MCP subcommand
 - **Tool Chain**: MCP tools call the same binary for filesystem operations
 
 ### Call Flow
 ```
-Console (ftl dev console) 
-    ↓ creates MCP client
-    ↓ calls os.Args[0] ["dev", "mcp", "--ftl-path", "/path/to/self"]
-    ↓
-MCP Server (same binary, MCP mode)
-    ↓ handles MCP tool calls
-    ↓ calls configured FTL binary (usually self)  
-    ↓
-FTL Operations (same binary, CLI mode)
-    ↓ performs actual filesystem changes
+
+
 ```
 
 ## MCP Tool Configuration
@@ -44,6 +35,7 @@ type ToolConfig struct {
 ### Core Tools (`tools/`)
 - **lifecycle/**: `up`, `stop`, `status` - Process lifecycle management
 - **operations/**: `build`, `components`, `logs` - Build and deployment operations  
+- **project/**: `init`, `add` - Project management and tool installation
 - **process/**: Cross-platform process management utilities
 - **testing/**: Test-specific tools (enabled with `--test-mode`)
 

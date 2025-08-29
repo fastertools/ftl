@@ -3,9 +3,12 @@ import TestHelpers from '../../utils/test-helpers';
 
 test.describe('Sidebar Project Buttons', () => {
   test.beforeEach(async ({ page }: { page: Page }) => {
-    // Initialize test data with multiple projects for sidebar testing
-    await TestDataManager.initialize('multiple', { count: 3 });
-    await page.goto('/');
+    // Initialize test environment with multiple projects for sidebar testing
+    const projectSetup = await TestHelpers.setupMultipleProjects();
+    await page.goto(projectSetup.baseUrl);
+    
+    // Use enhanced HTMX waiting instead of waitForSelector
+    await TestHelpers.waitForHTMX(page, { timeout: 10000 });
     await page.waitForSelector('[data-testid="sidebar"]', { timeout: 10000 });
   });
 
@@ -64,7 +67,7 @@ test.describe('Sidebar Project Buttons', () => {
     
     // Skip if no inactive projects to click
     if (await inactiveProject.count() === 0) {
-      test.skip('No inactive projects available for switching test');
+      test.skip(true, 'No inactive projects available for switching test');
     }
     
     // Get the project name before clicking

@@ -42,6 +42,8 @@ help:
 	@echo "    test-browser-debug  - Run browser tests in debug mode"
 	@echo "    test-new-user - Test new user centralized experience"
 	@echo "    test-button-refactor - Run button refactor TDD tests"
+	@echo "    test-unit-mcp - Run MCP validator unit tests"
+	@echo "    debug-cue-validation - Debug CUE validation for missing project_name"
 	@echo ""
 	@echo "  Quick Commands:"
 	@echo "    dev           - Quick development build and test"
@@ -258,5 +260,16 @@ test-button-refactor-headed: build kill clean-test-data
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser
+
+# Run MCP validator unit tests
+test-unit-mcp:
+	@echo "🧪 Running MCP validator unit tests..."
+	@cd ui && npm run test:unit
+	@echo "✅ MCP unit tests completed"
+
+# Debug CUE validation for project_name requirement
+debug-cue-validation:
+	@echo "🔍 Testing CUE validation for missing project_name..."
+	@cd /tmp && cue vet test-exact-failure.cue || echo "✅ Validation correctly failed as expected"
 
 .DEFAULT_GOAL := help

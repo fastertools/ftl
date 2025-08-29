@@ -1,5 +1,11 @@
 # FTL CLI Development Constraints
 
+You WILL NEVER RUN one off commands. ESPECIALLY if you think you are being efficient
+
+- Everything you test MUST be in the form of a repeatable test
+- You will NEVER: echo '{"method": "tools/call", "params": {"name": "mcp-server__health_check", "arguments": {}}}' | /Users/coreyryan/data/mashh/ftl-cli/bin/ftl dev mcp
+
+
 ## WASM Runtime Constraints
 
 **CRITICAL**: This project runs in WebAssembly (WASM) environments with significant runtime limitations.

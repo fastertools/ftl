@@ -10,7 +10,10 @@
     "install-playwright": "npx playwright install chromium",
     "setup": "npm install && npx playwright install chromium",
     "css:build": "npx @tailwindcss/cli -c tailwind.config.js -i ../static/css/input.css -o ../static/css/output.css",
-    "css:watch": "npx @tailwindcss/cli -c tailwind.config.js -i ../static/css/input.css -o ../static/css/output.css --watch"
+    "css:watch": "npx @tailwindcss/cli -c tailwind.config.js -i ../static/css/input.css -o ../static/css/output.css --watch",
+    "test:unit": "npx vitest run e2e/utils/*.test.ts",
+    "test:unit:watch": "npx vitest e2e/utils/mcp-tool-validator.test.ts",
+    "debug-cue": "cd /tmp && cue vet test-exact-failure.cue"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
@@ -19,6 +22,7 @@
     "playwright": "^1.40.0",
     "tailwindcss": "^4.1.12",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^1.0.0"
   }
 }

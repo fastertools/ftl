@@ -299,3 +299,42 @@ type WaitReadyResponse struct {
 	ProcessInfo *ProcessInfo `json:"process_info,omitempty"`
 	Error       string       `json:"error,omitempty"`
 }
+
+// Project management input types
+
+// InitProjectInput represents input for initializing an FTL project
+type InitProjectInput struct {
+	ProjectName string `json:"project_name" jsonschema:"description:Name of the project to create"`
+	Language    string `json:"language,omitempty" jsonschema:"description:Programming language for the project,default:rust,enum:rust,enum:python,enum:go"`
+	BasePath    string `json:"base_path,omitempty" jsonschema:"description:Base directory to create the project in,default:."`
+	Template    string `json:"template,omitempty" jsonschema:"description:Template to use for the project"`
+}
+
+// AddToolInput represents input for adding a tool to an FTL project  
+type AddToolInput struct {
+	ProjectName string `json:"project_name,omitempty" jsonschema:"description:Name of the project (used if project_path not specified)"`
+	ProjectPath string `json:"project_path,omitempty" jsonschema:"description:Full path to the FTL project directory"`
+	ToolName    string `json:"tool_name" jsonschema:"description:Name of the tool to add"`
+	Registry    string `json:"registry,omitempty" jsonschema:"description:Registry to use,default:ferm"`
+	Version     string `json:"version,omitempty" jsonschema:"description:Version of the tool to add,default:latest"`
+	Language    string `json:"language,omitempty" jsonschema:"description:Programming language,enum:rust,enum:python,enum:go"`
+	Yes         bool   `json:"yes,omitempty" jsonschema:"description:Skip confirmation prompts,default:false"`
+}
+
+// Testing input types for enhanced TestHelpers
+
+// ProjectLifecycleTestInput represents input for project lifecycle testing
+type ProjectLifecycleTestInput struct {
+	ProjectName string `json:"project_name" jsonschema:"description:Name of the test project"`
+	Language    string `json:"language,omitempty" jsonschema:"description:Programming language for the project,default:rust,enum:rust,enum:python,enum:go"`
+	ProjectPath string `json:"project_path,omitempty" jsonschema:"description:Path to the project (auto-generated if not provided)"`
+	TestID      string `json:"test_id,omitempty" jsonschema:"description:Unique test identifier"`
+	TempDir     string `json:"temp_dir,omitempty" jsonschema:"description:Temporary directory for testing"`
+}
+
+// MCPToolTestInput represents input for testing individual MCP tools
+type MCPToolTestInput struct {
+	ToolName      string   `json:"tool_name" jsonschema:"description:Name of the MCP tool to test"`
+	ToolInput     string   `json:"tool_input" jsonschema:"description:JSON-encoded input for the tool"`
+	ExpectedFiles []string `json:"expected_files,omitempty" jsonschema:"description:List of files expected to be created"`
+}
