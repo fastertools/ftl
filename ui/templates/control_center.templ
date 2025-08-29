@@ -17,8 +17,6 @@ script addWatchMessage() {
 	document.getElementById('ftl-output').insertAdjacentHTML('beforeend', '<div style="color: #3b82f6">[' + new Date().toTimeString().slice(0,8) + '] Starting FTL in watch mode...</div>');
 }
 
-
-
 // ControlCenter combines status monitoring and control functionality into a unified panel
 templ ControlCenter(project Project, processStatus ProcessStatus, serverStatus ServerStatus, commandHistory []CommandOutput) {
 	<div data-testid="control-center">

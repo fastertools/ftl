@@ -6,12 +6,12 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
-script handleToolButtonHover(bgColor string) {
-	this.style.backgroundColor = bgColor;
+script handleToolButtonHover(event templ.JSExpression, bgColor string) {
+	event.target.style.backgroundColor = bgColor;
 }
 
-script handleToolButtonOut(bgColor string) {
-	this.style.backgroundColor = bgColor;
+script handleToolButtonOut(event templ.JSExpression, bgColor string) {
+	event.target.style.backgroundColor = bgColor;
 }
 
 // ToolsList displays the list of available tools from running servers
@@ -38,8 +38,8 @@ templ ToolsList(project Project, tools []*mcpclient.Tool, hash string) {
 									hx-swap="innerHTML"
 									class="text-xs px-2 py-1 rounded transition-colors"
 									style={ fmt.Sprintf("background-color: %s; color: %s;", ui.Colors.UI["button_bg"], ui.Colors.UI["muted_text"]) }
-									onmouseover={ handleToolButtonHover(ui.Colors.UI["button_bg_hover"]) }
-									onmouseout={ handleToolButtonOut(ui.Colors.UI["button_bg"]) }
+									onmouseover={ handleToolButtonHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"]) }
+									onmouseout={ handleToolButtonOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"]) }
 								>
 									Parameters
 								</button>

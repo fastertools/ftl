@@ -14,23 +14,23 @@ import (
 	ui "github.com/fastertools/ftl/ui/gen"
 )
 
-func handleToolButtonHover(bgColor string) templ.ComponentScript {
+func handleToolButtonHover(event templ.JSExpression, bgColor string) templ.ComponentScript {
 	return templ.ComponentScript{
-		Name: `__templ_handleToolButtonHover_5f30`,
-		Function: `function __templ_handleToolButtonHover_5f30(bgColor){this.style.backgroundColor = bgColor;
+		Name: `__templ_handleToolButtonHover_a12a`,
+		Function: `function __templ_handleToolButtonHover_a12a(event, bgColor){event.target.style.backgroundColor = bgColor;
 }`,
-		Call:       templ.SafeScript(`__templ_handleToolButtonHover_5f30`, bgColor),
-		CallInline: templ.SafeScriptInline(`__templ_handleToolButtonHover_5f30`, bgColor),
+		Call:       templ.SafeScript(`__templ_handleToolButtonHover_a12a`, event, bgColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleToolButtonHover_a12a`, event, bgColor),
 	}
 }
 
-func handleToolButtonOut(bgColor string) templ.ComponentScript {
+func handleToolButtonOut(event templ.JSExpression, bgColor string) templ.ComponentScript {
 	return templ.ComponentScript{
-		Name: `__templ_handleToolButtonOut_5f30`,
-		Function: `function __templ_handleToolButtonOut_5f30(bgColor){this.style.backgroundColor = bgColor;
+		Name: `__templ_handleToolButtonOut_a12a`,
+		Function: `function __templ_handleToolButtonOut_a12a(event, bgColor){event.target.style.backgroundColor = bgColor;
 }`,
-		Call:       templ.SafeScript(`__templ_handleToolButtonOut_5f30`, bgColor),
-		CallInline: templ.SafeScriptInline(`__templ_handleToolButtonOut_5f30`, bgColor),
+		Call:       templ.SafeScript(`__templ_handleToolButtonOut_a12a`, event, bgColor),
+		CallInline: templ.SafeScriptInline(`__templ_handleToolButtonOut_a12a`, event, bgColor),
 	}
 }
 
@@ -190,7 +190,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					return templ_7745c5c3_Err
 				}
 				if tool.InputSchema != nil {
-					templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleToolButtonHover(ui.Colors.UI["button_bg_hover"]), handleToolButtonOut(ui.Colors.UI["button_bg"]))
+					templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, handleToolButtonHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"]), handleToolButtonOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"]))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -237,7 +237,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var13 templ.ComponentScript = handleToolButtonHover(ui.Colors.UI["button_bg_hover"])
+					var templ_7745c5c3_Var13 templ.ComponentScript = handleToolButtonHover(templ.JSExpression("event"), ui.Colors.UI["button_bg_hover"])
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13.Call)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -246,7 +246,7 @@ func ToolsList(project Project, tools []*mcpclient.Tool, hash string) templ.Comp
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var14 templ.ComponentScript = handleToolButtonOut(ui.Colors.UI["button_bg"])
+					var templ_7745c5c3_Var14 templ.ComponentScript = handleToolButtonOut(templ.JSExpression("event"), ui.Colors.UI["button_bg"])
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14.Call)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

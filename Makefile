@@ -194,7 +194,7 @@ test-go:
 
 test-mcp: build
 	@echo "🧪 Testing MCP server mode..."
-	@echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | ./bin/ftl dev mcp | grep -q "mcp-server" && echo "✅ MCP mode works" || echo "❌ MCP mode failed"
+	@echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | ./bin/ftl dev mcp | grep -q "mcp-server" && echo "✅ MCP mode works" || echo "❌ MCP mode failed"
 
 test-console: build kill
 	@echo "🧪 Testing console server functionality..."
