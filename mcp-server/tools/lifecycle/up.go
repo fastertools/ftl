@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fastertools/ftl/mcp-server/internal/files"
@@ -113,13 +114,55 @@ func parseListenAddress(listen string) (int, error) {
 	return port, nil
 }
 
+// buildUpCommandWithOptions constructs an ftl up command using full embedded CLI options
+func (h *UpHandler) buildUpCommandWithOptions(projectPath, listenAddr string, options *types.UpOptionsEmbedded) *exec.Cmd {
+	// Start with base "up" command
+	args := []string{"up"}
+	
+	// Override listen address with the calculated one
+	modifiedOptions := *options
+	modifiedOptions.Listen = listenAddr
+	
+	// Convert all options to command line arguments
+	args = append(args, modifiedOptions.ToArgs()...)
+	
+	// Get FTL executable path from commander
+	cmd := exec.Command(h.ftlCommander.GetExecutable(), args...)
+	cmd.Dir = projectPath
+	
+	// For regular "up" mode (not watch), detach the process so it survives console exit
+	if !modifiedOptions.Watch {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,  // Create new process group
+		}
+	}
+	
+	fmt.Fprintf(os.Stderr, "DEBUG: buildUpCommandWithOptions - Executing command: %s %s in directory: %s\n", 
+		cmd.Path, strings.Join(args, " "), projectPath)
+	
+	return cmd
+}
+
 // Handle processes the ftl up request
 func (h *UpHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[types.FTLUpInput]) (*mcp.CallToolResultFor[struct{}], error) {
 	fmt.Fprintf(os.Stderr, "DEBUG: ftlUp function called\n")
 	projectPath := params.Arguments.ProjectPath
-	watch := params.Arguments.Watch
-	build := params.Arguments.Build
-	listen := params.Arguments.Listen
+	
+	// Extract options from embedded struct or legacy fields
+	var watch, build bool
+	var listen string
+	
+	if params.Arguments.UpOptions != nil {
+		// Use new embedded options
+		watch = params.Arguments.UpOptions.Watch
+		build = params.Arguments.UpOptions.Build
+		listen = params.Arguments.UpOptions.Listen
+	} else {
+		// Fall back to legacy fields for backwards compatibility
+		watch = params.Arguments.Watch
+		build = params.Arguments.Build
+		listen = params.Arguments.Listen
+	}
 
 	// Determine mode
 	mode := "regular"
@@ -145,10 +188,10 @@ func (h *UpHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *m
 	fmt.Fprintf(os.Stderr, "DEBUG: Project path validation successful\n")
 
 	// Start unified process
-	return h.startProcess(ctx, projectPath, mode, build, listen)
+	return h.startProcess(ctx, params, projectPath, mode, build, listen)
 }
 
-func (h *UpHandler) startProcess(ctx context.Context, projectPath, mode string, build bool, listen string) (*mcp.CallToolResultFor[struct{}], error) {
+func (h *UpHandler) startProcess(ctx context.Context, params *mcp.CallToolParamsFor[types.FTLUpInput], projectPath, mode string, build bool, listen string) (*mcp.CallToolResultFor[struct{}], error) {
 	fmt.Fprintf(os.Stderr, "DEBUG: startProcess called with project path: %s, mode: %s, build: %t, listen: %s\n", projectPath, mode, build, listen)
 
 	// Check if there's already a running process
@@ -185,7 +228,13 @@ func (h *UpHandler) startProcess(ctx context.Context, projectPath, mode string, 
 	}
 	
 	// Get command using unified method
-	cmd = h.ftlCommander.UpCommand(projectPath, listenAddr, build, mode == "watch")
+	if params.Arguments.UpOptions != nil {
+		// Use full embedded options to construct command with all CLI flags
+		cmd = h.buildUpCommandWithOptions(projectPath, listenAddr, params.Arguments.UpOptions)
+	} else {
+		// Use legacy individual parameters
+		cmd = h.ftlCommander.UpCommand(projectPath, listenAddr, build, mode == "watch")
+	}
 
 	// Log the command that will be executed
 	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %v in directory: %s\n",

@@ -13,11 +13,28 @@ type Commander struct {
 	executable string
 }
 
-// NewCommander creates a new FTL commander
+// NewCommander creates a new FTL commander with default "ftl" executable
 func NewCommander() *Commander {
 	return &Commander{
 		executable: "ftl",
 	}
+}
+
+// NewCommanderWithPath creates a new FTL commander with custom executable path
+func NewCommanderWithPath(ftlPath string) *Commander {
+	return &Commander{
+		executable: ftlPath,
+	}
+}
+
+// SetFTLPath updates the FTL executable path
+func (c *Commander) SetFTLPath(path string) {
+	c.executable = path
+}
+
+// GetExecutable returns the FTL executable path
+func (c *Commander) GetExecutable() string {
+	return c.executable
 }
 
 // BuildCommand constructs an ftl build command

@@ -7,11 +7,17 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/fastertools/ftl/internal/types"
 	"github.com/fastertools/ftl/mcp-server/tools"
 )
 
 // newDevMcpCmd creates the dev mcp command
 func newDevMcpCmd() *cobra.Command {
+	var (
+		ftlPath  string
+		testMode bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Run MCP server for AI tool integration",
@@ -22,26 +28,50 @@ tools for project management, building, deployment, and monitoring.`,
   ftl dev mcp
 
   # Test MCP server with debugging output  
-  ftl dev mcp --verbose`,
-		RunE: runDevMcp,
+  ftl dev mcp --verbose
+  
+  # Use specific FTL binary path
+  ftl dev mcp --ftl-path /path/to/ftl`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDevMcp(cmd, args, ftlPath, testMode)
+		},
 	}
+
+	// Add flags
+	cmd.Flags().StringVar(&ftlPath, "ftl-path", "", "Path to FTL binary to use (defaults to 'ftl')")
+	cmd.Flags().BoolVar(&testMode, "test-mode", false, "Enable test tools for e2e testing")
 
 	return cmd
 }
 
-func runDevMcp(cmd *cobra.Command, args []string) error {
-	fmt.Fprintf(os.Stderr, "DEBUG: Starting FTL MCP server\n")
+func runDevMcp(cmd *cobra.Command, args []string, ftlPath string, testMode bool) error {
+	fmt.Fprintf(os.Stderr, "DEBUG: Starting FTL MCP server (test mode: %v, ftl path: %s)\n", testMode, ftlPath)
 	
-	// Initialize MCP server exactly like the original
+	// Create tool configuration
+	toolConfig := &types.ToolConfig{}
+	if ftlPath != "" {
+		toolConfig.FTLPath = ftlPath
+	}
+	
+	// Initialize MCP server
+	serverOptions := &mcp.ServerOptions{
+		Instructions: "FTL server - handles ftl operations with configurable binary path",
+	}
+	
+	if testMode {
+		serverOptions.Instructions = "FTL server with test tools enabled for e2e testing"
+	}
+	
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "mcp-server",
 		Version: "1.0.0",
-	}, &mcp.ServerOptions{
-		Instructions: "FTL server - handles ftl up operations in regular and watch modes",
-	})
+	}, serverOptions)
 
-	// Register all tools using the tools registry
-	registry := tools.NewRegistry(server)
+	// Register all tools with configuration
+	registry := tools.NewRegistryWithConfig(server, toolConfig)
+	if testMode {
+		registry.EnableTestMode()
+	}
 	registry.RegisterAll()
 
 	// Run with stdio transport

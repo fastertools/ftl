@@ -2,6 +2,7 @@ package tools
 
 import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/fastertools/ftl/internal/types"
 	"github.com/fastertools/ftl/mcp-server/internal/files"
 	"github.com/fastertools/ftl/mcp-server/internal/ftl"
 	"github.com/fastertools/ftl/mcp-server/internal/port"
@@ -20,15 +21,21 @@ type Registry struct {
 	portManager    *port.Manager
 	ftlCommander   *ftl.Commander
 	testMode       bool
+	toolConfig     *types.ToolConfig // Universal tool configuration
 }
 
-// NewRegistry creates a new tool registry
+// NewRegistry creates a new tool registry with default configuration
 func NewRegistry(server *mcp.Server) *Registry {
+	return NewRegistryWithConfig(server, &types.ToolConfig{})
+}
+
+// NewRegistryWithConfig creates a new tool registry with custom tool configuration
+func NewRegistryWithConfig(server *mcp.Server, config *types.ToolConfig) *Registry {
 	// Initialize shared dependencies
 	fileManager := files.NewManager()
 	processManager := process.NewManager(fileManager)
 	portManager := port.NewManager(3000)
-	ftlCommander := ftl.NewCommander()
+	ftlCommander := ftl.NewCommanderWithPath(config.GetFTLPath())
 
 	return &Registry{
 		server:         server,
@@ -37,6 +44,7 @@ func NewRegistry(server *mcp.Server) *Registry {
 		portManager:    portManager,
 		ftlCommander:   ftlCommander,
 		testMode:       false,
+		toolConfig:     config,
 	}
 }
 
@@ -193,4 +201,48 @@ func (r *Registry) registerTestTools() {
 		Name:        "mcp-server__cleanup_test_data",
 		Description: "Clean up test data and reset configuration (test tool)",
 	}, cleanupTestDataHandler.Handle)
+
+	// Register TestHelpers integration tools
+	serverStartHandler := testing.NewServerStartHandler()
+	serverStopHandler := testing.NewServerStopHandler()
+	serverStatusHandler := testing.NewServerStatusHandler()
+	testProjectSetupHandler := testing.NewTestProjectSetupHandler()
+	ensureTestDirectoryHandler := testing.NewEnsureTestDirectoryHandler()
+	generateTestProjectNameHandler := testing.NewGenerateTestProjectNameHandler()
+	cleanupTestProjectsHandler := testing.NewCleanupTestProjectsHandler()
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__server_start",
+		Description: "Start FTL development server for testing (TestHelpers integration)",
+	}, serverStartHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__server_stop",
+		Description: "Stop running FTL development server (TestHelpers integration)",
+	}, serverStopHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__server_status",
+		Description: "Check if FTL development server is running (TestHelpers integration)",
+	}, serverStatusHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__setup_test_projects",
+		Description: "Setup test projects configuration (replaces TestHelpers.resetTestProjectsFile)",
+	}, testProjectSetupHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__ensure_test_directory",
+		Description: "Ensure test directory exists with FTL project (replaces TestHelpers.ensureTestDirectory)",
+	}, ensureTestDirectoryHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__generate_test_project_name",
+		Description: "Generate unique test project name (replaces TestHelpers.generateTestProjectName)",
+	}, generateTestProjectNameHandler.Handle)
+
+	mcp.AddTool(r.server, &mcp.Tool{
+		Name:        "mcp-server__cleanup_test_projects",
+		Description: "Comprehensive test project cleanup (replaces TestHelpers.cleanupTestData)",
+	}, cleanupTestProjectsHandler.Handle)
 }

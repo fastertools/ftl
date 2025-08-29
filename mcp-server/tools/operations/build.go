@@ -27,10 +27,27 @@ func NewBuildHandler(ftlCommander *ftl.Commander) *BuildHandler {
 func (h *BuildHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[types.FTLBuildInput]) (*mcp.CallToolResultFor[struct{}], error) {
 	fmt.Fprintf(os.Stderr, "DEBUG: ftlBuild function called\n")
 	projectPath := params.Arguments.ProjectPath
-	clean := params.Arguments.Clean
+	
+	// Extract options from embedded struct or legacy fields
+	var clean bool
+	var skipSynth bool
+	var configFile string
+	
+	if params.Arguments.BuildOptions != nil {
+		// Use new embedded options
+		clean = false // Clean option not available in BuildOptions, keep as legacy
+		skipSynth = params.Arguments.BuildOptions.SkipSynth
+		configFile = params.Arguments.BuildOptions.ConfigFile
+	}
+	
+	// Always check legacy field for clean (not part of CLI BuildOptions)
+	if params.Arguments.Clean {
+		clean = true
+	}
 
 	// Log the incoming payload to stderr
-	fmt.Fprintf(os.Stderr, "DEBUG: ftl_build received payload: project_path='%s', clean='%t'\n", projectPath, clean)
+	fmt.Fprintf(os.Stderr, "DEBUG: ftl_build received payload: project_path='%s', clean='%t', skip_synth='%t', config_file='%s'\n", 
+		projectPath, clean, skipSynth, configFile)
 
 	// Validate project directory
 	if err := ftl.ValidateProjectPath(projectPath); err != nil {
@@ -47,6 +64,8 @@ func (h *BuildHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params
 	}
 
 	// Execute build command
+	// TODO: Update ftl.Commander to support full BuildOptions (SkipSynth, ConfigFile)
+	// For now, only clean flag is supported
 	output, err := h.ftlCommander.ExecuteBuild(projectPath, clean)
 	
 	if err != nil {

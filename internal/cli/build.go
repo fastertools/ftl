@@ -12,6 +12,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// BuildOptions holds options for the build command
+type BuildOptions struct {
+	SkipSynth  bool   `json:"skip_synth,omitempty"`
+	ConfigFile string `json:"config_file,omitempty"`
+}
+
+// ToArgs converts BuildOptions to command line arguments
+func (opts *BuildOptions) ToArgs() []string {
+	var args []string
+	
+	if opts.SkipSynth {
+		args = append(args, "--skip-synth")
+	}
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
+	}
+	
+	return args
+}
+
 func newBuildCmd() *cobra.Command {
 	var skipSynth bool
 	var configFile string

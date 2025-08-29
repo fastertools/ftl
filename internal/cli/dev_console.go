@@ -40,9 +40,24 @@ an HTMX-powered interface.`,
 func runDevConsole(port int) error {
 	Info("Starting FTL development console...")
 	
+	// Get current executable path (console = FTL binary)
+	currentBinary, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get current executable: %w", err)
+	}
+	
 	// Path to our FTL MCP server - use self as subprocess
 	mcpServerPath := os.Args[0] // Use self as the MCP server
-	mcpClient := mcpclient.NewClientWithArgs(mcpServerPath, []string{"dev", "mcp"})
+	
+	// Pass FTL binary path to MCP server
+	mcpArgs := []string{"dev", "mcp", "--ftl-path", currentBinary}
+	
+	// Add test mode flag if enabled
+	if os.Getenv("FTL_TEST_MODE") == "true" {
+		mcpArgs = append(mcpArgs, "--test-mode")
+	}
+	
+	mcpClient := mcpclient.NewClientWithArgs(mcpServerPath, mcpArgs)
 
 	// Cleanup on exit
 	defer mcpClient.Cleanup()

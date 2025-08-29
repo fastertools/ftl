@@ -2,12 +2,14 @@ package types
 
 // Input types for FTL operations
 
-// FTLUpInput represents input for ftl up command
+// FTLUpInput represents input for ftl up command with embedded CLI options
 type FTLUpInput struct {
-	ProjectPath string `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
-	Watch       bool   `json:"watch,omitempty" jsonschema:"description:Run in watch mode,default:false"`
-	Build       bool   `json:"build,omitempty" jsonschema:"description:Build before running,default:false"`
-	Listen      string `json:"listen,omitempty" jsonschema:"description:Listen address (e.g. localhost:3000). If not specified, an available port will be automatically selected"`
+	ProjectPath string             `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
+	UpOptions   *UpOptionsEmbedded `json:"up_options,omitempty" jsonschema:"description:CLI options for up command"`
+	// Legacy fields for backwards compatibility
+	Watch  bool   `json:"watch,omitempty" jsonschema:"description:Run in watch mode,default:false"`
+	Build  bool   `json:"build,omitempty" jsonschema:"description:Build before running,default:false"`
+	Listen string `json:"listen,omitempty" jsonschema:"description:Listen address (e.g. localhost:3000). If not specified, an available port will be automatically selected"`
 }
 
 // GetLogsInput represents input for getting logs
@@ -21,10 +23,12 @@ type StopInput struct {
 	ProjectPath string `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
 }
 
-// FTLBuildInput represents input for ftl build command
+// FTLBuildInput represents input for ftl build command with embedded CLI options
 type FTLBuildInput struct {
-	ProjectPath string `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
-	Clean       bool   `json:"clean,omitempty" jsonschema:"description:Clean build (rebuild all),default:false"`
+	ProjectPath  string                `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
+	BuildOptions *BuildOptionsEmbedded `json:"build_options,omitempty" jsonschema:"description:CLI options for build command"`
+	// Legacy fields for backwards compatibility
+	Clean bool `json:"clean,omitempty" jsonschema:"description:Clean build (rebuild all),default:false"`
 }
 
 // GetStatusInput represents input for getting status
@@ -198,6 +202,59 @@ type CleanupTestDataInput struct {
 	KeepProjectsFile bool `json:"keep_projects_file,omitempty" jsonschema:"description:Keep the projects JSON file,default:false"`
 	KeepLogs         bool `json:"keep_logs,omitempty" jsonschema:"description:Keep log files,default:false"`
 	Force            bool `json:"force,omitempty" jsonschema:"description:Force cleanup without confirmation,default:false"`
+}
+
+// TestServer management input types for TestHelpers integration
+
+// ServerStartInput represents input for starting a test server
+type ServerStartInput struct {
+	Port             int               `json:"port,omitempty" jsonschema:"description:Port to use (auto-assigned if not specified)"`
+	UseTestProjects  bool              `json:"use_test_projects" jsonschema:"description:Set up test projects environment,default:true"`
+	Timeout          int               `json:"timeout,omitempty" jsonschema:"description:Timeout in milliseconds,default:30000"`
+	Retries          int               `json:"retries,omitempty" jsonschema:"description:Number of retries,default:3"`
+	Environment      map[string]string `json:"environment,omitempty" jsonschema:"description:Additional environment variables"`
+	FTLBinaryPath    string            `json:"ftl_binary_path,omitempty" jsonschema:"description:Path to FTL binary (defaults to 'ftl' in PATH)"`
+}
+
+// ServerStopInput represents input for stopping a test server
+type ServerStopInput struct {
+	Port      int  `json:"port,omitempty" jsonschema:"description:Port of server to stop"`
+	PID       int  `json:"pid,omitempty" jsonschema:"description:Process ID of server to stop"`
+	Graceful  bool `json:"graceful" jsonschema:"description:Use graceful shutdown (SIGTERM before SIGKILL),default:true"`
+	Timeout   int  `json:"timeout,omitempty" jsonschema:"description:Graceful shutdown timeout in milliseconds,default:5000"`
+}
+
+// ServerStatusInput represents input for checking server status
+type ServerStatusInput struct {
+	Port int `json:"port" jsonschema:"description:Port to check"`
+}
+
+// TestProjectSetupInput represents input for setting up test projects (TestHelpers integration)
+type TestProjectSetupInput struct {
+	CreateEmpty      bool     `json:"create_empty" jsonschema:"description:Create empty projects file for new-user tests,default:false"`
+	ProjectNames     []string `json:"project_names,omitempty" jsonschema:"description:Names of test projects to create"`
+	ProjectsFilePath string   `json:"projects_file_path,omitempty" jsonschema:"description:Custom path for projects file"`
+}
+
+// EnsureTestDirectoryInput represents input for ensuring test directories exist
+type EnsureTestDirectoryInput struct {
+	ProjectName   string `json:"project_name" jsonschema:"description:Name of the test project"`
+	ProjectPath   string `json:"project_path,omitempty" jsonschema:"description:Custom path for project (auto-generated if not specified)"`
+	Language      string `json:"language,omitempty" jsonschema:"description:Programming language,enum:rust,enum:python,enum:go,default:rust"`
+	ToolName      string `json:"tool_name,omitempty" jsonschema:"description:Name of tool to create (auto-generated if not specified)"`
+	FTLBinaryPath string `json:"ftl_binary_path,omitempty" jsonschema:"description:Path to FTL binary (defaults to 'ftl' in PATH)"`
+}
+
+// GenerateTestProjectNameInput represents input for generating test project names
+type GenerateTestProjectNameInput struct {
+	Prefix string `json:"prefix,omitempty" jsonschema:"description:Prefix for project name,default:TestProject"`
+}
+
+// CleanupTestProjectsInput represents input for comprehensive test cleanup
+type CleanupTestProjectsInput struct {
+	ProjectsFilePath  string `json:"projects_file_path,omitempty" jsonschema:"description:Path to projects file"`
+	RemoveDirectories bool   `json:"remove_directories" jsonschema:"description:Remove project directories,default:true"`
+	KeepProjectsFile  bool   `json:"keep_projects_file" jsonschema:"description:Keep projects file (reset to empty),default:false"`
 }
 
 // Test tool response types

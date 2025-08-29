@@ -36,6 +36,44 @@ type DeployOptions struct {
 	OrgID         string // Explicitly specify organization ID
 }
 
+// ToArgs converts DeployOptions to command line arguments  
+func (opts *DeployOptions) ToArgs() []string {
+	var args []string
+	
+	if opts.Environment != "" {
+		args = append(args, "--environment", opts.Environment)
+	}
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.DryRun {
+		args = append(args, "--dry-run")
+	}
+	if opts.Yes {
+		args = append(args, "--yes")
+	}
+	if opts.AccessControl != "" {
+		args = append(args, "--access-control", opts.AccessControl)
+	}
+	if opts.JWTIssuer != "" {
+		args = append(args, "--jwt-issuer", opts.JWTIssuer)
+	}
+	if opts.JWTAudience != "" {
+		args = append(args, "--jwt-audience", opts.JWTAudience)
+	}
+	for _, role := range opts.AllowedRoles {
+		args = append(args, "--allowed-role", role)
+	}
+	for key, value := range opts.Variables {
+		args = append(args, "--variable", fmt.Sprintf("%s=%s", key, value))
+	}
+	if opts.OrgID != "" {
+		args = append(args, "--org", opts.OrgID)
+	}
+	
+	return args
+}
+
 func newDeployCmd() *cobra.Command {
 	opts := &DeployOptions{
 		Variables: make(map[string]string),

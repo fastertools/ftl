@@ -7,19 +7,27 @@ import (
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/fastertools/ftl/internal/types"
 	"github.com/fastertools/ftl/mcp-server/tools"
 )
 
 func main() {
 	// Parse command-line flags
 	testMode := flag.Bool("test-mode", false, "Enable test tools for e2e testing")
+	ftlPath := flag.String("ftl-path", "", "Path to FTL binary to use")
 	flag.Parse()
 	
-	fmt.Fprintf(os.Stderr, "DEBUG: Starting FTL MCP server (test mode: %v)\n", *testMode)
+	fmt.Fprintf(os.Stderr, "DEBUG: Starting FTL MCP server (test mode: %v, ftl path: %s)\n", *testMode, *ftlPath)
+	
+	// Create tool configuration
+	toolConfig := &types.ToolConfig{}
+	if *ftlPath != "" {
+		toolConfig.FTLPath = *ftlPath
+	}
 	
 	// Initialize MCP server
 	serverOptions := &mcp.ServerOptions{
-		Instructions: "FTL server - handles ftl up operations in regular and watch modes",
+		Instructions: "FTL server - handles ftl operations with configurable binary path",
 	}
 	
 	if *testMode {
@@ -31,8 +39,8 @@ func main() {
 		Version: "1.0.0",
 	}, serverOptions)
 
-	// Register all tools
-	registry := tools.NewRegistry(server)
+	// Register all tools with configuration
+	registry := tools.NewRegistryWithConfig(server, toolConfig)
 	if *testMode {
 		registry.EnableTestMode()
 	}

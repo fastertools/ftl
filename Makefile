@@ -73,13 +73,13 @@ generate-ui:
 # Build Tailwind CSS
 generate-css:
 	@echo "🎨 Building Tailwind CSS..."
-	@npm run css:build
+	@cd ui && npm run css:build
 	@echo "✅ CSS built: static/css/output.css"
 
 # Watch and rebuild CSS on changes
 css-watch:
 	@echo "👁️  Watching CSS files for changes..."
-	@npm run css:watch
+	@cd ui && npm run css:watch
 
 # Build FTL CLI (Go) with all generation steps
 build: generate-ui generate-templ generate-css
@@ -167,11 +167,11 @@ install-system: build
 	@echo "✅ Installed to /usr/local/bin/ftl"
 
 # Clean all build artifacts
-clean: clean-test-data
+clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf bin/ target/ coverage*.out coverage*.html
-	@rm -rf node_modules/ playwright-report/ test-results/
-	@rm -rf ui/gen/ ui/templates/*_templ.go static/css/output.css
+	@rm -rf playwright-report/ test-results/
+	@rm -rf ui/gen/ ui/templates/*_templ.go static/css/output.css ui/node_modules
 	@go clean -cache -testcache
 	@cargo clean
 	@echo "✅ Clean complete"
@@ -243,41 +243,18 @@ kill:
 	@lsof -ti:8080,8081,8082,8083,8084,8085,8086,8087,8088,8089 | xargs kill -9 2>/dev/null || true
 	@echo "✅ All FTL processes killed"
 
-# Clean test data
-clean-test-data:
-	@echo "🧹 Cleaning E2E test data..."
-	@rm -f .e2e-projects.json
-	@rm -rf .e2e-projects/
-	@echo "✅ E2E test data cleaned"
-
 # Run button refactor TDD tests
-test-button-refactor: build kill 
+test-button-refactor: build kill
 	@echo "🧪 Running button refactor TDD tests..."
-	@echo "🚀 Starting global test setup..."
-	@rm -f .e2e-projects.json
-	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
-	@echo "Starting server on port 8080..."
-	@sleep 3
-	@echo "Server is ready"
-	@echo "✅ Test server ready at http://localhost:8080"
-	@npx playwright test --config=playwright.config.js ui/e2e/specs/button-simple/ --reporter=list || true
-	@echo "🧹 Starting global test teardown..."
-	@echo "Stopping server..."
-	@pkill -f "ftl dev console" || true
-	@echo "✅ Test server stopped"
-	@$(MAKE) clean-test-data
-	@echo "✅ Cleaned up orphaned FTL processes"
-	@echo "✅ Global teardown complete"
+	@echo "🚀 Starting TypeScript E2E tests..."
+	@cd ui && npm test ui/e2e/specs/button-simple/ --reporter=list || true
 	@echo "Button refactor tests completed"
 
 # Run button refactor tests with visible browser (for debugging)
 test-button-refactor-headed: build kill clean-test-data
 	@echo "🧪 Running button refactor tests with visible browser..."
-	@PROJECTS_FILE=.e2e-projects.json ./bin/ftl dev console --port 8080 > test_server.log 2>&1 &
-	@sleep 3
-	@cd e2e-tests && npx playwright test e2e/specs/button-simple/ --headed
-	@pkill -f "ftl dev console" || true
-	@$(MAKE) clean-test-data
+	@cd ui && npm run test:headed ui/e2e/specs/button-simple/ || true
+	@echo "Button refactor headed tests completed"
 
 # Test all functionality
 test: test-go test-mcp test-console test-browser
