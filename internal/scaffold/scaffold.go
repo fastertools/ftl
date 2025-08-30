@@ -80,6 +80,12 @@ _versions: {
 
 // GenerateComponent creates a new component from templates
 func (s *Scaffolder) GenerateComponent(name, language string) error {
+	// Use current directory as target
+	return s.GenerateComponentInDirectory(name, language, ".")
+}
+
+// GenerateComponentInDirectory creates a new component from templates in the specified directory
+func (s *Scaffolder) GenerateComponentInDirectory(name, language, targetDir string) error {
 	// Validate inputs
 	if err := s.validateInputs(name, language); err != nil {
 		return err
@@ -91,13 +97,13 @@ func (s *Scaffolder) GenerateComponent(name, language string) error {
 		return fmt.Errorf("failed to create component instance: %w", err)
 	}
 
-	// Generate files
-	if err := s.generateFiles(name, component); err != nil {
+	// Generate files in target directory
+	if err := s.generateFilesInDirectory(name, component, targetDir); err != nil {
 		return fmt.Errorf("failed to generate files: %w", err)
 	}
 
-	// Update ftl.yaml
-	if err := s.updateFTLConfig(name, component); err != nil {
+	// Update ftl.yaml in target directory
+	if err := s.updateFTLConfigInDirectory(name, component, targetDir); err != nil {
 		return fmt.Errorf("failed to update ftl.yaml: %w", err)
 	}
 
@@ -227,8 +233,14 @@ component: #Templates[%q] & {
 
 // generateFiles creates all the component files
 func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
-	// Create component directory
-	if err := os.MkdirAll(name, 0750); err != nil {
+	// Use current directory as target
+	return s.generateFilesInDirectory(name, component, ".")
+}
+
+func (s *Scaffolder) generateFilesInDirectory(name string, component cue.Value, targetDir string) error {
+	// Create component directory in target location
+	componentDir := filepath.Join(targetDir, name)
+	if err := os.MkdirAll(componentDir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -273,12 +285,12 @@ func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 			}
 		}
 
-		// Create full path
-		fullPath := filepath.Join(name, path)
+		// Create full path in target directory
+		fullPath := filepath.Join(componentDir, path)
 
 		// Create directory if needed
 		dir := filepath.Dir(fullPath)
-		if dir != "." && dir != name {
+		if dir != "." && dir != componentDir {
 			if err := os.MkdirAll(dir, 0750); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", dir, err)
 			}
@@ -295,8 +307,14 @@ func (s *Scaffolder) generateFiles(name string, component cue.Value) error {
 
 // updateFTLConfig adds the new component to ftl.yaml or ftl.json
 func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
-	// Detect configuration format
-	format, configPath, err := s.detectConfigFormat()
+	// Use current directory as target
+	return s.updateFTLConfigInDirectory(name, component, ".")
+}
+
+// updateFTLConfigInDirectory adds the new component to ftl.yaml or ftl.json in the specified directory
+func (s *Scaffolder) updateFTLConfigInDirectory(name string, component cue.Value, targetDir string) error {
+	// Detect configuration format in target directory
+	format, configPath, err := s.detectConfigFormatInDirectory(targetDir)
 	if err != nil {
 		return err
 	}
@@ -429,25 +447,34 @@ func (s *Scaffolder) updateFTLConfig(name string, component cue.Value) error {
 
 // detectConfigFormat detects which configuration format is being used
 func (s *Scaffolder) detectConfigFormat() (string, string, error) {
+	return s.detectConfigFormatInDirectory(".")
+}
+
+// detectConfigFormatInDirectory detects which configuration format is being used in the specified directory
+func (s *Scaffolder) detectConfigFormatInDirectory(targetDir string) (string, string, error) {
 	// Check for YAML first (most common)
-	if _, err := os.Stat("ftl.yaml"); err == nil {
-		return "yaml", "ftl.yaml", nil
+	yamlPath := filepath.Join(targetDir, "ftl.yaml")
+	if _, err := os.Stat(yamlPath); err == nil {
+		return "yaml", yamlPath, nil
 	}
 
 	// Check for JSON
-	if _, err := os.Stat("ftl.json"); err == nil {
-		return "json", "ftl.json", nil
+	jsonPath := filepath.Join(targetDir, "ftl.json")
+	if _, err := os.Stat(jsonPath); err == nil {
+		return "json", jsonPath, nil
 	}
 
 	// Check for CUE
-	if _, err := os.Stat("app.cue"); err == nil {
-		return "cue", "app.cue", nil
+	cuePath := filepath.Join(targetDir, "app.cue")
+	if _, err := os.Stat(cuePath); err == nil {
+		return "cue", cuePath, nil
 	}
 
 	// Check for Go
-	if _, err := os.Stat("main.go"); err == nil {
+	goPath := filepath.Join(targetDir, "main.go")
+	if _, err := os.Stat(goPath); err == nil {
 		// Double-check it's actually an FTL Go config by looking for the CDK import
-		data, err := os.ReadFile("main.go")
+		data, err := os.ReadFile(goPath)
 		if err == nil && strings.Contains(string(data), "synthesis.NewCDK") {
 			return "go", "main.go", nil
 		}

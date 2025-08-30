@@ -220,8 +220,12 @@ func (th *TestHelpers) testUpProject(ctx context.Context, testConfig TestContext
 	executable := th.ftlCommander.GetExecutable()
 	
 	// Start in background (similar to HTMXHelpers pattern)
-	cmd := exec.Command(executable, "up", "--port", "8090")
-	cmd.Dir = testConfig.ProjectPath
+	args := []string{"up", "--port", "8090"}
+	// Use --project-path flag instead of changing directory
+	if testConfig.ProjectPath != "" && testConfig.ProjectPath != "." {
+		args = append(args, "--project-path", testConfig.ProjectPath)
+	}
+	cmd := exec.Command(executable, args...)
 	
 	err := cmd.Start()
 	if err != nil {

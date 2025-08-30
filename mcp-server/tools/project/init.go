@@ -78,17 +78,16 @@ func (h *InitHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params 
 		}, nil
 	}
 
-	// Build ftl init command
-	args := []string{"init", input.ProjectName, "--language", "yaml"} // Use yaml as config language
-	if input.Template != "" {
+	// Build ftl init command - use yaml as default config language
+	configLanguage := "yaml"
+	args := []string{"init", input.ProjectName, "--language", configLanguage, "--project-path", input.BasePath}
+	if input.Template != "" && input.Template != input.Language {
 		args = append(args, "--template", input.Template)
-	} else {
-		args = append(args, "--template", "mcp") // Default to mcp template
 	}
 
 	// Execute ftl init command
 	cmd := exec.Command(h.ftlCommander.GetExecutable(), args...)
-	cmd.Dir = input.BasePath
+	// No need to change directory now that we use --project-path
 	
 	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %s in directory: %s\n",
 		h.ftlCommander.GetExecutable(), strings.Join(args, " "), input.BasePath)
@@ -106,7 +105,7 @@ func (h *InitHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params 
 			Template:    input.Template,
 			BasePath:    input.BasePath,
 			Success:     false,
-			Error:       fmt.Sprintf("Failed to initialize project: %s", err.Error()),
+			Error:       fmt.Sprintf("Failed to initialize project: %s\nCommand output: %s", err.Error(), outputStr),
 		}
 		responseJSON, _ := json.Marshal(response)
 		return &mcp.CallToolResultFor[struct{}]{

@@ -1,7 +1,7 @@
 import TestHelpers from './utils/test-helpers';
-import ServerManager from './utils/server-manager';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 interface TestConfig {
     baseURL: string;
@@ -12,15 +12,23 @@ async function globalSetup(): Promise<TestConfig> {
     console.log('🚀 Starting global test setup...');
     
     // Clean up orphaned browsers from previous runs
-    ServerManager.cleanupOrphanedBrowsers();
+    try {
+        execSync('pkill -f chromium || true', { stdio: 'ignore' });
+    } catch {
+        // Ignore errors
+    }
     
     try {
-        // Start server with dynamic port using TestHelpers
-        const baseURL = await TestHelpers.startServer({
+        // Find available port and start console server
+        const port = await TestHelpers.findAvailablePort(8080);
+        await TestHelpers.startConsoleServer({
+            port: port,
             useTestProjects: true,
             timeout: 30000,
             retries: 3
         });
+        
+        const baseURL = `http://localhost:${port}`;
         
         console.log(`✅ Test server ready at ${baseURL}`);
         

@@ -119,16 +119,16 @@ func (h *UpHandler) buildUpCommandWithOptions(projectPath, listenAddr string, op
 	// Start with base "up" command
 	args := []string{"up"}
 	
-	// Override listen address with the calculated one
+	// Override listen address and project path with calculated values
 	modifiedOptions := *options
 	modifiedOptions.Listen = listenAddr
+	modifiedOptions.ProjectPath = projectPath
 	
 	// Convert all options to command line arguments
 	args = append(args, modifiedOptions.ToArgs()...)
 	
 	// Get FTL executable path from commander
 	cmd := exec.Command(h.ftlCommander.GetExecutable(), args...)
-	cmd.Dir = projectPath
 	
 	// For regular "up" mode (not watch), detach the process so it survives console exit
 	if !modifiedOptions.Watch {
@@ -148,21 +148,15 @@ func (h *UpHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *m
 	fmt.Fprintf(os.Stderr, "DEBUG: ftlUp function called\n")
 	projectPath := params.Arguments.ProjectPath
 	
-	// Extract options from embedded struct or legacy fields
-	var watch, build bool
-	var listen string
-	
-	if params.Arguments.UpOptions != nil {
-		// Use new embedded options
-		watch = params.Arguments.UpOptions.Watch
-		build = params.Arguments.UpOptions.Build
-		listen = params.Arguments.UpOptions.Listen
-	} else {
-		// Fall back to legacy fields for backwards compatibility
-		watch = params.Arguments.Watch
-		build = params.Arguments.Build
-		listen = params.Arguments.Listen
+	// Extract options from embedded struct - require UpOptions
+	if params.Arguments.UpOptions == nil {
+		return h.createErrorResponse(projectPath, "unknown", "validate input", 
+			fmt.Errorf("up_options is required"))
 	}
+	
+	watch := params.Arguments.UpOptions.Watch
+	build := params.Arguments.UpOptions.Build
+	listen := params.Arguments.UpOptions.Listen
 
 	// Determine mode
 	mode := "regular"
@@ -227,14 +221,8 @@ func (h *UpHandler) startProcess(ctx context.Context, params *mcp.CallToolParams
 		listenAddr = fmt.Sprintf("localhost:%d", availablePort)
 	}
 	
-	// Get command using unified method
-	if params.Arguments.UpOptions != nil {
-		// Use full embedded options to construct command with all CLI flags
-		cmd = h.buildUpCommandWithOptions(projectPath, listenAddr, params.Arguments.UpOptions)
-	} else {
-		// Use legacy individual parameters
-		cmd = h.ftlCommander.UpCommand(projectPath, listenAddr, build, mode == "watch")
-	}
+	// Use full embedded options to construct command with all CLI flags
+	cmd = h.buildUpCommandWithOptions(projectPath, listenAddr, params.Arguments.UpOptions)
 
 	// Log the command that will be executed
 	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %v in directory: %s\n",

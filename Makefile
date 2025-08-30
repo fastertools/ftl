@@ -272,4 +272,10 @@ debug-cue-validation:
 	@echo "🔍 Testing CUE validation for missing project_name..."
 	@cd /tmp && cue vet test-exact-failure.cue || echo "✅ Validation correctly failed as expected"
 
+# Test MCP client architecture
+test-mcp-client: build kill
+	@echo "🧪 Testing MCP client architecture..."
+	@cd ui/e2e && npx playwright test mcp-client.spec.ts
+	@echo "MCP client tests completed"
+
 .DEFAULT_GOAL := help

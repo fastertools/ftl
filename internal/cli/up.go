@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/fastertools/ftl/internal/config"
 	"github.com/fastertools/ftl/spin"
 	"github.com/fastertools/ftl/synthesis"
 	"github.com/fatih/color"
@@ -18,6 +18,7 @@ type UpOptions struct {
 	Watch                 bool     `json:"watch,omitempty"`
 	SkipSynth            bool     `json:"skip_synth,omitempty"`
 	ConfigFile           string   `json:"config_file,omitempty"`
+	ProjectPath          string   `json:"project_path,omitempty"`
 	ComponentIds         []string `json:"component_ids,omitempty"`
 	CacheDir             string   `json:"cache_dir,omitempty"`
 	DirectMounts         bool     `json:"direct_mounts,omitempty"`
@@ -55,6 +56,9 @@ func (opts *UpOptions) ToArgs() []string {
 	}
 	if opts.ConfigFile != "" {
 		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.ProjectPath != "" {
+		args = append(args, "--project-path", opts.ProjectPath)
 	}
 	for _, id := range opts.ComponentIds {
 		args = append(args, "--component-id", id)
@@ -125,6 +129,7 @@ func newUpCmd() *cobra.Command {
 	var watch bool
 	var skipSynth bool
 	var configFile string
+	var projectPath string
 
 	// Spin up specific flags
 	var componentIds []string
@@ -160,16 +165,29 @@ func newUpCmd() *cobra.Command {
 			green := color.New(color.FgGreen).SprintFunc()
 			yellow := color.New(color.FgYellow).SprintFunc()
 
+			// Handle project path - no directory changing needed
+			var workDir string
+			if projectPath != "" {
+				workDir = projectPath
+			} else {
+				workDir = "." // Default to current directory
+			}
+
 			// Ensure spin is installed
 			if err := spin.EnsureInstalled(); err != nil {
 				return err
 			}
 
-			// Auto-detect config file if not specified
+			// Auto-detect config file if not specified (in project directory)
 			if configFile == "" {
-				detected, err := config.AutoDetectForBuild()
-				if err == nil {
-					configFile = detected.Path
+				// Look for config file in the project directory
+				configFiles := []string{"ftl.yaml", "ftl.json", "app.cue"}
+				for _, cf := range configFiles {
+					cfPath := filepath.Join(workDir, cf)
+					if _, err := os.Stat(cfPath); err == nil {
+						configFile = cfPath
+						break
+					}
 				}
 			}
 
@@ -184,16 +202,18 @@ func newUpCmd() *cobra.Command {
 						return fmt.Errorf("synthesis failed: %w", err)
 					}
 
-					// Write spin.toml
-					if err := os.WriteFile("spin.toml", []byte(manifest), 0600); err != nil {
+					// Write spin.toml to project directory
+					spinTomlPath := filepath.Join(workDir, "spin.toml")
+					if err := os.WriteFile(spinTomlPath, []byte(manifest), 0600); err != nil {
 						return fmt.Errorf("failed to write spin.toml: %w", err)
 					}
 
 					fmt.Printf("%s Generated spin.toml\n", green("✓"))
 				}
 			} else if configFile == "" && !skipSynth {
-				// No config file found, check for spin.toml
-				if _, err := os.Stat("spin.toml"); os.IsNotExist(err) {
+				// No config file found, check for spin.toml in project directory
+				spinTomlPath := filepath.Join(workDir, "spin.toml")
+				if _, err := os.Stat(spinTomlPath); os.IsNotExist(err) {
 					return fmt.Errorf("no ftl.yaml, ftl.json, app.cue, or spin.toml found. Run 'ftl init' first")
 				}
 				fmt.Printf("%s No FTL config found, using existing spin.toml\n", yellow("ℹ"))
@@ -202,8 +222,14 @@ func newUpCmd() *cobra.Command {
 			// Build if requested
 			if build {
 				fmt.Printf("%s Building application first...\n", blue("→"))
-				if err := spin.Build(ctx); err != nil {
-					return fmt.Errorf("failed to build: %w", err)
+				if projectPath != "" {
+					if err := spin.BuildFromProject(ctx, projectPath); err != nil {
+						return fmt.Errorf("failed to build: %w", err)
+					}
+				} else {
+					if err := spin.Build(ctx); err != nil {
+						return fmt.Errorf("failed to build: %w", err)
+					}
 				}
 				fmt.Printf("%s Build completed\n", green("✓"))
 			}
@@ -316,13 +342,25 @@ func newUpCmd() *cobra.Command {
 			// Run with watch if requested
 			if watch {
 				fmt.Printf("%s Starting with watch mode...\n", yellow("ℹ"))
-				if err := spin.Watch(ctx, spinOptions...); err != nil {
-					return fmt.Errorf("failed to start with watch: %w", err)
+				if projectPath != "" {
+					if err := spin.WatchFromProject(ctx, projectPath, spinOptions...); err != nil {
+						return fmt.Errorf("failed to start with watch: %w", err)
+					}
+				} else {
+					if err := spin.Watch(ctx, spinOptions...); err != nil {
+						return fmt.Errorf("failed to start with watch: %w", err)
+					}
 				}
 			} else {
 				// Run normally
-				if err := spin.Up(ctx, spinOptions...); err != nil {
-					return fmt.Errorf("failed to start: %w", err)
+				if projectPath != "" {
+					if err := spin.UpFromProject(ctx, projectPath, spinOptions...); err != nil {
+						return fmt.Errorf("failed to start: %w", err)
+					}
+				} else {
+					if err := spin.Up(ctx, spinOptions...); err != nil {
+						return fmt.Errorf("failed to start: %w", err)
+					}
 				}
 			}
 
@@ -335,6 +373,7 @@ func newUpCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes and reload")
 	cmd.Flags().BoolVar(&skipSynth, "skip-synth", false, "Skip synthesis of spin.toml from FTL config")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Configuration file to synthesize (auto-detects if not specified)")
+	cmd.Flags().StringVar(&projectPath, "project-path", "", "project directory to run from (defaults to current directory)")
 
 	// Spin up pass-through flags
 	cmd.Flags().StringArrayVar(&componentIds, "component-id", nil, "[Experimental] Component ID to run. This can be specified multiple times. The default is all components")

@@ -2,11 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/fastertools/ftl/internal/project"
 	"github.com/fastertools/ftl/internal/scaffold"
 )
 
@@ -16,6 +16,7 @@ type InitOptions struct {
 	Description   string
 	Template      string
 	Language      string // Configuration language: yaml, go, cue, json
+	ProjectPath   string // Base path where project should be created
 	NoInteractive bool
 	Force         bool
 }
@@ -45,6 +46,7 @@ This command creates a new FTL project directory with:
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "project description")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "mcp", "project template (mcp, basic, empty)")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "configuration language (yaml, go, cue, json)")
+	cmd.Flags().StringVar(&opts.ProjectPath, "project-path", "", project.StandardProjectPathFlag("init"))
 	cmd.Flags().BoolVar(&opts.NoInteractive, "no-interactive", false, "disable interactive prompts")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "overwrite existing files")
 
@@ -74,16 +76,26 @@ func runInit(opts *InitOptions) error {
 		}
 	}
 
-	// Create project directory
-	projectDir := opts.Name
+	// Resolve project directory using standardized utility
+	projectDir, err := project.ResolveWorkingDirectory(project.PathOptions{
+		ProjectPath: opts.ProjectPath,
+		CreateNew:   true,
+		ProjectName: opts.Name,
+	})
+	if err != nil {
+		return err
+	}
+	
 	if !opts.Force {
-		if _, err := os.Stat(projectDir); err == nil {
+		if exists, err := project.CheckDirectoryExists(projectDir); err != nil {
+			return err
+		} else if exists {
 			return fmt.Errorf("directory %s already exists (use --force to overwrite)", projectDir)
 		}
 	}
 
-	if err := os.MkdirAll(projectDir, 0750); err != nil {
-		return fmt.Errorf("failed to create project directory: %w", err)
+	if err := project.EnsureDirectoryExists(projectDir); err != nil {
+		return err
 	}
 
 	Info("Initializing FTL project '%s' with %s configuration", opts.Name, opts.Language)

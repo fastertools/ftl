@@ -202,16 +202,55 @@ func Up(ctx context.Context, options ...string) error {
 	return NewExecutor().Run(ctx, args...)
 }
 
+// UpFromManifest runs 'spin up --from <manifest_path>'
+func UpFromManifest(ctx context.Context, manifestPath string, options ...string) error {
+	args := []string{"up", "--from", manifestPath}
+	args = append(args, options...)
+	return NewExecutor().Run(ctx, args...)
+}
+
+// UpFromProject runs 'spin up --from <project_path>/spin.toml'
+func UpFromProject(ctx context.Context, projectPath string, options ...string) error {
+	manifestPath := filepath.Join(projectPath, "spin.toml")
+	return UpFromManifest(ctx, manifestPath, options...)
+}
+
 // Build runs 'spin build'
 func Build(ctx context.Context, options ...string) error {
 	args := append([]string{"build"}, options...)
 	return NewExecutor().Run(ctx, args...)
 }
 
+// BuildFromManifest runs 'spin build --from <manifest_path>'
+func BuildFromManifest(ctx context.Context, manifestPath string, options ...string) error {
+	args := []string{"build", "--from", manifestPath}
+	args = append(args, options...)
+	return NewExecutor().Run(ctx, args...)
+}
+
+// BuildFromProject runs 'spin build --from <project_path>/spin.toml'
+func BuildFromProject(ctx context.Context, projectPath string, options ...string) error {
+	manifestPath := filepath.Join(projectPath, "spin.toml")
+	return BuildFromManifest(ctx, manifestPath, options...)
+}
+
 // Deploy runs 'spin deploy'
 func Deploy(ctx context.Context, options ...string) error {
 	args := append([]string{"deploy"}, options...)
 	return NewExecutor().Run(ctx, args...)
+}
+
+// DeployFromManifest runs 'spin deploy --from <manifest_path>'
+func DeployFromManifest(ctx context.Context, manifestPath string, options ...string) error {
+	args := []string{"deploy", "--from", manifestPath}
+	args = append(args, options...)
+	return NewExecutor().Run(ctx, args...)
+}
+
+// DeployFromProject runs 'spin deploy --from <project_path>/spin.toml'
+func DeployFromProject(ctx context.Context, projectPath string, options ...string) error {
+	manifestPath := filepath.Join(projectPath, "spin.toml")
+	return DeployFromManifest(ctx, manifestPath, options...)
 }
 
 // New runs 'spin new'
@@ -230,6 +269,19 @@ func Registry(ctx context.Context, subcommand string, options ...string) error {
 func Watch(ctx context.Context, options ...string) error {
 	args := append([]string{"watch"}, options...)
 	return NewExecutor().Run(ctx, args...)
+}
+
+// WatchFromManifest runs 'spin watch --from <manifest_path>'
+func WatchFromManifest(ctx context.Context, manifestPath string, options ...string) error {
+	args := []string{"watch", "--from", manifestPath}
+	args = append(args, options...)
+	return NewExecutor().Run(ctx, args...)
+}
+
+// WatchFromProject runs 'spin watch --from <project_path>/spin.toml'
+func WatchFromProject(ctx context.Context, projectPath string, options ...string) error {
+	manifestPath := filepath.Join(projectPath, "spin.toml")
+	return WatchFromManifest(ctx, manifestPath, options...)
 }
 
 // EnsureInstalled ensures Spin is installed

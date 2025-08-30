@@ -8,7 +8,7 @@ test.describe('Control Center Buttons', () => {
     await page.goto(projectSetup.baseUrl);
     
     // Use enhanced HTMX waiting instead of waitForSelector
-    await TestHelpers.waitForHTMX(page, { timeout: 10000 });
+    await TestHelpers.waitForHTMX(page, 10000);
     await page.waitForSelector('[data-testid="control-center"]', { timeout: 10000 });
   });
 

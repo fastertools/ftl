@@ -93,6 +93,15 @@ func runDevConsole(port int) error {
 	http.HandleFunc("/tools-list", handler.HandleToolsList)
 	http.HandleFunc("/tool-params/", handler.HandleToolParams)
 	
+	// API endpoints for MCP tool access (TypeScript integration)
+	http.HandleFunc("/api/mcp/project/init", handler.HandleAPIProjectInit)
+	http.HandleFunc("/api/mcp/project/add", handler.HandleAPIProjectAdd) 
+	http.HandleFunc("/api/mcp/project/build", handler.HandleAPIProjectBuild)
+	http.HandleFunc("/api/mcp/project/up", handler.HandleAPIProjectUp)
+	http.HandleFunc("/api/mcp/project/stop", handler.HandleAPIProjectStop)
+	http.HandleFunc("/api/mcp/server/start", handler.HandleAPIServerStart)
+	http.HandleFunc("/api/mcp/health", handler.HandleAPIHealthCheck)
+	
 	// Test-specific endpoints (enabled when running tests)
 	if os.Getenv("FTL_TEST_MODE") == "true" {
 		Info("Test mode enabled - registering test endpoints")

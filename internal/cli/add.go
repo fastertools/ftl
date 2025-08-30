@@ -7,13 +7,15 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/fastertools/ftl/internal/project"
 	"github.com/fastertools/ftl/internal/scaffold"
 )
 
 // AddOptions holds options for the add command
 type AddOptions struct {
-	Name     string
-	Language string
+	Name        string
+	Language    string
+	ProjectPath string // Base path where component should be created
 }
 
 // newAddCmd creates the add command
@@ -53,11 +55,26 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "programming language (rust, typescript, python, go)")
+	cmd.Flags().StringVar(&opts.ProjectPath, "project-path", "", project.StandardProjectPathFlag("existing"))
 
 	return cmd
 }
 
 func runAdd(opts *AddOptions) error {
+	// Resolve working directory using standardized utility
+	workDir, err := project.ResolveWorkingDirectory(project.PathOptions{
+		ProjectPath: opts.ProjectPath,
+		CreateNew:   false,
+	})
+	if err != nil {
+		return err
+	}
+	
+	// Validate that we're in a valid FTL project directory
+	if err := project.ValidateProjectDirectory(workDir); err != nil {
+		return err
+	}
+	
 	// Create scaffolder
 	scaffolder, err := scaffold.NewScaffolder()
 	if err != nil {
@@ -119,8 +136,8 @@ func runAdd(opts *AddOptions) error {
 
 	Info("Creating %s component '%s'", opts.Language, opts.Name)
 
-	// Generate the component
-	if err := scaffolder.GenerateComponent(opts.Name, opts.Language); err != nil {
+	// Generate the component in the project directory
+	if err := scaffolder.GenerateComponentInDirectory(opts.Name, opts.Language, workDir); err != nil {
 		return fmt.Errorf("failed to generate component: %w", err)
 	}
 

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 )
 
 // Commander handles FTL command execution
@@ -43,50 +42,18 @@ func (c *Commander) BuildCommand(projectPath string, clean bool) *exec.Cmd {
 	if clean {
 		args = append(args, "--clean")
 	}
+	// Use --project-path flag instead of changing directory
+	if projectPath != "" && projectPath != "." {
+		args = append(args, "--project-path", projectPath)
+	}
 	
-	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %s in directory: %s\n", 
-		c.executable, strings.Join(args, " "), projectPath)
+	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %s\n", 
+		c.executable, strings.Join(args, " "))
 	
 	cmd := exec.Command(c.executable, args...)
-	cmd.Dir = projectPath
 	return cmd
 }
 
-// UpCommand constructs an ftl up command with optional watch mode
-func (c *Commander) UpCommand(projectPath string, listen string, build bool, watch bool) *exec.Cmd {
-	args := []string{"up"}
-	
-	// Add watch flag if requested
-	if watch {
-		args = append(args, "--watch")
-	}
-	
-	// Add build flag if requested
-	if build {
-		args = append(args, "--build")
-	}
-	
-	// Add listen address
-	args = append(args, "--listen", listen)
-	
-	cmd := exec.Command(c.executable, args...)
-	cmd.Dir = projectPath
-	
-	// For regular "up" mode (not watch), detach the process so it survives console exit
-	if !watch {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid: true,  // Create new process group
-		}
-	}
-	
-	return cmd
-}
-
-// UpWatchCommand constructs an ftl up --watch command (legacy compatibility)
-func (c *Commander) UpWatchCommand(projectPath string, port int, build bool) *exec.Cmd {
-	listenAddr := fmt.Sprintf("localhost:%d", port)
-	return c.UpCommand(projectPath, listenAddr, build, true)
-}
 
 
 // ExecuteBuild runs the build command and returns output
@@ -106,11 +73,16 @@ func (c *Commander) ExecuteBuild(projectPath string, clean bool) (string, error)
 
 // ComponentListCommand constructs an ftl component list command
 func (c *Commander) ComponentListCommand(projectPath string) *exec.Cmd {
-	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s component list in directory: %s\n", 
-		c.executable, projectPath)
+	args := []string{"component", "list"}
+	// Use --project-path flag instead of changing directory
+	if projectPath != "" && projectPath != "." {
+		args = append(args, "--project-path", projectPath)
+	}
 	
-	cmd := exec.Command(c.executable, "component", "list")
-	cmd.Dir = projectPath
+	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %s\n", 
+		c.executable, strings.Join(args, " "))
+	
+	cmd := exec.Command(c.executable, args...)
 	return cmd
 }
 

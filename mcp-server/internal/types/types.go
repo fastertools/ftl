@@ -6,10 +6,6 @@ package types
 type FTLUpInput struct {
 	ProjectPath string             `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
 	UpOptions   *UpOptionsEmbedded `json:"up_options,omitempty" jsonschema:"description:CLI options for up command"`
-	// Legacy fields for backwards compatibility
-	Watch  bool   `json:"watch,omitempty" jsonschema:"description:Run in watch mode,default:false"`
-	Build  bool   `json:"build,omitempty" jsonschema:"description:Build before running,default:false"`
-	Listen string `json:"listen,omitempty" jsonschema:"description:Listen address (e.g. localhost:3000). If not specified, an available port will be automatically selected"`
 }
 
 // GetLogsInput represents input for getting logs
@@ -27,8 +23,6 @@ type StopInput struct {
 type FTLBuildInput struct {
 	ProjectPath  string                `json:"project_path" jsonschema:"description:Full path to the FTL project directory"`
 	BuildOptions *BuildOptionsEmbedded `json:"build_options,omitempty" jsonschema:"description:CLI options for build command"`
-	// Legacy fields for backwards compatibility
-	Clean bool `json:"clean,omitempty" jsonschema:"description:Clean build (rebuild all),default:false"`
 }
 
 // GetStatusInput represents input for getting status

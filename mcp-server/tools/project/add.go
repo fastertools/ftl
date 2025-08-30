@@ -96,6 +96,9 @@ func (h *AddHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *
 	if input.Yes {
 		args = append(args, "--yes")
 	}
+	
+	// Use --project-path flag to specify target directory
+	args = append(args, "--project-path", projectPath)
 
 	// Capture files before operation (for comparison)
 	filesBefore := make(map[string]os.FileInfo)
@@ -108,7 +111,6 @@ func (h *AddHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params *
 
 	// Execute ftl add command
 	cmd := exec.Command(h.ftlCommander.GetExecutable(), args...)
-	cmd.Dir = projectPath
 	
 	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s %s in directory: %s\n",
 		h.ftlCommander.GetExecutable(), strings.Join(args, " "), projectPath)

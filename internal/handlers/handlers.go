@@ -831,6 +831,402 @@ func (h *Handler) HandleProjectReload(w http.ResponseWriter, r *http.Request) {
 
 
 // ============================================================================
+// API Endpoints for MCP Tool Access (TypeScript Integration)
+// ============================================================================
+
+// HandleAPIProjectInit initializes a new FTL project via API
+func (h *Handler) HandleAPIProjectInit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectName string `json:"project_name"`
+		Language    string `json:"language"`
+		BasePath    string `json:"base_path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProjectName == "" || req.Language == "" || req.BasePath == "" {
+		http.Error(w, "project_name, language, and base_path are required", http.StatusBadRequest)
+		return
+	}
+
+	args := map[string]interface{}{
+		"project_name": req.ProjectName,
+		"language":     req.Language,
+		"base_path":    req.BasePath,
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__init", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIProjectAdd adds a tool to an existing FTL project via API
+func (h *Handler) HandleAPIProjectAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectPath string `json:"project_path"`
+		ToolName    string `json:"tool_name"`
+		Language    string `json:"language"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProjectPath == "" || req.ToolName == "" {
+		http.Error(w, "project_path and tool_name are required", http.StatusBadRequest)
+		return
+	}
+
+	// Default language if not specified
+	if req.Language == "" {
+		req.Language = "rust"
+	}
+
+	args := map[string]interface{}{
+		"project_path": req.ProjectPath,
+		"tool_name":    req.ToolName,
+		"language":     req.Language,
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__add", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIProjectBuild builds an FTL project via API
+func (h *Handler) HandleAPIProjectBuild(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectPath string `json:"project_path"`
+		Clean       bool   `json:"clean"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProjectPath == "" {
+		http.Error(w, "project_path is required", http.StatusBadRequest)
+		return
+	}
+
+	args := map[string]interface{}{
+		"project_path": req.ProjectPath,
+		"clean":        req.Clean,
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__build", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIProjectUp starts an FTL project via API
+func (h *Handler) HandleAPIProjectUp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectPath string `json:"project_path"`
+		Port        int    `json:"port"`
+		Watch       bool   `json:"watch"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProjectPath == "" {
+		http.Error(w, "project_path is required", http.StatusBadRequest)
+		return
+	}
+
+	// Default port if not specified
+	if req.Port == 0 {
+		req.Port = 8080
+	}
+
+	args := map[string]interface{}{
+		"project_path": req.ProjectPath,
+		"port":         req.Port,
+		"watch":        req.Watch,
+		"build":        false,
+		"listen":       "",
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__up", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIProjectStop stops an FTL project via API
+func (h *Handler) HandleAPIProjectStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectPath string `json:"project_path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProjectPath == "" {
+		http.Error(w, "project_path is required", http.StatusBadRequest)
+		return
+	}
+
+	args := map[string]interface{}{
+		"project_path": req.ProjectPath,
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__stop", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIServerStart starts the development server via API
+func (h *Handler) HandleAPIServerStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		UseTestProjects bool   `json:"use_test_projects"`
+		ProjectBase     string `json:"project_base"`
+		TimeoutMs       int    `json:"timeout_ms"`
+		FTLBinaryPath   string `json:"ftl_binary_path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	// Set defaults
+	if req.TimeoutMs == 0 {
+		req.TimeoutMs = 30000
+	}
+
+	args := map[string]interface{}{
+		"use_test_projects": req.UseTestProjects,
+		"project_base":      req.ProjectBase,
+		"timeout_ms":        req.TimeoutMs,
+		"ftl_binary_path":   req.FTLBinaryPath,
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__server_start", args)
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// HandleAPIHealthCheck provides MCP server health check via API
+func (h *Handler) HandleAPIHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, ui.Handlers.Errors["method_not_allowed"], http.StatusMethodNotAllowed)
+		return
+	}
+
+	result, err := h.mcpClient.CallTool("mcp-server__health_check", map[string]interface{}{})
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse the MCP response
+	var mcpResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &mcpResponse); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse MCP response",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mcpResponse)
+}
+
+// ============================================================================
 // Test-Specific HTTP Endpoints (Phase 2)
 // ============================================================================
 

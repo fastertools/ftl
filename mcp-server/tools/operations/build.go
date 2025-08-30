@@ -28,22 +28,24 @@ func (h *BuildHandler) Handle(ctx context.Context, ss *mcp.ServerSession, params
 	fmt.Fprintf(os.Stderr, "DEBUG: ftlBuild function called\n")
 	projectPath := params.Arguments.ProjectPath
 	
-	// Extract options from embedded struct or legacy fields
-	var clean bool
-	var skipSynth bool
-	var configFile string
-	
-	if params.Arguments.BuildOptions != nil {
-		// Use new embedded options
-		clean = false // Clean option not available in BuildOptions, keep as legacy
-		skipSynth = params.Arguments.BuildOptions.SkipSynth
-		configFile = params.Arguments.BuildOptions.ConfigFile
+	// Extract options from embedded struct - require BuildOptions
+	if params.Arguments.BuildOptions == nil {
+		response := types.BuildResponse{
+			Success:     false,
+			ProjectPath: projectPath,
+			Error:       "build_options is required",
+		}
+		responseJSON, _ := json.Marshal(response)
+		return &mcp.CallToolResultFor[struct{}]{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(responseJSON)}},
+		}, nil
 	}
 	
-	// Always check legacy field for clean (not part of CLI BuildOptions)
-	if params.Arguments.Clean {
-		clean = true
-	}
+	// Note: Clean functionality is not available in CLI build command
+	// so we always use clean=false to match CLI behavior
+	clean := false
+	skipSynth := params.Arguments.BuildOptions.SkipSynth
+	configFile := params.Arguments.BuildOptions.ConfigFile
 
 	// Log the incoming payload to stderr
 	fmt.Fprintf(os.Stderr, "DEBUG: ftl_build received payload: project_path='%s', clean='%t', skip_synth='%t', config_file='%s'\n", 

@@ -8,6 +8,7 @@ type UpOptionsEmbedded struct {
 	Watch                 bool     `json:"watch,omitempty"`
 	SkipSynth            bool     `json:"skip_synth,omitempty"`
 	ConfigFile           string   `json:"config_file,omitempty"`
+	ProjectPath          string   `json:"project_path,omitempty"`
 	ComponentIds         []string `json:"component_ids,omitempty"`
 	CacheDir             string   `json:"cache_dir,omitempty"`
 	DirectMounts         bool     `json:"direct_mounts,omitempty"`
@@ -45,6 +46,9 @@ func (opts *UpOptionsEmbedded) ToArgs() []string {
 	}
 	if opts.ConfigFile != "" {
 		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.ProjectPath != "" {
+		args = append(args, "--project-path", opts.ProjectPath)
 	}
 	for _, id := range opts.ComponentIds {
 		args = append(args, "--component-id", id)

@@ -391,6 +391,169 @@ func TestAddCommandHelpers(t *testing.T) {
 	})
 }
 
+func TestRunAdd_WithProjectPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		projectPath string
+		projectName string
+		wantErr     bool
+		check       func(t *testing.T, baseDir, projectPath, projectName string)
+	}{
+		{
+			name:        "absolute project path",
+			projectPath: "", // Will be set to tmpDir in test
+			projectName: "absolute-project",
+			wantErr:     false,
+			check: func(t *testing.T, baseDir, projectPath, projectName string) {
+				// Verify component was created in the specified project path
+				componentPath := filepath.Join(projectPath, "test-component")
+				assert.DirExists(t, componentPath)
+				assert.FileExists(t, filepath.Join(componentPath, "Cargo.toml"))
+			},
+		},
+		{
+			name:        "nested project path",
+			projectPath: "", // Will be set to tmpDir/nested in test
+			projectName: "nested-project",
+			wantErr:     false,
+			check: func(t *testing.T, baseDir, projectPath, projectName string) {
+				componentPath := filepath.Join(projectPath, "test-component")
+				assert.DirExists(t, componentPath)
+				assert.FileExists(t, filepath.Join(componentPath, "Cargo.toml"))
+				
+				// Verify component is not in working directory
+				wrongPath := filepath.Join(baseDir, "test-component")
+				assert.NoDirExists(t, wrongPath)
+			},
+		},
+		{
+			name:        "empty project path uses current directory",
+			projectPath: "",
+			projectName: "current-dir-project",
+			wantErr:     false,
+			check: func(t *testing.T, baseDir, projectPath, projectName string) {
+				// When ProjectPath is empty, should create in current directory (workingDir)
+				workingDir := filepath.Join(baseDir, "working")
+				componentPath := filepath.Join(workingDir, "test-component")
+				assert.DirExists(t, componentPath)
+				assert.FileExists(t, filepath.Join(componentPath, "Cargo.toml"))
+			},
+		},
+		{
+			name:        "nonexistent project path fails",
+			projectPath: "", // Will be set to nonexistent path
+			projectName: "nonexistent-project",
+			wantErr:     true,
+			check:       nil,
+		},
+		{
+			name:        "project path without ftl.yaml fails",
+			projectPath: "", // Will be set to empty directory
+			projectName: "no-ftl-yaml-project",
+			wantErr:     true,
+			check:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			
+			// Set up project path based on test case
+			var projectPath string
+			switch tt.name {
+			case "absolute project path":
+				projectPath = filepath.Join(baseDir, "projects")
+				require.NoError(t, os.MkdirAll(projectPath, 0750))
+				// Create ftl.yaml in project directory
+				ftlConfig := `name: test-app
+version: "0.1.0"
+components: []
+access: public
+`
+				require.NoError(t, os.WriteFile(filepath.Join(projectPath, "ftl.yaml"), []byte(ftlConfig), 0600))
+			case "nested project path":
+				projectPath = filepath.Join(baseDir, "nested", "projects")
+				require.NoError(t, os.MkdirAll(projectPath, 0750))
+				// Create ftl.yaml in project directory
+				ftlConfig := `name: test-app
+version: "0.1.0"
+components: []
+access: public
+`
+				require.NoError(t, os.WriteFile(filepath.Join(projectPath, "ftl.yaml"), []byte(ftlConfig), 0600))
+			case "empty project path uses current directory":
+				projectPath = "" // Empty means use current directory
+				// Create ftl.yaml in working directory (where the command will run)
+				workingDirPath := filepath.Join(baseDir, "working")
+				require.NoError(t, os.MkdirAll(workingDirPath, 0750))
+				ftlConfig := `name: test-app
+version: "0.1.0"
+components: []
+access: public
+`
+				require.NoError(t, os.WriteFile(filepath.Join(workingDirPath, "ftl.yaml"), []byte(ftlConfig), 0600))
+			case "nonexistent project path fails":
+				projectPath = filepath.Join(baseDir, "nonexistent")
+				// Don't create this directory - let the command fail
+			case "project path without ftl.yaml fails":
+				projectPath = filepath.Join(baseDir, "empty")
+				require.NoError(t, os.MkdirAll(projectPath, 0750))
+				// Don't create ftl.yaml - let the command fail
+			}
+
+			// Change to a different working directory to ensure project-path works
+			workingDir := filepath.Join(baseDir, "working")
+			require.NoError(t, os.MkdirAll(workingDir, 0750))
+			
+			oldWd, _ := os.Getwd()
+			defer func() { _ = os.Chdir(oldWd) }()
+			require.NoError(t, os.Chdir(workingDir))
+
+			opts := &AddOptions{
+				Name:        "test-component",
+				Language:    "rust",
+				ProjectPath: projectPath,
+			}
+
+			// Capture output to avoid cluttering test output
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			err := runAdd(opts)
+
+			// Restore stdout
+			_ = w.Close()
+			os.Stdout = oldStdout
+			_, _ = io.ReadAll(r) // Discard output
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.check != nil {
+					// For empty project path test, use workingDir as the effective project path
+					effectiveProjectPath := projectPath
+					if projectPath == "" {
+						effectiveProjectPath = workingDir
+					}
+					tt.check(t, baseDir, effectiveProjectPath, tt.projectName)
+				}
+			}
+		})
+	}
+}
+
+func TestNewAddCmd_ProjectPathFlag(t *testing.T) {
+	cmd := newAddCmd()
+	
+	// Check that project-path flag exists
+	projectPathFlag := cmd.Flags().Lookup("project-path")
+	assert.NotNil(t, projectPathFlag)
+	assert.Equal(t, "", projectPathFlag.DefValue) // Should default to empty string
+}
+
 // Output formatting test
 func TestPrintSuccessMessageFormatting(t *testing.T) {
 	// Create a buffer to capture output
